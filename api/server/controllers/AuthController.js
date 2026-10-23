@@ -86,6 +86,21 @@ const sanitizeUserForAuthResponse = (user) => {
     totpSecret: _ts,
     backupCodes: _bc,
     federatedTokens: _ft,
+    familyAccountId: _familyAccountId,
+    guardianId: _guardianId,
+    familyLimits: _familyLimits,
+    guardianProcessingConsentAt: _guardianProcessingConsentAt,
+    guardianProcessingConsentVersion: _guardianProcessingConsentVersion,
+    parentalTranscriptConsentAt: _parentalTranscriptConsentAt,
+    parentalTranscriptConsentVersion: _parentalTranscriptConsentVersion,
+    imageGenerationConsentAt: _imageGenerationConsentAt,
+    imageGenerationConsentVersion: _imageGenerationConsentVersion,
+    familyRole: _familyRole,
+    seatToken: _seatToken,
+    privacyAssertion: _privacyAssertion,
+    satchidaSeatAlias: _satchidaSeatAlias,
+    tenantSeatCapabilities: _tenantSeatCapabilities,
+    privacyEntitled: _privacyEntitled,
     ...safeUser
   } = source;
   return safeUser;

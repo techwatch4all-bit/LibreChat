@@ -775,7 +775,7 @@ describe('Skill CRUD methods', () => {
     }
   });
 
-  it('deleteSkill cascades ACL entries and skill files', async () => {
+  it('deleteSkill soft-deletes by default and cascades on permanent deletion', async () => {
     const { skill } = await methods.createSkill(makeSkillInput());
     await grantOwner(skill._id);
     await methods.upsertSkillFile({
@@ -793,10 +793,19 @@ describe('Skill CRUD methods', () => {
     expect(await AclEntry.countDocuments({ resourceId: skill._id })).toBe(1);
     expect(await SkillFile.countDocuments({ skillId: skill._id })).toBe(1);
 
+    // A default delete is a soft delete: the row, its files and its grants are all
+    // preserved so an administrator can restore them, and the skill stops being
+    // listed and drops out of agent allowlists.
     const res = await methods.deleteSkill(skill._id.toString());
     expect(res.deleted).toBe(true);
-    expect(await AclEntry.countDocuments({ resourceId: skill._id })).toBe(0);
+    expect(await SkillFile.countDocuments({ skillId: skill._id })).toBe(1);
+    expect(await AclEntry.countDocuments({ resourceId: skill._id })).toBe(1);
+
+    // A permanent delete is the hard cascade.
+    const permanent = await methods.deleteSkill(skill._id.toString(), { permanent: true });
+    expect(permanent.deleted).toBe(true);
     expect(await SkillFile.countDocuments({ skillId: skill._id })).toBe(0);
+    expect(await AclEntry.countDocuments({ resourceId: skill._id })).toBe(0);
   });
 
   it('filterExistingSkillIds matches uppercase-hex candidates and returns canonical ids', async () => {
@@ -812,11 +821,13 @@ describe('Skill CRUD methods', () => {
     const Agent = mongoose.models.Agent;
     const agent = await Agent.create(makeAgentDoc([skill._id.toString()]));
 
+    // The file cascade belongs to the permanent path, so the retry contract is
+    // exercised there.
     const deleteManySpy = jest
       .spyOn(SkillFile, 'deleteMany')
       .mockRejectedValueOnce(new Error('transient storage failure'));
     try {
-      const first = await methods.deleteSkill(skill._id.toString());
+      const first = await methods.deleteSkill(skill._id.toString(), { permanent: true });
       expect(first).toEqual({
         deleted: true,
         skillAbsent: true,
@@ -824,7 +835,7 @@ describe('Skill CRUD methods', () => {
         failedCleanupSteps: ['skill_files'],
       });
 
-      const retry = await methods.deleteSkill(skill._id.toString());
+      const retry = await methods.deleteSkill(skill._id.toString(), { permanent: true });
       expect(retry).toEqual({
         deleted: false,
         skillAbsent: true,

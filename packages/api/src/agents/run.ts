@@ -2389,14 +2389,26 @@ export async function createRun({
       modelParameters ?? {},
       'streamUsage',
     );
+    const agentModelParams = modelParameters as Record<string, unknown> | undefined;
+    const isStreamingDisabled =
+      agentModelParams?.disableStreaming === true ||
+      agentModelParams?.streaming === false ||
+      agentModelParams?.stream === false;
+    const effectiveStreaming = isStreamingDisabled ? false : streaming;
     const llmConfig = withModelCallbacks(
       Object.assign(
         {
           provider,
-          streaming,
+          streaming: effectiveStreaming,
           streamUsage,
         },
         modelParameters,
+        isStreamingDisabled
+          ? {
+              streaming: false,
+              disableStreaming: true,
+            }
+          : {},
       ) as t.RunLLMConfig,
       modelCallbacks,
     );

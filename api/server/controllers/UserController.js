@@ -41,37 +41,7 @@ const {
   restoreUserSchedulesFromDeletion,
 } = require('~/server/services/Schedules');
 const db = require('~/models');
-
-const PUBLIC_USER_RESPONSE_FIELDS = [
-  '_id',
-  'id',
-  'name',
-  'username',
-  'email',
-  'emailVerified',
-  'avatar',
-  'provider',
-  'role',
-  'plugins',
-  'twoFactorEnabled',
-  'termsAccepted',
-  'personalization',
-  'favorites',
-  'skillStates',
-  'createdAt',
-  'updatedAt',
-  'tenantId',
-];
-
-const sanitizeUserForResponse = (user) => {
-  const source = user.toObject != null ? user.toObject() : user;
-  return PUBLIC_USER_RESPONSE_FIELDS.reduce((userData, field) => {
-    if (source[field] !== undefined) {
-      userData[field] = source[field];
-    }
-    return userData;
-  }, {});
-};
+const { sanitizeUserForResponse } = require('~/server/utils/userResponse');
 
 const getUserController = async (req, res) => {
   const appConfig = req.config ?? (await getAppConfig(getAppConfigOptionsFromUser(req.user)));

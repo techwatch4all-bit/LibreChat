@@ -4,6 +4,8 @@ const { SystemRoles, roleDefaults } = require('librechat-data-provider');
 
 const mockGetRoleByName = jest.fn();
 const mockHasCapability = jest.fn();
+const mockHasOperatorControl = jest.fn();
+const mockUpdateRoleByName = jest.fn();
 
 jest.mock('~/server/middleware', () => ({
   requireJwtAuth: (_req, _res, next) => next(),
@@ -11,12 +13,17 @@ jest.mock('~/server/middleware', () => ({
 
 jest.mock('~/server/middleware/roles/capabilities', () => ({
   hasCapability: (...args) => mockHasCapability(...args),
-  requireCapability: () => (_req, _res, next) => next(),
+  requireCapability: (capability) => async (req, res, next) => {
+    if (capability === 'operator:control' && !(await mockHasOperatorControl(req.user))) {
+      return res.status(403).send({ message: 'Forbidden' });
+    }
+    return next();
+  },
 }));
 
 jest.mock('~/models', () => ({
   getRoleByName: (...args) => mockGetRoleByName(...args),
-  updateRoleByName: jest.fn(),
+  updateRoleByName: (...args) => mockUpdateRoleByName(...args),
 }));
 
 const rolesRouter = require('../roles');
@@ -45,7 +52,36 @@ const adminRole = roleDefaults[SystemRoles.ADMIN];
 beforeEach(() => {
   jest.clearAllMocks();
   mockHasCapability.mockResolvedValue(false);
+  mockHasOperatorControl.mockResolvedValue(false);
+  mockUpdateRoleByName.mockResolvedValue(staffRole);
   mockGetRoleByName.mockResolvedValue(null);
+});
+
+describe('role permission updates require operator control', () => {
+  it('denies a tenant administrator even when it has MANAGE_ROLES', async () => {
+    mockHasCapability.mockResolvedValue(true);
+    const app = createApp({ id: 'tenant-admin', role: SystemRoles.ADMIN, tenantId: 'school-1' });
+
+    const res = await request(app).put('/api/roles/STAFF/agents').send({ USE: true });
+
+    expect(res.status).toBe(403);
+    expect(mockHasOperatorControl).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tenant-admin', tenantId: 'school-1' }),
+    );
+    expect(mockUpdateRoleByName).not.toHaveBeenCalled();
+  });
+
+  it('allows the operator to update role permissions', async () => {
+    mockHasOperatorControl.mockResolvedValue(true);
+    mockGetRoleByName.mockResolvedValue(staffRole);
+    const app = createApp({ id: 'operator', role: SystemRoles.ADMIN, tenantId: 'satchida-master' });
+
+    const res = await request(app).put('/api/roles/STAFF/agents').send({ USE: true });
+
+    expect(res.status).toBe(200);
+    expect(mockHasOperatorControl).toHaveBeenCalled();
+    expect(mockUpdateRoleByName).toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/roles/:roleName — isOwnRole authorization', () => {

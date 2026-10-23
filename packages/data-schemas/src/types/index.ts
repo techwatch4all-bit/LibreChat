@@ -18,6 +18,8 @@ export * from './message';
 export * from './agent';
 export * from './agentApiKey';
 export * from './agentCategory';
+export * from './tenantPolicy';
+export * from './entitlement';
 export * from './codeEnvironment';
 export * from './role';
 export * from './query';

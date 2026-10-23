@@ -202,6 +202,8 @@ router.delete(
   handlers.delete,
 );
 
+router.post('/:id/restore', handlers.restore);
+
 router.get(
   '/:id/files',
   canAccessSkillResource({ requiredPermission: PermissionBits.VIEW }),

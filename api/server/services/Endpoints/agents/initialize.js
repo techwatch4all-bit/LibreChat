@@ -756,6 +756,20 @@ const initializeClientWithProvider = async ({
       getAccessibleMcpServerNames,
       updateFilesUsage: db.updateFilesUsage,
       getUserKeyValues: db.getUserKeyValues,
+      /**
+       * The tenant-local Privacy authority.
+       *
+       * `EndpointDbMethods` declares these as mandatory, because the Privacy
+       * path is fail-closed: a request without an assertion, or one made while
+       * the local runtime is unhealthy, must be refused rather than forwarded.
+       * They were not passed here, so the endpoint initializer called
+       * `db.getPrivacyAssertion` on an object that did not have it and every
+       * Privacy turn failed with "db.getPrivacyAssertion is not a function".
+       */
+      getPrivacyAssertion: db.getPrivacyAssertion,
+      isPrivacyLocalReady: db.isPrivacyLocalReady,
+      authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+      getTenantSeatPolicy: db.getTenantSeatPolicy,
       getUserCodeFiles: db.getUserCodeFiles,
       getDeferredProvisionFiles: db.getDeferredProvisionFiles,
       getToolFilesByIds: db.getToolFilesByIds,
@@ -1333,6 +1347,20 @@ const initializeClientWithProvider = async ({
           getAccessibleMcpServerNames,
           updateFilesUsage: db.updateFilesUsage,
           getUserKeyValues: db.getUserKeyValues,
+          /**
+           * The tenant-local Privacy authority.
+           *
+           * `EndpointDbMethods` declares these as mandatory, because the Privacy
+           * path is fail-closed: a request without an assertion, or one made while
+           * the local runtime is unhealthy, must be refused rather than forwarded.
+           * They were not passed here, so the endpoint initializer called
+           * `db.getPrivacyAssertion` on an object that did not have it and every
+           * Privacy turn failed with "db.getPrivacyAssertion is not a function".
+           */
+          getPrivacyAssertion: db.getPrivacyAssertion,
+          isPrivacyLocalReady: db.isPrivacyLocalReady,
+          authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+          getTenantSeatPolicy: db.getTenantSeatPolicy,
           getUserCodeFiles: db.getUserCodeFiles,
           getDeferredProvisionFiles: db.getDeferredProvisionFiles,
           getToolFilesByIds: db.getToolFilesByIds,

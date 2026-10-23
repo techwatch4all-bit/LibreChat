@@ -1,0 +1,10 @@
+# Local runtime state for the Satchida fleet: signing keys, licences and the
+# E2E harness credentials. None of it belongs in the repository.
+.state/
+*.key.pem
+*.pub.pem
+licence.token
+
+# The end-to-end harness writes a credential file for the provisioned test
+# seat. It is a real password for a real login, so it must never be committed.
+e2e-credentials.json

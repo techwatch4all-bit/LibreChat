@@ -210,6 +210,26 @@ export type AdminUserListItem = {
   provider: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Owning tenant; absent for platform-scoped users. */
+  tenantId?: string;
+  /** Account-type tier (one-api seat group), when assigned. */
+  accountType?: string | null;
+  familyAccountId?: string | null;
+  familyRole?: string | null;
+  mustChangePassword?: boolean;
+  /** True when a one-api seat is bound. */
+  seatAssigned?: boolean;
+  /** Last four characters of the seat token. The raw token is never returned. */
+  seatTokenHint?: string | null;
+  /** Groups this user belongs to, as ids. */
+  groupIds?: string[];
+};
+
+/** A group membership as returned by the admin user-groups endpoint. */
+export type AdminUserGroup = {
+  id: string;
+  name: string;
+  description?: string;
 };
 
 /** Minimal user info returned by user search endpoints. */

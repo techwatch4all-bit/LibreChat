@@ -1,0 +1,50 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "description": "Satchida compliance hooks for edge nodes: shell guardrail, secret redaction, and a child-safety submission check. All handlers are `command` type — the built-in executor supports only `command`, not `prompt`.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "shell|exec|bash|run_command|execute_code",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "commandWindows": "node",
+            "args": ["${PLUGIN_ROOT}/ai.librechat/hooks/guard-shell.mjs"],
+            "shell": "bash",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "shell|exec|bash|run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "commandWindows": "node",
+            "args": ["${PLUGIN_ROOT}/ai.librechat/hooks/redact-secrets.mjs"],
+            "shell": "bash",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "commandWindows": "node",
+            "args": ["${PLUGIN_ROOT}/ai.librechat/hooks/child-safety-gate.mjs"],
+            "shell": "bash",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

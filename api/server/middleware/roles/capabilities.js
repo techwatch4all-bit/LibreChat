@@ -8,6 +8,7 @@ const {
 
 const {
   hasCapability,
+  hasOperatorControl,
   requireCapability,
   hasConfigCapability,
   getHeldCapabilities,
@@ -22,6 +23,7 @@ const {
 
 module.exports = {
   hasCapability,
+  hasOperatorControl,
   requireCapability,
   hasConfigCapability,
   getHeldCapabilities,

@@ -2,6 +2,7 @@ import { configCapability, SystemCapabilities, type MessageMethods } from '@libr
 import { createSharedLangfuseSessionResolver } from './session';
 
 const getHeldCapabilities = jest.fn();
+const hasOperatorControl = jest.fn();
 const getMessages = jest.fn() as unknown as MessageMethods['getMessages'];
 const resolveSessionUrl = jest.fn();
 
@@ -14,6 +15,7 @@ const config = {
 function createResolver() {
   return createSharedLangfuseSessionResolver({
     getHeldCapabilities,
+    hasOperatorControl,
     getMessages,
     resolveSessionUrl,
   });
@@ -30,23 +32,21 @@ const validParams = {
 describe('createSharedLangfuseSessionResolver', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getHeldCapabilities.mockResolvedValue(
-      new Set([SystemCapabilities.ACCESS_ADMIN, SystemCapabilities.MANAGE_CONFIGS]),
-    );
+    getHeldCapabilities.mockResolvedValue(new Set([SystemCapabilities.MANAGE_CONFIGS]));
+    hasOperatorControl.mockResolvedValue(true);
     resolveSessionUrl.mockResolvedValue('https://cloud.langfuse.com/session-1');
   });
 
-  it('resolves the source session for an authorized same-tenant admin', async () => {
+  it('resolves the source session for an operator with same-tenant config access', async () => {
     const result = await createResolver()(validParams);
 
     expect(result).toBe('https://cloud.langfuse.com/session-1');
+    expect(hasOperatorControl).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'admin-1', tenantId: 'tenant-1' }),
+    );
     expect(getHeldCapabilities).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'admin-1', tenantId: 'tenant-1' }),
-      [
-        SystemCapabilities.ACCESS_ADMIN,
-        SystemCapabilities.MANAGE_CONFIGS,
-        configCapability('langfuse'),
-      ],
+      [SystemCapabilities.MANAGE_CONFIGS, configCapability('langfuse')],
     );
     expect(resolveSessionUrl).toHaveBeenCalledWith({
       config,
@@ -67,32 +67,43 @@ describe('createSharedLangfuseSessionResolver', () => {
     expect(resolveSessionUrl).not.toHaveBeenCalled();
   });
 
-  it('rejects a viewer without admin access', async () => {
-    getHeldCapabilities.mockResolvedValue(new Set([SystemCapabilities.MANAGE_CONFIGS]));
-
-    const result = await createResolver()(validParams);
-
-    expect(result).toBeNull();
-    expect(resolveSessionUrl).not.toHaveBeenCalled();
-  });
-
-  it('rejects an admin without Langfuse config access', async () => {
-    getHeldCapabilities.mockResolvedValue(new Set([SystemCapabilities.ACCESS_ADMIN]));
-
-    const result = await createResolver()(validParams);
-
-    expect(result).toBeNull();
-    expect(resolveSessionUrl).not.toHaveBeenCalled();
-  });
-
-  it('accepts an admin with section-specific Langfuse config access', async () => {
+  it('rejects a tenant admin even with Langfuse config access', async () => {
+    hasOperatorControl.mockResolvedValue(false);
     getHeldCapabilities.mockResolvedValue(
-      new Set([SystemCapabilities.ACCESS_ADMIN, configCapability('langfuse')]),
+      new Set([SystemCapabilities.MANAGE_CONFIGS, configCapability('langfuse')]),
     );
 
     const result = await createResolver()(validParams);
 
+    expect(result).toBeNull();
+    expect(resolveSessionUrl).not.toHaveBeenCalled();
+  });
+
+  it('rejects an operator without Langfuse config access', async () => {
+    getHeldCapabilities.mockResolvedValue(new Set([]));
+
+    const result = await createResolver()(validParams);
+
+    expect(result).toBeNull();
+    expect(resolveSessionUrl).not.toHaveBeenCalled();
+  });
+
+  it('accepts an operator with section-specific Langfuse config access', async () => {
+    getHeldCapabilities.mockResolvedValue(new Set([configCapability('langfuse')]));
+
+    const result = await createResolver()(validParams);
+
     expect(result).toBe('https://cloud.langfuse.com/session-1');
+  });
+
+  it('does not resolve Langfuse for an operator lacking operator control', async () => {
+    hasOperatorControl.mockResolvedValue(false);
+    getHeldCapabilities.mockResolvedValue(new Set([configCapability('langfuse')]));
+
+    const result = await createResolver()(validParams);
+
+    expect(result).toBeNull();
+    expect(resolveSessionUrl).not.toHaveBeenCalled();
   });
 
   it('treats the system tenant and an omitted tenant as the same deployment', async () => {

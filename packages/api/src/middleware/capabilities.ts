@@ -146,6 +146,7 @@ export type GetReadableConfigSectionsFn = (
 
 export function generateCapabilityCheck(deps: CapabilityDeps): {
   hasCapability: HasCapabilityFn;
+  hasOperatorControl: (user: CapabilityUser) => Promise<boolean>;
   requireCapability: RequireCapabilityFn;
   hasConfigCapability: HasConfigCapabilityFn;
   getHeldCapabilities: GetHeldCapabilitiesFn;
@@ -272,6 +273,13 @@ export function generateCapabilityCheck(deps: CapabilityDeps): {
     return hasCapability(user, sectionCap);
   }
 
+  async function hasOperatorControl(user: CapabilityUser): Promise<boolean> {
+    // `platformOnly` removes tenant role/group principals but retains the direct
+    // user principal. The operator may be attached to the reserved master tenant;
+    // its authority comes only from the explicitly bootstrapped direct grant.
+    return hasCapability(user, SystemCapabilities.OPERATOR_CONTROL, { platformOnly: true });
+  }
+
   function requireCapability(
     capability: SystemCapability,
     { platformOnly = false }: { platformOnly?: boolean } = {},
@@ -315,6 +323,7 @@ export function generateCapabilityCheck(deps: CapabilityDeps): {
 
   return {
     hasCapability,
+    hasOperatorControl,
     requireCapability,
     hasConfigCapability,
     getHeldCapabilities,

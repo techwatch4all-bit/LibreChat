@@ -6,7 +6,9 @@ const { getAppConfig } = require('~/server/services/Config');
 const { requireJwtAuth } = require('~/server/middleware');
 
 const router = express.Router();
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+const requireAdminAccess = requireCapability(SystemCapabilities.OPERATOR_CONTROL, {
+  platformOnly: true,
+});
 const requireCodeEnvironmentManage = requireCapability(
   SystemCapabilities.MANAGE_CODE_ENVIRONMENTS,
   { platformOnly: true },

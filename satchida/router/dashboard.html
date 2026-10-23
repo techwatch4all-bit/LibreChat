@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satchida Gateway — Daily Model Refresh & Pricing Policy Roster</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            dark: {
+              950: '#06090e',
+              900: '#0b0f19',
+              850: '#0f172a',
+              800: '#131e36',
+              700: '#1e293b',
+              600: '#334155'
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', 'monospace'],
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .glass-nav {
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .badge-glow {
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+    }
+    .hud-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .hud-card:hover {
+      transform: translateY(-2px);
+    }
+    .hud-card.active-tier {
+      border-color: rgba(255, 255, 255, 0.45) !important;
+      box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), inset 0 0 16px rgba(255, 255, 255, 0.06);
+    }
+    .th-sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .th-sortable:hover {
+      color: #f8fafc;
+      background: rgba(30, 41, 59, 0.7);
+    }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-100 font-sans min-h-screen antialiased flex flex-col selection:bg-brand-500 selection:text-dark-950">
+
+  <!-- Header / Navigation -->
+  <header class="glass-nav sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-dark-950">
+          <i data-lucide="layers" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-lg font-bold tracking-tight text-white">Satchida Gateway</h1>
+            <span class="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-full badge-glow flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live Gateway :8700
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">Daily Model Refresh & Multi-Provider Pricing Policy Roster</p>
+        </div>
+      </div>
+
+      <!-- Action Cluster -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2 bg-dark-900 border border-dark-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>Refreshed: <span id="last-updated-text" class="text-white font-mono font-medium">Just now</span></span>
+        </div>
+        <button onclick="exportRosterJSON()" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-dark-800 hover:bg-dark-700 text-slate-200 border border-dark-700 transition active:scale-95 shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Export JSON</span>
+        </button>
+        <button id="btn-sync" onclick="syncCatalogs()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 transition active:scale-95 disabled:opacity-50">
+          <i data-lucide="refresh-cw" id="sync-icon" class="w-3.5 h-3.5"></i>
+          <span id="sync-label">Sync Provider Catalogs</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1 flex flex-col gap-6">
+
+    <!-- Clickable KPI HUD Metric Cards (Now 5 Tiers Including Operator Blacklist) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <!-- HUD 1: Auto Authorized -->
+      <button onclick="switchTab('auto')" id="hud-card-auto" class="hud-card glass-card rounded-2xl p-4 relative overflow-hidden group text-left cursor-pointer border border-emerald-500/30 hover:border-emerald-500/60 active-tier">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition"></div>
+        <div class="flex items-center justify-between text-slate-400 mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Tier 1 • Auto
+          </span>
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-auto-count" class="text-2xl font-extrabold text-white font-mono tracking-tight">—</span>
+          <span class="text-[11px] text-emerald-400 font-medium">Active</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p id="kpi-auto-desc" class="text-[11px] text-slate-400 font-mono">Out &le; $0.70</p>
+          <span class="text-[10px] text-emerald-400 font-medium group-hover:underline">&rarr;</span>
+        </div>
+      </button>
+
+      <!-- HUD 2: Manual Queue -->
+      <button onclick="switchTab('manual')" id="hud-card-manual" class="hud-card glass-card rounded-2xl p-4 relative overflow-hidden group text-left cursor-pointer border border-amber-500/30 hover:border-amber-500/60">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition"></div>
+        <div class="flex items-center justify-between text-slate-400 mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            Tier 2 • Review
+          </span>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-manual-count" class="text-2xl font-extrabold text-amber-300 font-mono tracking-tight">—</span>
+          <span class="text-[11px] text-amber-400/80 font-medium">Queue</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p id="kpi-manual-desc" class="text-[11px] text-slate-400 font-mono">$0.70 &lt; Out &le; $1.30</p>
+          <span class="text-[10px] text-amber-400 font-medium group-hover:underline">&rarr;</span>
+        </div>
+      </button>
+
+      <!-- HUD 3: Operator Rejected Blacklist -->
+      <button onclick="switchTab('rejected')" id="hud-card-rejected" class="hud-card glass-card rounded-2xl p-4 relative overflow-hidden group text-left cursor-pointer border border-purple-500/30 hover:border-purple-500/60">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition"></div>
+        <div class="flex items-center justify-between text-slate-400 mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+            Operator Blacklist
+          </span>
+          <i data-lucide="slash" class="w-4 h-4 text-purple-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-rejected-count" class="text-2xl font-extrabold text-purple-300 font-mono tracking-tight">0</span>
+          <span class="text-[11px] text-purple-400/80 font-medium">Declined</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p class="text-[11px] text-slate-400 font-mono">Admin Override</p>
+          <span class="text-[10px] text-purple-400 font-medium group-hover:underline">&rarr;</span>
+        </div>
+      </button>
+
+      <!-- HUD 4: Hard Policy Banned -->
+      <button onclick="switchTab('banned')" id="hud-card-banned" class="hud-card glass-card rounded-2xl p-4 relative overflow-hidden group text-left cursor-pointer border border-rose-500/30 hover:border-rose-500/60">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition"></div>
+        <div class="flex items-center justify-between text-slate-400 mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+            Tier 3 • Banned
+          </span>
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-banned-count" class="text-2xl font-extrabold text-rose-400 font-mono tracking-tight">—</span>
+          <span class="text-[11px] text-rose-400/80 font-medium">Filtered</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p class="text-[11px] text-slate-400 font-mono">Out &gt; $1.30</p>
+          <span class="text-[10px] text-rose-400 font-medium group-hover:underline">&rarr;</span>
+        </div>
+      </button>
+
+      <!-- HUD 5: Cloud Fallback Stats -->
+      <button onclick="toggleFallbackModal()" class="hud-card glass-card rounded-2xl p-4 relative overflow-hidden group text-left cursor-pointer border border-indigo-500/30 hover:border-indigo-500/60">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition"></div>
+        <div class="flex items-center justify-between text-slate-400 mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+            Cloud Fallback
+          </span>
+          <i data-lucide="zap" class="w-4 h-4 text-indigo-400"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-fallback-count" class="text-2xl font-extrabold text-indigo-300 font-mono tracking-tight">0</span>
+          <span class="text-[11px] text-indigo-400/80 font-medium">Events</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p class="text-[11px] text-slate-400">DeepSeek Safety</p>
+          <span class="text-[10px] text-indigo-400 font-medium group-hover:underline">Audit &rarr;</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Policy Directives & Interactive Baseline Controls -->
+    <div class="glass-card rounded-2xl p-6 border border-dark-700/60 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div class="space-y-1.5 max-w-2xl">
+        <div class="flex items-center gap-2 text-sm font-bold text-white">
+          <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i>
+          <span>Dynamic Approval Ceiling Policy</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Models are autonomously ranked with <strong class="text-slate-200">lowest In / Input cost first</strong>. Adjust baseline thresholds below to instantly update the daily roster qualification boundaries. Operators can decline any auto-authorized model to place it into the persistent Operator Blacklist.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
+        <div class="flex items-center gap-2 bg-dark-900 border border-dark-700 rounded-xl px-3.5 py-2">
+          <label for="input-auto-ceiling" class="text-xs text-slate-400 font-medium">Auto Ceiling:</label>
+          <span class="text-xs text-emerald-400 font-mono font-bold">$</span>
+          <input type="number" id="input-auto-ceiling" step="0.05" min="0.10" max="2.00" value="0.70" class="w-16 bg-transparent text-sm font-mono font-bold text-white focus:outline-none text-right">
+          <span class="text-[11px] text-slate-500 font-mono">/1M</span>
+        </div>
+
+        <div class="flex items-center gap-2 bg-dark-900 border border-dark-700 rounded-xl px-3.5 py-2">
+          <label for="input-manual-ceiling" class="text-xs text-slate-400 font-medium">Manual Max:</label>
+          <span class="text-xs text-amber-400 font-mono font-bold">$</span>
+          <input type="number" id="input-manual-ceiling" step="0.05" min="0.50" max="5.00" value="1.30" class="w-16 bg-transparent text-sm font-mono font-bold text-white focus:outline-none text-right">
+          <span class="text-[11px] text-slate-500 font-mono">/1M</span>
+        </div>
+
+        <button onclick="saveBaselinePolicy()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-dark-700 hover:bg-dark-600 text-white border border-slate-600/50 transition active:scale-95 flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="save" class="w-3.5 h-3.5"></i>
+          <span>Save Policy</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Fallback Audit History Banner (shown if fallbacks occur) -->
+    <div id="fallback-banner" class="hidden glass-card rounded-2xl p-4 border border-indigo-500/30 bg-indigo-950/20">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h4 class="text-xs font-bold text-indigo-200">Emergency Cloud Fallback Audit Trail</h4>
+            <p id="fallback-banner-desc" class="text-[11px] text-indigo-300/80">Recorded safety triggers when free local/cloud models exhausted.</p>
+          </div>
+        </div>
+        <button onclick="toggleFallbackModal()" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4">
+          View Log
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab & Search Bar -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+      <!-- Tabs (Now includes Operator Blacklist Tab) -->
+      <div class="flex items-center p-1 bg-dark-900 border border-dark-700 rounded-xl text-xs font-medium overflow-x-auto">
+        <button id="tab-auto" onclick="switchTab('auto')" class="px-4 py-2 rounded-lg transition active:scale-95 flex items-center gap-2 bg-dark-700 text-white shadow whitespace-nowrap">
+          <i data-lucide="badge-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Auto-Authorized</span>
+          <span id="tab-count-auto" class="px-1.5 py-0.2 bg-dark-950/60 rounded text-[11px] font-mono text-emerald-300">0</span>
+        </button>
+        <button id="tab-manual" onclick="switchTab('manual')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition active:scale-95 flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="help-circle" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Manual Approval Queue</span>
+          <span id="tab-count-manual" class="px-1.5 py-0.2 bg-dark-950/60 rounded text-[11px] font-mono text-amber-300">0</span>
+        </button>
+        <button id="tab-rejected" onclick="switchTab('rejected')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition active:scale-95 flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="slash" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Operator Blacklist</span>
+          <span id="tab-count-rejected" class="px-1.5 py-0.2 bg-dark-950/60 rounded text-[11px] font-mono text-purple-300">0</span>
+        </button>
+        <button id="tab-banned" onclick="switchTab('banned')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition active:scale-95 flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="ban" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Policy Banned</span>
+          <span id="tab-count-banned" class="px-1.5 py-0.2 bg-dark-950/60 rounded text-[11px] font-mono text-rose-300">0</span>
+        </button>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex-1 sm:w-64">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          <input type="text" id="filter-search" oninput="applyFilters()" placeholder="Search model or provider..." class="w-full bg-dark-900 border border-dark-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <select id="filter-provider" onchange="applyFilters()" class="bg-dark-900 border border-dark-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 transition">
+          <option value="all">All Providers</option>
+          <option value="CheapInference">CheapInference (Discounted)</option>
+          <option value="TokenHarbor">TokenHarbor</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="llama.cpp">Local GPU</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Data Tables Container -->
+    <div class="glass-card rounded-2xl border border-dark-700/60 overflow-hidden shadow-2xl">
+
+      <!-- Table View: Auto-Authorized -->
+      <div id="view-auto" class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-dark-900/90 border-b border-dark-700 text-slate-400 uppercase text-[11px] tracking-wider font-semibold font-mono">
+              <th class="py-3.5 px-4 w-12 text-center">#</th>
+              <th onclick="toggleSort('id')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Model & Architecture</span>
+                  <span id="sort-icon-id" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('provider')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Provider / Vendor</span>
+                  <span id="sort-icon-provider" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('inputCost')" class="th-sortable py-3.5 px-4 group text-emerald-400">
+                <div class="flex items-center gap-1.5">
+                  <span>Input Cost</span>
+                  <span id="sort-icon-inputCost" class="text-emerald-400 font-mono text-[10px]">▼</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('outputCost')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Output Cost</span>
+                  <span id="sort-icon-outputCost" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('contextLength')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Context</span>
+                  <span id="sort-icon-contextLength" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('batchHealth')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Batch Health</span>
+                  <span id="sort-icon-batchHealth" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th class="py-3.5 px-4 text-right">Operator Control</th>
+            </tr>
+          </thead>
+          <tbody id="table-body-auto" class="divide-y divide-dark-700/40 font-normal">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table View: Manual Queue -->
+      <div id="view-manual" class="overflow-x-auto hidden">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-dark-900/90 border-b border-dark-700 text-slate-400 uppercase text-[11px] tracking-wider font-semibold font-mono">
+              <th onclick="toggleSort('id')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Model Identifier</span>
+                  <span id="sort-icon-id-manual" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('provider')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Provider</span>
+                  <span id="sort-icon-provider-manual" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('inputCost')" class="th-sortable py-3.5 px-4 group text-emerald-400">
+                <div class="flex items-center gap-1.5">
+                  <span>Input Cost</span>
+                  <span id="sort-icon-inputCost-manual" class="text-emerald-400 font-mono text-[10px]">▼</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('outputCost')" class="th-sortable py-3.5 px-4 group text-amber-300">
+                <div class="flex items-center gap-1.5">
+                  <span>Output Cost</span>
+                  <span id="sort-icon-outputCost-manual" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('contextLength')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Context</span>
+                  <span id="sort-icon-contextLength-manual" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th class="py-3.5 px-4">Pricing Tier</th>
+              <th class="py-3.5 px-4 text-right">Operator Action</th>
+            </tr>
+          </thead>
+          <tbody id="table-body-manual" class="divide-y divide-dark-700/40">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table View: Operator Blacklist (Declined/Rejected) -->
+      <div id="view-rejected" class="overflow-x-auto hidden">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-dark-900/90 border-b border-dark-700 text-slate-400 uppercase text-[11px] tracking-wider font-semibold font-mono">
+              <th onclick="toggleSort('id')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Model Identifier</span>
+                  <span id="sort-icon-id-rejected" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('provider')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Provider</span>
+                  <span id="sort-icon-provider-rejected" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('inputCost')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Input Cost</span>
+                  <span id="sort-icon-inputCost-rejected" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('outputCost')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Output Cost</span>
+                  <span id="sort-icon-outputCost-rejected" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th class="py-3.5 px-4">Decline Reason</th>
+              <th class="py-3.5 px-4 text-right">Operator Override</th>
+            </tr>
+          </thead>
+          <tbody id="table-body-rejected" class="divide-y divide-dark-700/40">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table View: Banned Models -->
+      <div id="view-banned" class="overflow-x-auto hidden">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-dark-900/90 border-b border-dark-700 text-slate-400 uppercase text-[11px] tracking-wider font-semibold font-mono">
+              <th onclick="toggleSort('id')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Model Identifier</span>
+                  <span id="sort-icon-id-banned" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('provider')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Provider</span>
+                  <span id="sort-icon-provider-banned" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('inputCost')" class="th-sortable py-3.5 px-4 group">
+                <div class="flex items-center gap-1.5">
+                  <span>Input Cost</span>
+                  <span id="sort-icon-inputCost-banned" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th onclick="toggleSort('outputCost')" class="th-sortable py-3.5 px-4 group text-rose-400">
+                <div class="flex items-center gap-1.5">
+                  <span>Output Cost</span>
+                  <span id="sort-icon-outputCost-banned" class="text-slate-500 group-hover:text-white font-mono text-[10px]">⇅</span>
+                </div>
+              </th>
+              <th class="py-3.5 px-4">Policy Disqualification Reason</th>
+            </tr>
+          </thead>
+          <tbody id="table-body-banned" class="divide-y divide-dark-700/40">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="table-empty" class="hidden p-12 text-center text-slate-500">
+        <i data-lucide="inbox" class="w-10 h-10 mx-auto stroke-[1.5] mb-2 text-slate-600"></i>
+        <p class="text-sm font-medium">No models found matching your current filter.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Fallback Audit Trail Modal -->
+  <div id="fallback-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl border border-indigo-500/40 w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-dark-700 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="zap" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="font-bold text-white text-sm">Emergency Cloud Fallback Audit Trail</h3>
+        </div>
+        <button onclick="toggleFallbackModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-3 text-xs" id="fallback-modal-list">
+        <!-- Dynamically injected -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-dark-850 border border-emerald-500/30 text-white rounded-xl px-4 py-3 shadow-2xl flex items-center gap-3">
+      <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+      <span id="toast-message" class="text-xs font-medium">Operation completed</span>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    let rosterData = null;
+    let currentTab = 'auto';
+    let sortColumn = 'inputCost';
+    let sortDirection = 'asc'; // 'asc' or 'desc'
+
+    // Fetch roster from API
+    async function fetchRoster(force = false) {
+      setSyncLoading(true);
+      try {
+        const url = '/api/roster' + (force ? '?force=true' : '');
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        rosterData = await res.json();
+        renderDashboard();
+        if (force) showToast('Catalogs synced with multi-provider discounts!');
+      } catch (err) {
+        console.error('Failed to fetch roster:', err);
+        showToast('Error syncing roster: ' + err.message, true);
+      } finally {
+        setSyncLoading(false);
+      }
+    }
+
+    function syncCatalogs() {
+      fetchRoster(true);
+    }
+
+    function setSyncLoading(loading) {
+      const btn = document.getElementById('btn-sync');
+      const icon = document.getElementById('sync-icon');
+      const label = document.getElementById('sync-label');
+      if (loading) {
+        btn.disabled = true;
+        icon.classList.add('animate-spin');
+        label.textContent = 'Syncing...';
+      } else {
+        btn.disabled = false;
+        icon.classList.remove('animate-spin');
+        label.textContent = 'Sync Provider Catalogs';
+      }
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-message');
+      text.textContent = msg;
+      toast.className = `fixed bottom-6 right-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 pointer-events-none`;
+      if (isError) {
+        toast.querySelector('div').className = 'bg-dark-850 border border-rose-500/40 text-white rounded-xl px-4 py-3 shadow-2xl flex items-center gap-3';
+      } else {
+        toast.querySelector('div').className = 'bg-dark-850 border border-emerald-500/30 text-white rounded-xl px-4 py-3 shadow-2xl flex items-center gap-3';
+      }
+      setTimeout(() => {
+        toast.className = `fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none`;
+      }, 3500);
+    }
+
+    function renderDashboard() {
+      if (!rosterData) return;
+
+      // Update KPI counts
+      document.getElementById('kpi-auto-count').textContent = rosterData.stats.autoAuthorizedCount;
+      document.getElementById('kpi-manual-count').textContent = rosterData.stats.manualQueueCount;
+      document.getElementById('kpi-rejected-count').textContent = rosterData.stats.operatorRejectedCount || 0;
+      document.getElementById('kpi-banned-count').textContent = rosterData.stats.bannedCount;
+      document.getElementById('kpi-fallback-count').textContent = rosterData.stats.lastCloudFallbackCount;
+
+      document.getElementById('kpi-auto-desc').textContent = `Out ≤ $${rosterData.config.maxOutAuto.toFixed(2)}`;
+      document.getElementById('kpi-manual-desc').textContent = `$${rosterData.config.maxOutAuto.toFixed(2)} < Out ≤ $${rosterData.config.maxOutManual.toFixed(2)}`;
+
+      // Update Tab Counter Badges
+      document.getElementById('tab-count-auto').textContent = rosterData.stats.autoAuthorizedCount;
+      document.getElementById('tab-count-manual').textContent = rosterData.stats.manualQueueCount;
+      document.getElementById('tab-count-rejected').textContent = rosterData.stats.operatorRejectedCount || 0;
+      document.getElementById('tab-count-banned').textContent = rosterData.stats.bannedCount;
+
+      // Update Config Input Fields
+      document.getElementById('input-auto-ceiling').value = rosterData.config.maxOutAuto.toFixed(2);
+      document.getElementById('input-manual-ceiling').value = rosterData.config.maxOutManual.toFixed(2);
+
+      // Last updated time
+      const date = new Date(rosterData.timestamp || Date.now());
+      document.getElementById('last-updated-text').textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Fallback Banner
+      const fbBanner = document.getElementById('fallback-banner');
+      if (rosterData.stats.lastCloudFallbackCount > 0) {
+        fbBanner.classList.remove('hidden');
+        document.getElementById('fallback-banner-desc').textContent = `${rosterData.stats.lastCloudFallbackCount} emergency triggers recorded. DeepSeek Flash served as final cloud safeguard.`;
+      } else {
+        fbBanner.classList.add('hidden');
+      }
+
+      applyFilters();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabs = ['auto', 'manual', 'rejected', 'banned'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const view = document.getElementById(`view-${t}`);
+        const hudCard = document.getElementById(`hud-card-${t}`);
+        if (t === tab) {
+          if (btn) btn.className = 'px-4 py-2 rounded-lg transition active:scale-95 flex items-center gap-2 bg-dark-700 text-white shadow whitespace-nowrap';
+          if (view) view.classList.remove('hidden');
+          if (hudCard) hudCard.classList.add('active-tier');
+        } else {
+          if (btn) btn.className = 'px-4 py-2 rounded-lg text-slate-400 hover:text-white transition active:scale-95 flex items-center gap-2 whitespace-nowrap';
+          if (view) view.classList.add('hidden');
+          if (hudCard) hudCard.classList.remove('active-tier');
+        }
+      });
+      applyFilters();
+    }
+
+    function toggleSort(col) {
+      if (sortColumn === col) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortColumn = col;
+        sortDirection = 'asc';
+      }
+      updateSortIcons();
+      applyFilters();
+    }
+
+    function updateSortIcons() {
+      const cols = ['id', 'provider', 'inputCost', 'outputCost', 'contextLength', 'batchHealth'];
+      cols.forEach(c => {
+        const iconEl = document.getElementById(`sort-icon-${c}`);
+        const manualIcon = document.getElementById(`sort-icon-${c}-manual`);
+        const rejectedIcon = document.getElementById(`sort-icon-${c}-rejected`);
+        const bannedIcon = document.getElementById(`sort-icon-${c}-banned`);
+        const arrow = (sortColumn === c) ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅';
+        const color = (sortColumn === c) ? 'text-emerald-400 font-bold' : 'text-slate-500';
+
+        if (iconEl) {
+          iconEl.textContent = arrow;
+          iconEl.className = `${color} font-mono text-[10px]`;
+        }
+        if (manualIcon) {
+          manualIcon.textContent = arrow;
+          manualIcon.className = `${color} font-mono text-[10px]`;
+        }
+        if (rejectedIcon) {
+          rejectedIcon.textContent = arrow;
+          rejectedIcon.className = `${color} font-mono text-[10px]`;
+        }
+        if (bannedIcon) {
+          bannedIcon.textContent = arrow;
+          bannedIcon.className = `${color} font-mono text-[10px]`;
+        }
+      });
+    }
+
+    function sortModels(models) {
+      return [...models].sort((a, b) => {
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+
+        if (sortColumn === 'batchHealth') {
+          valA = a.isBatch ? (a.batchHealth?.healthy ? 1 : -1) : 0;
+          valB = b.isBatch ? (b.batchHealth?.healthy ? 1 : -1) : 0;
+        }
+
+        if (typeof valA === 'string') {
+          valA = valA.toLowerCase();
+          valB = (valB || '').toLowerCase();
+          return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+          valA = Number(valA || 0);
+          valB = Number(valB || 0);
+          return sortDirection === 'asc' ? valA - valB : valB - valA;
+        }
+      });
+    }
+
+    function applyFilters() {
+      if (!rosterData) return;
+      const q = document.getElementById('filter-search').value.toLowerCase().trim();
+      const p = document.getElementById('filter-provider').value;
+
+      const filterFn = (m) => {
+        const matchesQ = !q || m.id.toLowerCase().includes(q) || (m.name && m.name.toLowerCase().includes(q)) || m.provider.toLowerCase().includes(q);
+        const matchesP = p === 'all' || m.provider.toLowerCase() === p.toLowerCase();
+        return matchesQ && matchesP;
+      };
+
+      if (currentTab === 'auto') {
+        const filtered = rosterData.autoAuthorized.filter(filterFn);
+        renderAutoTable(sortModels(filtered));
+      } else if (currentTab === 'manual') {
+        const filtered = rosterData.manualQueue.filter(filterFn);
+        renderManualTable(sortModels(filtered));
+      } else if (currentTab === 'rejected') {
+        const filtered = (rosterData.operatorRejected || []).filter(filterFn);
+        renderRejectedTable(sortModels(filtered));
+      } else {
+        const filtered = rosterData.banned.filter(filterFn);
+        renderBannedTable(sortModels(filtered));
+      }
+      lucide.createIcons();
+    }
+
+    function renderAutoTable(models) {
+      const tbody = document.getElementById('table-body-auto');
+      const empty = document.getElementById('table-empty');
+      if (!models.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = models.map((m, idx) => {
+        const isBatch = m.isBatch;
+        const health = m.batchHealth || { healthy: true };
+        const isDiscounted = m.provider === 'CheapInference' || m.provider === 'TokenHarbor';
+
+        return `
+          <tr class="hover:bg-dark-800/50 transition duration-150">
+            <td class="py-3 px-4 text-center font-mono text-slate-500 font-medium">${idx + 1}</td>
+            <td class="py-3 px-4">
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-semibold text-sky-400">${m.id}</span>
+                ${isBatch ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">BATCH</span>' : ''}
+                ${isDiscounted ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">DISCOUNTED</span>' : ''}
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${m.name || m.id}</div>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded bg-dark-900 border border-dark-700 text-slate-300 font-mono text-[11px]">${m.provider}</span>
+            </td>
+            <td class="py-3 px-4 font-mono font-bold text-emerald-400 text-sm">
+              $${m.inputCost.toFixed(3)}
+            </td>
+            <td class="py-3 px-4 font-mono text-slate-300 font-medium">
+              $${m.outputCost.toFixed(3)}
+            </td>
+            <td class="py-3 px-4 font-mono text-slate-400">
+              ${m.contextLength ? Math.round(m.contextLength / 1024) + 'k' : '—'}
+            </td>
+            <td class="py-3 px-4">
+              ${isBatch ? `
+                <div class="inline-flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full ${health.healthy ? 'bg-emerald-400 shadow-sm shadow-emerald-400/80 animate-pulse' : 'bg-rose-500'}"></span>
+                  <span class="text-[11px] ${health.healthy ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'}">${health.healthy ? 'Live Verified' : 'Failing (Bypassed)'}</span>
+                </div>
+              ` : '<span class="text-slate-500 text-[11px]">Standard (Unary)</span>'}
+            </td>
+            <td class="py-3 px-4 text-right">
+              <div class="inline-flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 text-emerald-400 font-semibold font-mono text-[11px] bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">
+                  <i data-lucide="check" class="w-3 h-3"></i> ACTIVE
+                </span>
+                <button onclick="operatorDeclineModel('${m.id}')" class="px-2 py-1 rounded-md text-[11px] font-semibold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition active:scale-95" title="Operator Decline / Blacklist this model">
+                  Decline
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderManualTable(models) {
+      const tbody = document.getElementById('table-body-manual');
+      const empty = document.getElementById('table-empty');
+      if (!models.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = models.map(m => `
+        <tr class="hover:bg-dark-800/50 transition duration-150">
+          <td class="py-3 px-4">
+            <div class="font-mono font-semibold text-slate-200">${m.id}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${m.name || m.id}</div>
+          </td>
+          <td class="py-3 px-4 font-mono text-slate-300">
+            <span class="px-2 py-0.5 rounded bg-dark-900 border border-dark-700 text-slate-300 font-mono text-[11px]">${m.provider}</span>
+          </td>
+          <td class="py-3 px-4 font-mono font-bold text-emerald-400 text-sm">$${m.inputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 font-mono font-bold text-amber-300 text-sm">$${m.outputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 font-mono text-slate-400">${m.contextLength ? Math.round(m.contextLength / 1024) + 'k' : '—'}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold text-[10px] uppercase">Manual Review</span>
+          </td>
+          <td class="py-3 px-4 text-right">
+            <div class="inline-flex items-center gap-1.5">
+              ${m.isApproved ? `
+                <span class="text-emerald-400 font-semibold mr-2 flex items-center gap-1 font-mono text-[11px]">
+                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> APPROVED
+                </span>
+                <button onclick="approveModel('${m.id}', false)" class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition">
+                  Revoke
+                </button>
+              ` : `
+                <button onclick="approveModel('${m.id}', true)" class="px-3 py-1 rounded-md text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition active:scale-95 shadow-sm">
+                  Approve
+                </button>
+                <button onclick="operatorDeclineModel('${m.id}')" class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition active:scale-95">
+                  Decline
+                </button>
+              `}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderRejectedTable(models) {
+      const tbody = document.getElementById('table-body-rejected');
+      const empty = document.getElementById('table-empty');
+      if (!models.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = models.map(m => `
+        <tr class="hover:bg-dark-800/50 transition duration-150">
+          <td class="py-3 px-4">
+            <div class="font-mono font-semibold text-purple-300">${m.id}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${m.name || m.id}</div>
+          </td>
+          <td class="py-3 px-4 font-mono text-slate-300">
+            <span class="px-2 py-0.5 rounded bg-dark-900 border border-dark-700 text-slate-300 font-mono text-[11px]">${m.provider}</span>
+          </td>
+          <td class="py-3 px-4 font-mono text-slate-400">$${m.inputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 font-mono text-slate-400">$${m.outputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 text-purple-400 font-medium">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="shield-x" class="w-3.5 h-3.5 text-purple-400"></i>
+              <span>${m.reason || 'Operator Declined'}</span>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-right">
+            <button onclick="operatorRestoreModel('${m.id}')" class="px-3 py-1 rounded-md text-[11px] font-semibold bg-purple-600 hover:bg-purple-500 text-white transition active:scale-95 shadow-sm">
+              Restore to Roster
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderBannedTable(models) {
+      const tbody = document.getElementById('table-body-banned');
+      const empty = document.getElementById('table-empty');
+      if (!models.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = models.map(m => `
+        <tr class="hover:bg-dark-800/50 transition duration-150">
+          <td class="py-3 px-4 font-mono text-rose-300/80 font-medium">${m.id}</td>
+          <td class="py-3 px-4 font-mono text-slate-400 text-[11px]">${m.provider}</td>
+          <td class="py-3 px-4 font-mono text-slate-400">$${m.inputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 font-mono font-bold text-rose-400">$${m.outputCost.toFixed(3)}</td>
+          <td class="py-3 px-4 text-rose-400/90 text-xs">${m.reason || 'Exceeds cost ceiling'}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function operatorDeclineModel(modelId) {
+      const reason = prompt(`Enter optional reason for declining / blacklisting "${modelId}":`, 'Operator Disqualified');
+      if (reason === null) return; // User cancelled prompt
+      try {
+        const res = await fetch('/api/roster/override', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId, action: 'reject', reason })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        rosterData = data.roster;
+        renderDashboard();
+        showToast(`Model ${modelId} placed into Operator Blacklist`, true);
+      } catch (err) {
+        showToast('Decline action failed: ' + err.message, true);
+      }
+    }
+
+    async function operatorRestoreModel(modelId) {
+      try {
+        const res = await fetch('/api/roster/override', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId, action: 'restore' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        rosterData = data.roster;
+        renderDashboard();
+        showToast(`Model ${modelId} restored to active qualification roster!`);
+      } catch (err) {
+        showToast('Restore action failed: ' + err.message, true);
+      }
+    }
+
+    async function approveModel(modelId, approved) {
+      try {
+        const res = await fetch('/api/roster/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId, approved })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        rosterData = data.roster;
+        renderDashboard();
+        showToast(approved ? `Model ${modelId} approved for daily roster` : `Model ${modelId} declined`);
+      } catch (err) {
+        showToast('Approval action failed: ' + err.message, true);
+      }
+    }
+
+    async function saveBaselinePolicy() {
+      const maxOutAuto = parseFloat(document.getElementById('input-auto-ceiling').value);
+      const maxOutManual = parseFloat(document.getElementById('input-manual-ceiling').value);
+
+      if (isNaN(maxOutAuto) || isNaN(maxOutManual) || maxOutAuto >= maxOutManual) {
+        showToast('Invalid ceilings: Auto must be strictly less than Manual ceiling', true);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/roster/baseline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maxOutAuto, maxOutManual })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        rosterData = data.roster;
+        renderDashboard();
+        showToast(`Ceilings updated: Auto ≤ $${maxOutAuto.toFixed(2)}, Manual ≤ $${maxOutManual.toFixed(2)}`);
+      } catch (err) {
+        showToast('Failed to update baseline: ' + err.message, true);
+      }
+    }
+
+    function exportRosterJSON() {
+      if (!rosterData) return;
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rosterData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `satchida_model_roster_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Model roster exported to JSON');
+    }
+
+    function toggleFallbackModal() {
+      const modal = document.getElementById('fallback-modal');
+      const list = document.getElementById('fallback-modal-list');
+      if (modal.classList.contains('hidden')) {
+        const history = rosterData?.fallbackHistory || [];
+        const designated = rosterData?.stats?.designatedFallback || {
+          modelId: 'openrouter/deepseek/deepseek-flash-latest',
+          name: 'DeepSeek Flash (Modern V4 Fast Branch)',
+          provider: 'openrouter',
+          inputCost: 0.02,
+          outputCost: 0.60,
+          status: 'Armed & Ready (Last Cloud Guardrail)'
+        };
+
+        let html = `
+          <div class="p-4 bg-indigo-950/40 border border-indigo-500/40 rounded-xl space-y-2 mb-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Designated Last Cloud Safeguard
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                ACTIVE GUARDRAIL
+              </span>
+            </div>
+            <div class="flex items-center justify-between pt-1">
+              <div>
+                <div class="font-mono text-sm font-bold text-white">${designated.modelId}</div>
+                <div class="text-[11px] text-indigo-300">${designated.name} • Vendor: <span class="font-mono">${designated.provider}</span></div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-mono font-bold text-emerald-400">$${designated.inputCost.toFixed(3)} In / $${designated.outputCost.toFixed(3)} Out</div>
+                <div class="text-[10px] text-slate-400">Policy: Triggered when free/local models fail</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (!history.length) {
+          html += `
+            <div class="p-6 bg-dark-900 border border-dark-700 rounded-xl text-center space-y-2">
+              <i data-lucide="shield-check" class="w-8 h-8 mx-auto text-emerald-400"></i>
+              <div class="text-xs font-semibold text-white">0 Fallback Triggers (All Primary Free/Local Models Healthy)</div>
+              <p class="text-[11px] text-slate-400 max-w-md mx-auto">
+                No emergency triggers have occurred yet because free and local models are resolving client requests directly. If upstream rate limits (429) or outages hit the free tier, requests will automatically divert to <span class="font-mono text-indigo-300">${designated.modelId}</span> and log the full event trace here.
+              </p>
+            </div>
+          `;
+        } else {
+          html += history.map(item => `
+            <div class="p-3 bg-dark-900 border border-dark-700 rounded-xl space-y-1">
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span class="font-mono text-indigo-400 font-semibold">${item.model}</span>
+                <span>${new Date(item.t).toLocaleString()}</span>
+              </div>
+              <div class="text-xs text-slate-300">Reason: ${item.reason}</div>
+              <div class="text-[11px] text-slate-500">Client: ${item.client || 'unknown'} • Provider: ${item.provider}</div>
+            </div>
+          `).join('');
+        }
+
+        list.innerHTML = html;
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchRoster();
+    });
+  </script>
+</body>
+</html>

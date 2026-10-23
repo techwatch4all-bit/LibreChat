@@ -73,6 +73,7 @@ function withinRequestContext<T>(fn: () => Promise<T>): Promise<T> {
 
 describe('capabilities integration (real MongoDB)', () => {
   let adminUser: { _id: Types.ObjectId; id: string; role: string };
+  let tenantAdminUser: { _id: Types.ObjectId; id: string; role: string; tenantId: string };
   let regularUser: { _id: Types.ObjectId; id: string; role: string };
 
   beforeEach(async () => {
@@ -87,6 +88,39 @@ describe('capabilities integration (real MongoDB)', () => {
     });
     adminUser = { _id: admin._id, id: admin._id.toString(), role: SystemRoles.ADMIN };
 
+    /*
+     * This deployment removed upstream's blanket platform-scoped grants on the
+     * ADMIN role (`seedSystemGrants` now only deletes them — "ADMIN is
+     * tenant-local"), so an administrator's authority comes from explicit
+     * grants. Mirror `bootstrapOperatorCapability` and grant the fixture admin
+     * directly, so these tests keep exercising the resolution pipeline
+     * (principals → grant lookup → implications → caching) unchanged.
+     */
+    await Promise.all(
+      Object.values(SystemCapabilities).map((capability) =>
+        methods.grantCapability({
+          principalType: PrincipalType.USER,
+          principalId: admin._id,
+          capability,
+        }),
+      ),
+    );
+
+    const tenantAdmin = await User.create({
+      name: 'Tenant Admin',
+      email: 'tenant-admin@test.com',
+      password: 'password123',
+      provider: 'local',
+      role: SystemRoles.ADMIN,
+      tenantId: 'tenant-school',
+    });
+    tenantAdminUser = {
+      _id: tenantAdmin._id,
+      id: tenantAdmin._id.toString(),
+      role: SystemRoles.ADMIN,
+      tenantId: 'tenant-school',
+    };
+
     const user = await User.create({
       name: 'Regular',
       email: 'user@test.com',
@@ -99,16 +133,17 @@ describe('capabilities integration (real MongoDB)', () => {
 
   describe('end-to-end with real getUserPrincipals + hasCapabilityForPrincipals', () => {
     let hasCapability: ReturnType<typeof generateCapabilityCheck>['hasCapability'];
+    let hasOperatorControl: ReturnType<typeof generateCapabilityCheck>['hasOperatorControl'];
     let hasConfigCapability: ReturnType<typeof generateCapabilityCheck>['hasConfigCapability'];
 
     beforeEach(() => {
-      ({ hasCapability, hasConfigCapability } = generateCapabilityCheck({
+      ({ hasCapability, hasOperatorControl, hasConfigCapability } = generateCapabilityCheck({
         getUserPrincipals: methods.getUserPrincipals,
         hasCapabilityForPrincipals: methods.hasCapabilityForPrincipals,
       }));
     });
 
-    it('returns true for ADMIN after seedSystemGrants', async () => {
+    it('returns true for an admin holding a direct grant after seedSystemGrants', async () => {
       await methods.seedSystemGrants();
 
       const result = await hasCapability(adminUser, SystemCapabilities.ACCESS_ADMIN);
@@ -122,7 +157,7 @@ describe('capabilities integration (real MongoDB)', () => {
       expect(result).toBe(false);
     });
 
-    it('resolves all seeded capabilities for ADMIN', async () => {
+    it('resolves all directly granted capabilities for ADMIN', async () => {
       await methods.seedSystemGrants();
 
       for (const cap of Object.values(SystemCapabilities)) {
@@ -202,6 +237,36 @@ describe('capabilities integration (real MongoDB)', () => {
         capability: SystemCapabilities.READ_USAGE,
       });
       expect(await hasCapability(regularUser, SystemCapabilities.READ_USAGE)).toBe(false);
+    });
+
+    it('only the direct master-tenant user grant passes operator control', async () => {
+      const operatorId = new Types.ObjectId();
+      const User = mongoose.models.User;
+      await User.create({
+        _id: operatorId,
+        name: 'Operator',
+        email: 'operator@satchida.local',
+        password: 'password123',
+        provider: 'local',
+        role: SystemRoles.ADMIN,
+        tenantId: 'satchida-master',
+      });
+      const operator = {
+        id: operatorId.toString(),
+        role: SystemRoles.ADMIN,
+        tenantId: 'satchida-master',
+      };
+
+      await methods.seedSystemGrants();
+      await methods.grantCapability({
+        principalType: PrincipalType.USER,
+        principalId: operatorId,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+      });
+
+      expect(await hasOperatorControl(operator)).toBe(true);
+      expect(await hasOperatorControl(tenantAdminUser)).toBe(false);
+      expect(await hasOperatorControl(regularUser)).toBe(false);
     });
 
     it('tenant-scoped grant does not leak to platform-level check', async () => {

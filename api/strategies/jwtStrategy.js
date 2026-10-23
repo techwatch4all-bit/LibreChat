@@ -37,7 +37,16 @@ const jwtLogin = () =>
         const user = await runAsSystem(() =>
           getUserById(
             payload?.id,
-            '-password -__v -totpSecret -backupCodes +agentTriggerDeletionStartedAt',
+            // `satchidaSeatAlias` and `seatToken` both carry `select: false` on
+            // the schema, so they have to be asked for explicitly.
+            //
+            // The alias is the seat pseudonym that the Privacy path binds a
+            // request to. The seat token is the tenant's own bearer credential
+            // for the operator's gateway, and it is what the cloud path
+            // presents. Without either, the request user has no seat, so the
+            // Privacy path cannot mint an assertion and the cloud path falls
+            // back to the operator's licence token instead of the tenant's.
+            '-password -__v -totpSecret -backupCodes +agentTriggerDeletionStartedAt +satchidaSeatAlias +seatToken',
           ),
         );
         if (user?.agentTriggerDeletionStartedAt != null) {

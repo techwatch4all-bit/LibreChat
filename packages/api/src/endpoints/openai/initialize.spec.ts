@@ -215,6 +215,43 @@ describe('initializeOpenAI – user-provided credentials', () => {
       EModelEndpoint.openAI,
     );
   });
+
+  it('uses only the server-resolved seat token for Satchida cloud requests', async () => {
+    const params = createParams({ OPENAI_API_KEY: 'operator-fallback-key' });
+    (params.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-1',
+      seatToken: 'tk-server-seat-token',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    try {
+      await initializeOpenAI(params);
+    } finally {
+      (params as unknown as { _restore: () => void })._restore();
+    }
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'tk-server-seat-token',
+      expect.any(Object),
+      EModelEndpoint.openAI,
+    );
+  });
+
+  it('does not put server-only seat credentials into provider model options', async () => {
+    const params = createParams({ OPENAI_API_KEY: 'operator-fallback-key' });
+    (params.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-1',
+      seatToken: 'tk-server-seat-token',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    try {
+      await initializeOpenAI(params);
+    } finally {
+      (params as unknown as { _restore: () => void })._restore();
+    }
+    const calls = mockGetOpenAIConfig.mock.calls;
+    const options = calls[calls.length - 1]?.[1] as { modelOptions?: Record<string, unknown> };
+    expect(options.modelOptions?.user).toBe('user-1');
+    expect(JSON.stringify(options)).not.toContain('tk-server-seat-token');
+  });
 });
 
 describe('initializeOpenAI – custom headers', () => {

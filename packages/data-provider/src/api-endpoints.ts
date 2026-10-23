@@ -450,9 +450,10 @@ export const skills = () => `${BASE_URL}/api/skills`;
 export const importSkill = () => `${skills()}/import`;
 
 export const getSkill = (id: string) => `${skills()}/${encodeURIComponent(id)}`;
+export const restoreSkill = (id: string) => `${getSkill(id)}/restore`;
 
 export const listSkillsWithFilters = (
-  filter: Record<string, string | number | undefined | null>,
+  filter: Record<string, string | number | boolean | undefined | null>,
 ) => {
   const cleaned = Object.entries(filter).reduce(
     (acc, [key, value]) => {

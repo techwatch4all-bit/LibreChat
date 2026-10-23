@@ -48,10 +48,12 @@ function makeDeps(user: IUser | undefined, overrides: Partial<AdminRefreshDeps> 
   const findUsers = jest.fn().mockResolvedValue(user ? [user] : []);
   const getUserById = jest.fn().mockResolvedValue(user ?? null);
   const mintToken = jest.fn().mockResolvedValue({ token: 'minted-jwt', expiresAt: 1234567890 });
+  const canAccessOperator = jest.fn().mockResolvedValue(true);
   const onRefreshSuccess = jest.fn().mockResolvedValue(undefined);
   return {
     findUsers,
     getUserById,
+    canAccessOperator,
     mintToken,
     onRefreshSuccess,
     ...overrides,
@@ -579,11 +581,11 @@ describe('applyAdminRefresh', () => {
     });
   });
 
-  describe('admin-access guard', () => {
-    it('throws FORBIDDEN and does not mint when canAccessAdmin returns false', async () => {
+  describe('operator-access guard', () => {
+    it('throws FORBIDDEN and does not mint when the user is not the operator', async () => {
       const user = makeUser();
-      const canAccessAdmin = jest.fn().mockResolvedValue(false);
-      const deps = makeDeps(user, { canAccessAdmin });
+      const canAccessOperator = jest.fn().mockResolvedValue(false);
+      const deps = makeDeps(user, { canAccessOperator });
 
       await expect(applyAdminRefresh(makeTokenset(), deps)).rejects.toMatchObject({
         name: 'AdminRefreshError',
@@ -591,37 +593,41 @@ describe('applyAdminRefresh', () => {
         status: 403,
       });
 
-      expect(canAccessAdmin).toHaveBeenCalledWith(user);
+      expect(canAccessOperator).toHaveBeenCalledWith(user);
       expect(deps.mintToken).not.toHaveBeenCalled();
       expect(deps.onRefreshSuccess).not.toHaveBeenCalled();
     });
 
-    it('mints when canAccessAdmin returns true', async () => {
+    it('mints when the operator grant is verified', async () => {
       const user = makeUser();
-      const canAccessAdmin = jest.fn().mockResolvedValue(true);
-      const deps = makeDeps(user, { canAccessAdmin });
+      const canAccessOperator = jest.fn().mockResolvedValue(true);
+      const deps = makeDeps(user, { canAccessOperator });
 
       const result = await applyAdminRefresh(makeTokenset(), deps);
 
-      expect(canAccessAdmin).toHaveBeenCalledWith(user);
+      expect(canAccessOperator).toHaveBeenCalledWith(user);
       expect(deps.mintToken).toHaveBeenCalledWith(user, expect.any(Object));
       expect(result.token).toBe('minted-jwt');
     });
 
-    it('skips the check when canAccessAdmin is not provided', async () => {
+    it('fails closed when the operator check is missing', async () => {
       const user = makeUser();
-      const { canAccessAdmin: _omit, ...rest } = makeDeps(user);
-      const deps: AdminRefreshDeps = rest;
+      const { canAccessOperator: _omit, ...rest } = makeDeps(user);
+      const deps = { ...rest, canAccessOperator: undefined } as unknown as AdminRefreshDeps;
 
-      const result = await applyAdminRefresh(makeTokenset(), deps);
-      expect(result.token).toBe('minted-jwt');
+      await expect(applyAdminRefresh(makeTokenset(), deps)).rejects.toMatchObject({
+        name: 'AdminRefreshError',
+        code: 'FORBIDDEN',
+        status: 403,
+      });
+      expect(deps.mintToken).not.toHaveBeenCalled();
     });
 
-    it('propagates errors thrown by canAccessAdmin without minting', async () => {
+    it('propagates errors thrown by the operator check without minting', async () => {
       const user = makeUser();
       const boom = new Error('capability backend exploded');
-      const canAccessAdmin = jest.fn().mockRejectedValue(boom);
-      const deps = makeDeps(user, { canAccessAdmin });
+      const canAccessOperator = jest.fn().mockRejectedValue(boom);
+      const deps = makeDeps(user, { canAccessOperator });
 
       await expect(applyAdminRefresh(makeTokenset(), deps)).rejects.toBe(boom);
       expect(deps.mintToken).not.toHaveBeenCalled();

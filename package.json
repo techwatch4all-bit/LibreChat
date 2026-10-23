@@ -152,7 +152,8 @@
     "migrate:code-file-duplicates:batch": "node config/migrate-code-file-duplicates.js --batch-size=50",
     "lighthouse": "npm run e2e:prepare && npm run lighthouse:run",
     "lighthouse:run": "playwright test --config=e2e/playwright.config.lighthouse.ts",
-    "lighthouse:regression": "cross-env LIGHTHOUSE_REGRESSION=serial-reads npm run lighthouse:run"
+    "lighthouse:regression": "cross-env LIGHTHOUSE_REGRESSION=serial-reads npm run lighthouse:run",
+    "postinstall": "patch-package"
   },
   "repository": {
     "type": "git",
@@ -192,6 +193,7 @@
     "jest": "^30.2.0",
     "lighthouse": "13.4.1",
     "lint-staged": "^15.4.3",
+    "patch-package": "^8.0.1",
     "prettier": "^3.5.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "turbo": "^2.10.5",

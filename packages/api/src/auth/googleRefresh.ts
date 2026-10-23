@@ -35,7 +35,7 @@ export interface GoogleAdminRefreshDeps {
     options: { sort: Record<string, 1 | -1>; limit: number },
   ) => Promise<IUser[]>;
   getUserById: (id: string, projection: string) => Promise<IUser | null>;
-  canAccessAdmin: (user: IUser) => Promise<boolean>;
+  canAccessOperator: (user: IUser) => Promise<boolean>;
   /**
    * Re-runs the deployment's `registration.allowedDomains` check against the
    * resolved user's email. Returns true to allow refresh, false to reject.
@@ -278,8 +278,8 @@ export async function applyGoogleAdminRefresh(
     );
   }
 
-  if (!(await deps.canAccessAdmin(user))) {
-    throw new AdminRefreshError('FORBIDDEN', 403, 'User does not have admin access');
+  if (!(await deps.canAccessOperator(user))) {
+    throw new AdminRefreshError('FORBIDDEN', 403, 'User does not have operator access');
   }
 
   const minted = await deps.mintToken(user);

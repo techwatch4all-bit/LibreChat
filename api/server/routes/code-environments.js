@@ -6,8 +6,7 @@ const {
   codeEnvironmentStatusIpLimiter,
   codeEnvironmentStatusLimiter,
 } = require('@librechat/api');
-const { SystemCapabilities } = require('@librechat/data-schemas');
-const { requireCapability } = require('~/server/middleware/roles/capabilities');
+const { hasOperatorControl } = require('~/server/middleware/roles/capabilities');
 const { getAppConfig, getCodeEnvironmentRegistry } = require('~/server/services/Config');
 const { requireJwtAuth } = require('~/server/middleware');
 const db = require('~/models');
@@ -29,14 +28,29 @@ function getHandlers() {
   }
   return handlers;
 }
-const requireCodeEnvironmentManage = requireCapability(SystemCapabilities.MANAGE_CODE_ENVIRONMENTS);
-
 router.use(requireJwtAuth);
+
+const requireOperatorForEnvironmentRegistration = async (req, res, next) => {
+  try {
+    const allowed = await hasOperatorControl({
+      id: req.user?.id ?? req.user?._id?.toString(),
+      role: req.user?.role ?? '',
+      tenantId: req.user?.tenantId,
+      idOnTheSource: req.user?.idOnTheSource ?? null,
+    });
+    if (!allowed) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    return next();
+  } catch {
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
 router.get('/', (req, res, next) => getHandlers().list(req, res, next));
 router.post('/pairings', codeEnvironmentPairingLimiter, (req, res, next) =>
   getHandlers().pair(req, res, next),
 );
-router.post('/', requireCodeEnvironmentManage, (req, res, next) =>
+router.post('/', requireOperatorForEnvironmentRegistration, (req, res, next) =>
   getHandlers().register(req, res, next),
 );
 router.get(

@@ -76,7 +76,9 @@ export type DeploymentSkill = {
   sourceMetadata: { deployment: true; directory: string; plugin?: string };
   fileCount: number;
   alwaysApply: boolean;
-  isPublic: true;
+  isPublic: boolean;
+  adminOnly?: boolean;
+  allowedRoles?: string[];
   deployment: true;
   files: DeploymentSkillFile[];
   createdAt: Date;
@@ -105,6 +107,8 @@ type SkillSummaryRow = {
   fileCount?: number;
   alwaysApply?: boolean;
   isPublic?: boolean;
+  adminOnly?: boolean;
+  allowedRoles?: string[];
   tenantId?: string;
   deployment?: boolean;
   createdAt?: Date;
@@ -229,6 +233,8 @@ export class DeploymentSkillRegistry {
   private readonly skillsByName = new Map<string, DeploymentSkill>();
   private readonly filesByPath = new Map<string, DeploymentSkillFile>();
 
+  private readonly overrides = new Map<string, { adminOnly?: boolean; allowedRoles?: string[] }>();
+
   constructor(
     private readonly directory: string | null,
     skills: DeploymentSkill[],
@@ -240,6 +246,29 @@ export class DeploymentSkillRegistry {
         this.filesByPath.set(file.filepath, file);
       }
     }
+  }
+
+  setSkillOverrides(
+    id: SkillId,
+    meta: { adminOnly?: boolean; allowedRoles?: string[] },
+  ): DeploymentSkill | null {
+    const key = id.toString();
+    const existing = this.skillsById.get(key);
+    if (!existing) {
+      return null;
+    }
+    const currentOverride = this.overrides.get(key) ?? {};
+    if (meta.adminOnly !== undefined) {
+      currentOverride.adminOnly = meta.adminOnly;
+      existing.adminOnly = meta.adminOnly;
+      existing.isPublic = !meta.adminOnly;
+    }
+    if (meta.allowedRoles !== undefined) {
+      currentOverride.allowedRoles = meta.allowedRoles;
+      existing.allowedRoles = meta.allowedRoles;
+    }
+    this.overrides.set(key, currentOverride);
+    return existing;
   }
 
   getDirectory(): string | null {
@@ -388,6 +417,13 @@ export function isDeploymentSkillFileSource(source: unknown): boolean {
 
 export function getDeploymentSkillById(id: SkillId): DeploymentSkill | null {
   return registry.getById(id);
+}
+
+export function updateDeploymentSkillMeta(
+  id: SkillId,
+  meta: { adminOnly?: boolean; allowedRoles?: string[] },
+): DeploymentSkill | null {
+  return registry.setSkillOverrides(id, meta);
 }
 
 export function isDeploymentSkillFilePath(filepath: string): boolean {

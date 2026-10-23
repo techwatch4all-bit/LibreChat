@@ -241,6 +241,9 @@ function createMocks(overrides?: {
     updateFilesUsage: jest.fn().mockResolvedValue([]),
     getUserKey: jest.fn().mockResolvedValue('user-1'),
     getUserKeyValues: jest.fn().mockResolvedValue([]),
+    getPrivacyAssertion: jest.fn().mockResolvedValue(undefined),
+    isPrivacyLocalReady: jest.fn().mockResolvedValue(false),
+    authorizeTenantSeatRequest: jest.fn().mockResolvedValue(false),
     getToolFilesByIds: jest.fn().mockResolvedValue([]),
   };
 

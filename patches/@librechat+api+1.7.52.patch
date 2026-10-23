@@ -1,0 +1,16 @@
+diff --git a/node_modules/@librechat/api/dist/index.cjs b/node_modules/@librechat/api/dist/index.cjs
+index 28a55887489dd55360fe6a9e1456e63dbae22bbe..43983bcc92abfd08138d74e5db2a1c6c6081cba1 100644
+--- a/node_modules/@librechat/api/dist/index.cjs
++++ b/node_modules/@librechat/api/dist/index.cjs
+@@ -110181,10 +110181,11 @@ function capturedText(stream) {
+ 		const child = (0, node_child_process.spawn)(invocation.executable, invocation.argv, {
+ 			cwd,
+ 			env,
+ 			detached: process.platform !== "win32",
++			windowsHide: process.platform === "win32",
+ 			stdio: [
+ 				"pipe",
+ 				"pipe",
+ 				"pipe"
+ 			]
+ 		});

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Satchida Admin - Dashboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="admin-page">
+  <header class="header">
+    <h1>Satchida Admin</h1>
+    <div class="userinfo" id="userinfo">…</div>
+    <button class="logout-btn" id="logoutBtn" title="Log out">Log out</button>
+  </header>
+  <nav class="tabs">
+    <button data-tab="users" class="tab active">Users</button>
+    <button data-tab="roles" class="tab">Roles</button>
+    <button data-tab="groups" class="tab">Groups</button>
+    <button data-tab="grants" class="tab">Grants</button>
+    <button data-tab="audit" class="tab">Audit log</button>
+  </nav>
+  <main class="content">
+    <section id="users" class="tabpanel">
+      <h2>Users</h2>
+      <p class="count" id="usersCount"></p>
+      <div class="actionBar">
+        <input type="search" id="usersSearch" placeholder="Search users…" autocomplete="off" />
+        <button type="button" id="usersCreateBtn" class="btn btn-primary">Create User</button>
+        <button type="button" id="usersBulkImportBtn" class="btn btn-ghost">Bulk CSV Import</button>
+        <button type="button" id="usersDownloadTemplateBtn" class="btn btn-ghost">Download Template</button>
+      </div>
+      <div class="actionBar" id="usersPagerBar" hidden>
+        <span class="hint" id="usersRange"></span>
+        <label class="hint"
+          >Rows
+          <select id="usersPageSize">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+          </select>
+        </label>
+        <button type="button" id="usersPrevBtn" class="btn btn-ghost">‹ Prev</button>
+        <button type="button" id="usersNextBtn" class="btn btn-ghost">Next ›</button>
+      </div>
+      <div class="actionBar" id="bulkProgressBar" hidden>
+        <span class="hint" id="bulkProgressText"></span>
+        <progress id="bulkProgress" value="0" max="100"></progress>
+      </div>
+      <div class="tablewrap" id="usersTable"></div>
+    </section>
+    <section id="roles" class="tabpanel" hidden>
+      <h2>Roles</h2>
+      <p class="count" id="rolesCount"></p>
+      <div class="actionBar"><button type="button" id="rolesCreateBtn" class="btn btn-ghost">Create role</button></div>
+      <div class="tablewrap" id="rolesTable"></div>
+    </section>
+    <section id="groups" class="tabpanel" hidden>
+      <h2>Groups</h2>
+      <p class="count" id="groupsCount"></p>
+      <div class="actionBar"><button type="button" id="groupsCreateBtn" class="btn btn-ghost">Create group</button></div>
+      <div class="actionBar" id="groupsPagerBar" hidden>
+        <span class="hint" id="groupsRange"></span>
+        <label class="hint"
+          >Rows
+          <select id="groupsPageSize">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+          </select>
+        </label>
+        <button type="button" id="groupsPrevBtn" class="btn btn-ghost">‹ Prev</button>
+        <button type="button" id="groupsNextBtn" class="btn btn-ghost">Next ›</button>
+      </div>
+      <div class="tablewrap" id="groupsTable"></div>
+    </section>
+    <section id="grants" class="tabpanel" hidden>
+      <h2>Grants</h2>
+      <p class="count" id="grantsCount"></p>
+      <div class="actionBar">
+        <span class="hint">Assign capability → role / group / user (OPERATOR_CONTROL is server-rejected).</span>
+        <span id="grantsAssignForm" style="display:none">
+          <select id="grantPrincipalType"><option value="role">role</option></select>
+          <select id="grantRole"><option value="">role…</option></select>
+          <select id="grantGroup" style="display:none"><option value="">group…</option></select>
+          <input id="grantUserId" type="text" placeholder="user id…" size="26" style="display:none" />
+          <select id="grantCap"><option value="">capability…</option></select>
+          <input id="grantTenantId" type="text" placeholder="target tenant (blank = your own)" size="28" />
+          <button type="button" id="grantAssignBtn" class="btn btn-primary">Assign</button>
+        </span>
+        <button type="button" id="provisionTenantAdminBtn" class="btn btn-ghost" style="display:none">Provision tenant admin</button>
+      </div>
+      <div class="tablewrap" id="grantsEffective"></div>
+      <div class="tablewrap" id="grantsTable"></div>
+    </section>
+    <section id="audit" class="tabpanel" hidden>
+      <h2>Audit log</h2>
+      <p class="count" id="auditCount"></p>
+      <div class="tablewrap" id="auditTable"></div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

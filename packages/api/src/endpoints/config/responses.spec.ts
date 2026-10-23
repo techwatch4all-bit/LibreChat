@@ -42,6 +42,9 @@ const db = {
   getUserKeyValues: jest
     .fn()
     .mockResolvedValue({ apiKey: 'test-key', baseURL: 'https://user-gateway.example/v1' }),
+  getPrivacyAssertion: jest.fn().mockResolvedValue(undefined),
+  isPrivacyLocalReady: jest.fn().mockResolvedValue(false),
+  authorizeTenantSeatRequest: jest.fn().mockResolvedValue(false),
 };
 async function runtime(
   appConfig: AppConfig,

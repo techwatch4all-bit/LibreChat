@@ -50,6 +50,7 @@ const { getResourcePermissionsMap } = require('~/server/services/PermissionServi
 const { hasCapability } = require('~/server/middleware/roles/capabilities');
 const { getMCPManager, getMCPServersRegistry } = require('~/config');
 const db = require('~/models');
+const { filterExtensions, loadTenantPolicy } = require('@librechat/api');
 
 /**
  * Handles MCP-specific errors and sends appropriate HTTP responses.
@@ -148,9 +149,14 @@ const getMCPTools = async (req, res) => {
         `[getMCPTools] Skipping MCP server "${shadowedName}": its normalized name collides with an earlier configured server, making tool keys ambiguous. Rename one server to expose both.`,
       );
     }
-    const configuredServers = Object.keys(mcpConfig).filter(
+    const unshadowedServers = Object.keys(mcpConfig).filter(
       (serverName) => !shadowedServers.has(serverName),
     );
+
+    /* Per-tenant extension policy. Filtered before catalog loading so a tenant
+     * denied an MCP server never initiates connections or tool discovery to it. */
+    const policy = await loadTenantPolicy(req, db.getTenantPolicy);
+    const configuredServers = filterExtensions(policy, 'mcp', unshadowedServers, (name) => name);
 
     if (!configuredServers.length) {
       return res.status(200).json({ servers: {} });
@@ -162,6 +168,7 @@ const getMCPTools = async (req, res) => {
       tenantId: getTenantId(),
     });
     const catalogAbortController = new AbortController();
+
     const abortCatalogLoad = () => {
       if (!res.writableEnded) {
         catalogAbortController.abort();
@@ -342,7 +349,26 @@ const getMCPServersList = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const serverConfigs = await resolveAllMcpConfigs(userId, req.user);
+    const allConfigs = await resolveAllMcpConfigs(userId, req.user);
+
+    /* Per-tenant extension policy. Filtered HERE, at the response boundary,
+     * rather than inside the registry: `resolveAllMcpConfigs` is shared with the
+     * assistants and tools paths, and hiding a server from one caller must not
+     * change what another caller resolves. With no stored policy the defaults
+     * apply and an MCP server is denied, so this stops the "every tenant sees
+     * every server" leak the moment it is wired in.
+     *
+     * `allConfigs` is a Record keyed by server name, and `filterExtensions`
+     * takes an array. Rebuild the record from the surviving names rather than
+     * passing the object and letting `.filter` fail on it. */
+    const policy = await loadTenantPolicy(req, db.getTenantPolicy);
+    const allowedNames = filterExtensions(policy, 'mcp', Object.keys(allConfigs), (name) => name);
+    const serverConfigs = Object.fromEntries(
+      allowedNames
+        .filter((name) => allConfigs[name] != null)
+        .map((name) => [name, allConfigs[name]]),
+    );
+
     const canEditByServer = await computeCanEditByServer(req, serverConfigs, {
       skipCapabilityWithoutDbIds: true,
     });

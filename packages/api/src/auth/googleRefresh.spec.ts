@@ -69,7 +69,7 @@ describe('applyGoogleAdminRefresh', () => {
     deps = {
       findUsers: jest.fn(),
       getUserById: jest.fn(),
-      canAccessAdmin: jest.fn(),
+      canAccessOperator: jest.fn(),
       isEmailAllowed: jest.fn().mockResolvedValue(true),
       mintToken: jest.fn(),
     };
@@ -88,7 +88,7 @@ describe('applyGoogleAdminRefresh', () => {
       makeOkJson({ access_token: 'new-access', id_token: makeIdToken() }),
     );
     deps.findUsers.mockResolvedValue([user]);
-    deps.canAccessAdmin.mockResolvedValue(true);
+    deps.canAccessOperator.mockResolvedValue(true);
     deps.mintToken.mockResolvedValue({ token: 'minted-jwt', expiresAt: 1700000000000 });
 
     const result = await applyGoogleAdminRefresh(deps, baseOptions);
@@ -172,7 +172,7 @@ describe('applyGoogleAdminRefresh', () => {
       .mockResolvedValueOnce(makeOkJson({ access_token: 'new-access' }))
       .mockResolvedValueOnce(makeOkJson({ sub: SUB }));
     deps.findUsers.mockResolvedValue([user]);
-    deps.canAccessAdmin.mockResolvedValue(true);
+    deps.canAccessOperator.mockResolvedValue(true);
     deps.mintToken.mockResolvedValue({ token: 'minted-jwt', expiresAt: 1 });
 
     const result = await applyGoogleAdminRefresh(deps, baseOptions);
@@ -210,7 +210,7 @@ describe('applyGoogleAdminRefresh', () => {
       makeOkJson({ access_token: 'new-access', id_token: makeIdToken() }),
     );
     deps.findUsers.mockResolvedValue([user]);
-    deps.canAccessAdmin.mockResolvedValue(true);
+    deps.canAccessOperator.mockResolvedValue(true);
     deps.mintToken.mockResolvedValue({ token: 'minted-jwt', expiresAt: 1 });
 
     const result = await applyGoogleAdminRefresh(deps, {
@@ -260,7 +260,7 @@ describe('applyGoogleAdminRefresh', () => {
       code: 'PROVIDER_MISMATCH',
       status: 401,
     });
-    expect(deps.canAccessAdmin).not.toHaveBeenCalled();
+    expect(deps.canAccessOperator).not.toHaveBeenCalled();
   });
 
   it('throws PROVIDER_MISMATCH when the direct-lookup user is not bound to the google provider', async () => {
@@ -273,7 +273,7 @@ describe('applyGoogleAdminRefresh', () => {
     await expect(
       applyGoogleAdminRefresh(deps, { ...baseOptions, userId: String(direct._id) }),
     ).rejects.toMatchObject({ code: 'PROVIDER_MISMATCH', status: 401 });
-    expect(deps.canAccessAdmin).not.toHaveBeenCalled();
+    expect(deps.canAccessOperator).not.toHaveBeenCalled();
   });
 
   it('throws USER_NOT_FOUND when no admin user matches the refreshed googleId', async () => {
@@ -294,7 +294,7 @@ describe('applyGoogleAdminRefresh', () => {
       makeOkJson({ access_token: 'new-access', id_token: makeIdToken() }),
     );
     deps.findUsers.mockResolvedValue([user]);
-    deps.canAccessAdmin.mockResolvedValue(false);
+    deps.canAccessOperator.mockResolvedValue(false);
 
     await expect(applyGoogleAdminRefresh(deps, baseOptions)).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -315,7 +315,7 @@ describe('applyGoogleAdminRefresh', () => {
       status: 403,
       message: expect.stringContaining('domain'),
     });
-    expect(deps.canAccessAdmin).not.toHaveBeenCalled();
+    expect(deps.canAccessOperator).not.toHaveBeenCalled();
   });
 
   it('returns the rotated refresh_token when Google supplies one', async () => {
@@ -328,7 +328,7 @@ describe('applyGoogleAdminRefresh', () => {
       }),
     );
     deps.findUsers.mockResolvedValue([user]);
-    deps.canAccessAdmin.mockResolvedValue(true);
+    deps.canAccessOperator.mockResolvedValue(true);
     deps.mintToken.mockResolvedValue({ token: 'minted-jwt', expiresAt: 1 });
 
     const result = await applyGoogleAdminRefresh(deps, baseOptions);

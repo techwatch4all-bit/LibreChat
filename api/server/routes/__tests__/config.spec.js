@@ -10,9 +10,11 @@ jest.mock('~/server/services/Config/ldap', () => ({
 }));
 
 const mockHasCapability = jest.fn();
+const mockHasOperatorControl = jest.fn();
 const mockHasConfigCapability = jest.fn();
 jest.mock('~/server/middleware/roles/capabilities', () => ({
   hasCapability: (...args) => mockHasCapability(...args),
+  hasOperatorControl: (...args) => mockHasOperatorControl(...args),
   hasConfigCapability: (...args) => mockHasConfigCapability(...args),
 }));
 
@@ -60,7 +62,19 @@ const baseAppConfig = {
     modelSelect: true,
   },
   turnstileConfig: { siteKey: 'test-key' },
-  modelSpecs: { list: [{ name: 'test-spec' }] },
+  modelSpecs: {
+    enforce: false,
+    list: [
+      { name: 'Chat', label: 'Chat', preset: { endpoint: 'Satchida', model: 'Chat' } },
+      { name: 'Work', label: 'Work', preset: { endpoint: 'Satchida', model: 'Work' } },
+      { name: 'Privacy', label: 'Privacy', preset: { endpoint: 'Satchida', model: 'Privacy' } },
+      {
+        name: 'Secret Provider Model',
+        label: 'Secret Provider Model',
+        preset: { endpoint: 'openAI', model: 'gpt-secret' },
+      },
+    ],
+  },
   webSearch: { searchProvider: 'tavily' },
 };
 
@@ -69,6 +83,10 @@ const mockUser = {
   role: 'USER',
   tenantId: undefined,
 };
+
+beforeEach(() => {
+  mockHasOperatorControl.mockResolvedValue(false);
+});
 
 afterEach(() => {
   jest.resetAllMocks();
@@ -340,7 +358,7 @@ describe('GET /api/config', () => {
       });
     });
 
-    it('should include modelSpecs, balance, and webSearch', async () => {
+    it('should include semantic modelSpecs, balance, and webSearch for non-operators', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
       process.env.CHECK_BALANCE = 'true';
       process.env.START_BALANCE = '10000';
@@ -348,7 +366,12 @@ describe('GET /api/config', () => {
 
       const response = await request(app).get('/api/config');
 
-      expect(response.body.modelSpecs).toEqual({ list: [{ name: 'test-spec' }] });
+      expect(response.body.modelSpecs.list.map((spec) => spec.name)).toEqual([
+        'Chat',
+        'Work',
+        'Privacy',
+      ]);
+      expect(response.body).not.toHaveProperty('endpoints');
       expect(response.body.balance).toEqual({ enabled: true, startBalance: 10000 });
       expect(response.body.webSearch).toEqual({ searchProvider: 'tavily' });
       expect(response.body.codeEnvironmentDecisionVersion).toBeUndefined();
@@ -443,21 +466,51 @@ describe('GET /api/config', () => {
       const response = await request(app).get('/api/config');
 
       expect(response.statusCode).toBe(200);
-      expect(response.body.modelSpecs.list[0].preset).toEqual({
-        endpoint: 'openAI',
-        model: 'gpt-4o',
-        greeting: 'Hello',
-      });
-      expect(response.body.modelSpecs.list[0]).not.toHaveProperty('skills');
+      expect(response.body.modelSpecs.list.map((spec) => spec.name)).toEqual([]);
     });
 
-    it('should include full interface config', async () => {
+    it('returns full sanitized model specs only to the operator', async () => {
+      mockGetAppConfig.mockResolvedValue({
+        ...baseAppConfig,
+        modelSpecs: {
+          enforce: false,
+          list: [
+            { name: 'Chat', label: 'Chat', preset: { endpoint: 'Satchida', model: 'Chat' } },
+            {
+              name: 'Secret Provider Model',
+              label: 'Secret',
+              showInMenu: false,
+              preset: { endpoint: 'openAI', model: 'gpt-secret' },
+            },
+          ],
+        },
+      });
+      mockHasOperatorControl.mockResolvedValue(true);
+      const app = createApp(mockUser);
+      const response = await request(app).get('/api/config');
+      expect(response.statusCode).toBe(200);
+      expect(response.body.modelSpecs.list.map((spec) => spec.name)).toEqual(['Chat']);
+      expect(response.body).not.toHaveProperty('endpoints');
+      expect(response.body.interface).toEqual(baseAppConfig.interfaceConfig);
+    });
+
+    it('should project interface config for a non-operator', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
       const app = createApp(mockUser);
 
       const response = await request(app).get('/api/config');
 
-      expect(response.body.interface).toEqual(baseAppConfig.interfaceConfig);
+      expect(response.body.interface).toEqual({
+        ...baseAppConfig.interfaceConfig,
+        modelSelect: true,
+        presets: false,
+      });
+      expect(response.body.modelSpecs.list.map((spec) => spec.name)).toEqual([
+        'Chat',
+        'Work',
+        'Privacy',
+      ]);
+      expect(response.body).not.toHaveProperty('endpoints');
     });
 
     it('should include authenticated-only env var fields', async () => {
@@ -488,7 +541,7 @@ describe('GET /api/config', () => {
 
     it('should advertise Langfuse fanout only when the toggle and collector URL are configured', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       process.env.LANGFUSE_FANOUT_ENABLED = 'true';
       const app = createApp(mockUser);
@@ -510,7 +563,7 @@ describe('GET /api/config', () => {
 
     it('hides Langfuse connection access when tenant export is emergency-disabled', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       process.env.LANGFUSE_FANOUT_ENABLED = 'true';
       process.env.LANGFUSE_FANOUT_COLLECTOR_URL = 'http://langfuse-fanout:4318';
@@ -532,9 +585,7 @@ describe('GET /api/config', () => {
       process.env.LANGFUSE_FANOUT_COLLECTOR_URL = 'http://langfuse-fanout:4318';
       const app = createApp({ ...mockUser, role: 'DELEGATED_ADMIN' });
 
-      mockHasCapability.mockImplementation(
-        async (_user, capability) => capability === 'access:admin',
-      );
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       let response = await request(app).get('/api/config');
       expect(response.body.langfuseConnectionAccess).toBe(true);
@@ -547,7 +598,7 @@ describe('GET /api/config', () => {
 
     it('skips the Langfuse management capability check without admin access', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(false);
+      mockHasOperatorControl.mockResolvedValue(false);
       const app = createApp(mockUser);
 
       const response = await request(app).get('/api/config');
@@ -558,7 +609,7 @@ describe('GET /api/config', () => {
 
     it('advertises Langfuse connection access by default in single-tenant mode', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       const app = createApp(mockUser);
 
@@ -570,7 +621,7 @@ describe('GET /api/config', () => {
 
     it('hides single-tenant connection settings when environment credentials are configured', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       process.env.LANGFUSE_PUBLIC_KEY = 'pk-env';
       process.env.LANGFUSE_SECRET_KEY = 'sk-env';
@@ -588,7 +639,7 @@ describe('GET /api/config', () => {
       ['LANGFUSE_SAMPLE_RATE', '0'],
     ])('hides Langfuse connection settings when %s=%s', async (key, value) => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
+      mockHasOperatorControl.mockResolvedValue(true);
       mockHasConfigCapability.mockResolvedValue(true);
       process.env[key] = value;
       const app = createApp(mockUser);
@@ -683,63 +734,52 @@ describe('GET /api/config', () => {
       );
     });
 
-    it('should set allowAccountDeletion to false for authenticated users without ACCESS_ADMIN', async () => {
+    it('does not grant operator deletion bypass to tenant users', async () => {
       process.env.ALLOW_ACCOUNT_DELETION = 'false';
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(false);
-      const app = createApp(mockUser);
+      mockHasOperatorControl.mockResolvedValue(false);
+      const app = createApp({ ...mockUser, tenantId: 'tenant-school' });
 
       const response = await request(app).get('/api/config');
 
       expect(response.body.allowAccountDeletion).toBe(false);
-      expect(mockHasCapability).toHaveBeenCalled();
+      expect(mockHasOperatorControl).toHaveBeenCalled();
     });
 
-    it('should override allowAccountDeletion to true for users with ACCESS_ADMIN capability', async () => {
+    it('grants operator deletion bypass only to the designated operator', async () => {
       process.env.ALLOW_ACCOUNT_DELETION = 'false';
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
-      const app = createApp(mockUser);
+      mockHasOperatorControl.mockResolvedValue(true);
+      const app = createApp({ ...mockUser, tenantId: 'satchida-master' });
 
       const response = await request(app).get('/api/config');
 
       expect(response.body.allowAccountDeletion).toBe(true);
-      expect(mockHasCapability).toHaveBeenCalled();
+      expect(mockHasOperatorControl).toHaveBeenCalled();
     });
 
-    it('should not call hasCapability when allowAccountDeletion is already true', async () => {
-      mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      process.env.LANGFUSE_TRACING_ENABLED = 'false';
-      const app = createApp(mockUser);
-
-      const response = await request(app).get('/api/config');
-
-      expect(response.body.allowAccountDeletion).toBe(true);
-      expect(mockHasCapability).not.toHaveBeenCalled();
-    });
-
-    it('should include adminPanelURL for users with ACCESS_ADMIN capability', async () => {
+    it('includes adminPanelURL only for the designated operator', async () => {
       process.env.ADMIN_PANEL_URL = 'https://admin.example.com';
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(true);
-      const app = createApp(mockUser);
+      mockHasOperatorControl.mockResolvedValue(true);
+      const app = createApp({ ...mockUser, tenantId: 'satchida-master' });
 
       const response = await request(app).get('/api/config');
 
       expect(response.body.adminPanelURL).toBe('https://admin.example.com');
-      expect(mockHasCapability).toHaveBeenCalled();
+      expect(mockHasOperatorControl).toHaveBeenCalled();
     });
 
-    it('should omit adminPanelURL for authenticated users without ACCESS_ADMIN', async () => {
+    it('omits adminPanelURL for a tenant administrator', async () => {
       process.env.ADMIN_PANEL_URL = 'https://admin.example.com';
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      mockHasCapability.mockResolvedValue(false);
-      const app = createApp(mockUser);
+      mockHasOperatorControl.mockResolvedValue(false);
+      const app = createApp({ ...mockUser, role: 'ADMIN', tenantId: 'tenant-school' });
 
       const response = await request(app).get('/api/config');
 
       expect(response.body).not.toHaveProperty('adminPanelURL');
-      expect(mockHasCapability).toHaveBeenCalled();
+      expect(mockHasOperatorControl).toHaveBeenCalled();
     });
 
     it('should omit adminPanelURL when ADMIN_PANEL_URL is not set', async () => {

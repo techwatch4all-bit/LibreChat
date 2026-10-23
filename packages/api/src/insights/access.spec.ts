@@ -19,7 +19,7 @@ const createDeps = (): jest.Mocked<InsightsAgentAccessDeps> =>
   }) as jest.Mocked<InsightsAgentAccessDeps>;
 
 describe('createInsightsAgentAccessResolver', () => {
-  it('returns every tenant agent for a literal admin', async () => {
+  it('does not grant tenant-wide insights access based on the ADMIN role name', async () => {
     const deps = createDeps();
     const resolve = createInsightsAgentAccessResolver(deps);
 
@@ -29,12 +29,13 @@ describe('createInsightsAgentAccessResolver', () => {
       tenantId: 'tenant-a',
     });
 
-    expect(deps.getAgents).toHaveBeenCalledWith({ tenantId: 'tenant-a' }, '_id id name tenantId');
-    expect(deps.getUserPrincipals).not.toHaveBeenCalled();
-    expect(result).toEqual([
-      { id: 'agent-b', name: 'Alpha' },
-      { id: 'agent-a', name: 'Zulu' },
-    ]);
+    expect(deps.getUserPrincipals).toHaveBeenCalledWith({
+      userId: 'admin-id',
+      role: SystemRoles.ADMIN,
+      idOnTheSource: undefined,
+    });
+    expect(deps.findAccessibleResources).toHaveBeenCalled();
+    expect(result).toEqual([]);
   });
 
   it('returns every tenant agent for a global read:insights grant', async () => {

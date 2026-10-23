@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "satchida-guardrails",
+  "version": "1.0.0",
+  "description": "Satchida compliance hooks. Blocks destructive shell commands on edge nodes, redacts secrets from tool output, and refuses image-generation tool calls on child accounts.",
+  "author": {
+    "name": "Satchida",
+    "email": "hello@satchida.com"
+  },
+  "homepage": "https://satchida.com",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": ["satchida", "compliance", "guardrails", "child-safety", "pocso"]
+}

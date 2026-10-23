@@ -7,7 +7,14 @@ const db = require('~/models');
 
 const router = express.Router();
 
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+/**
+ * Admin-surface gate. Satisfied by a platform operator (`operator:control`
+ * implies every capability) or by a tenant admin holding `access:admin` within
+ * their own tenant. `hasCapability` derives the tenant from the caller, so
+ * tenant-scoped authority never reaches another tenant's rows; the per-route
+ * capabilities below then narrow each action.
+ */
+const requireAdminSurface = requireCapability(SystemCapabilities.ACCESS_ADMIN);
 const requireReadGroups = requireCapability(SystemCapabilities.READ_GROUPS);
 const requireManageGroups = requireCapability(SystemCapabilities.MANAGE_GROUPS);
 
@@ -26,7 +33,7 @@ const handlers = createAdminGroupsHandlers({
   deleteAclEntries: db.deleteAclEntries,
 });
 
-router.use(requireJwtAuth, requireAdminAccess);
+router.use(requireJwtAuth, requireAdminSurface);
 
 router.get('/', requireReadGroups, handlers.listGroups);
 router.post('/', requireManageGroups, handlers.createGroup);

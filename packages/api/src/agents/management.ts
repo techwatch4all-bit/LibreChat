@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { filterExtensions } from 'librechat-data-provider';
 import type {
   AgentSubagentGraph,
   AgentSubagentGraphEdge,
   AgentSubagentsConfig,
 } from 'librechat-data-provider';
+import type { TenantPolicy } from 'librechat-data-provider';
 import { agentCreateSchema, agentUpdateSchema } from './validation';
 
 const MAX_LIST_LIMIT = 100;
@@ -298,8 +300,21 @@ export function projectAgentManagementResponse(
 
 export function projectAgentManagementListResponse(
   source: AgentManagementListProjectionSource,
+  policy?: TenantPolicy,
 ): AgentManagementListResponse {
-  const data = (source.data ?? []).map(projectAgentManagementResponse);
+  /* Per-tenant policy, applied BEFORE projection so `first_id`/`last_id` are
+   * derived from the rows the client actually receives. Filtering after the
+   * schema parse would leave both cursors pointing at rows that were dropped,
+   * and the next page would skip an agent the tenant is allowed to see. */
+  const allowed = policy
+    ? filterExtensions(
+        policy,
+        'agent',
+        source.data ?? [],
+        (a: AgentManagementProjectionSource) => a.name ?? '',
+      )
+    : (source.data ?? []);
+  const data = allowed.map(projectAgentManagementResponse);
   return agentManagementListResponseSchema.parse({
     object: 'list',
     data,

@@ -1,5 +1,5 @@
 import { logger } from '@librechat/data-schemas';
-import { Permissions, SystemRoles, PrincipalType, PermissionTypes } from 'librechat-data-provider';
+import { Permissions, PrincipalType, PermissionTypes } from 'librechat-data-provider';
 import type {
   TUser,
   TPeoplePickerPermissions,
@@ -132,13 +132,6 @@ export function createPeoplePickerAccess({
       }
 
       const requested = getRequestedPrincipalTypes(req.query);
-
-      if (user.role === SystemRoles.ADMIN) {
-        req.principalSearchTypes =
-          requested.length > 0 ? requested : [...SEARCHABLE_PRINCIPAL_TYPES];
-        return next();
-      }
-
       const role = await getRoleByName(user.role);
       if (!role || !role.permissions) {
         return res.status(403).json({

@@ -1,5 +1,5 @@
 import { logger } from '@librechat/data-schemas';
-import { Permissions, SystemRoles, PrincipalType, PermissionTypes } from 'librechat-data-provider';
+import { Permissions, PrincipalType, PermissionTypes, SystemRoles } from 'librechat-data-provider';
 import type { TPrincipalSearchResult } from 'librechat-data-provider';
 import type { Response } from 'express';
 import type {
@@ -127,19 +127,25 @@ describe('createPeoplePickerAccess', () => {
     expect(outcomeOf(test)).toEqual(forbidden('No permissions configured for user role'));
   });
 
-  it('allows a literal admin every type without loading the role', async () => {
+  it('does not grant broad search access because the role name is ADMIN', async () => {
     const test = setup({ role: SystemRoles.ADMIN });
     await test.run();
 
-    expect(outcomeOf(test)).toEqual(allowed([USER, GROUP, ROLE]));
-    expect(test.getRoleByName).not.toHaveBeenCalled();
+    expect(outcomeOf(test)).toEqual(
+      forbidden('Insufficient permissions to search for users, groups, or roles'),
+    );
+    expect(test.getRoleByName).toHaveBeenCalledWith(SystemRoles.ADMIN);
   });
 
-  it('narrows a literal admin search to the requested types', async () => {
-    const test = setup({ role: SystemRoles.ADMIN, query: { type: GROUP } });
+  it('limits ADMIN searches to explicit role permissions', async () => {
+    const test = setup({
+      role: SystemRoles.ADMIN,
+      query: { type: GROUP },
+      picker: permissionsFor([USER]),
+    });
     await test.run();
 
-    expect(outcomeOf(test)).toEqual(allowed([GROUP]));
+    expect(outcomeOf(test)).toEqual(forbidden('Insufficient permissions to search for groups'));
   });
 
   it.each<[Query, SearchablePrincipalType[], SearchablePrincipalType[]]>([

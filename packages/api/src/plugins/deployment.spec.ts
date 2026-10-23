@@ -59,7 +59,12 @@ afterEach(async () => {
 describe('resolveDeploymentPluginDirectory', () => {
   it('defaults to plugin/ under the project root', () => {
     const resolved = resolveDeploymentPluginDirectory({ projectRoot: '/srv/app', env: {} });
-    expect(resolved).toEqual({ directory: '/srv/app/plugin', explicitlyConfigured: false });
+    // The resolved directory is a native path, so the expectation is derived from
+    // the platform rather than written as a POSIX literal.
+    expect(resolved).toEqual({
+      directory: path.resolve('/srv/app', 'plugin'),
+      explicitlyConfigured: false,
+    });
   });
 
   it('honors an absolute configured directory', () => {
@@ -67,6 +72,8 @@ describe('resolveDeploymentPluginDirectory', () => {
       projectRoot: '/srv/app',
       env: { [DEPLOYMENT_PLUGINS_DIR_ENV]: '/mnt/plugins' },
     });
+    // An explicitly configured absolute directory is used exactly as the operator
+    // wrote it, so the expectation is the literal rather than a resolved path.
     expect(resolved).toEqual({ directory: '/mnt/plugins', explicitlyConfigured: true });
   });
 });

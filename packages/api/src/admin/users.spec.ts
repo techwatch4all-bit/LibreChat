@@ -4,7 +4,7 @@ import type { IUser, UserDeleteResult } from '@librechat/data-schemas';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import type { AdminUsersDeps } from './users';
-import { createAdminUsersHandlers } from './users';
+import { createAdminUsersHandlers, MAX_BULK_ROWS } from './users';
 
 jest.mock('@librechat/data-schemas', () => ({
   ...jest.requireActual('@librechat/data-schemas'),
@@ -32,13 +32,14 @@ function createReqRes(
   overrides: {
     params?: Record<string, string>;
     query?: Record<string, string | string[]>;
+    body?: Record<string, unknown>;
     user?: { _id?: Types.ObjectId; id?: string; role?: string; tenantId?: string };
   } = {},
 ) {
   const req = {
     params: overrides.params ?? {},
     query: overrides.query ?? {},
-    body: {},
+    body: overrides.body ?? {},
     user: overrides.user ?? { _id: new Types.ObjectId(), role: 'admin' },
   } as unknown as ServerRequest;
 
@@ -53,6 +54,23 @@ function createDeps(overrides: Partial<AdminUsersDeps> = {}): AdminUsersDeps {
   return {
     findUsers: jest.fn().mockResolvedValue([]),
     countUsers: jest.fn().mockResolvedValue(0),
+    isPlatformOperator: jest.fn().mockResolvedValue(true),
+    createUserRecord: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+    updateUserRecord: jest.fn().mockResolvedValue(null),
+    getUserGroups: jest.fn().mockResolvedValue([]),
+    upsertBalanceFields: jest.fn().mockResolvedValue(null),
+    hashPassword: jest.fn().mockResolvedValue('hashed-password'),
+    generateTempPassword: jest.fn().mockReturnValue('TempPass123!'),
+    findGroupByName: jest.fn().mockResolvedValue(null),
+    addUserToGroup: jest.fn().mockResolvedValue(undefined),
+    findExistingEmails: jest.fn().mockResolvedValue([]),
+    insertUserRecords: jest
+      .fn()
+      .mockImplementation(async (docs: Array<{ email: string }>) =>
+        docs.map((doc) => ({ _id: new Types.ObjectId(), email: doc.email })),
+      ),
+    insertBalanceRecords: jest.fn().mockResolvedValue(undefined),
+    addUsersToGroupByName: jest.fn().mockResolvedValue(0),
     beginAgentTriggerUserDeletion: jest.fn().mockResolvedValue('acquired'),
     cancelAgentTriggerUserDeletion: jest.fn().mockResolvedValue(true),
     drainAgentTriggerDeliveriesForUser: jest.fn().mockResolvedValue(undefined),
@@ -150,6 +168,90 @@ describe('createAdminUsersHandlers', () => {
 
       expect(status).toHaveBeenCalledWith(500);
       expect(json).toHaveBeenCalledWith({ error: 'Failed to list users' });
+    });
+  });
+
+  describe('listing scope', () => {
+    it('serves a system-scoped listing to a platform operator', async () => {
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(true) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'satchida-master' },
+      });
+
+      await handlers.listUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+    });
+
+    it('confines a tenant admin to their own tenant', async () => {
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(false) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'tenant-a' },
+      });
+
+      await handlers.listUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+    });
+
+    it('ignores a client-supplied scope=all from a tenant admin', async () => {
+      const runAsSystemSpy = jest.spyOn(jest.requireMock('@librechat/data-schemas'), 'runAsSystem');
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(false) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        query: { scope: 'all' },
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'tenant-a' },
+      });
+
+      await handlers.listUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(runAsSystemSpy).not.toHaveBeenCalled();
+      runAsSystemSpy.mockRestore();
+    });
+
+    it('ignores a client-supplied tenantId from a tenant admin', async () => {
+      const runAsSystemSpy = jest.spyOn(jest.requireMock('@librechat/data-schemas'), 'runAsSystem');
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(false) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res } = createReqRes({
+        query: { tenantId: 'tenant-b' },
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'tenant-a' },
+      });
+
+      await handlers.listUsers(req, res);
+
+      expect(runAsSystemSpy).not.toHaveBeenCalled();
+      runAsSystemSpy.mockRestore();
+    });
+
+    it('refuses a caller with neither platform authority nor a tenant', async () => {
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(false) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        user: { _id: new Types.ObjectId(), role: 'ADMIN' },
+      });
+
+      await handlers.listUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(403);
+      expect(json).toHaveBeenCalledWith({ error: 'Tenant context required to list users' });
+    });
+
+    it('refuses a tenantless non-operator search too', async () => {
+      const deps = createDeps({ isPlatformOperator: jest.fn().mockResolvedValue(false) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        query: { q: 'test' },
+        user: { _id: new Types.ObjectId(), role: 'ADMIN' },
+      });
+
+      await handlers.searchUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(403);
+      expect(json).toHaveBeenCalledWith({ error: 'Tenant context required to search users' });
     });
   });
 
@@ -628,6 +730,437 @@ describe('createAdminUsersHandlers', () => {
       expect(deps.prepareAgentTriggerUserPurge).toHaveBeenCalled();
       expect(deps.cancelAgentTriggerUserPurge).not.toHaveBeenCalled();
       expect(deps.cancelAgentTriggerUserDeletion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createUser', () => {
+    it('rejects an invalid email', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ body: { email: 'not-an-email' } });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'A valid email is required' });
+      expect(deps.createUserRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown account type', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        body: { email: 'new@example.com', accountType: 'Platinum' },
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json.mock.calls[0][0].error).toContain('accountType must be one of');
+      expect(deps.createUserRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects a duplicate email within the tenant', async () => {
+      const deps = createDeps({ findUsers: jest.fn().mockResolvedValue([mockUser()]) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ body: { email: 'taken@example.com' } });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(409);
+      expect(json).toHaveBeenCalledWith({
+        error: 'A user with this email already exists',
+        error_code: 'EMAIL_EXISTS',
+      });
+      expect(deps.createUserRecord).not.toHaveBeenCalled();
+    });
+
+    it('provisions the user with hashed password, quota and account type', async () => {
+      const createUserRecord = jest
+        .fn()
+        .mockResolvedValue({ _id: new Types.ObjectId(validUserId) });
+      const upsertBalanceFields = jest.fn().mockResolvedValue(null);
+      const addUserToGroup = jest.fn().mockResolvedValue(undefined);
+      const deps = createDeps({
+        createUserRecord,
+        upsertBalanceFields,
+        addUserToGroup,
+        findGroupByName: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        body: {
+          email: '  New@Example.com ',
+          name: 'New Person',
+          accountType: 'pro',
+          quota: 2500,
+          familyRole: 'adult',
+        },
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'tenant-a' },
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(createUserRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'new@example.com',
+          name: 'New Person',
+          password: 'hashed-password',
+          role: 'USER',
+          tenantId: 'tenant-a',
+          accountType: 'pro',
+          familyRole: 'adult',
+          mustChangePassword: true,
+        }),
+      );
+      expect(upsertBalanceFields).toHaveBeenCalledWith(
+        validUserId,
+        expect.objectContaining({ tokenCredits: 2500, refillAmount: 2500 }),
+      );
+      expect(addUserToGroup).toHaveBeenCalled();
+      const response = json.mock.calls[0][0];
+      expect(response.ok).toBe(true);
+      expect(response.temporaryPassword).toBe('TempPass123!');
+    });
+
+    it('stores the account type even when no matching group exists', async () => {
+      const deps = createDeps({ findGroupByName: jest.fn().mockResolvedValue(null) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        body: { email: 'new@example.com', accountType: 'family' },
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(deps.addUserToGroup).not.toHaveBeenCalled();
+      expect(deps.createUserRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ accountType: 'family' }),
+      );
+    });
+
+    it('returns 500 when the record insert fails', async () => {
+      const deps = createDeps({
+        createUserRecord: jest.fn().mockRejectedValue(new Error('duplicate key')),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ body: { email: 'new@example.com' } });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({ error: 'Failed to create user' });
+    });
+  });
+
+  describe('updateUser', () => {
+    it('rejects an invalid user id', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status, json } = createReqRes({
+        params: { id: 'nope' },
+        body: { name: 'X' },
+      });
+
+      await handlers.updateUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
+    it('rejects a body with no supported fields', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status, json } = createReqRes({
+        params: { id: validUserId },
+        body: { tenantId: 'tenant-b' },
+      });
+
+      await handlers.updateUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'No supported fields to update' });
+    });
+
+    it('returns 404 when the user is outside the caller tenant', async () => {
+      const deps = createDeps({ updateUserRecord: jest.fn().mockResolvedValue(null) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        params: { id: validUserId },
+        body: { name: 'Rename' },
+        user: { _id: new Types.ObjectId(), role: 'ADMIN', tenantId: 'tenant-a' },
+      });
+
+      await handlers.updateUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(404);
+      expect(json).toHaveBeenCalledWith({ error: 'User not found' });
+    });
+
+    it('updates supported fields and returns the list item', async () => {
+      const updateUserRecord = jest
+        .fn()
+        .mockResolvedValue(mockUser({ accountType: 'pro', familyRole: 'adult' }));
+      const deps = createDeps({ updateUserRecord });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        params: { id: validUserId },
+        body: { name: ' Renamed ', accountType: 'pro', familyRole: 'adult' },
+      });
+
+      await handlers.updateUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(updateUserRecord).toHaveBeenCalledWith(validUserId, {
+        name: 'Renamed',
+        accountType: 'pro',
+        familyRole: 'adult',
+      });
+      const response = json.mock.calls[0][0];
+      expect(response.user.accountType).toBe('pro');
+    });
+
+    it('accepts null to clear the account type', async () => {
+      const updateUserRecord = jest.fn().mockResolvedValue(mockUser());
+      const deps = createDeps({ updateUserRecord });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        params: { id: validUserId },
+        body: { accountType: null },
+      });
+
+      await handlers.updateUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(updateUserRecord).toHaveBeenCalledWith(validUserId, { accountType: null });
+    });
+
+    it('never returns the raw seat token', async () => {
+      const token = 'tk_tenant_a_deadbeefcafe1234';
+      const deps = createDeps({
+        updateUserRecord: jest.fn().mockResolvedValue(mockUser({ seatToken: token })),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes({
+        params: { id: validUserId },
+        body: { name: 'Renamed' },
+      });
+
+      await handlers.updateUser(req, res);
+
+      const serialized = JSON.stringify(json.mock.calls[0][0]);
+      expect(serialized).not.toContain('deadbeefcafe');
+      expect(serialized).not.toContain(token);
+      expect(json.mock.calls[0][0].user.seatAssigned).toBe(true);
+      expect(json.mock.calls[0][0].user.seatTokenHint).toBe('…1234');
+    });
+  });
+
+  describe('getUserGroups', () => {
+    it('rejects an invalid user id', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status, json } = createReqRes({ params: { id: 'nope' } });
+
+      await handlers.getUserGroups(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
+    it('returns the groups the user belongs to', async () => {
+      const groups = [{ id: 'g1', name: 'basic' }];
+      const deps = createDeps({ getUserGroups: jest.fn().mockResolvedValue(groups) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ params: { id: validUserId } });
+
+      await handlers.getUserGroups(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith({ groups });
+    });
+  });
+
+  describe('bulkCreateUsers', () => {
+    const roster = [
+      { name: 'A One', email: 'a.one@school.edu', group: 'Grade-10', account_type: 'basic' },
+      { name: 'B Two', email: 'b.two@school.edu', group: 'Grade-10', account_type: 'basic' },
+      { name: 'C Three', email: 'c.three@school.edu', group: 'Faculty', account_type: 'pro' },
+    ];
+
+    it('rejects an empty roster', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ body: { users: [] } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ error_code: 'EMPTY_ROSTER' }));
+      expect(deps.insertUserRecords).not.toHaveBeenCalled();
+    });
+
+    it('rejects a roster above the batch limit', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const rows = Array.from({ length: MAX_BULK_ROWS + 1 }, (_, i) => ({
+        email: `user${i}@school.edu`,
+      }));
+      const { req, res, status, json } = createReqRes({ body: { users: rows } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ error_code: 'BATCH_TOO_LARGE' }));
+      expect(deps.insertUserRecords).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The regression guard for the batched rewrite: a roster must cost one
+     * duplicate query and one insert, not one of each per row.
+     */
+    it('batches the duplicate check and the insert', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({ body: { users: roster } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(deps.findExistingEmails).toHaveBeenCalledTimes(1);
+      expect(deps.findExistingEmails).toHaveBeenCalledWith([
+        'a.one@school.edu',
+        'b.two@school.edu',
+        'c.three@school.edu',
+      ]);
+      expect(deps.insertUserRecords).toHaveBeenCalledTimes(1);
+      expect(deps.insertUserRecords).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ email: 'a.one@school.edu', accountType: 'basic' }),
+          expect.objectContaining({ email: 'c.three@school.edu', accountType: 'pro' }),
+        ]),
+      );
+      expect(deps.insertBalanceRecords).toHaveBeenCalledTimes(1);
+    });
+
+    it('inserts already-hashed passwords and forces a change on first login', async () => {
+      const hashSpy = jest.fn().mockResolvedValue('hashed-password');
+      const deps = createDeps({ hashPassword: hashSpy });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res } = createReqRes({ body: { users: roster } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(hashSpy).toHaveBeenCalledTimes(roster.length);
+      const [docs] = (deps.insertUserRecords as jest.Mock).mock.calls[0];
+      for (const doc of docs as Array<{ password: string; mustChangePassword: boolean }>) {
+        expect(doc.password).toBe('hashed-password');
+        expect(doc.mustChangePassword).toBe(true);
+      }
+    });
+
+    it('skips emails that already exist without failing the batch', async () => {
+      const deps = createDeps({
+        findExistingEmails: jest.fn().mockResolvedValue(['b.two@school.edu']),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes({ body: { users: roster } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      const [payload] = (json as jest.Mock).mock.calls[0];
+      expect(payload.createdCount).toBe(2);
+      expect(payload.skipped).toEqual([
+        expect.objectContaining({ email: 'b.two@school.edu', reason: 'already exists' }),
+      ]);
+    });
+
+    it('reports invalid and duplicated rows as skips rather than failing', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes({
+        body: {
+          users: [
+            { email: 'not-an-email' },
+            { email: 'dup@school.edu' },
+            { email: 'DUP@school.edu' },
+          ],
+        },
+      });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      const [payload] = (json as jest.Mock).mock.calls[0];
+      expect(payload.createdCount).toBe(1);
+      expect(payload.skipped).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ reason: 'invalid email' }),
+          expect.objectContaining({ reason: 'duplicate row in this batch' }),
+        ]),
+      );
+    });
+
+    it('updates each distinct group once, not once per row', async () => {
+      const addToGroup = jest.fn().mockResolvedValue(2);
+      const deps = createDeps({ addUsersToGroupByName: addToGroup });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res } = createReqRes({ body: { users: roster } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      const groupNames = addToGroup.mock.calls.map((call) => call[0]).sort();
+      expect(groupNames).toEqual(['Grade-10', 'Faculty', 'basic', 'pro'].sort());
+      for (const call of addToGroup.mock.calls) {
+        expect((call[1] as string[]).length).toBeGreaterThan(0);
+      }
+    });
+
+    it('parses a CSV payload and maps the account_type column', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const csv = [
+        'name,email,role,account_type,group,quota',
+        'Ada Lovelace,ada@school.edu,USER,basic,Grade-9,250000',
+      ].join('\n');
+      const { req, res, json } = createReqRes({ body: { csvData: csv } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(deps.insertUserRecords).toHaveBeenCalledWith([
+        expect.objectContaining({
+          email: 'ada@school.edu',
+          name: 'Ada Lovelace',
+          accountType: 'basic',
+        }),
+      ]);
+      const [balDocs] = (deps.insertBalanceRecords as jest.Mock).mock.calls[0];
+      expect(balDocs[0]).toEqual(expect.objectContaining({ tokenCredits: 250000 }));
+      const [payload] = (json as jest.Mock).mock.calls[0];
+      expect(payload.slips[0]).toEqual(expect.objectContaining({ group: 'Grade-9' }));
+    });
+
+    it('rejects an unknown account type as a skip', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes({
+        body: { users: [{ email: 'x@school.edu', account_type: 'Family' }] },
+      });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      const [payload] = (json as jest.Mock).mock.calls[0];
+      expect(payload.createdCount).toBe(0);
+      expect(payload.skipped[0].reason).toMatch(/accountType must be one of/);
+    });
+
+    it('returns 500 when the bulk insert fails', async () => {
+      const deps = createDeps({
+        insertUserRecords: jest.fn().mockRejectedValue(new Error('mongo down')),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({ body: { users: roster } });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(500);
     });
   });
 });

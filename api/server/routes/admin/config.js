@@ -14,7 +14,9 @@ const db = require('~/models');
 
 const router = express.Router();
 
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+const requireAdminAccess = requireCapability(SystemCapabilities.OPERATOR_CONTROL, {
+  platformOnly: true,
+});
 
 const handlers = createAdminConfigHandlers({
   listAllConfigs: db.listAllConfigs,

@@ -2,7 +2,7 @@ const express = require('express');
 const request = require('supertest');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { createModels, createMethods } = require('@librechat/data-schemas');
+const { createModels, createMethods, SystemCapabilities } = require('@librechat/data-schemas');
 const { PrincipalType, SystemRoles } = require('librechat-data-provider');
 
 /**
@@ -25,12 +25,18 @@ jest.mock('~/server/middleware/roles/capabilities', () => ({
 let mongoServer;
 let db;
 
+const adminUserId = new mongoose.Types.ObjectId();
+const adminUser = {
+  _id: adminUserId,
+  id: adminUserId.toString(),
+  role: SystemRoles.ADMIN,
+};
+
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
   createModels(mongoose);
   db = createMethods(mongoose);
-  await db.seedSystemGrants();
   await db.initializeRoles();
   await db.seedDefaultRoles();
 });
@@ -40,18 +46,30 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-afterEach(async () => {
-  const SystemGrant = mongoose.models.SystemGrant;
-  // Clean non-seed grants (keep admin seed)
-  await SystemGrant.deleteMany({
-    $or: [
-      { principalId: { $ne: SystemRoles.ADMIN } },
-      { principalType: { $ne: PrincipalType.ROLE } },
-    ],
-  });
+beforeEach(async () => {
+  await mongoose.models.SystemGrant.deleteMany({});
+  await db.seedSystemGrants();
+  /*
+   * This deployment deliberately removed upstream's blanket platform-scoped
+   * grants on the ADMIN role (see `seedSystemGrants`: "ADMIN is tenant-local").
+   * An administrator's authority therefore comes from explicit grants, so this
+   * fixture mirrors `bootstrapOperatorCapability` and grants the caller directly.
+   * `manage:roles` implies `read:roles`, and `manage:users` implies `read:users`.
+   */
+  for (const capability of [
+    SystemCapabilities.ACCESS_ADMIN,
+    SystemCapabilities.MANAGE_ROLES,
+    SystemCapabilities.MANAGE_USERS,
+  ]) {
+    await db.grantCapability({
+      principalType: PrincipalType.USER,
+      principalId: adminUserId,
+      capability,
+    });
+  }
 });
 
-function createApp(user) {
+function createApp(user, { isPlatformOperator = true } = {}) {
   const { createAdminGrantsHandlers, getCachedPrincipals } = require('@librechat/api');
 
   const handlers = createAdminGrantsHandlers({
@@ -65,7 +83,18 @@ function createApp(user) {
     hasCapabilityForPrincipals: db.hasCapabilityForPrincipals,
     getHeldCapabilities: db.getHeldCapabilities,
     getCachedPrincipals,
-    checkRoleExists: async (name) => (await db.getRoleByName(name)) != null,
+    isPlatformOperator: async () => isPlatformOperator,
+    seedTenantAdmin: db.seedTenantAdmin,
+    /** Type-aware existence check, mirroring the route wiring. */
+    checkPrincipalExists: async (principalType, principalId) => {
+      if (principalType === PrincipalType.ROLE) {
+        return (await db.getRoleByName(principalId)) != null;
+      }
+      if (principalType === PrincipalType.GROUP) {
+        return (await db.findGroupById(principalId)) != null;
+      }
+      return (await db.getUserById(principalId)) != null;
+    },
   });
 
   const app = express();
@@ -80,6 +109,7 @@ function createApp(user) {
   router.get('/effective', handlers.getEffectiveCapabilities);
   router.get('/:principalType/:principalId', handlers.getPrincipalGrants);
   router.post('/', handlers.assignGrant);
+  router.post('/tenant-admin', handlers.provisionTenantAdmin);
   router.delete('/:principalType/:principalId/:capability', handlers.revokeGrant);
   app.use('/api/admin/grants', router);
 
@@ -87,31 +117,32 @@ function createApp(user) {
 }
 
 describe('Admin Grants Routes — Integration', () => {
-  const adminUserId = new mongoose.Types.ObjectId();
-  const adminUser = {
-    _id: adminUserId,
-    id: adminUserId.toString(),
-    role: SystemRoles.ADMIN,
-  };
-
-  it('GET / returns seeded admin grants', async () => {
+  it('GET / exposes no platform-scoped ADMIN role grants', async () => {
     const app = createApp(adminUser);
     const res = await request(app).get('/api/admin/grants').expect(200);
 
     expect(res.body).toHaveProperty('grants');
     expect(res.body).toHaveProperty('total');
-    expect(res.body.grants.length).toBeGreaterThan(0);
-    // Seeded grants are for the ADMIN role
-    expect(res.body.grants[0].principalType).toBe(PrincipalType.ROLE);
+    /* The fork removed the blanket ADMIN role grants: `seedSystemGrants` only
+     * deletes them, it does not create any. */
+    expect(
+      res.body.grants.some(
+        (g) => g.principalType === PrincipalType.ROLE && g.principalId === SystemRoles.ADMIN,
+      ),
+    ).toBe(false);
+    // The caller's own direct grants are listed.
+    expect(res.body.grants.some((g) => g.principalType === PrincipalType.USER)).toBe(true);
   });
 
-  it('GET /effective returns capabilities for admin', async () => {
+  it('GET /effective returns the caller grants plus their implications', async () => {
     const app = createApp(adminUser);
     const res = await request(app).get('/api/admin/grants/effective').expect(200);
 
     expect(res.body).toHaveProperty('capabilities');
-    expect(res.body.capabilities).toContain('access:admin');
-    expect(res.body.capabilities).toContain('manage:roles');
+    expect(res.body.capabilities).toContain(SystemCapabilities.ACCESS_ADMIN);
+    expect(res.body.capabilities).toContain(SystemCapabilities.MANAGE_ROLES);
+    // manage:users implies read:users
+    expect(res.body.capabilities).toContain(SystemCapabilities.READ_USERS);
   });
 
   it('POST / assigns a grant and DELETE / revokes it', async () => {
@@ -153,7 +184,25 @@ describe('Admin Grants Routes — Integration', () => {
     expect(afterRes.body.grants.some((g) => g.capability === 'read:users')).toBe(false);
   });
 
-  it('POST / returns 400 for non-existent role when checkRoleExists is wired', async () => {
+  it('POST / refuses a GROUP principal without manage:groups', async () => {
+    const app = createApp(adminUser);
+
+    const res = await request(app)
+      .post('/api/admin/grants')
+      .send({
+        principalType: PrincipalType.GROUP,
+        principalId: new mongoose.Types.ObjectId().toString(),
+        capability: SystemCapabilities.MANAGE_GROUPS,
+      })
+      .expect(403);
+
+    /* The caller holds manage:roles + manage:users, not manage:groups, so a
+     * GROUP grant is refused — authority over one principal kind does not imply
+     * authority over another. */
+    expect(res.body.error).toBe('Insufficient permissions');
+  });
+
+  it('POST / returns 400 for a non-existent principal when the check is wired', async () => {
     const app = createApp(adminUser);
 
     const res = await request(app)
@@ -165,7 +214,59 @@ describe('Admin Grants Routes — Integration', () => {
       })
       .expect(400);
 
-    expect(res.body.error).toBe('Role not found');
+    expect(res.body.error).toBe('Target principal not found');
+  });
+
+  it('POST / refuses a body tenantId from a non-operator', async () => {
+    const tenantAdmin = {
+      _id: adminUserId,
+      id: adminUserId.toString(),
+      role: SystemRoles.ADMIN,
+      tenantId: 'tenant-a',
+    };
+    const app = createApp(tenantAdmin, { isPlatformOperator: false });
+
+    const res = await request(app)
+      .post('/api/admin/grants')
+      .send({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.USER,
+        capability: 'read:users',
+        tenantId: 'tenant-b',
+      })
+      .expect(403);
+
+    expect(res.body.error).toBe('Only a platform operator may target another tenant');
+  });
+
+  it('POST /tenant-admin seeds the tenant-scoped administrator capability set', async () => {
+    const app = createApp(adminUser);
+
+    const res = await request(app)
+      .post('/api/admin/grants/tenant-admin')
+      .send({ tenantId: 'tenant-a', roleName: SystemRoles.ADMIN })
+      .expect(200);
+
+    expect(res.body).toMatchObject({ success: true, tenantId: 'tenant-a' });
+
+    const seeded = await db.getCapabilitiesForPrincipal({
+      principalType: PrincipalType.ROLE,
+      principalId: SystemRoles.ADMIN,
+      tenantId: 'tenant-a',
+    });
+    const capabilities = seeded.map((g) => g.capability);
+    expect(capabilities).toContain(SystemCapabilities.ACCESS_ADMIN);
+    expect(capabilities).toContain(SystemCapabilities.MANAGE_USERS);
+    /* Never a platform grant, and never operator control. */
+    expect(capabilities).not.toContain(SystemCapabilities.OPERATOR_CONTROL);
+    expect(seeded.every((g) => g.tenantId === 'tenant-a')).toBe(true);
+
+    /* The tenant grant must not leak into a platform-level check. */
+    const asPlatform = await db.hasCapabilityForPrincipals({
+      principals: [{ principalType: PrincipalType.ROLE, principalId: SystemRoles.ADMIN }],
+      capability: SystemCapabilities.MANAGE_USERS,
+    });
+    expect(asPlatform).toBe(false);
   });
 
   it('POST / returns 401 without authenticated user', async () => {

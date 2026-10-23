@@ -3,7 +3,6 @@ const {
   Constants,
   Permissions,
   ResourceType,
-  SystemRoles,
   PermissionTypes,
   isAgentsEndpoint,
   isEphemeralAgentId,
@@ -92,23 +91,17 @@ const checkAddedConvoAccess = (requiredPermission) => async (req, res, next) => 
       });
     }
 
-    if (req.user.role !== SystemRoles.ADMIN) {
-      const role = await getRoleByName(req.user.role);
-      const hasMultiConvo = role?.permissions?.[PermissionTypes.MULTI_CONVO]?.[Permissions.USE];
-      if (!hasMultiConvo) {
-        return res.status(403).json({
-          error: 'Forbidden',
-          message: 'Multi-conversation feature is not enabled',
-        });
-      }
+    const role = await getRoleByName(req.user.role);
+    const hasMultiConvo = role?.permissions?.[PermissionTypes.MULTI_CONVO]?.[Permissions.USE];
+    if (!hasMultiConvo) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Multi-conversation feature is not enabled',
+      });
     }
 
     const addedAgentId = addedConvo.agent_id;
     if (!addedAgentId || typeof addedAgentId !== 'string' || isEphemeralAgentId(addedAgentId)) {
-      return next();
-    }
-
-    if (req.user.role === SystemRoles.ADMIN) {
       return next();
     }
 

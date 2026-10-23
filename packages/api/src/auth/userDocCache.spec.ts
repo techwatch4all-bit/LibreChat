@@ -160,6 +160,11 @@ describe('auth user document cache helpers', () => {
       refreshToken: [{ refreshToken: 'secret' }],
       federatedTokens: { access_token: 'secret' },
       openidTokens: { access_token: 'secret' },
+      seatToken: 'tk-secret-seat',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+      privacyAssertion: 'signed-secret-assertion',
+      tenantSeatCapabilities: ['mcp'],
+      privacyEntitled: true,
       totpSecret: 'secret',
       backupCodes: [{ codeHash: 'secret', used: false }],
     });
@@ -176,6 +181,11 @@ describe('auth user document cache helpers', () => {
     expect(cached.user.openidTokens).toBeUndefined();
     expect(cached.user.totpSecret).toBeUndefined();
     expect(cached.user.backupCodes).toBeUndefined();
+    expect(cached.user.seatToken).toBeUndefined();
+    expect(cached.user.satchidaSeatAlias).toBeUndefined();
+    expect(cached.user.privacyAssertion).toBeUndefined();
+    expect(cached.user.tenantSeatCapabilities).toBeUndefined();
+    expect(cached.user.privacyEntitled).toBeUndefined();
 
     expect(store.set).toHaveBeenCalledWith(
       cacheKey,

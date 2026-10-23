@@ -31,6 +31,9 @@ function createParams(
     db: {
       getUserKey: jest.fn(),
       getUserKeyValues: jest.fn(),
+      getPrivacyAssertion: jest.fn().mockResolvedValue(undefined),
+      isPrivacyLocalReady: jest.fn().mockResolvedValue(false),
+      authorizeTenantSeatRequest: jest.fn().mockResolvedValue(false),
     },
   };
 

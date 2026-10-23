@@ -17,13 +17,26 @@ const {
   resolveCodeEnvironmentTransitionVersion,
 } = require('@librechat/api');
 const { EModelEndpoint, defaultSocialLogins } = require('librechat-data-provider');
-const { logger, getTenantId, SystemCapabilities } = require('@librechat/data-schemas');
-const { hasCapability, hasConfigCapability } = require('~/server/middleware/roles/capabilities');
+const { logger, getTenantId } = require('@librechat/data-schemas');
+const {
+  hasOperatorControl,
+  hasConfigCapability,
+} = require('~/server/middleware/roles/capabilities');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getRumConfig } = require('~/server/services/Config/rum');
 const { getAppConfig } = require('~/server/services/Config/app');
 
 const router = express.Router();
+
+async function isOperatorUser(user) {
+  if (!user) return false;
+  return hasOperatorControl({
+    id: user.id ?? user._id?.toString(),
+    role: user.role ?? '',
+    tenantId: user.tenantId,
+    idOnTheSource: user.idOnTheSource ?? null,
+  });
+}
 const emailLoginEnabled =
   process.env.ALLOW_EMAIL_LOGIN === undefined || isEnabled(process.env.ALLOW_EMAIL_LOGIN);
 const passwordResetEnabled = isEnabled(process.env.ALLOW_PASSWORD_RESET);
@@ -73,7 +86,7 @@ function buildPreLoginPayload() {
 
   /** @type {Partial<TStartupConfig>} */
   const payload = {
-    appTitle: process.env.APP_TITLE || 'LibreChat',
+    appTitle: process.env.APP_TITLE || 'Satchida',
     discordLoginEnabled: !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET,
     facebookLoginEnabled: !!process.env.FACEBOOK_CLIENT_ID && !!process.env.FACEBOOK_CLIENT_SECRET,
     githubLoginEnabled: !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET,
@@ -276,10 +289,7 @@ router.get('/', async function (req, res) {
             tenantId: req.user.tenantId,
             idOnTheSource: req.user.idOnTheSource ?? null,
           };
-          const hasAdminAccess = await hasCapability(
-            capabilityUser,
-            SystemCapabilities.ACCESS_ADMIN,
-          );
+          const hasAdminAccess = await hasOperatorControl(capabilityUser);
           if (hasAdminAccess) {
             langfuseConnectionAccess = await hasConfigCapability(capabilityUser, 'langfuse');
           }
@@ -290,19 +300,35 @@ router.get('/', async function (req, res) {
     }
 
     /** @type {TStartupConfig} */
+    const operatorAccess = await hasOperatorControl({
+      id: req.user.id ?? req.user._id?.toString(),
+      role: req.user.role ?? '',
+      tenantId: req.user.tenantId,
+      idOnTheSource: req.user.idOnTheSource ?? null,
+    });
+    const fullModelSpecs = sanitizeModelSpecs(excludeHiddenModelSpecs(appConfig?.modelSpecs));
+    const semanticModelSpecs = fullModelSpecs
+      ? {
+          ...fullModelSpecs,
+          list: (fullModelSpecs.list ?? []).filter((spec) =>
+            ['Chat', 'Work', 'VibeCoder', 'Study', 'Privacy'].includes(spec.name),
+          ),
+        }
+      : undefined;
+    const userInterface = { ...appConfig?.interfaceConfig, modelSelect: true, presets: false };
     const payload = {
       ...preLoginPayload,
       ...publicSharePayload,
       ...buildPostLoginPayload(),
       sharedLinksSnapshotFilesEnabled: sharedLinksEnabled && isFileSnapshotEnabled(appConfig),
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
-      interface: appConfig?.interfaceConfig,
+      interface: operatorAccess ? appConfig?.interfaceConfig : userInterface,
       titleGenerationTiming: resolveTitleTiming({
         appConfig,
         endpoint: EModelEndpoint.agents,
       }),
       turnstile: appConfig?.turnstileConfig,
-      modelSpecs: sanitizeModelSpecs(excludeHiddenModelSpecs(appConfig?.modelSpecs)),
+      modelSpecs: operatorAccess ? fullModelSpecs : semanticModelSpecs,
       balance: balanceConfig,
       bundlerURL: process.env.SANDPACK_BUNDLER_URL,
       staticBundlerURL: process.env.SANDPACK_STATIC_BUNDLER_URL,
@@ -337,24 +363,12 @@ router.get('/', async function (req, res) {
     }
 
     const adminPanelURL = process.env.ADMIN_PANEL_URL;
-    if (adminPanelURL || !payload.allowAccountDeletion) {
-      try {
-        const userId = req.user.id ?? req.user._id?.toString();
-        if (userId) {
-          const hasAdminAccess = await hasCapability(
-            { id: userId, role: req.user.role ?? '', tenantId: req.user.tenantId },
-            SystemCapabilities.ACCESS_ADMIN,
-          );
-          if (hasAdminAccess && adminPanelURL) {
-            payload.adminPanelURL = adminPanelURL;
-          }
-          if (hasAdminAccess && !payload.allowAccountDeletion) {
-            payload.allowAccountDeletion = true;
-          }
-        }
-      } catch (err) {
-        logger.warn(`[config] ACCESS_ADMIN capability check failed: ${err.message}`);
-      }
+    try {
+      const operator = await isOperatorUser(req.user);
+      if (operator && adminPanelURL) payload.adminPanelURL = adminPanelURL;
+      if (operator && !payload.allowAccountDeletion) payload.allowAccountDeletion = true;
+    } catch (err) {
+      logger.warn(`[config] OPERATOR_CONTROL capability check failed: ${err.message}`);
     }
 
     return res.status(200).send(payload);

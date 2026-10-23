@@ -7,6 +7,7 @@ require('module-alias')({ base: path.resolve(__dirname, '..') });
 const cors = require('cors');
 const axios = require('axios');
 const express = require('express');
+const WebSocket = require('ws');
 const mongoose = require('mongoose');
 const passport = require('passport');
 const compression = require('compression');
@@ -61,6 +62,7 @@ const {
   waitForKeyvRedisClient,
   warnOnUnreachableDeliveryPaths,
   createCodeApiUploadRegistry,
+  deadManLeaseGuard,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
 const {
@@ -400,6 +402,10 @@ const startServer = async () => {
   /* Pre-auth tenant context for unauthenticated routes that need tenant scoping.
    * The reverse proxy / auth gateway sets `X-Tenant-Id` header for multi-tenant deployments. */
   app.use('/oauth', preAuthTenantMiddleware, routes.oauth);
+
+  /* Dead-man cryptographic lease & anti-clock-tampering guard */
+  app.use(deadManLeaseGuard);
+
   /* API Endpoints */
   app.use('/api/auth', preAuthTenantMiddleware, routes.auth);
   app.use('/api/insights', routes.insights);
@@ -424,6 +430,8 @@ const startServer = async () => {
   app.use('/api/traces', routes.traces);
   app.use('/api/presets', routes.presets);
   app.use('/api/projects', routes.projects);
+  app.use('/api/opencode', routes.opencode);
+  app.use('/api/ide', routes.ide.router);
   app.use('/api/prompts', routes.prompts);
   app.use('/api/skills', routes.skills);
   app.use('/api/categories', routes.categories);
@@ -459,6 +467,16 @@ const startServer = async () => {
 
   /** 404 for unmatched API routes */
   app.use('/api', apiNotFound);
+
+  /** Admin panel (standalone static app mounted at /admin). Placed before the SPA
+   *  fallback so /admin/* never resolves to the chat app's index.html. Real assets
+   *  are served by the static mount; client-side routes (/admin, /admin/users, ...)
+   *  fall through to the shell. No rebuild needed — plain `pm2 restart librechat`
+   *  picks up file changes under <root>/admin. */
+  const adminDistDir = path.join(__dirname, '../../admin');
+  app.use('/admin', staticCache(adminDistDir), (req, res) =>
+    res.sendFile(path.join(adminDistDir, 'index.html')),
+  );
 
   /** SPA fallback - serve index.html for all unmatched routes */
   app.use(createSpaFallback(sendIndexHtml));
@@ -537,6 +555,60 @@ const startServer = async () => {
     keepAliveTimeoutBuffer: server.keepAliveTimeoutBuffer,
     headersTimeout: server.headersTimeout,
     requestTimeout: server.requestTimeout,
+  });
+
+  const ptyWss = new WebSocket.Server({ noServer: true });
+  server.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname.startsWith('/api/ide')) {
+      if (routes.ide?.vscoderProxy?.upgrade) {
+        // Rewrite origin and host so code-server's internal origin-check passes
+        req.headers['origin'] = `http://${routes.ide.VSCODER_TARGET.replace('http://', '')}`;
+        req.headers['host'] = routes.ide.VSCODER_TARGET.replace('http://', '');
+        routes.ide.vscoderProxy.upgrade(req, socket, head);
+      }
+      return;
+    }
+    const match = url.pathname.match(/\/api\/opencode\/pty\/(pty_[^/]+)\/connect/);
+    if (match) {
+      const ptyId = match[1];
+      ptyWss.handleUpgrade(req, socket, head, (clientWs) => {
+        const opencodePort = process.env.OPENCODE_PORT || 4096;
+        const targetWs = new WebSocket(`ws://127.0.0.1:${opencodePort}/pty/${ptyId}/connect`);
+
+        targetWs.on('open', () => {
+          clientWs.on('message', (msg) => {
+            if (targetWs.readyState === WebSocket.OPEN) {
+              targetWs.send(msg);
+            }
+          });
+        });
+
+        targetWs.on('message', (data) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(data);
+          }
+        });
+
+        const closeBoth = () => {
+          try {
+            clientWs.close();
+          } catch {
+            /* socket already closed */
+          }
+          try {
+            targetWs.close();
+          } catch {
+            /* socket already closed */
+          }
+        };
+
+        clientWs.on('close', closeBoth);
+        clientWs.on('error', closeBoth);
+        targetWs.on('close', closeBoth);
+        targetWs.on('error', closeBoth);
+      });
+    }
   });
 
   setupGracefulShutdown(server);

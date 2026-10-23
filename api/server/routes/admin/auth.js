@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('passport');
 const crypto = require('node:crypto');
+const bcrypt = require('bcryptjs');
 const openIdClient = require('openid-client');
 const { CacheKeys } = require('librechat-data-provider');
 const {
@@ -25,7 +26,7 @@ const {
   isEmailDomainAllowed,
 } = require('@librechat/api');
 const { loginController } = require('~/server/controllers/auth/LoginController');
-const { hasCapability, requireCapability } = require('~/server/middleware/roles/capabilities');
+const { hasOperatorControl, requireCapability } = require('~/server/middleware/roles/capabilities');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const {
   findBalanceByUser,
@@ -33,13 +34,25 @@ const {
   generateToken,
   getUserById,
   upsertBalanceFields,
+  updateUser,
+  deleteAllUserSessions,
 } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const getLogStores = require('~/cache/getLogStores');
 const { getOpenIdConfig } = require('~/strategies');
 const middleware = require('~/server/middleware');
 
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+const requireAdminAccess = requireCapability(SystemCapabilities.OPERATOR_CONTROL, {
+  platformOnly: true,
+});
+
+/**
+ * Panel entry gate for interactive sign-in: satisfied by a platform operator or
+ * by a tenant admin holding `access:admin` in their own tenant. The OAuth admin
+ * entry points below stay on `requireAdminAccess` — those are the operator's SSO
+ * path, and widening them is a separate decision.
+ */
+const requireAdminSurface = requireCapability(SystemCapabilities.ACCESS_ADMIN);
 
 const setBalanceConfig = createSetBalanceConfig({
   getAppConfig,
@@ -122,18 +135,18 @@ async function isEmailAllowedForUser(user) {
 
 function buildAdminRefreshClosures(sessionExpiry) {
   return {
-    canAccessAdmin: async (user) => {
+    canAccessOperator: async (user) => {
       try {
-        return await hasCapability(
-          {
-            id: user.id ?? user._id?.toString(),
-            role: user.role ?? '',
-            tenantId: user.tenantId,
-          },
-          SystemCapabilities.ACCESS_ADMIN,
-        );
+        return await hasOperatorControl({
+          id: user.id ?? user._id?.toString(),
+          role: user.role ?? '',
+          tenantId: user.tenantId,
+          idOnTheSource: user.idOnTheSource ?? null,
+        });
       } catch (err) {
-        logger.warn(`[admin/oauth/refresh] capability check failed, denying: ${err?.message}`);
+        logger.warn(
+          `[admin/oauth/refresh] operator capability check failed, denying: ${err?.message}`,
+        );
         return false;
       }
     },
@@ -162,15 +175,31 @@ router.post(
   middleware.validateEmailLogin,
   middleware.requireLocalAuth,
   tenantContextMiddleware,
-  requireAdminAccess,
+  requireAdminSurface,
   setBalanceConfig,
   loginController,
 );
 
-router.get('/verify', middleware.requireJwtAuth, requireAdminAccess, (req, res) => {
+/**
+ * Returns the caller's identity plus whether they hold platform (cross-tenant)
+ * authority, so the panel can gate operator-only actions without the client
+ * having to infer scope from the role name.
+ */
+router.get('/verify', middleware.requireJwtAuth, requireAdminSurface, async (req, res) => {
   const { password: _p, totpSecret: _t, __v, ...user } = req.user;
   user.id = user._id.toString();
-  res.status(200).json({ user });
+  let isOperator = false;
+  try {
+    isOperator = await hasOperatorControl({
+      id: user.id,
+      role: user.role ?? '',
+      tenantId: user.tenantId,
+      idOnTheSource: user.idOnTheSource ?? null,
+    });
+  } catch (err) {
+    logger.warn(`[admin/verify] operator capability check failed, denying: ${err?.message}`);
+  }
+  res.status(200).json({ user, isOperator, tenantId: user.tenantId ?? null });
 });
 
 router.get('/oauth/openid/check', (req, res) => {
@@ -753,5 +782,153 @@ router.post(
     }
   },
 );
+
+/* ──────────────────────────────────────────────
+ * Gated forgot-password for the standalone admin panel.
+ *
+ * The admin login is a bootstrap operator account (admin@satchida.local), so a
+ * password-reset flow that relies on email delivery would let any unauthenticated
+ * requester trigger a reset. Instead the gate is a challenge question + answer
+ * supplied by the operator through environment configuration:
+ *
+ *   SATCHIDA_ADMIN_RESET_QUESTION  human-readable challenge question
+ *   SATCHIDA_ADMIN_RESET_ANSWER    the expected answer (never echoed in chat output)
+ *
+ * The answer is bcrypt-hashed once at module load and verified with
+ * `bcrypt.compareSync`, so the secret is not held in plaintext in memory. If the
+ * answer env var is absent the gate is closed and both endpoints respond 404,
+ * ensuring the admin account cannot be reset until an operator explicitly opts in.
+ *
+ * No email is sent. Successful resets invalidate every active session/JWT for the
+ * target user via `deleteAllUserSessions`, forcing re-login with the new password.
+ * ────────────────────────────────────────────── */
+
+const ADMIN_RESET_QUESTION = process.env.SATCHIDA_ADMIN_RESET_QUESTION?.trim() ?? undefined;
+const ADMIN_RESET_ANSWER_HASH = (() => {
+  const answer = process.env.SATCHIDA_ADMIN_RESET_ANSWER?.trim();
+  if (!answer) {
+    return null;
+  }
+  return bcrypt.hashSync(answer, 10);
+})();
+
+const isResetGateArmed = () =>
+  typeof ADMIN_RESET_QUESTION === 'string' &&
+  ADMIN_RESET_QUESTION.length > 0 &&
+  ADMIN_RESET_ANSWER_HASH !== null;
+
+/** Generic, non-enumerating message shaped returned from both reset endpoints. */
+const RESET_GENERIC = {
+  ok: true,
+  message: 'If the account exists and the challenge is satisfied, the password has been reset.',
+};
+
+/**
+ * POST /api/admin/forgot-password
+ * Body: { email: string }
+ *
+ * Returns the operator-configured challenge question without revealing whether
+ * the account exists (the same shape is returned whether or not the user is
+ * present), then the client posts the answer + new password to /reset-password.
+ */
+router.post('/forgot-password', middleware.loginLimiter, async (req, res) => {
+  try {
+    if (!isResetGateArmed()) {
+      return res.status(404).json({
+        error: 'Password reset is not configured',
+        error_code: 'RESET_NOT_CONFIGURED',
+      });
+    }
+
+    /* Intentionally do not look up the user here: the challenge question is a
+     * fixed operator secret, so returning it reveals nothing exploitable about
+     * account existence. */
+    res.status(200).json({
+      ok: true,
+      challengeQuestion: ADMIN_RESET_QUESTION,
+      message: 'Solve the challenge to reset the password.',
+    });
+  } catch (err) {
+    logger.error('[admin/forgot-password] Error:', err);
+    res.status(500).json({ error: 'Internal server error', error_code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/admin/reset-password
+ * Body: { email, challengeAnswer, newPassword }
+ *
+ * Verifies the challenge answer against the env-backed hash, then bcrypt-hashes
+ * the new password and writes it to the user document. A wrong answer is the only
+ * distinguishing response (403) — it is the point where the gate has teeth.
+ */
+router.post('/reset-password', middleware.loginLimiter, async (req, res) => {
+  try {
+    if (!isResetGateArmed()) {
+      return res.status(404).json({
+        error: 'Password reset is not configured',
+        error_code: 'RESET_NOT_CONFIGURED',
+      });
+    }
+
+    const { email, challengeAnswer, newPassword } = req.body ?? {};
+
+    if (typeof email !== 'string' || email.trim().length === 0) {
+      return res.status(400).json({
+        error: 'A valid email is required',
+        error_code: 'MISSING_EMAIL',
+      });
+    }
+
+    if (typeof challengeAnswer !== 'string' || challengeAnswer.length === 0) {
+      return res.status(400).json({
+        error: 'Challenge answer is required',
+        error_code: 'MISSING_CHALLENGE_ANSWER',
+      });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({
+        error: 'New password must be at least 8 characters',
+        error_code: 'WEAK_PASSWORD',
+      });
+    }
+
+    const [user] = await findUsers({ email: email.trim() }, 'email _id password');
+
+    /* No user found: respond with the generic success shape so the endpoint
+     * does not confirm or deny the existence of the account. */
+    if (!user) {
+      logger.info(
+        `[admin/reset-password] Reset requested for unknown account [Email: ${email}] [IP: ${req.ip}]`,
+      );
+      return res.status(200).json(RESET_GENERIC);
+    }
+
+    if (!bcrypt.compareSync(challengeAnswer, ADMIN_RESET_ANSWER_HASH)) {
+      logger.warn(`[admin/reset-password] Challenge failed [Email: ${email}] [IP: ${req.ip}]`);
+      return res.status(403).json({
+        error: 'Challenge answer does not match',
+        error_code: 'CHALLENGE_FAILED',
+      });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(newPassword, salt);
+    await updateUser(user._id.toString(), { password: hash });
+    await deleteAllUserSessions({ userId: user._id.toString() });
+
+    logger.info(
+      `[admin/reset-password] Password reset successful [Email: ${email}] [IP: ${req.ip}]`,
+    );
+    res.status(200).json({
+      ok: true,
+      message: 'Password has been reset. You can sign in again with the new password.',
+    });
+  } catch (err) {
+    logger.error('[admin/reset-password] Error:', err);
+    res.status(500).json({ error: 'Internal server error', error_code: 'INTERNAL_ERROR' });
+  }
+});
 
 module.exports = router;

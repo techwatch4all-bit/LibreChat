@@ -5,6 +5,10 @@ import { readFile, stat } from 'fs/promises';
 import { UnsupportedProviderAudioError } from '~/files/upload/errors';
 
 const USER_FACING_UPLOAD_ERRORS = [
+  ['No file_id provided', 'No file_id provided'],
+  ['No agent ID provided', 'No agent ID provided for agent file upload'],
+  ['No endpoint provided', 'No endpoint provided'],
+  ['Empty file uploaded', 'Empty file uploaded'],
   ['Invalid file format', 'Invalid file format'],
   ['exceeds token limit', 'File content exceeds token limit'],
   ['Unable to extract text from', 'Unable to extract text from file'],

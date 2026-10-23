@@ -23,7 +23,7 @@ const mockGetAppConfig = jest.fn();
 
 jest.mock('@librechat/data-schemas', () => ({
   SystemCapabilities: {
-    ACCESS_ADMIN: 'access:admin',
+    OPERATOR_CONTROL: 'operator:control',
     MANAGE_CODE_ENVIRONMENTS: 'manage:code_environments',
   },
 }));
@@ -68,7 +68,7 @@ describe('admin code environment routes', () => {
       .expect(200);
 
     expect(response.body).toEqual({ operation, environmentId: 'attached-vm' });
-    expect(middlewareCalls).toEqual(['jwt', 'access:admin', 'manage:code_environments']);
+    expect(middlewareCalls).toEqual(['jwt', 'operator:control', 'manage:code_environments']);
     expect(mockHandlers[handlerName]).toHaveBeenCalledTimes(1);
     if (path === 'pairings') {
       expect(mockRequireCapability).toHaveBeenCalledWith('manage:code_environments', {

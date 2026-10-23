@@ -129,6 +129,20 @@ function sanitizeUserForCache(user: Partial<IUser>): CachedAuthUser {
   delete sanitized.pendingBackupCodes;
   delete sanitized.federatedTokens;
   delete sanitized.openidTokens;
+  // Seat bearer tokens and local Privacy assertions are credentials used only
+  // during server-side endpoint initialization. Never retain them in burst cache.
+  delete sanitized.seatToken;
+  delete (sanitized as CachedAuthUser & { privacyAssertion?: string }).privacyAssertion;
+  delete (sanitized as CachedAuthUser & { tenantSeatCapabilities?: string[] })
+    .tenantSeatCapabilities;
+  delete (sanitized as CachedAuthUser & { privacyEntitled?: boolean }).privacyEntitled;
+  // The seat alias is NOT a credential and is deliberately kept.
+  //
+  // It is an opaque pseudonym for a seat, not a secret: minting a Privacy
+  // assertion still requires the tenant's signing key, which never leaves the
+  // tenant's own server. Dropping the alias from the cached document left the
+  // request user without a seat, so the Privacy path refused every request.
+  // The seat token and the assertion, which ARE credentials, are dropped above.
 
   return sanitized;
 }

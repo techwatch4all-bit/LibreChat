@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { logger } from '@librechat/data-schemas';
 import { getRegisteredToolApprovalHookCount, clearToolApprovalHooks } from './hooks';
 import { loadToolApprovalHooks } from './hookLoader';
@@ -147,7 +149,12 @@ describe('loadToolApprovalHooks', () => {
         importModule,
         basePath: '/srv/app',
       });
-      expect(importModule).toHaveBeenCalledWith('file:///srv/app/hooks/x.js');
+      // The URL is built from the resolved path, so the expectation is derived
+      // rather than written as a literal: a POSIX path and a Windows path with a
+      // drive letter and backslashes are both correct on their own host.
+      expect(importModule).toHaveBeenCalledWith(
+        pathToFileURL(path.resolve('/srv/app', 'hooks/x.js')).toString(),
+      );
     });
   });
 });

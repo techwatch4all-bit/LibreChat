@@ -100,6 +100,21 @@ export function transformToOpenAIConfig({
 
       if (knownOpenAIParams.has(key)) {
         (openAIConfig as Record<string, unknown>)[key] = value;
+        if (key === 'stream' || key === 'streaming') {
+          if (value === false) {
+            openAIConfig.streaming = false;
+            openAIConfig.disableStreaming = true;
+          } else if (value === true) {
+            openAIConfig.streaming = true;
+            openAIConfig.disableStreaming = false;
+          }
+        } else if (key === 'disableStreaming') {
+          /**
+           * Independent of `streaming` upstream — see the matching note in
+           * `llm.ts` and Bugs.md B34.
+           */
+          openAIConfig.disableStreaming = value === true;
+        }
       } else {
         modelKwargs[key] = value;
         hasModelKwargs = true;

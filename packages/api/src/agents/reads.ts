@@ -9,6 +9,7 @@ import type { IRole, IUser, SystemCapability } from '@librechat/data-schemas';
 import type { Request, Response } from 'express';
 import type { Types } from 'mongoose';
 import type { AgentManagementProjectionSource } from './management';
+import type { TenantPolicyReader } from '~/tenancy/policy';
 import {
   agentManagementListSchema,
   mapAgentManagementError,
@@ -50,6 +51,12 @@ export interface AgentManagementReadDeps {
     requiredPermission: PermissionBits;
   }) => Promise<boolean>;
   hasCapability: (user: IUser, capability: SystemCapability) => Promise<boolean>;
+
+  /**
+   * Per-tenant extension policy reader. Optional so an existing caller keeps
+   * working; without it the platform defaults apply, which deny agents.
+   */
+  getTenantPolicy?: TenantPolicyReader;
 }
 
 function sendError(
@@ -148,7 +155,13 @@ export function createAgentManagementReadHandlers(deps: AgentManagementReadDeps)
         after: parsedQuery.data.cursor,
       });
 
-      return res.status(200).json(projectAgentManagementListResponse(result));
+      /* The agents router authenticates machine-to-machine and does not pass
+       * through requireJwtAuth, so the tenant comes from the resolved principal
+       * rather than from ALS. `getTenantPolicy` is optional: without it the
+       * platform defaults apply, which deny agents. */
+      const policy = deps.getTenantPolicy ? await deps.getTenantPolicy(user.tenantId) : undefined;
+
+      return res.status(200).json(projectAgentManagementListResponse(result, policy));
     } catch (error) {
       logger.error('[AgentManagement] Error listing Agents', error);
       return sendError(res, 'internal_error');

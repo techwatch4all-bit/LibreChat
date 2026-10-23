@@ -17,6 +17,7 @@ import {
 import type { IAclEntry } from '@librechat/data-schemas';
 import type { Model } from 'mongoose';
 import { AccessControlService } from './accessControlService';
+import { mongoInstanceArgs } from '~/test-support/mongo';
 
 let mongo: MongoMemoryServer;
 let entries: Model<IAclEntry>;
@@ -33,7 +34,7 @@ const filter = {
 };
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create({ instance: { args: ['--nounixsocket'] } });
+  mongo = await MongoMemoryServer.create({ instance: { args: mongoInstanceArgs() } });
   await mongoose.connect(mongo.getUri());
   createModels(mongoose);
   entries = mongoose.models.AclEntry as Model<IAclEntry>;
@@ -473,7 +474,7 @@ describe('role-only ACL writes', () => {
   test('keeps all guarded writes inside a caller-owned transaction', async () => {
     const replica = await MongoMemoryReplSet.create({
       replSet: { count: 1 },
-      instanceOpts: [{ args: ['--nounixsocket'] }],
+      instanceOpts: [{ args: mongoInstanceArgs() }],
     });
     const connection = new mongoose.Mongoose();
     try {

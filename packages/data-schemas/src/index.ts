@@ -51,6 +51,8 @@ export {
   digestMCPAuthorityValue,
 } from './methods';
 export { FAVORITE_ITEM_TYPES } from './types/favorite';
+/** Account-type tiers are a runtime list (schema enum + one-api group names), not just a type. */
+export { ACCOUNT_TYPES } from './types/user';
 export {
   AGENT_EVENT_ACTOR_SUMMARY_VERSION,
   MAX_AGENT_EVENT_ACTOR_DISCOVERED_TOOLS,

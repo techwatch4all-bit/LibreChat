@@ -22,6 +22,7 @@ import type {
   TAgentsEndpoint,
 } from './config';
 import type { StatefulCodeEnvironment } from './stateful-code';
+import type { TenantAccountType } from './tenant-entitlement';
 import type { CodeApprovalMode } from './code/approval';
 import type { EToolResources } from './types/tools';
 import type { RefillIntervalUnit } from './balance';
@@ -314,6 +315,8 @@ export type TBackupCode = {
   usedAt: Date | null;
 };
 
+export type TFamilyRole = 'owner' | 'adult' | 'minor' | null;
+
 export type TUser = {
   id: string;
   username: string;
@@ -323,6 +326,20 @@ export type TUser = {
   role: string;
   provider: string;
   tenantId?: string;
+  familyRole?: TFamilyRole;
+  /**
+   * The commercial account type the operator allocated to this seat.
+   *
+   * One of basic, standard, family, pro, pro_family, enterprise, privacy. The
+   * account type is a product, not a capability: a `privacy` seat is a local
+   * product, and whether it may also reach the cloud is decided by the
+   * operator's allocation rather than by the type.
+   */
+  accountType?: TenantAccountType;
+  /** Privileged capabilities the operator granted to this seat. */
+  tenantSeatCapabilities?: string[];
+  /** Whether the seat is entitled to the local Privacy mode. */
+  privacyEntitled?: boolean;
   plugins?: string[];
   twoFactorEnabled?: boolean;
   backupCodes?: TBackupCode[];
@@ -414,11 +431,13 @@ export type TChatProject = {
   lastConversationId?: string | null;
   createdAt: string;
   updatedAt: string;
+  localPath?: string;
 };
 
 export type TCreateChatProjectRequest = {
   name: string;
   description?: string;
+  localPath?: string;
 };
 
 export type TUpdateChatProjectRequest = Partial<TCreateChatProjectRequest> & {

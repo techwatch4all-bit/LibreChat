@@ -1,0 +1,45 @@
+diff --git a/node_modules/@librechat/agents/dist/cjs/llm/invoke.cjs b/node_modules/@librechat/agents/dist/cjs/llm/invoke.cjs
+index befc001..39b667f 100644
+--- a/node_modules/@librechat/agents/dist/cjs/llm/invoke.cjs
++++ b/node_modules/@librechat/agents/dist/cjs/llm/invoke.cjs
+@@ -257,7 +257,7 @@ async function attemptInvoke(params, config) {
+ 			onChunk: params.onChunk,
+ 			preemptAgentId: params.preemptAgentId
+ 		}, stampedConfig);
+-		const calls = result.messages?.flatMap((message) => "tool_calls" in message ? message.tool_calls ?? [] : []) ?? [];
++		const calls = result.messages?.flatMap((message) => message != null && "tool_calls" in message ? message.tool_calls ?? [] : []) ?? [];
+ 		prepared?.finish(preparedAttempt, calls);
+ 		return result;
+ 	} catch (error) {
+diff --git a/node_modules/@librechat/agents/dist/esm/llm/invoke.mjs b/node_modules/@librechat/agents/dist/esm/llm/invoke.mjs
+index 1a70183..88c76ae 100644
+--- a/node_modules/@librechat/agents/dist/esm/llm/invoke.mjs
++++ b/node_modules/@librechat/agents/dist/esm/llm/invoke.mjs
+@@ -257,7 +257,7 @@ async function attemptInvoke(params, config) {
+ 			onChunk: params.onChunk,
+ 			preemptAgentId: params.preemptAgentId
+ 		}, stampedConfig);
+-		const calls = result.messages?.flatMap((message) => "tool_calls" in message ? message.tool_calls ?? [] : []) ?? [];
++		const calls = result.messages?.flatMap((message) => message != null && "tool_calls" in message ? message.tool_calls ?? [] : []) ?? [];
+ 		prepared?.finish(preparedAttempt, calls);
+ 		return result;
+ 	} catch (error) {
+diff --git a/node_modules/@librechat/agents/src/llm/invoke.ts b/node_modules/@librechat/agents/src/llm/invoke.ts
+index b5bf86e..edadcd2 100644
+--- a/node_modules/@librechat/agents/src/llm/invoke.ts
++++ b/node_modules/@librechat/agents/src/llm/invoke.ts
+@@ -768,9 +768,11 @@ export async function attemptInvoke(
+     );
+     const calls =
+       result.messages?.flatMap((message) =>
+-        'tool_calls' in message
+-          ? ((message.tool_calls as ToolCall[] | undefined) ?? [])
+-          : []
++        message == null
++          ? []
++          : 'tool_calls' in message
++            ? ((message.tool_calls as ToolCall[] | undefined) ?? [])
++            : []
+       ) ?? [];
+     prepared?.finish(preparedAttempt, calls);
+     return result;

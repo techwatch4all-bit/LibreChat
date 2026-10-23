@@ -9,7 +9,9 @@ const { getAppConfig } = require('~/server/services/Config');
 const configMiddleware = require('~/server/middleware/config/app');
 
 const router = express.Router();
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+const requireAdminAccess = requireCapability(SystemCapabilities.OPERATOR_CONTROL, {
+  platformOnly: true,
+});
 
 const syncAccess = createAdminSkillsSyncAccess({
   getAppConfig,

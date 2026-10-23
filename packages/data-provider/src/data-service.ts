@@ -1299,6 +1299,10 @@ export function deleteSkill(id: string): Promise<sk.TDeleteSkillResponse> {
   return request.delete(endpoints.getSkill(id));
 }
 
+export function restoreSkill(id: string): Promise<sk.TSkill> {
+  return request.post(endpoints.restoreSkill(id), {});
+}
+
 export function listSkillFiles(skillId: string): Promise<sk.TListSkillFilesResponse> {
   return request.get(endpoints.skillFiles(skillId));
 }

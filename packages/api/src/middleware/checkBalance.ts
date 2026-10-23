@@ -213,13 +213,28 @@ export async function checkBalance(
   deps: CheckBalanceDeps,
 ): Promise<BalanceReservation> {
   const { user, model, endpoint, valueKey, tokenType, amount, endpointTokenConfig } = txData;
-  const multiplier = deps.getMultiplier({
+  let multiplier = deps.getMultiplier({
     valueKey,
     tokenType,
     model,
     endpoint,
     endpointTokenConfig,
   });
+
+  // Support Privacy mode rate multiplier (default 1.0, configurable via PRIVACY_RATE_MULTIPLIER)
+  if (
+    model?.toLowerCase() === 'privacy' ||
+    endpoint?.toLowerCase() === 'privacy' ||
+    valueKey?.toLowerCase() === 'privacy'
+  ) {
+    const rawPrivacyMultiplier = process.env.PRIVACY_RATE_MULTIPLIER;
+    const privacyMultiplier =
+      rawPrivacyMultiplier != null && !isNaN(Number(rawPrivacyMultiplier))
+        ? Number(rawPrivacyMultiplier)
+        : 1.0;
+    multiplier = multiplier * privacyMultiplier;
+  }
+
   const tokenCost = amount * multiplier;
   const reservationId = randomUUID();
   const ttlMs = getReservationTtlMs(deps.balanceConfig);

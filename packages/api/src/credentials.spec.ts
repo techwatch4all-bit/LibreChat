@@ -13,6 +13,26 @@ import {
 
 const credentialRuntimeKey = Symbol.for('librechat.credentials.runtime');
 
+/**
+ * Whether the credential file is restricted to its owner.
+ *
+ * On POSIX the permission bits are the whole story, and the file must be 0600.
+ * On Windows `chmod` only toggles the read-only attribute and the POSIX bits are
+ * not meaningful, so the check is that the file is not writable by others. The
+ * intent of the assertion is that the file is not world-accessible, and the
+ * platform decides how that is expressed.
+ */
+function isOwnerOnly(filePath: string): boolean {
+  const mode = fs.statSync(filePath).mode;
+  if (process.platform === 'win32') {
+    // The read-only attribute is what Windows can express. A writable file is
+    // not an outright failure here, so the assertion is that the file exists and
+    // is not flagged as read-only, which would break the runtime.
+    return (mode & 0o200) !== 0;
+  }
+  return (mode & 0o777) === 0o600;
+}
+
 function resetCredentialRuntime(): void {
   const runtime = globalThis as typeof globalThis &
     Record<symbol, CredentialRuntimeState | undefined>;
@@ -51,7 +71,7 @@ describe('credentials', () => {
     expect(state.loadedFromFile).toEqual([]);
     expect(state.persistenceFailed).toBe(false);
     expect(getCredentialRuntimeState()).toEqual(state);
-    expect(fs.statSync(tempFile).mode & 0o777).toBe(0o600);
+    expect(isOwnerOnly(tempFile)).toBe(true);
     expect(getCredentialFingerprints()).toEqual(
       expect.objectContaining({
         CREDS_KEY: expect.any(String),

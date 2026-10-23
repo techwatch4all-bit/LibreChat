@@ -2,13 +2,10 @@ const express = require('express');
 const request = require('supertest');
 
 const middlewareCalls = [];
+const mockHasOperatorControl = jest.fn();
 const mockRequireJwtAuth = jest.fn((req, _res, next) => {
   middlewareCalls.push('jwt');
   req.user = { id: '68b2f0c498f24c1e78fa0001', role: 'USER' };
-  next();
-});
-const mockRequireCapability = jest.fn((capability) => (req, _res, next) => {
-  middlewareCalls.push(capability);
   next();
 });
 const mockCodeEnvironmentPairingLimiter = jest.fn((_req, _res, next) => {
@@ -66,7 +63,7 @@ jest.mock('@librechat/api', () => ({
 }));
 
 jest.mock('~/server/middleware/roles/capabilities', () => ({
-  requireCapability: mockRequireCapability,
+  hasOperatorControl: (...args) => mockHasOperatorControl(...args),
 }));
 jest.mock('~/server/middleware', () => ({ requireJwtAuth: mockRequireJwtAuth }));
 jest.mock('~/server/services/Config', () => ({
@@ -88,6 +85,7 @@ describe('code environment routes', () => {
   beforeEach(() => {
     middlewareCalls.length = 0;
     jest.clearAllMocks();
+    mockHasOperatorControl.mockResolvedValue(true);
   });
 
   it('defers registry initialization until the route is requested', () => {
@@ -103,14 +101,28 @@ describe('code environment routes', () => {
     expect(mockHandlers.list).toHaveBeenCalledTimes(1);
   });
 
-  it('requires the management capability before registration', async () => {
+  it('requires operator control before registration', async () => {
     await request(createApp())
       .post('/api/code-environments')
       .send({ name: 'Personal VM' })
       .expect(201);
 
-    expect(middlewareCalls).toEqual(['jwt', 'manage:code_environments']);
+    expect(middlewareCalls).toEqual(['jwt']);
+    expect(mockHasOperatorControl).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '68b2f0c498f24c1e78fa0001' }),
+    );
     expect(mockHandlers.register).toHaveBeenCalledTimes(1);
+  });
+
+  it('denies tenant admins without operator control from registering environments', async () => {
+    mockHasOperatorControl.mockResolvedValue(false);
+
+    await request(createApp())
+      .post('/api/code-environments')
+      .send({ name: 'Tenant VM' })
+      .expect(403);
+
+    expect(mockHandlers.register).not.toHaveBeenCalled();
   });
 
   it('allows an authenticated user to pair through an opted-in control plane', async () => {

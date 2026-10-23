@@ -51,7 +51,7 @@ const skillSchema: Schema<ISkillDocument> = new Schema(
     name: {
       type: String,
       required: true,
-      index: true,
+
       maxlength: [SKILL_NAME_MAX_LENGTH, `Name cannot exceed ${SKILL_NAME_MAX_LENGTH} characters`],
       validate: {
         validator: function (value: string): boolean {
@@ -139,6 +139,25 @@ const skillSchema: Schema<ISkillDocument> = new Schema(
       default: true,
     },
     /**
+     * When `true`, this skill is restricted strictly to administrators.
+     * Normal users cannot view, invoke, or search this skill.
+     * Solves the issue where administrative/system skills (e.g., Satchida,
+     * Bifrost) leak to ordinary users.
+     */
+    adminOnly: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    /**
+     * Optional granular role allowlist for this skill (e.g., ['ADMIN', 'PRO_USER']).
+     * If populated and user's role is not included, the skill is omitted from their catalog.
+     */
+    allowedRoles: {
+      type: [String],
+      default: undefined,
+    },
+    /**
      * Skill-declared tool allowlist forwarded verbatim from frontmatter.
      * Surfaced on resolved skill primes so the agent's effective tool set
      * for the turn can union these in alongside the agent-configured tools.
@@ -218,6 +237,17 @@ const skillSchema: Schema<ISkillDocument> = new Schema(
       type: String,
       index: true,
     },
+    /**
+     * Soft deletion timestamp.
+     * When null or undefined, the skill is active.
+     * When populated with a Date, the skill is soft-deleted and hidden from ordinary users,
+     * but available for administrators to inspect and restore.
+     */
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -228,6 +258,7 @@ skillSchema.index({ author: 1, tenantId: 1 });
 skillSchema.index({ category: 1, updatedAt: -1 });
 skillSchema.index({ updatedAt: -1, _id: 1 });
 skillSchema.index({ name: 1, author: 1, tenantId: 1 }, { unique: true });
+skillSchema.index({ deletedAt: 1, updatedAt: -1 });
 skillSchema.index({ source: 1, 'sourceMetadata.upstreamId': 1, tenantId: 1 });
 skillSchema.index({ source: 1, 'sourceMetadata.sourceId': 1, tenantId: 1 });
 

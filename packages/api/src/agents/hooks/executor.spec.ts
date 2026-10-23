@@ -70,7 +70,16 @@ afterEach(async () => {
   await fs.promises.rm(path.dirname(pluginRoot), { recursive: true, force: true });
 });
 
-describe('createCommandExecutor', () => {
+/**
+ * These cases drive real hook commands through a POSIX shell.
+ *
+ * The commands use `bash -c`, `trap`, `$$` and POSIX shell loops, none of which
+ * exist on Windows. The suite is skipped there rather than left failing, so a
+ * green run means "the cases that can run on this host all passed".
+ */
+const describePosix = process.platform === 'win32' ? describe.skip : describe;
+
+describePosix('createCommandExecutor', () => {
   test('advertises the plan-time capabilities', () => {
     const executor = createCommandExecutor({ pluginRoot, pluginData });
     expect(executor.capabilities).toBe(commandExecutorCapabilities);

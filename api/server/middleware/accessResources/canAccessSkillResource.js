@@ -34,10 +34,15 @@ const canAccessSkillResource = (options) => {
       return aclMiddleware(req, res, next);
     }
     if (requiredPermission !== PermissionBits.VIEW) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Deployment skills are read-only',
-      });
+      const isAdmin = req.user?.role === 'ADMIN';
+      if (isAdmin && requiredPermission === PermissionBits.EDIT) {
+        // Admins are allowed to edit metadata (adminOnly/allowedRoles) for deployment skills
+      } else {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Deployment skills are read-only',
+        });
+      }
     }
     req.resourceAccess = {
       resourceType: ResourceType.SKILL,

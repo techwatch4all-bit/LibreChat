@@ -31,6 +31,9 @@ function createDb(): EndpointDbMethods {
   return {
     getUserKey: jest.fn().mockResolvedValue('user-google-key'),
     getUserKeyValues: jest.fn().mockResolvedValue({}),
+    getPrivacyAssertion: jest.fn().mockResolvedValue(undefined),
+    isPrivacyLocalReady: jest.fn().mockResolvedValue(false),
+    authorizeTenantSeatRequest: jest.fn().mockResolvedValue(false),
   };
 }
 

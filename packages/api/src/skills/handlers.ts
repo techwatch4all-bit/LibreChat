@@ -34,10 +34,16 @@ import type {
 import type { Response } from 'express';
 import type { Types } from 'mongoose';
 import type { ServerRequest, StrategyFunctions } from '~/types';
+import type { TenantPolicyReader } from '~/tenancy/policy';
+import {
+  getDeploymentSkillIds,
+  isDeploymentSkillId,
+  updateDeploymentSkillMeta,
+} from './deployment';
 import { extractSkillContent, inspectContentWithTraversal } from '~/protection';
 import { deleteSkillWithRetry, mergeDeleteSkillResults } from './cleanup';
 import { contentFilterBlockResponse } from '~/middleware/contentFilter';
-import { getDeploymentSkillIds } from './deployment';
+import { applyTenantPolicy, loadTenantPolicy } from '~/tenancy/policy';
 import { resolveDownloadPath } from '~/storage/path';
 import { resolveSkillFilePathParam } from './path';
 import { parseSkillMarkdown } from './parse';
@@ -64,7 +70,8 @@ export interface SkillsHandlersDeps {
     expectedVersion: number;
     update: UpdateSkillInput;
   }) => Promise<UpdateSkillResult>;
-  deleteSkill: (id: string) => Promise<DeleteSkillResult>;
+  deleteSkill: (id: string, options?: { permanent?: boolean }) => Promise<DeleteSkillResult>;
+  restoreSkill: (id: string) => Promise<(ISkill & { _id: Types.ObjectId }) | null>;
   listSkillFiles: (
     skillId: string | Types.ObjectId,
   ) => Promise<Array<ISkillFile & { _id: Types.ObjectId }>>;
@@ -115,6 +122,13 @@ export interface SkillsHandlersDeps {
 
   /** ObjectId validation helper from data-schemas. */
   isValidObjectIdString: (value: unknown) => boolean;
+
+  /**
+   * Per-tenant extension policy reader. Optional so a caller that has not been
+   * wired up keeps working — without it the platform defaults apply, which for
+   * skills means visible, matching the documented default.
+   */
+  getTenantPolicy?: TenantPolicyReader;
 }
 
 /**
@@ -164,8 +178,11 @@ function serializeSkill(
     sourceMetadata: serializeSourceMetadata(skill.sourceMetadata),
     fileCount: skill.fileCount,
     alwaysApply: skill.alwaysApply,
+    adminOnly: skill.adminOnly ?? false,
+    allowedRoles: skill.allowedRoles,
     isPublic: pub,
     tenantId: skill.tenantId,
+    deletedAt: skill.deletedAt ? new Date(skill.deletedAt).toISOString() : null,
     createdAt: (skill.createdAt ?? new Date()).toISOString(),
     updatedAt: (skill.updatedAt ?? new Date()).toISOString(),
   };
@@ -192,8 +209,11 @@ function serializeSkillSummary(
     sourceMetadata: serializeSourceMetadata(skill.sourceMetadata),
     fileCount: skill.fileCount,
     alwaysApply: skill.alwaysApply,
+    adminOnly: skill.adminOnly ?? false,
+    allowedRoles: skill.allowedRoles,
     isPublic: pub,
     tenantId: skill.tenantId,
+    deletedAt: skill.deletedAt ? new Date(skill.deletedAt).toISOString() : null,
     createdAt: (skill.createdAt ?? new Date()).toISOString(),
     updatedAt: (skill.updatedAt ?? new Date()).toISOString(),
   };
@@ -319,6 +339,7 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
   get: (req: ServerRequest, res: Response, options?: SkillResponseOptions) => Promise<Response>;
   patch: (req: ServerRequest, res: Response, options?: SkillResponseOptions) => Promise<Response>;
   delete: (req: ServerRequest, res: Response) => Promise<Response>;
+  restore: (req: ServerRequest, res: Response) => Promise<Response>;
   listFiles: (req: ServerRequest, res: Response) => Promise<Response>;
   downloadFile: (req: ServerRequest, res: Response) => Promise<Response | undefined>;
   deleteFile: (req: ServerRequest, res: Response) => Promise<Response>;
@@ -329,6 +350,7 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
     listSkillsByAccess,
     updateSkill,
     deleteSkill,
+    restoreSkill,
     listSkillFiles,
     deleteSkillFile,
     getSkillFileByPath,
@@ -339,6 +361,7 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
     hasPublicPermission,
     grantPermission,
     isValidObjectIdString,
+    getTenantPolicy,
   } = deps;
 
   /** O(1) public check for a single skill (avoids fetching all public IDs). */
@@ -360,11 +383,12 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
       if (!user || !user.id) {
         return res.status(401).json({ error: 'Authentication required' });
       }
-      const { category, search, limit, cursor } = req.query as {
+      const { category, search, limit, cursor, deleted } = req.query as {
         category?: string;
         search?: string;
         limit?: string;
         cursor?: string;
+        deleted?: string;
       };
       const parsedLimit = parseLimit(limit);
 
@@ -387,6 +411,10 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
         new Map([...accessibleIds, ...publicIds].map((id) => [id.toString(), id])).values(),
       );
 
+      const isAdmin = user.role === 'ADMIN' || user.role === 'admin';
+      const userRole = user.role;
+      const onlyDeleted = isAdmin && (deleted === 'true' || deleted === '1');
+
       const result = await listSkillsByAccess({
         accessibleIds: mergedIds,
         category: typeof category === 'string' && category.length > 0 ? category : undefined,
@@ -395,10 +423,41 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
         limit: options?.limit ?? parsedLimit,
         cursor:
           options?.cursor ?? (typeof cursor === 'string' && cursor.length > 0 ? cursor : null),
+        isAdmin,
+        userRole,
+        onlyDeleted,
       });
 
       const publicSet = new Set(publicIds.map((id) => id.toString()));
-      const skills = result.skills.map((s) => serializeSkillSummary(s, publicSet));
+
+      /* Per-tenant policy. Applied AFTER the deployment/Mongo merge, because
+       * deployment skills come off the filesystem and carry no tenantId — a
+       * filter inside the Mongo query would not see them at all. */
+      const tenantFiltered = getTenantPolicy
+        ? applyTenantPolicy(
+            await loadTenantPolicy(req, getTenantPolicy),
+            'skill',
+            result.skills,
+            (s) => s.name,
+          )
+        : result.skills;
+
+      /* Granular Admin-Only & Role gating:
+       * Exclude adminOnly skills (e.g. Satchida, Satchida-Gateway) and enforce allowedRoles for ordinary users */
+      const visible = tenantFiltered.filter((s) => {
+        if (isAdmin) {
+          return true;
+        }
+        if (s.adminOnly === true) {
+          return false;
+        }
+        if (Array.isArray(s.allowedRoles) && s.allowedRoles.length > 0) {
+          return userRole ? s.allowedRoles.includes(userRole) : false;
+        }
+        return true;
+      });
+
+      const skills = visible.map((s) => serializeSkillSummary(s, publicSet));
 
       return res.status(200).json({
         skills,
@@ -528,6 +587,33 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
       const { id } = req.params as { id: string };
       const body = (req.body ?? {}) as TUpdateSkillPayload & { expectedVersion?: number };
       const { expectedVersion, ...rest } = body;
+      const isAdmin = req.user?.role === 'ADMIN';
+
+      // Deployment skills are read-only for general content, but Admins can toggle
+      // adminOnly or allowedRoles to control tenant/user availability.
+      if (isDeploymentSkillId(id)) {
+        if (!isAdmin) {
+          return res
+            .status(403)
+            .json({ error: 'Only administrators can modify deployment skill access' });
+        }
+        const updatedDeployment = updateDeploymentSkillMeta(id, {
+          adminOnly: rest.adminOnly,
+          allowedRoles: rest.allowedRoles,
+        });
+        if (!updatedDeployment) {
+          return res.status(404).json({ error: 'Deployment skill not found' });
+        }
+        return res
+          .status(200)
+          .json(
+            serializeSkill(
+              updatedDeployment as unknown as ISkill & { _id: Types.ObjectId },
+              updatedDeployment.isPublic,
+            ),
+          );
+      }
+
       // `typeof NaN === 'number'` is true, so we need the stricter isFinite/isInteger
       // checks below to avoid NaN passing through and triggering a misleading 409
       // (MongoDB's `{ version: NaN }` never matches, so the handler would fall
@@ -553,6 +639,8 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
       }
       if (rest.category !== undefined) update.category = rest.category;
       if (rest.alwaysApply !== undefined) update.alwaysApply = rest.alwaysApply;
+      if (rest.adminOnly !== undefined) update.adminOnly = rest.adminOnly;
+      if (rest.allowedRoles !== undefined) update.allowedRoles = rest.allowedRoles;
 
       if (Object.keys(update).length === 0) {
         return res.status(400).json({ error: 'At least one field must be provided for update' });
@@ -599,6 +687,25 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
       const { id } = req.params as { id: string };
       if (!isValidObjectIdString(id)) {
         return res.status(400).json({ error: 'Invalid skill id' });
+      }
+
+      // Deployment skills cannot be deleted by anyone via standard delete endpoint
+      if (isDeploymentSkillId(id)) {
+        return res.status(403).json({ error: 'System deployment skills cannot be deleted' });
+      }
+
+      // Check author ownership: users can ONLY delete skills they personally authored
+      const existingSkill = await getSkillById(id);
+      if (!existingSkill) {
+        return res.status(404).json({ error: 'Skill not found' });
+      }
+
+      const isAuthor = existingSkill.author?.toString() === req.user?.id?.toString();
+      const isAdmin = req.user?.role === 'ADMIN';
+      if (!isAuthor && !isAdmin) {
+        return res.status(403).json({
+          error: 'Permission denied: You are only permitted to delete skills that you created.',
+        });
       }
 
       // Collect file records before deletion so we can clean up storage blobs
@@ -662,6 +769,38 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
     } catch (error) {
       logger.error('[DELETE /skills/:id] Error deleting skill', error);
       return res.status(500).json({ error: 'Error deleting skill' });
+    }
+  }
+
+  async function restoreHandler(req: ServerRequest, res: Response) {
+    try {
+      const user = req.user;
+      if (!user || !user.id) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const isAdmin = user.role === 'ADMIN' || user.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).json({
+          error: 'Permission denied: Only administrators can restore deleted skills.',
+        });
+      }
+
+      const { id } = req.params as { id: string };
+      if (!isValidObjectIdString(id)) {
+        return res.status(400).json({ error: 'Invalid skill id' });
+      }
+
+      const restored = await restoreSkill(id);
+      if (!restored) {
+        return res.status(404).json({ error: 'Skill not found or not in deleted state' });
+      }
+
+      const response = serializeSkill(restored, false);
+      return res.status(200).json(response);
+    } catch (error) {
+      logger.error('[POST /skills/:id/restore] Error restoring skill', error);
+      return res.status(500).json({ error: 'Error restoring skill' });
     }
   }
 
@@ -887,6 +1026,7 @@ export function createSkillsHandlers(deps: SkillsHandlersDeps): {
     get: getHandler,
     patch: patchHandler,
     delete: deleteHandler,
+    restore: restoreHandler,
     listFiles: listFilesHandler,
     downloadFile: downloadFileHandler,
     deleteFile: deleteFileHandler,

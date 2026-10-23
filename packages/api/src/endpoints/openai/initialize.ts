@@ -1,4 +1,4 @@
-import { ErrorTypes, EModelEndpoint, mapModelToAzureConfig } from 'librechat-data-provider';
+﻿import { ErrorTypes, EModelEndpoint, mapModelToAzureConfig } from 'librechat-data-provider';
 import type {
   InitializeResultBase,
   OpenAIConfigOptions,
@@ -88,7 +88,7 @@ export async function initializeOpenAI(
 
   let apiKey = userProvidesKey
     ? userValues?.apiKey
-    : credentials[endpoint as keyof typeof credentials];
+    : (user?.seatToken ?? credentials[endpoint as keyof typeof credentials]);
   const baseURL = userProvidesURL ? userValues?.baseURL : configuredBaseURL;
 
   const clientOptions: OpenAIConfigOptions = {
@@ -103,7 +103,7 @@ export async function initializeOpenAI(
 
   /**
    * Custom headers are forwarded only when the destination URL is admin-trusted.
-   * When the user supplies the base URL, withhold them — they may carry
+   * When the user supplies the base URL, withhold them â€” they may carry
    * `${SECRET}` gateway values or user/OpenID token placeholders resolved later
    * by `resolveConfigHeaders`, which must not reach a user-controlled endpoint.
    */
@@ -127,7 +127,7 @@ export async function initializeOpenAI(
       headers: { ...headers, ...(clientOptions.headers ?? {}) },
       user,
     });
-    /** `endpoints.all` headers apply globally, but stay unresolved here — they are
+    /** `endpoints.all` headers apply globally, but stay unresolved here â€” they are
      *  resolved once at request time by `resolveConfigHeaders`. Resolving them now
      *  (in addition) would re-expand already-substituted user values, violating the
      *  env-before-user invariant. Azure-managed headers stay authoritative. */

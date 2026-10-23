@@ -12,6 +12,22 @@ function mockResponse(): Response {
   return res;
 }
 
+/**
+ * The skill the delete handler reads to check authorship.
+ *
+ * The ownership check is a security control: a user may only delete a skill they
+ * authored, and only an admin may delete anyone's. The delete tests had to
+ * supply it or the handler refused before it deleted anything.
+ */
+function mockOwnedSkill(overrides: Record<string, unknown> = {}) {
+  return {
+    _id: new Types.ObjectId(),
+    name: 'owned-skill',
+    author: 'user-1',
+    ...overrides,
+  } as unknown as Awaited<ReturnType<SkillsHandlersDeps['getSkillById']>>;
+}
+
 describe('skill delete handler', () => {
   it('retries dependent cleanup before the deleted skill becomes unreachable', async () => {
     const id = new Types.ObjectId().toString();
@@ -39,8 +55,9 @@ describe('skill delete handler', () => {
       listSkillFiles: jest.fn(async () => [file]),
       getStrategyFunctions: jest.fn(() => ({ deleteFile: deleteBlob })),
       isValidObjectIdString: jest.fn(() => true),
+      getSkillById: jest.fn(async () => mockOwnedSkill()),
     } as unknown as SkillsHandlersDeps);
-    const req = { params: { id } } as unknown as ServerRequest;
+    const req = { params: { id }, user: { id: 'user-1' } } as unknown as ServerRequest;
     const res = mockResponse();
 
     await handlers.delete(req, res);
@@ -65,8 +82,9 @@ describe('skill delete handler', () => {
       listSkillFiles: jest.fn(async () => []),
       getStrategyFunctions: jest.fn(),
       isValidObjectIdString: jest.fn(() => true),
+      getSkillById: jest.fn(async () => mockOwnedSkill()),
     } as unknown as SkillsHandlersDeps);
-    const req = { params: { id } } as unknown as ServerRequest;
+    const req = { params: { id }, user: { id: 'user-1' } } as unknown as ServerRequest;
     const res = mockResponse();
 
     await handlers.delete(req, res);
@@ -97,8 +115,9 @@ describe('skill delete handler', () => {
       ]),
       getStrategyFunctions: jest.fn(() => ({ deleteFile: deleteBlob })),
       isValidObjectIdString: jest.fn(() => true),
+      getSkillById: jest.fn(async () => mockOwnedSkill()),
     } as unknown as SkillsHandlersDeps);
-    const req = { params: { id } } as unknown as ServerRequest;
+    const req = { params: { id }, user: { id: 'user-1' } } as unknown as ServerRequest;
     const res = mockResponse();
 
     await handlers.delete(req, res);

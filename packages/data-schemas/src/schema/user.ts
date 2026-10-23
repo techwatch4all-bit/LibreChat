@@ -1,4 +1,4 @@
-import { Schema } from 'mongoose';
+﻿import { Schema } from 'mongoose';
 import { SystemRoles, STATEFUL_CODE_ENVIRONMENTS } from 'librechat-data-provider';
 import { IUser } from '~/types';
 
@@ -131,6 +131,23 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    challengeQuestion: {
+      type: String,
+      default: null,
+    },
+    challengeAnswerHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+    },
     agentTriggerDeletionStartedAt: {
       type: Date,
       select: false,
@@ -199,6 +216,85 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       type: String,
       index: true,
     },
+    familyAccountId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    guardianId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    familyRole: {
+      type: String,
+      enum: ['owner', 'adult', 'minor', null],
+      default: null,
+    },
+    seatToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    satchidaSeatAlias: {
+      type: String,
+      default: null,
+      select: false,
+      match: /^[A-Za-z0-9_-]{16,128}$/,
+    },
+    privacyAssertion: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    accountType: {
+      type: String,
+      enum: ['basic', 'pro', 'family', 'privacy', null],
+      default: null,
+    },
+    familyLimits: {
+      type: {
+        imageGenEnabled: { type: Boolean, default: false },
+        imageCreditsPerDay: { type: Number, min: 0, default: null },
+        tokenCreditsPerDay: { type: Number, min: 0, default: null },
+        allowedHoursFrom: {
+          type: String,
+          match: /^(?:[01]\d|2[0-3]):[0-5]\d$/,
+          default: null,
+        },
+        allowedHoursTo: {
+          type: String,
+          match: /^(?:[01]\d|2[0-3]):[0-5]\d$/,
+          default: null,
+        },
+        timezone: { type: String, default: null },
+      },
+      default: null,
+    },
+    guardianProcessingConsentAt: {
+      type: Date,
+      default: null,
+    },
+    guardianProcessingConsentVersion: {
+      type: String,
+      default: null,
+    },
+    parentalTranscriptConsentAt: {
+      type: Date,
+      default: null,
+    },
+    parentalTranscriptConsentVersion: {
+      type: String,
+      default: null,
+    },
+    imageGenerationConsentAt: {
+      type: Date,
+      default: null,
+    },
+    imageGenerationConsentVersion: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true },
 );
@@ -206,6 +302,14 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
 userSchema.index({ email: 1, tenantId: 1 }, { unique: true });
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ idOnTheSource: 1, openidIssuer: 1, tenantId: 1 });
+userSchema.index(
+  { familyAccountId: 1, tenantId: 1, familyRole: 1 },
+  { partialFilterExpression: { familyAccountId: { $type: 'objectId' } } },
+);
+userSchema.index(
+  { guardianId: 1, tenantId: 1, familyRole: 1 },
+  { partialFilterExpression: { guardianId: { $type: 'objectId' } } },
+);
 
 const oAuthIdFields = [
   'googleId',

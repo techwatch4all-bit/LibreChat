@@ -16,6 +16,7 @@ import {
   validateThemeDefinition,
 } from '../registry';
 import applyTheme, { applyResolvedTheme, themeOwnedProperties } from '../utils/applyTheme';
+import { satchidaTheme } from '../themes/satchida';
 import { defaultTheme } from '../themes/default';
 import { darkTheme } from '../themes/dark';
 import '../highContrast.css';
@@ -32,7 +33,16 @@ const themeModes = [
   'system',
   'high-contrast-light',
   'high-contrast-dark',
+  'satchida-dark',
+  'satchida-light',
 ] as const;
+
+export type Season = 'winter' | 'monsoon' | 'spring' | 'autumn';
+
+export function getActiveSeason(_theme: string): Season | null {
+  void _theme;
+  return null;
+}
 
 type AppearanceMode = (typeof themeModes)[number];
 
@@ -70,6 +80,7 @@ type ThemeContextType = {
    */
   resolvedMode: ThemeMode;
   highContrast: boolean;
+  season?: Season | null;
   themeRGB?: IThemeRGB;
   setThemeRGB: (colors?: IThemeRGB) => void;
   themeDefinition?: ThemeDefinition;
@@ -84,6 +95,7 @@ export const ThemeContext: React.Context<ThemeContextType> = createContext<Theme
   setTheme: () => undefined,
   resolvedMode: 'light',
   highContrast: false,
+  season: null,
   setThemeRGB: () => undefined,
   setThemeDefinition: () => undefined,
   setThemeName: () => undefined,
@@ -116,7 +128,11 @@ export const isDark = (theme: string): boolean => {
   if (theme === 'system') {
     return matchesMedia('(prefers-color-scheme: dark)');
   }
-  return theme === 'dark' || theme === 'high-contrast-dark';
+  return (
+    theme === 'dark' ||
+    theme === 'high-contrast-dark' ||
+    (theme.startsWith('satchida') && theme !== 'satchida-light')
+  );
 };
 
 /**
@@ -219,7 +235,7 @@ const writeStorage = (key: string, value?: string): void => {
 
 const getInitialTheme = (): AppearanceMode => {
   const stored = readStorage(THEME_KEY);
-  return stored && isAppearanceMode(stored) ? stored : 'system';
+  return stored && isAppearanceMode(stored) ? stored : 'satchida-dark';
 };
 
 const getStoredThemeState = (): InitialThemeState => {
@@ -305,6 +321,7 @@ const restoreThemeDOM = (snapshot: ThemeDOMSnapshot, root: HTMLElement): void =>
   } else {
     root.setAttribute('data-theme', snapshot.dataTheme);
   }
+  root.removeAttribute('data-season');
 };
 
 export function ThemeProvider({
@@ -615,10 +632,17 @@ export function ThemeProvider({
 
       /** A contrast mode is an accessibility need, so it outranks both a
        *  deployment's custom definition and the legacy RGB colors. */
-      const definition = highContrast ? highContrastTheme : themeDefinition;
+      const isSatchidaTheme = currentTheme.startsWith('satchida');
+      let definition = themeDefinition;
+      if (highContrast) {
+        definition = highContrastTheme;
+      } else if (isSatchidaTheme) {
+        definition = satchidaTheme;
+      }
 
       if (!definition) {
         restoreAppliedTheme(root);
+        root.removeAttribute('data-season');
         return;
       }
 
@@ -627,16 +651,31 @@ export function ThemeProvider({
         root.style.setProperty('color-scheme', mode);
       }
 
-      if (!highContrast && legacyThemeRGB) {
+      if (!highContrast && !isSatchidaTheme && legacyThemeRGB) {
         applyTheme(legacyThemeRGB, root, mode === 'dark' ? darkTheme : defaultTheme);
         root.dataset.theme = definition.name;
+        root.removeAttribute('data-season');
         return;
       }
 
       try {
-        applyResolvedTheme(resolveTheme(definition, mode), root);
+        const resolvedTheme = resolveTheme(definition, mode);
+        applyResolvedTheme(resolvedTheme, root);
+        if (isSatchidaTheme) {
+          root.dataset.theme = 'satchida';
+          const currentSeason = getActiveSeason(currentTheme);
+          if (currentSeason) {
+            root.dataset.season = currentSeason;
+          } else {
+            root.removeAttribute('data-season');
+          }
+        } else {
+          root.removeAttribute('data-theme');
+          root.removeAttribute('data-season');
+        }
       } catch (error) {
         restoreAppliedTheme(root);
+        root.removeAttribute('data-season');
         console.error('Unable to apply theme definition', error);
       }
     },
@@ -688,12 +727,14 @@ export function ThemeProvider({
   }, [restoreAppliedTheme, setTheme, setThemeDefinition, writeThemeStorage]);
 
   const themeRGB = legacyThemeRGB ?? themeDefinition?.modes.light?.colors;
+  const season = useMemo(() => getActiveSeason(theme), [theme]);
   const value = useMemo(
     () => ({
       theme,
       setTheme,
       resolvedMode,
       highContrast,
+      season,
       themeRGB,
       setThemeRGB,
       themeDefinition,
@@ -710,6 +751,7 @@ export function ThemeProvider({
       setThemeRGB,
       resolvedMode,
       highContrast,
+      season,
       theme,
       themeDefinition,
       themeName,

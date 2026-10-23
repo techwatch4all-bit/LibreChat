@@ -1,4 +1,4 @@
-import { useContext, useCallback, useEffect, useState } from 'react';
+﻿import { useContext, useCallback, useEffect, useState } from 'react';
 import { JSX } from 'react/jsx-runtime';
 import { Sun, Moon, Monitor, Contrast } from 'lucide';
 import type { IconNode } from './MorphIcon';
@@ -34,23 +34,16 @@ const themeIcons: Record<ThemeType, IconNode> = {
   'high-contrast-dark': Moon,
 };
 
-const Theme = ({
-  theme,
-  highContrast,
-  onChange,
-}: {
-  theme: string;
-  highContrast: boolean;
-  onChange: (value: string) => void;
-}) => {
+const Theme = ({ theme, onChange }: { theme: string; onChange: (value: string) => void }) => {
   const localize = useLocalize();
 
-  const nextScheme = isDark(theme) ? 'light' : 'dark';
-  /** The toggle flips the colour scheme without discarding a contrast choice.
-   *  Resolved contrast rather than `isHighContrast(theme)`: under `system` the
-   *  contrast comes from `prefers-contrast`, which the stored mode never names,
-   *  so keying off the mode alone would silently drop an OS-requested need. */
-  const nextTheme = highContrast ? `high-contrast-${nextScheme}` : nextScheme;
+  let nextScheme: string;
+  if (theme === 'satchida-light' || theme === 'light' || (!isDark(theme) && theme === 'system')) {
+    nextScheme = 'satchida-dark';
+  } else {
+    nextScheme = 'satchida-light';
+  }
+  const nextTheme = nextScheme;
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -84,7 +77,7 @@ const Theme = ({
  * Contrast toggle, rendered beside the scheme toggle. On the login,
  * registration and email-verification routes this selector is the only
  * appearance control, and the scheme toggle above preserves a contrast choice
- * but can never introduce one — the full appearance dropdown lives behind auth.
+ * but can never introduce one â€” the full appearance dropdown lives behind auth.
  * Without this button a logged-out user who needs the high contrast palette
  * could reach it only by editing local storage or turning on an OS-wide
  * preference.
@@ -100,11 +93,11 @@ const ContrastToggle = ({
 }) => {
   const localize = useLocalize();
 
-  const scheme = isDark(theme) ? 'dark' : 'light';
+  const scheme = isDark(theme) ? 'satchida-dark' : 'satchida-light';
   /** Turning contrast off lands on the plain mode for the scheme currently
    *  rendered, so `system` under an OS contrast request becomes an explicit
    *  opt-out rather than silently snapping back on. */
-  const nextTheme = highContrast ? scheme : `high-contrast-${scheme}`;
+  const nextTheme = highContrast ? scheme : `high-contrast-${isDark(theme) ? 'dark' : 'light'}`;
 
   return (
     <Button
@@ -170,13 +163,13 @@ const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }): JSX.
   }, [announcement]);
 
   if (returnThemeOnly === true) {
-    return <Theme theme={theme} highContrast={highContrast} onChange={changeScheme} />;
+    return <Theme theme={theme} onChange={changeScheme} />;
   }
 
   return (
     <div className="flex flex-col items-center justify-center bg-surface-primary pt-6 sm:pt-0">
       <div className="absolute bottom-0 left-0 m-4 flex items-center">
-        <Theme theme={theme} highContrast={highContrast} onChange={changeScheme} />
+        <Theme theme={theme} onChange={changeScheme} />
         <ContrastToggle theme={theme} highContrast={highContrast} onChange={changeContrast} />
       </div>
       <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only">

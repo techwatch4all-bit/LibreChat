@@ -1,0 +1,1706 @@
+/* Satchida Admin — full RBAC management UI. Vanilla JS, no framework.
+ * Reuses the operator JWT stored in sessionStorage by login.html and sends it
+ * as `Authorization: Bearer` (the session cookie is Secure/SameSite=Strict and
+ * therefore not sent over plain HTTP on this host). */
+const BASE = '/api/admin';
+
+const API = (path, opts = {}) => {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = sessionStorage.getItem('token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(path, { credentials: 'include', headers, ...opts });
+};
+
+async function apiAdmin(path, opts = {}) {
+  let res;
+  try {
+    res = await API(BASE + path, opts);
+  } catch {
+    return { ok: false, status: 0, statusText: 'network', json: null };
+  }
+  const json = res.status === 204 ? null : await res.json().catch(() => null);
+  if (res.status === 401 || res.status === 403) sessionStorage.removeItem('token');
+  return { ok: res.ok, status: res.status, statusText: res.statusText, json };
+}
+
+const escapeHtml = (s) =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
+const truncate = (s, n = 90) => {
+  const t = String(s ?? '');
+  return t.length > n ? t.slice(0, n) + '…' : t;
+};
+
+function normalizeList(res) {
+  if (!res?.json) return [];
+  const j = res.json;
+  if (Array.isArray(j)) return j;
+  if (Array.isArray(j?.members)) return j.members;
+  if (Array.isArray(j?.users)) return j.users;
+  if (Array.isArray(j?.roles)) return j.roles;
+  if (Array.isArray(j?.groups)) return j.groups;
+  if (Array.isArray(j?.grants)) return j.grants;
+  if (Array.isArray(j?.items)) return j.items;
+  if (Array.isArray(j?.data)) return j.data;
+  if (Array.isArray(j?.results)) return j.results;
+  if (j && typeof j === 'object') return [j];
+  return [];
+}
+
+const uid = (u) => u._id || u.id || u.userId || '';
+const uname = (u) => u.name || u.displayName || u.username || u.email || uid(u);
+
+/* SystemCapabilities served by the platform (OPERATOR_CONTROL omitted — the server
+ * rejects it on assign, and it must never be self-granted). */
+const CAPS = [
+  'access:admin',
+  'read:users',
+  'manage:users',
+  'read:groups',
+  'manage:groups',
+  'read:roles',
+  'manage:roles',
+  'read:configs',
+  'manage:configs',
+  'assign:configs',
+  'read:usage',
+  'read:insights',
+  'read:agents',
+  'manage:agents',
+  'manage:code_environments',
+  'read:prompts',
+  'manage:prompts',
+  'read:sharedlinks',
+  'manage:sharedlinks',
+  'read:assistants',
+  'manage:assistants',
+  'read:audit_log',
+];
+
+/* Account-type tiers mirror one-api's seeded policy groups exactly (lowercase).
+ * one-api resolves a seat's group with an exact name match, so a mis-cased name
+ * silently bypasses that side's MaxSeats cap. */
+const ACCOUNT_TYPES = [
+  { label: '— none —', value: '' },
+  { label: 'basic', value: 'basic' },
+  { label: 'pro', value: 'pro' },
+  { label: 'family', value: 'family' },
+  { label: 'privacy', value: 'privacy' },
+];
+
+const FAMILY_ROLE_OPTIONS = [
+  { label: '— none —', value: '' },
+  { label: 'owner', value: 'owner' },
+  { label: 'adult', value: 'adult' },
+  { label: 'minor', value: 'minor' },
+];
+
+const S = {
+  users: [],
+  roles: [],
+  groups: [],
+  grants: [],
+  effective: [],
+  isOperator: false,
+  tenantId: null,
+  /* Server-side page cursors. The server caps a page at 200 rows, so a tenant
+   * with thousands of accounts is reached by paging, never by fetching all. */
+  userPage: { limit: 100, offset: 0, total: 0 },
+  groupPage: { limit: 100, offset: 0, total: 0 },
+};
+let CURRENT = 'users';
+
+/* ---------- toast ---------- */
+function toast(msg, kind = 'info', ms = 3600) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    t.setAttribute('role', 'alert');
+    t.setAttribute('aria-live', 'polite');
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind === 'err' ? 'toastErr' : 'toastOk');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* ---------- modal singleton ---------- */
+const Modal = (() => {
+  let node, titleEl, bodyEl, footEl, resolveFn;
+  function ensure() {
+    if (node) return;
+    node = document.createElement('div');
+    node.id = 'satchidaModalWrap';
+    node.innerHTML =
+      '<div class="satchidaModal">' +
+      '<div class="satchidaModalHead"><span class="satchidaModalTitle"></span>' +
+      '<button class="satchidaModalClose" type="button" aria-label="close">&times;</button></div>' +
+      '<div class="satchidaModalBody"></div>' +
+      '<div class="satchidaModalFoot"></div>' +
+      '</div>';
+    node.addEventListener('click', (e) => {
+      if (e.target === node || e.target.classList.contains('satchidaModalClose')) close();
+    });
+    document.body.appendChild(node);
+    titleEl = node.querySelector('.satchidaModalTitle');
+    bodyEl = node.querySelector('.satchidaModalBody');
+    footEl = node.querySelector('.satchidaModalFoot');
+  }
+  function close() {
+    if (node) node.style.display = 'none';
+    if (resolveFn) {
+      const r = resolveFn;
+      resolveFn = null;
+      r(null);
+    }
+  }
+  function show(title, renderBody, renderFoot) {
+    ensure();
+    titleEl.textContent = title;
+    bodyEl.innerHTML = '';
+    renderBody(bodyEl);
+    footEl.innerHTML = '';
+    if (renderFoot) renderFoot(footEl);
+    node.style.display = 'block';
+  }
+  function wait(title, renderBody, renderFoot) {
+    return new Promise((res) => {
+      resolveFn = (v) => {
+        res(v);
+      };
+      show(title, renderBody, renderFoot);
+    });
+  }
+  return { show, close, wait };
+})();
+
+function confirmDialog(message) {
+  return Modal.wait(
+    'Confirm action',
+    (b) => {
+      const p = document.createElement('p');
+      p.textContent = message;
+      b.appendChild(p);
+    },
+    (f) => {
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = 'Cancel';
+      cancel.className = 'btn btn-ghost';
+      cancel.onclick = () => Modal.close();
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.textContent = 'Confirm';
+      ok.className = 'btn btn-primary';
+      ok.onclick = () => {
+        Modal.close();
+      };
+      f.appendChild(cancel);
+      f.appendChild(ok);
+    },
+  );
+}
+
+/* formModal: fields [{key,label,type,value,required,options}], resolves with
+ * values object on submit (after onSubmit ok), or null on cancel. */
+function formModal(title, fields, submitLabel, defaults, onSubmit) {
+  return Modal.wait(
+    title,
+    (b) => {
+      const form = document.createElement('form');
+      form.className = 'modalForm';
+      form.noValidate = true;
+      fields.forEach((fld) => {
+        const fx = document.createElement('div');
+        fx.className = 'modalField';
+        const lbl = document.createElement('label');
+        lbl.textContent = fld.label;
+        lbl.htmlFor = fld.key;
+        let input;
+        if (fld.type === 'select') {
+          input = document.createElement('select');
+          input.id = fld.key;
+          input.name = fld.key;
+          (fld.options || []).forEach((op) => {
+            const o = document.createElement('option');
+            o.value = op.value;
+            o.textContent = op.label;
+            if (String(op.value) === String((defaults || {})[fld.key] ?? fld.value ?? ''))
+              o.selected = true;
+            input.appendChild(o);
+          });
+        } else if (fld.type === 'textarea') {
+          input = document.createElement('textarea');
+          input.id = fld.key;
+          input.name = fld.key;
+          input.rows = 3;
+          input.value = (defaults || {})[fld.key] ?? fld.value ?? '';
+        } else {
+          input = document.createElement('input');
+          input.type = fld.type || 'text';
+          input.id = fld.key;
+          input.name = fld.key;
+          input.value = (defaults || {})[fld.key] ?? fld.value ?? '';
+          if (fld.required) input.required = true;
+        }
+        fx.appendChild(lbl);
+        fx.appendChild(input);
+        b.appendChild(fx);
+      });
+    },
+    (f) => {
+      const err = document.createElement('span');
+      err.className = 'modalError';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = 'Cancel';
+      cancel.className = 'btn btn-ghost';
+      cancel.onclick = () => {
+        Modal.close();
+      };
+      const sub = document.createElement('button');
+      sub.type = 'button';
+      sub.textContent = submitLabel;
+      sub.className = 'btn btn-primary';
+      sub.onclick = async () => {
+        const form = f.closest('.satchidaModal').querySelector('.modalForm');
+        const values = {};
+        new FormData(form).forEach((v, k) => (values[k] = v));
+        sub.disabled = true;
+        sub.textContent = 'Saving…';
+        err.textContent = '';
+        const result = await onSubmit(values);
+        if (result && result.ok === false) {
+          err.textContent = result.error || 'Could not save.';
+          sub.disabled = false;
+          sub.textContent = submitLabel;
+          f.insertBefore(err, f.firstChild);
+        } else {
+          closeSubmit();
+        }
+      };
+      function closeSubmit() {
+        Modal.close();
+      }
+      f.appendChild(err);
+      f.appendChild(cancel);
+      f.appendChild(sub);
+    },
+  );
+}
+
+/* ---------- loaders ---------- */
+/**
+ * Reflect a page of results into its "showing X–Y of N" line and the Prev/Next
+ * buttons. `total` is the server's count, so the label describes the whole
+ * tenant rather than the rows that happen to be on screen.
+ */
+function syncPager(state, ids, shown) {
+  const from = shown === 0 ? 0 : state.offset + 1;
+  const to = state.offset + shown;
+  const range = document.getElementById(ids.range);
+  if (range) {
+    range.textContent = state.total ? `Showing ${from}–${to} of ${state.total}` : 'No records';
+  }
+  const bar = document.getElementById(ids.bar);
+  if (bar) bar.hidden = false;
+  const prev = document.getElementById(ids.prev);
+  if (prev) prev.disabled = state.offset <= 0;
+  const next = document.getElementById(ids.next);
+  if (next) next.disabled = state.total > 0 && to >= state.total;
+}
+
+const USER_PAGER_IDS = {
+  bar: 'usersPagerBar',
+  range: 'usersRange',
+  prev: 'usersPrevBtn',
+  next: 'usersNextBtn',
+};
+
+const GROUP_PAGER_IDS = {
+  bar: 'groupsPagerBar',
+  range: 'groupsRange',
+  prev: 'groupsPrevBtn',
+  next: 'groupsNextBtn',
+};
+
+async function loadUsers() {
+  const state = S.userPage;
+  const res = await apiAdmin(`/users?limit=${state.limit}&offset=${state.offset}`);
+  const items = normalizeList(res).filter((u) => uid(u));
+
+  /* Deleting the last row of the last page leaves an empty page — step back one
+   * page instead of showing a dead end. Terminates because offset strictly decreases. */
+  if (res.ok && items.length === 0 && state.offset > 0) {
+    state.offset = Math.max(0, state.offset - state.limit);
+    return loadUsers();
+  }
+
+  S.users = items;
+  state.total = Number.isFinite(res.json?.total) ? res.json.total : items.length;
+  const c = document.getElementById('usersCount');
+  if (c) c.textContent = `${state.total} record(s)`;
+  renderUsers();
+  syncPager(state, USER_PAGER_IDS, items.length);
+  if (!res.ok) toast(`Could not load users (HTTP ${res.status})`, 'err');
+}
+
+async function loadRoles() {
+  const res = await apiAdmin('/roles');
+  S.roles = normalizeList(res).filter((r) => r && (r.name || r._id));
+  renderRoles();
+  const c = document.getElementById('rolesCount');
+  if (c) c.textContent = `${S.roles.length} record(s)`;
+  populateGrantsAssign();
+  if (!res.ok) toast(`Could not load roles (HTTP ${res.status})`, 'err');
+}
+
+async function loadGroups() {
+  const state = S.groupPage;
+  const res = await apiAdmin(`/groups?limit=${state.limit}&offset=${state.offset}`);
+  const items = normalizeList(res).filter((g) => g && (g._id || g.id || g.name));
+
+  if (res.ok && items.length === 0 && state.offset > 0) {
+    state.offset = Math.max(0, state.offset - state.limit);
+    return loadGroups();
+  }
+
+  S.groups = items;
+  state.total = Number.isFinite(res.json?.total) ? res.json.total : items.length;
+  const c = document.getElementById('groupsCount');
+  if (c) c.textContent = `${state.total} record(s)`;
+  renderGroups();
+  syncPager(state, GROUP_PAGER_IDS, items.length);
+  /* Groups feed the grant-assignment picker, so refresh it from the current page. */
+  populateGrantsAssign();
+  if (!res.ok) toast(`Could not load groups (HTTP ${res.status})`, 'err');
+}
+
+async function loadGrants() {
+  const res = await apiAdmin('/grants');
+  S.grants = normalizeList(res);
+  renderGrants();
+  const c = document.getElementById('grantsCount');
+  if (c) c.textContent = `${S.grants.length} record(s)`;
+  if (!res.ok) toast(`Could not load grants (HTTP ${res.status})`, 'err');
+}
+
+async function loadEffective() {
+  const res = await apiAdmin('/grants/effective');
+  S.effective = res.ok && Array.isArray(res.json?.capabilities) ? res.json.capabilities : [];
+  renderEffective();
+}
+
+async function loadAudit() {
+  const res = await apiAdmin('/audit-log');
+  const list = normalizeList(res);
+  const c = document.getElementById('auditCount');
+  if (c) c.textContent = `${list.length} record(s)`;
+  if (!res.ok) {
+    document.getElementById('auditTable').innerHTML =
+      '<p class="empty">Could not load audit log (HTTP ' + res.status + ').</p>';
+    return;
+  }
+  renderTable('#auditTable', list, null, true);
+}
+
+/* ---------- generic table renderer ---------- */
+function renderTable(containerSel, rows, columns, allFields) {
+  const el = document.querySelector(containerSel);
+  if (!el) return;
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    el.innerHTML = '<p class="empty">No records.</p>';
+    return;
+  }
+  const cols =
+    columns ||
+    (allFields
+      ? Array.from(new Set(list.flatMap((r) => Object.keys(r)))).map((k) => ({ h: k, k }))
+      : []);
+  const head = cols.map((c) => '<th>' + escapeHtml(c.h) + '</th>').join('');
+  const body = list
+    .map(
+      (it) =>
+        '<tr>' +
+        cols
+          .map((c) => '<td>' + escapeHtml(typeof c.v === 'function' ? c.v(it) : it[c.k]) + '</td>')
+          .join('') +
+        '</tr>',
+    )
+    .join('');
+  el.innerHTML =
+    '<table class="dataTable"><thead><tr>' +
+    head +
+    '</tr></thead><tbody>' +
+    body +
+    '</tbody></table>';
+}
+
+/* ---------- per-tab renderers (with action buttons) ---------- */
+function renderUsers() {
+  const el = document.getElementById('usersTable');
+  if (!el) return;
+  if (!S.users.length) {
+    el.innerHTML = '<p class="empty">No users.</p>';
+    return;
+  }
+  const head =
+    '<tr><th>Email</th><th>Name</th><th>Role</th><th>Account type</th><th>Tenant</th><th>Family</th><th>Seat</th><th class="thActions">Actions</th></tr>';
+  const body = S.users
+    .map((u) => {
+      const id = uid(u);
+      const seat = u.seatAssigned
+        ? '<span class="pill">' + escapeHtml(u.seatTokenHint || 'assigned') + '</span>'
+        : '';
+      return (
+        '<tr data-uid="' +
+        escapeHtml(id) +
+        '">' +
+        '<td>' +
+        escapeHtml(u.email || u.emailAddress || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(uname(u)) +
+        '</td>' +
+        '<td>' +
+        escapeHtml(u.role || u.roleName || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(u.accountType || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(u.tenantId || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(u.familyRole || '') +
+        '</td>' +
+        '<td>' +
+        seat +
+        '</td>' +
+        '<td class="actions">' +
+        '<button type="button" data-op="editUser" data-uid="' +
+        escapeHtml(id) +
+        '" class="action" title="Edit account">Edit</button>' +
+        '<button type="button" data-op="userGroups" data-uid="' +
+        escapeHtml(id) +
+        '" class="action" title="Group memberships">Groups</button>' +
+        '<button type="button" data-op="resetUser" data-uid="' +
+        escapeHtml(id) +
+        '" class="action" title="Reset password">Reset</button>' +
+        '<button type="button" data-op="delUser" data-uid="' +
+        escapeHtml(id) +
+        '" class="action actionDel" title="Delete account">Delete</button>' +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  el.innerHTML =
+    '<table class="dataTable"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+
+function renderRoles() {
+  const el = document.getElementById('rolesTable');
+  if (!el) return;
+  if (!S.roles.length) {
+    el.innerHTML = '<p class="empty">No roles.</p>';
+    return;
+  }
+  const head = '<tr><th>Name</th><th>Description</th><th class="thActions">Actions</th></tr>';
+  const body = S.roles
+    .map((r) => {
+      const name = r.name || r._id || '';
+      const desc = r.description || '';
+      const sys = name === 'ADMIN' || name === 'USER' || name === 'ERROR';
+      return (
+        '<tr data-role="' +
+        escapeHtml(name) +
+        '">' +
+        '<td>' +
+        escapeHtml(name) +
+        (sys ? ' <span class="pill">system</span>' : '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(truncate(desc, 70)) +
+        '</td>' +
+        '<td class="actions">' +
+        '<button type="button" data-op="editRole" data-role="' +
+        escapeHtml(name) +
+        '" class="action" title="Edit">Edit</button>' +
+        '<button type="button" data-op="roleMembers" data-role="' +
+        escapeHtml(name) +
+        '" class="action" title="Members">Members</button>' +
+        (sys
+          ? ''
+          : '<button type="button" data-op="delRole" data-role="' +
+            escapeHtml(name) +
+            '" class="action actionDel" title="Delete">Delete</button>') +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  el.innerHTML =
+    '<table class="dataTable"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+
+function renderGroups() {
+  const el = document.getElementById('groupsTable');
+  if (!el) return;
+  if (!S.groups.length) {
+    el.innerHTML = '<p class="empty">No groups.</p>';
+    return;
+  }
+  const head =
+    '<tr><th>Name</th><th>Description</th><th>Source</th><th>Members</th><th class="thActions">Actions</th></tr>';
+  const body = S.groups
+    .map((g) => {
+      const id = g._id || g.id || '';
+      return (
+        '<tr data-gid="' +
+        escapeHtml(id) +
+        '">' +
+        '<td>' +
+        escapeHtml(g.name || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(truncate(g.description || '', 70)) +
+        '</td>' +
+        '<td>' +
+        escapeHtml(g.source || '') +
+        '</td>' +
+        '<td>' +
+        escapeHtml(String((g.memberIds || []).length || g.memberCount || 0)) +
+        '</td>' +
+        '<td class="actions">' +
+        '<button type="button" data-op="editGroup" data-gid="' +
+        escapeHtml(id) +
+        '" class="action" title="Edit">Edit</button>' +
+        '<button type="button" data-op="groupMembers" data-gid="' +
+        escapeHtml(id) +
+        '" class="action" title="Members">Members</button>' +
+        '<button type="button" data-op="delGroup" data-gid="' +
+        escapeHtml(id) +
+        '" class="action actionDel" title="Delete">Delete</button>' +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  el.innerHTML =
+    '<table class="dataTable"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+
+function renderGrants() {
+  const el = document.getElementById('grantsTable');
+  if (!el) return;
+  if (!S.grants.length) {
+    el.innerHTML = '<p class="empty">No grants.</p>';
+    return;
+  }
+  const head =
+    '<tr><th>Principal type</th><th>Principal id</th><th>Capability</th><th class="thActions">Actions</th></tr>';
+  const body = S.grants
+    .map((g) => {
+      const pt = g.principalType || '';
+      const pid = g.principalId || '';
+      const cap = g.capability || '';
+      return (
+        '<tr data-pt="' +
+        escapeHtml(pt) +
+        '" data-pid="' +
+        escapeHtml(pid) +
+        '" data-cap="' +
+        escapeHtml(cap) +
+        '">' +
+        '<td>' +
+        escapeHtml(pt) +
+        '</td>' +
+        '<td>' +
+        escapeHtml(String(pid)) +
+        '</td>' +
+        '<td>' +
+        escapeHtml(cap) +
+        '</td>' +
+        '<td class="actions">' +
+        '<button type="button" data-op="revoke" data-pt="' +
+        escapeHtml(pt) +
+        '" data-pid="' +
+        escapeHtml(pid) +
+        '" data-cap="' +
+        escapeHtml(cap) +
+        '" class="action actionDel" title="Revoke">Revoke</button>' +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  el.innerHTML =
+    '<table class="dataTable"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+
+function renderEffective() {
+  const el = document.getElementById('grantsEffective');
+  if (!el) return;
+  const caps = S.effective.length ? S.effective : [];
+  el.innerHTML =
+    '<div class="effCaps">' +
+    (caps.length
+      ? '<span class="hint">Your effective capabilities: </span>' +
+        caps.map((c) => '<span class="pill cap">' + escapeHtml(c) + '</span>').join('')
+      : '<span class="hint">No effective additional capabilities.</span>') +
+    '</div>';
+  populateGrantsAssign();
+}
+
+function updateGrantPrincipalInputs() {
+  const type = (document.getElementById('grantPrincipalType') || {}).value || 'role';
+  const show = (id, on) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? '' : 'none';
+  };
+  show('grantRole', type === 'role');
+  show('grantGroup', type === 'group');
+  show('grantUserId', type === 'user');
+}
+
+function populateGrantsAssign() {
+  const wrap = document.getElementById('grantsAssignForm');
+  if (!wrap) return;
+  wrap.style.display = 'inline-flex';
+  const psel = document.getElementById('grantPrincipalType');
+  if (psel) {
+    /* Only an operator may target group/user principals; a tenant admin is
+     * limited to roles, and the server enforces the same boundary. */
+    psel.innerHTML = (
+      S.isOperator
+        ? [
+            ['role', 'role'],
+            ['group', 'group'],
+            ['user', 'user'],
+          ]
+        : [['role', 'role']]
+    )
+      .map(([v, t]) => '<option value="' + v + '">' + t + '</option>')
+      .join('');
+    psel.value = 'role';
+  }
+  const rsel = document.getElementById('grantRole');
+  if (rsel) {
+    rsel.innerHTML = '<option value="">role…</option>';
+    S.roles.forEach((r) => {
+      const opt = document.createElement('option');
+      opt.value = encodeURIComponent(r.name || r._id || '');
+      opt.textContent = r.name || r._id || '';
+      rsel.appendChild(opt);
+    });
+  }
+  const gsel = document.getElementById('grantGroup');
+  if (gsel) {
+    gsel.innerHTML = '<option value="">group…</option>';
+    S.groups.forEach((g) => {
+      const gid = g._id || g.id || '';
+      const opt = document.createElement('option');
+      opt.value = encodeURIComponent(gid);
+      opt.textContent = g.name || gid;
+      gsel.appendChild(opt);
+    });
+  }
+  const csel = document.getElementById('grantCap');
+  if (csel) {
+    csel.innerHTML = '<option value="">capability…</option>';
+    CAPS.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      csel.appendChild(opt);
+    });
+  }
+  const tInput = document.getElementById('grantTenantId');
+  if (tInput) {
+    tInput.style.display = S.isOperator ? '' : 'none';
+    tInput.placeholder = 'target tenant (blank = your own)';
+  }
+  const pBtn = document.getElementById('provisionTenantAdminBtn');
+  if (pBtn) pBtn.style.display = S.isOperator ? '' : 'none';
+  updateGrantPrincipalInputs();
+}
+
+/* ---------- action handlers ---------- */
+async function resetUserPassword(u) {
+  const id = uid(u);
+  const vals = await formModal(
+    'Reset password for ' + (u.email || uname(u)),
+    [
+      { key: 'newPassword', label: 'New password', type: 'password', required: true },
+      { key: 'confirm', label: 'Confirm new password', type: 'password', required: true },
+    ],
+    'Reset password',
+    {},
+    (v) => {
+      if (!v.newPassword || v.newPassword.length < 8) {
+        return { ok: false, error: 'Password must be at least 8 characters.' };
+      }
+      if (v.newPassword !== v.confirm) {
+        return { ok: false, error: 'Passwords do not match.' };
+      }
+      return { ok: true };
+    },
+  );
+  if (!vals) return;
+  const res = await apiAdmin('/users/' + encodeURIComponent(id) + '/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ newPassword: vals.newPassword }),
+  });
+  if (res.ok) {
+    toast('Password reset. The user must sign in again.', 'ok');
+  } else {
+    toast('Reset failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+async function deleteUser(u) {
+  const id = uid(u);
+  const ok = await confirmDialog(
+    'Delete user ' + escapeHtml(u.email || uname(u)) + '? This cannot be undone.',
+  );
+  if (!ok) return;
+  const res = await apiAdmin('/users/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (res.ok) {
+    toast('User deleted.', 'ok');
+    await loadUsers();
+  } else {
+    toast('Delete failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+async function createUser() {
+  await formModal(
+    'Create User Account',
+    [
+      { key: 'name', label: 'Full Name', type: 'text', required: true },
+      { key: 'email', label: 'Email / Identity', type: 'email', required: true },
+      {
+        key: 'role',
+        label: 'Role',
+        type: 'select',
+        options: [
+          { label: 'USER (Standard)', value: 'USER' },
+          { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
+        ],
+      },
+      { key: 'accountType', label: 'Account type', type: 'select', options: ACCOUNT_TYPES },
+      { key: 'familyRole', label: 'Family role', type: 'select', options: FAMILY_ROLE_OPTIONS },
+      { key: 'quota', label: 'Initial Token Quota', type: 'number', value: '100000' },
+    ],
+    'Provision Account',
+    { quota: '100000' },
+    async (v) => {
+      if (!v.email || !v.email.trim()) return { ok: false, error: 'Email is required.' };
+      const res = await apiAdmin('/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: v.name,
+          email: v.email,
+          role: v.role,
+          quota: v.quota,
+          accountType: v.accountType || undefined,
+          familyRole: v.familyRole || undefined,
+        }),
+      });
+      if (res.ok) {
+        const u = res.json?.user;
+        toast(`Account provisioned. Temporary password: ${u?.tempPassword}`, 'ok', 12000);
+        await loadUsers();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function editUser(u) {
+  const id = uid(u);
+  await formModal(
+    'Edit ' + (u.email || uname(u)),
+    [
+      { key: 'name', label: 'Full Name', type: 'text', value: u.name || '' },
+      { key: 'email', label: 'Email', type: 'email', value: u.email || '' },
+      {
+        key: 'role',
+        label: 'Role',
+        type: 'select',
+        value: u.role || 'USER',
+        options: [
+          { label: 'USER (Standard)', value: 'USER' },
+          { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
+        ],
+      },
+      {
+        key: 'accountType',
+        label: 'Account type',
+        type: 'select',
+        value: u.accountType || '',
+        options: ACCOUNT_TYPES,
+      },
+      {
+        key: 'familyRole',
+        label: 'Family role',
+        type: 'select',
+        value: u.familyRole || '',
+        options: FAMILY_ROLE_OPTIONS,
+      },
+      {
+        key: 'mustChangePassword',
+        label: 'Require password change at next sign-in',
+        type: 'select',
+        value: String(!!u.mustChangePassword),
+        options: [
+          { label: 'no', value: 'false' },
+          { label: 'yes', value: 'true' },
+        ],
+      },
+    ],
+    'Save changes',
+    {},
+    async (v) => {
+      const res = await apiAdmin('/users/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: v.name,
+          email: v.email,
+          role: v.role,
+          accountType: v.accountType || null,
+          familyRole: v.familyRole || null,
+          mustChangePassword: v.mustChangePassword === 'true',
+        }),
+      });
+      if (res.ok) {
+        toast('Account updated.', 'ok');
+        await loadUsers();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function userGroups(u) {
+  const id = uid(u);
+  const res = await apiAdmin('/users/' + encodeURIComponent(id) + '/groups');
+  if (!res.ok) {
+    toast(`Failed to load group memberships (HTTP ${res.status})`, 'err');
+    return;
+  }
+  const groups = res.json?.groups || [];
+  const html = groups.length
+    ? '<ul class="memberList">' +
+      groups
+        .map(
+          (g) =>
+            '<li>' +
+            escapeHtml(g.name || '') +
+            (g.description ? ' — ' + escapeHtml(truncate(g.description, 60)) : '') +
+            '</li>',
+        )
+        .join('') +
+      '</ul>'
+    : '<p class="hint">No group memberships.</p>';
+  Modal.show(
+    'Groups for ' + (u.email || uname(u)),
+    (b) => {
+      b.innerHTML = html;
+    },
+    (f) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-ghost';
+      btn.textContent = 'Close';
+      btn.addEventListener('click', () => Modal.close());
+      f.appendChild(btn);
+    },
+  );
+}
+
+/** Operator-only: grants a tenant's ADMIN role the tenant-scoped admin surface. */
+async function provisionTenantAdmin() {
+  await formModal(
+    'Provision tenant administrator',
+    [
+      { key: 'tenantId', label: 'Tenant id (e.g. hgrwa)', type: 'text', required: true },
+      { key: 'roleName', label: 'Role to grant (default ADMIN)', type: 'text', value: 'ADMIN' },
+    ],
+    'Provision',
+    { roleName: 'ADMIN' },
+    async (v) => {
+      if (!v.tenantId || !v.tenantId.trim()) return { ok: false, error: 'Tenant id is required.' };
+      const res = await apiAdmin('/grants/tenant-admin', {
+        method: 'POST',
+        body: JSON.stringify({ tenantId: v.tenantId.trim(), roleName: v.roleName || 'ADMIN' }),
+      });
+      if (res.ok) {
+        toast(
+          `Tenant admin provisioned for "${v.tenantId.trim()}" (access:admin + user/group/role management).`,
+          'ok',
+          9000,
+        );
+        await loadGrants();
+        await loadEffective();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+/**
+ * Rows posted per request. Comfortably under the server's 500-row batch limit,
+ * so one request never has to hash thousands of passwords before responding.
+ */
+const BULK_CHUNK_SIZE = 200;
+
+/** Browser-side CSV parse, mirroring the server's column handling. */
+function parseRosterCsv(text) {
+  const lines = String(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map((c) => c.trim());
+    if (cols.length < 2 || !cols[1]) continue;
+    const row = {};
+    headers.forEach((h, idx) => {
+      row[h] = cols[idx] || '';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function setBulkProgress(done, total, created, skipped) {
+  const bar = document.getElementById('bulkProgressBar');
+  const el = document.getElementById('bulkProgress');
+  const text = document.getElementById('bulkProgressText');
+  if (bar) bar.hidden = false;
+  if (el) {
+    el.max = total;
+    el.value = done;
+  }
+  if (text) {
+    text.textContent = `Importing ${done}/${total} — ${created} created, ${skipped} skipped`;
+  }
+}
+
+function hideBulkProgress() {
+  const bar = document.getElementById('bulkProgressBar');
+  if (bar) bar.hidden = true;
+}
+
+/** CSV writer that escapes embedded quotes and commas. */
+function toCsv(headers, rows, pick) {
+  const cell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  return [headers.join(',')]
+    .concat(rows.map((row) => headers.map((h) => cell(pick(row, h))).join(',')))
+    .join('\n');
+}
+
+function downloadCsv(filename, csv) {
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCredentialSlips(slips) {
+  const map = {
+    name: 'name',
+    email: 'email',
+    role: 'role',
+    account_type: 'accountType',
+    group: 'group',
+    tempPassword: 'tempPassword',
+  };
+  downloadCsv(
+    `credential_slips_${Date.now()}.csv`,
+    toCsv(Object.keys(map), slips, (row, key) => row[map[key]]),
+  );
+}
+
+/**
+ * Run a parsed roster in chunks, reporting progress and never failing silently.
+ *
+ * A partial import is the dangerous outcome here — a registrar who sees nothing
+ * cannot tell which students were created. So on a mid-way failure this reports
+ * how many rows landed, downloads the slips for those, and stops.
+ */
+async function runBulkImport(rows) {
+  const chunks = [];
+  for (let i = 0; i < rows.length; i += BULK_CHUNK_SIZE) {
+    chunks.push(rows.slice(i, i + BULK_CHUNK_SIZE));
+  }
+
+  let created = 0;
+  let skippedCount = 0;
+  const slips = [];
+  const skippedRows = [];
+  setBulkProgress(0, rows.length, 0, 0);
+
+  for (let i = 0; i < chunks.length; i++) {
+    const res = await apiAdmin('/users/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ users: chunks[i] }),
+    });
+
+    if (!res.ok) {
+      const detail = (res.json && res.json.error) || `HTTP ${res.status}`;
+      hideBulkProgress();
+      toast(`Import stopped at row ${i * BULK_CHUNK_SIZE + 1}: ${detail}`, 'err', 12000);
+      if (created > 0) {
+        toast(`Imported ${created} row(s) before stopping.`, 'info', 12000);
+        downloadCredentialSlips(slips);
+      }
+      await loadUsers();
+      return;
+    }
+
+    const data = res.json || {};
+    created += data.createdCount || 0;
+    skippedCount += data.skippedCount || 0;
+    if (Array.isArray(data.slips)) slips.push(...data.slips);
+    if (Array.isArray(data.skipped)) skippedRows.push(...data.skipped);
+    setBulkProgress(
+      Math.min(rows.length, (i + 1) * BULK_CHUNK_SIZE),
+      rows.length,
+      created,
+      skippedCount,
+    );
+  }
+
+  hideBulkProgress();
+  toast(`Bulk import complete — ${created} created, ${skippedCount} skipped.`, 'ok', 10000);
+  if (slips.length) downloadCredentialSlips(slips);
+  /* A skip list is what a registrar needs to fix and re-upload a roster. */
+  if (skippedRows.length) {
+    downloadCsv(
+      `skipped_rows_${Date.now()}.csv`,
+      toCsv(['email', 'reason'], skippedRows, (row, key) => row[key]),
+    );
+  }
+  await loadUsers();
+}
+
+async function bulkImportUsers() {
+  const body = document.createElement('div');
+  body.innerHTML =
+    '<div class="modalField"><label for="bulkCsv">CSV roster (columns: name,email,role,account_type,group,quota)</label>' +
+    '<textarea id="bulkCsv" rows="10" placeholder="name,email,role,account_type,group,quota&#10;John Doe,john.doe@school.edu,USER,basic,Grade-10,100000"></textarea></div>' +
+    `<p class="hint">Rows are uploaded in batches of ${BULK_CHUNK_SIZE}, so a large roster reports progress instead of timing out.</p>`;
+
+  const foot = document.createElement('div');
+  const start = document.createElement('button');
+  start.type = 'button';
+  start.className = 'btn btn-primary';
+  start.textContent = 'Start import';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-ghost';
+  cancel.textContent = 'Cancel';
+  foot.appendChild(start);
+  foot.appendChild(cancel);
+
+  Modal.show('Bulk CSV Roster Import', body, foot);
+
+  cancel.addEventListener('click', () => Modal.close());
+  start.addEventListener('click', async () => {
+    const raw = (document.getElementById('bulkCsv') || {}).value || '';
+    if (!raw.trim()) {
+      toast('Paste a CSV roster first.', 'err');
+      return;
+    }
+    const rows = parseRosterCsv(raw);
+    if (!rows.length) {
+      toast('No data rows found in that CSV.', 'err');
+      return;
+    }
+    Modal.close();
+    await runBulkImport(rows);
+  });
+}
+
+async function downloadTemplate() {
+  try {
+    const res = await API('/api/admin/users/csv-template');
+    if (!res.ok) {
+      toast(`Failed to download template: HTTP ${res.status}`, 'err');
+      return;
+    }
+    const text = await res.text();
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'satchida_user_roster_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Downloaded template.', 'ok');
+  } catch (err) {
+    toast(`Download failed: ${err.message}`, 'err');
+  }
+}
+
+function editRole(name) {
+  const r = S.roles.find((x) => (x.name || x._id) === name) || { name, description: '' };
+  formModal(
+    'Edit role',
+    [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+    'Save',
+    { name: r.name, description: r.description || '' },
+    async (v) => {
+      if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
+      const res = await apiAdmin('/roles/' + encodeURIComponent(name), {
+        method: 'PATCH',
+        body: JSON.stringify({ name: v.name.trim(), description: v.description || '' }),
+      });
+      if (res.ok) {
+        await loadRoles();
+        await refreshDependents();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function createRole() {
+  await formModal(
+    'Create role',
+    [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+    'Create',
+    {},
+    async (v) => {
+      if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
+      const res = await apiAdmin('/roles', {
+        method: 'POST',
+        body: JSON.stringify({ name: v.name.trim(), description: v.description || '' }),
+      });
+      if (res.ok) {
+        await loadRoles();
+        await refreshDependents();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function deleteRole(name) {
+  const ok = await confirmDialog(
+    'Delete role "' + escapeHtml(name) + '"? Members will be unaffected (role is detached).',
+  );
+  if (!ok) return;
+  const res = await apiAdmin('/roles/' + encodeURIComponent(name), { method: 'DELETE' });
+  if (res.ok) {
+    toast('Role deleted.', 'ok');
+    await loadRoles();
+    await refreshDependents();
+  } else {
+    toast('Delete failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+async function roleMembers(name) {
+  /* fetch members for this role */
+  const res = await apiAdmin('/roles/' + encodeURIComponent(name) + '/members');
+  const members = normalizeList(res);
+  /* Render member list into the modal body directly */
+  const node = document.querySelector('#satchidaModalWrap .satchidaModalBody');
+  if (node) {
+    node.innerHTML = '';
+    if (!members.length) {
+      node.innerHTML = '<p class="empty">No members.</p>';
+    } else {
+      let html =
+        '<table class="dataTable"><thead><tr><th>User</th><th>Email</th><th class="thActions">Actions</th></tr></thead><tbody>';
+      html += members
+        .map((u) => {
+          const id = uid(u);
+          return (
+            '<tr data-uid="' +
+            escapeHtml(id) +
+            '">' +
+            '<td>' +
+            escapeHtml(uname(u)) +
+            '</td>' +
+            '<td>' +
+            escapeHtml(u.email || '') +
+            '</td>' +
+            '<td class="actions"><button type="button" data-op="removeRoleMember" data-name="' +
+            escapeHtml(name) +
+            '" data-uid="' +
+            escapeHtml(id) +
+            '" class="action actionDel">Remove</button></td></tr>'
+          );
+        })
+        .join('');
+      html += '</tbody></table>';
+      node.innerHTML = html;
+    }
+    const foot = document.querySelector('#satchidaModalWrap .satchidaModalFoot');
+    if (foot)
+      foot.innerHTML =
+        '<button type="button" class="btn btn-ghost" onclick="closeModal()">Close</button>';
+    Modal.show(
+      'Members of role "' + escapeHtml(name) + '"',
+      () => {},
+      () => {},
+    );
+    // delegated listener for remove
+    const wrap = document.querySelector('#satchidaModalWrap .satchidaModalBody');
+    // attach once
+    if (wrap && !wrap.__bound) {
+      wrap.__bound = true;
+      wrap.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-op="removeRoleMember"]');
+        if (!b) return;
+        const n = b.dataset.name,
+          uidv = b.dataset.uid;
+        (async () => {
+          const res = await apiAdmin(
+            '/roles/' + encodeURIComponent(n) + '/members/' + encodeURIComponent(uidv),
+            { method: 'DELETE' },
+          );
+          if (res.ok) {
+            toast('Member removed.', 'ok');
+            await roleMembers(n);
+          } else
+            toast(
+              'Remove failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status),
+              'err',
+            );
+        })();
+      });
+    }
+  }
+}
+
+async function refreshDependents() {
+  // roles/grants may reference each other; keep selects fresh
+  populateGrantsAssign();
+}
+
+async function createGroup() {
+  await formModal(
+    'Create group',
+    [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+    'Create',
+    {},
+    async (v) => {
+      if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
+      const body = { name: v.name.trim(), description: v.description || '' };
+      const res = await apiAdmin('/groups', { method: 'POST', body: JSON.stringify(body) });
+      if (res.ok) {
+        await loadGroups();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+function editGroup(id) {
+  const g = S.groups.find((x) => (x._id || x.id) === id) || { name: '', description: '' };
+  formModal(
+    'Edit group',
+    [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+    'Save',
+    { name: g.name || '', description: g.description || '' },
+    async (v) => {
+      if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
+      const res = await apiAdmin('/groups/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify({ name: v.name.trim(), description: v.description || '' }),
+      });
+      if (res.ok) {
+        await loadGroups();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function deleteGroup(id) {
+  const ok = await confirmDialog('Delete group?');
+  if (!ok) return;
+  const res = await apiAdmin('/groups/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (res.ok) {
+    toast('Group deleted.', 'ok');
+    await loadGroups();
+  } else toast('Delete failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+}
+
+async function groupMembers(id) {
+  const res = await apiAdmin('/groups/' + encodeURIComponent(id) + '/members');
+  const members = normalizeList(res);
+  let html =
+    '<table class="dataTable"><thead><tr><th>User</th><th>Email</th><th class="thActions">Actions</th></tr></thead><tbody>';
+  if (members.length) {
+    html += members
+      .map((u) => {
+        const uidv = uid(u);
+        return (
+          '<tr data-uid="' +
+          escapeHtml(uidv) +
+          '">' +
+          '<td>' +
+          escapeHtml(uname(u)) +
+          '</td>' +
+          '<td>' +
+          escapeHtml(u.email || '') +
+          '</td>' +
+          '<td class="actions"><button type="button" data-op="removeGroupMember" data-gid="' +
+          escapeHtml(id) +
+          '" data-uid="' +
+          escapeHtml(uidv) +
+          '" class="action actionDel">Remove</button></td></tr>'
+        );
+      })
+      .join('');
+  } else {
+    html += '<tr><td colspan="3" class="empty">No members.</td></tr>';
+  }
+  html += '</tbody></table>';
+  // add member form row
+  html +=
+    '<div class="modalField" style="margin-top:12px"><label for="addGroupMember">Add member</label>' +
+    '<select id="addGroupMember"><option value="">select a user…</option>' +
+    S.users
+      .map(
+        (u) =>
+          '<option value="' +
+          escapeHtml(uid(u)) +
+          '">' +
+          escapeHtml(uname(u) + ' (' + (u.email || '') + ')') +
+          '</option>',
+      )
+      .join('') +
+    '</select></div>';
+  const grp = S.groups.find((x) => (x._id || x.id) === id);
+  const groupName = grp?.name ? `"${grp.name}"` : id;
+  const title = 'Members of group ' + groupName;
+  Modal.show(
+    title,
+    (b) => {
+      b.innerHTML = html;
+    },
+    (f) => {
+      f.innerHTML =
+        '<button type="button" class="btn btn-ghost" onclick="closeModal()">Close</button>';
+    },
+  );
+  const body = document.querySelector('#satchidaModalWrap .satchidaModalBody');
+  if (body && !body.__bound) {
+    body.__bound = true;
+    body.addEventListener('click', async (e) => {
+      const b = e.target.closest('button[data-op]');
+      if (!b) return;
+      const op = b.dataset.op;
+      const uidv = b.dataset.uid;
+      if (op === 'removeGroupMember') {
+        const res = await apiAdmin(
+          '/groups/' + encodeURIComponent(b.dataset.gid) + '/members/' + encodeURIComponent(uidv),
+          { method: 'DELETE' },
+        );
+        if (res.ok) {
+          toast('Member removed.', 'ok');
+          await groupMembers(id);
+        } else
+          toast('Remove failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status), 'err');
+      }
+    });
+    body.addEventListener('change', async (e) => {
+      if (e.target.id === 'addGroupMember' && e.target.value) {
+        const sel = e.target;
+        const val = sel.value;
+        sel.value = '';
+        const res = await apiAdmin('/groups/' + encodeURIComponent(id) + '/members', {
+          method: 'POST',
+          body: JSON.stringify({ userId: val }),
+        });
+        if (res.ok) {
+          toast('Member added.', 'ok');
+          await groupMembers(id);
+        } else
+          toast('Add failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status), 'err');
+      }
+    });
+  }
+}
+
+window.closeModal = function () {
+  Modal.close();
+};
+
+function grantPrincipalValue() {
+  const type = (document.getElementById('grantPrincipalType') || {}).value || 'role';
+  if (type === 'user') {
+    const input = document.getElementById('grantUserId');
+    return { principalType: 'user', principalId: input ? input.value.trim() : '' };
+  }
+  const sel = document.getElementById(type === 'group' ? 'grantGroup' : 'grantRole');
+  const enc = sel ? sel.value : '';
+  return { principalType: type, principalId: enc ? decodeURIComponent(enc) : '' };
+}
+
+async function assignGrant() {
+  const { principalType, principalId } = grantPrincipalValue();
+  const capSel = document.getElementById('grantCap');
+  const cap = capSel ? capSel.value : '';
+  const tenantInput = document.getElementById('grantTenantId');
+  const tenantId = tenantInput && S.isOperator ? tenantInput.value.trim() : '';
+  if (!principalId || !cap) return toast('Select a principal and a capability.', 'err');
+  const body = { principalType, principalId, capability: cap };
+  if (tenantId) body.tenantId = tenantId;
+  const res = await apiAdmin('/grants', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    toast(`Grant assigned to ${principalType} ${principalId}.`, 'ok');
+    await loadGrants();
+    await loadEffective();
+  } else {
+    toast('Assign failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+async function revokeGrant(pt, pid, cap) {
+  const ok = await confirmDialog('Revoke capability ' + cap + ' from ' + pt + ' "' + pid + '"?');
+  if (!ok) return;
+  const res = await apiAdmin(
+    '/grants/' +
+      encodeURIComponent(pt) +
+      '/' +
+      encodeURIComponent(pid) +
+      '/' +
+      encodeURIComponent(cap),
+    { method: 'DELETE' },
+  );
+  if (res.ok) {
+    toast('Grant revoked.', 'ok');
+    await loadGrants();
+    await loadEffective();
+  } else {
+    toast('Revoke failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+/* ---------- wiring ---------- */
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tabpanel').forEach((p) => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+      CURRENT = btn.dataset.tab;
+      // lazy load tabs not yet loaded
+      if (CURRENT === 'users' && !S.users.length) loadUsers();
+      if (CURRENT === 'roles' && !S.roles.length) loadRoles();
+      if (CURRENT === 'groups' && !S.groups.length) loadGroups();
+      if (CURRENT === 'grants' && !S.grants.length) loadGrants();
+      if (CURRENT === 'audit') loadAudit();
+    });
+  });
+}
+
+function attachListeners() {
+  // delegated actions per table container
+  document.getElementById('usersTable').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-op]');
+    if (!b) return;
+    const u = S.users.find((x) => uid(x) === b.dataset.uid);
+    if (!u) return;
+    if (b.dataset.op === 'editUser') editUser(u);
+    else if (b.dataset.op === 'userGroups') userGroups(u);
+    else if (b.dataset.op === 'resetUser') resetUserPassword(u);
+    else if (b.dataset.op === 'delUser') deleteUser(u);
+  });
+  document.getElementById('rolesTable').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-op]');
+    if (!b) return;
+    const name = b.dataset.role;
+    if (b.dataset.op === 'editRole') editRole(name);
+    else if (b.dataset.op === 'delRole') deleteRole(name);
+    else if (b.dataset.op === 'roleMembers') roleMembers(name);
+  });
+  document.getElementById('groupsTable').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-op]');
+    if (!b) return;
+    const id = b.dataset.gid;
+    if (b.dataset.op === 'editGroup') editGroup(id);
+    else if (b.dataset.op === 'delGroup') deleteGroup(id);
+    else if (b.dataset.op === 'groupMembers') groupMembers(id);
+  });
+  document.getElementById('grantsTable').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-op="revoke"]');
+    if (!b) return;
+    revokeGrant(b.dataset.pt, b.dataset.pid, b.dataset.cap);
+  });
+
+  document.getElementById('usersCreateBtn')?.addEventListener('click', createUser);
+  document.getElementById('usersBulkImportBtn')?.addEventListener('click', bulkImportUsers);
+  document.getElementById('usersDownloadTemplateBtn')?.addEventListener('click', downloadTemplate);
+  document.getElementById('rolesCreateBtn').addEventListener('click', createRole);
+  document.getElementById('groupsCreateBtn').addEventListener('click', createGroup);
+  document.getElementById('grantAssignBtn').addEventListener('click', assignGrant);
+  document
+    .getElementById('provisionTenantAdminBtn')
+    ?.addEventListener('click', provisionTenantAdmin);
+  document
+    .getElementById('grantPrincipalType')
+    ?.addEventListener('change', updateGrantPrincipalInputs);
+
+  /* Page-size selectors and Prev/Next for the two lists that grow with the
+   * tenant. Changing page size keeps the current first row visible instead of
+   * silently jumping back to the top. */
+  const userSize = document.getElementById('usersPageSize');
+  if (userSize) {
+    userSize.value = String(S.userPage.limit);
+    userSize.addEventListener('change', () => {
+      const firstRow = S.userPage.offset;
+      S.userPage.limit = Number(userSize.value) || 100;
+      S.userPage.offset = Math.floor(firstRow / S.userPage.limit) * S.userPage.limit;
+      loadUsers();
+    });
+  }
+  document.getElementById('usersPrevBtn')?.addEventListener('click', () => {
+    S.userPage.offset = Math.max(0, S.userPage.offset - S.userPage.limit);
+    loadUsers();
+  });
+  document.getElementById('usersNextBtn')?.addEventListener('click', () => {
+    S.userPage.offset += S.userPage.limit;
+    loadUsers();
+  });
+
+  const groupSize = document.getElementById('groupsPageSize');
+  if (groupSize) {
+    groupSize.value = String(S.groupPage.limit);
+    groupSize.addEventListener('change', () => {
+      const firstRow = S.groupPage.offset;
+      S.groupPage.limit = Number(groupSize.value) || 100;
+      S.groupPage.offset = Math.floor(firstRow / S.groupPage.limit) * S.groupPage.limit;
+      loadGroups();
+    });
+  }
+  document.getElementById('groupsPrevBtn')?.addEventListener('click', () => {
+    S.groupPage.offset = Math.max(0, S.groupPage.offset - S.groupPage.limit);
+    loadGroups();
+  });
+  document.getElementById('groupsNextBtn')?.addEventListener('click', () => {
+    S.groupPage.offset += S.groupPage.limit;
+    loadGroups();
+  });
+
+  // live user search
+  const us = document.getElementById('usersSearch');
+  let t;
+  if (us)
+    us.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(async () => {
+        const q = us.value.trim();
+        if (!q) {
+          /* Returning to the list starts at the first page again. */
+          S.userPage.offset = 0;
+          loadUsers();
+          return;
+        }
+        const res = await apiAdmin('/users/search?q=' + encodeURIComponent(q));
+        S.users = normalizeList(res).filter((u) => uid(u));
+        renderUsers();
+        /* The search endpoint clamps to 50 rows. Say so — an unqualified "50
+         * match(es)" reads as a complete answer on a 4,000-user tenant. */
+        const capped = res.json?.capped === true;
+        const c = document.getElementById('usersCount');
+        if (c) {
+          c.textContent = capped
+            ? `first ${S.users.length} match(es) — narrow the search to see the rest`
+            : `${S.users.length} match(es)`;
+        }
+        /* Search results are not a page of the list, so a pager would be wrong. */
+        const bar = document.getElementById('usersPagerBar');
+        if (bar) bar.hidden = true;
+        if (!res.ok) toast(`Search failed (HTTP ${res.status})`, 'err');
+      }, 350);
+    });
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await API('/api/auth/logout', { method: 'POST' });
+  sessionStorage.removeItem('token');
+  location.href = './login.html';
+});
+
+(async function init() {
+  const { ok, json } = await apiAdmin('/verify');
+  if (!ok) {
+    location.href = './login.html';
+    return;
+  }
+  const info = document.getElementById('userinfo');
+  if (info)
+    info.textContent = authUserEmail(json)
+      ? `Signed in as ${authUserEmail(json)}`
+      : 'Operator session active';
+
+  /* The server reports the caller's authority. Inferring it from the role name
+   * was both wrong for tenant admins (whose role is also ADMIN) and
+   * unenforceable client-side — the per-route capabilities decide. */
+  S.isOperator = Boolean(json?.isOperator);
+  S.tenantId = json?.tenantId ?? null;
+  if (info && S.tenantId) {
+    info.textContent += ` — tenant ${S.tenantId}`;
+  }
+
+  setupTabs();
+  attachListeners();
+  await Promise.all([
+    loadUsers(),
+    loadRoles(),
+    loadGroups(),
+    loadGrants(),
+    loadEffective(),
+    loadAudit(),
+  ]);
+})();
+
+function authUserEmail(json) {
+  try {
+    return json?.user?.email || json?.email || '';
+  } catch {
+    return '';
+  }
+}

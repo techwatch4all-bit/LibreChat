@@ -3,7 +3,6 @@ import type { Types, Model, ClientSession, FilterQuery } from 'mongoose';
 import type { SystemCapability } from '~/types/admin';
 import type { ISystemGrant } from '~/types';
 import { SystemCapabilities, CapabilityImplications } from '~/admin/capabilities';
-import { tenantSafeBulkWrite } from '~/utils/tenantBulkWrite';
 import { normalizePrincipalId } from '~/utils/principal';
 import logger from '~/config/winston';
 
@@ -69,6 +68,8 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
     session?: ClientSession,
   ) => Promise<{ grant: ISystemGrant | null; created: boolean }>;
   seedSystemGrants: () => Promise<void>;
+  bootstrapOperatorCapability: (userId?: string) => Promise<void>;
+  seedTenantAdmin: (tenantId: string, roleName?: string) => Promise<void>;
   revokeCapability: (
     {
       principalType,
@@ -329,6 +330,15 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
   ): Promise<{ grant: ISystemGrant | null; created: boolean }> {
     const SystemGrant = mongoose.models.SystemGrant as Model<ISystemGrant>;
 
+    if (capability === SystemCapabilities.OPERATOR_CONTROL) {
+      if (principalType !== PrincipalType.USER) {
+        throw new Error('OPERATOR_CONTROL may only be granted directly to a USER principal');
+      }
+      if (tenantId != null) {
+        throw new Error('OPERATOR_CONTROL grants must be platform-scoped');
+      }
+    }
+
     const normalizedPrincipalId = normalizePrincipalId(principalId, principalType);
 
     const filter: FilterQuery<ISystemGrant> = {
@@ -506,39 +516,27 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
   }
 
   /**
-   * Seed the ADMIN role with all system capabilities.
-   * Context-agnostic: caller provides tenant context (e.g., `runAsSystem()` for
-   * startup, `tenantStorage.run()` for future per-tenant provisioning).
-   * Idempotent and concurrency-safe: uses bulkWrite with ordered:false so parallel
-   * server instances (K8s rolling deploy, PM2 cluster) do not race on E11000.
-   * Retries up to 3 times with exponential backoff on transient failures.
+   * Remove legacy platform-level capabilities from ADMIN. ADMIN grants are
+   * tenant-local in this deployment; the explicitly configured operator receives
+   * platform capabilities through a direct user grant.
    */
   async function seedSystemGrants(): Promise<void> {
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const SystemGrant = mongoose.models.SystemGrant as Model<ISystemGrant>;
-        const now = new Date();
-        const ops = Object.values(SystemCapabilities).map((capability) => ({
-          updateOne: {
-            filter: {
-              principalType: PrincipalType.ROLE,
-              principalId: SystemRoles.ADMIN,
-              capability,
-              tenantId: { $exists: false },
-            },
-            update: {
-              $setOnInsert: {
-                principalType: PrincipalType.ROLE,
-                principalId: SystemRoles.ADMIN,
-                capability,
-                grantedAt: now,
-              },
-            },
-            upsert: true,
-          },
-        }));
-        await tenantSafeBulkWrite(SystemGrant, ops, { ordered: false });
+        /*
+         * ADMIN is tenant-local in this deployment and must not receive
+         * platform-scoped grants. The designated operator receives required
+         * capabilities as direct user grants in bootstrapOperatorCapability.
+         * Remove blanket ADMIN grants seeded by upstream so tenant admins do not
+         * retain those privileges after upgrade.
+         */
+        await SystemGrant.deleteMany({
+          principalType: PrincipalType.ROLE,
+          principalId: SystemRoles.ADMIN,
+          tenantId: { $exists: false },
+        });
         return;
       } catch (err) {
         if (attempt < maxRetries) {
@@ -549,14 +547,128 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           logger.error(
-            '[seedSystemGrants] Failed to seed capabilities after all retries. ' +
-              'Admin panel access requires these grants. Manual recovery: ' +
-              'db.systemgrants.insertMany([...]) with ADMIN role grants for each capability.',
+            '[seedSystemGrants] Failed to remove legacy platform ADMIN grants after all retries.',
             err,
           );
+          throw err;
         }
       }
     }
+  }
+
+  /**
+   * Reconcile platform administration to the explicitly configured operator.
+   * The ADMIN role and tenant grants never confer operator control: stale
+   * operator grants are removed, missing configuration removes all platform
+   * grants for this capability, and the configured master-tenant user receives
+   * the full platform capability set directly.
+   */
+  async function bootstrapOperatorCapability(userId?: string): Promise<void> {
+    const SystemGrant = mongoose.models.SystemGrant as Model<ISystemGrant>;
+    const configuredId = userId?.trim();
+    const existingOperators = await SystemGrant.find({
+      principalType: PrincipalType.USER,
+      capability: SystemCapabilities.OPERATOR_CONTROL,
+      tenantId: { $exists: false },
+    })
+      .select('principalId')
+      .lean();
+
+    const revokeOperatorPlatformGrants = async (except?: Types.ObjectId): Promise<void> => {
+      const operatorIds = existingOperators
+        .map(({ principalId }) => principalId as Types.ObjectId)
+        .filter((principalId) => except == null || !principalId.equals(except));
+      if (operatorIds.length > 0) {
+        await SystemGrant.deleteMany({
+          principalType: PrincipalType.USER,
+          principalId: { $in: operatorIds },
+          tenantId: { $exists: false },
+        });
+      }
+      await SystemGrant.deleteMany({
+        principalType: { $in: [PrincipalType.ROLE, PrincipalType.GROUP] },
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+        tenantId: { $exists: false },
+      });
+    };
+
+    if (!configuredId) {
+      await revokeOperatorPlatformGrants();
+      return;
+    }
+    if (!mongoose.isValidObjectId(configuredId)) {
+      await revokeOperatorPlatformGrants();
+      throw new Error('SATCHIDA_OPERATOR_USER_ID must be a valid user ObjectId');
+    }
+    const User = mongoose.models.User as Model<{ _id: Types.ObjectId; tenantId?: string }>;
+    const user = await User.findById(configuredId).select('_id tenantId').lean().exec();
+    if (!user) {
+      await revokeOperatorPlatformGrants();
+      throw new Error('Configured Satchida operator user does not exist');
+    }
+    if (user.tenantId !== 'satchida-master') {
+      await revokeOperatorPlatformGrants();
+      throw new Error('Configured operator is not the reserved master tenant');
+    }
+    await revokeOperatorPlatformGrants(user._id);
+    await Promise.all(
+      Object.values(SystemCapabilities).map((capability) =>
+        grantCapability({
+          principalType: PrincipalType.USER,
+          principalId: user._id,
+          capability,
+          grantedBy: user._id,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Provision a tenant's administrator.
+   *
+   * Grants the admin-surface gate (`access:admin`) and the user/group/role
+   * management capabilities, all with `tenantId` set. Tenant-scoped rows are
+   * invisible to platform checks and to every other tenant (see
+   * `tenantCondition` in `hasCapabilityForPrincipals`), so this can never confer
+   * cross-tenant authority. `OPERATOR_CONTROL` is refused outright by
+   * `grantCapability`, so this path cannot escalate a tenant admin to platform
+   * operator either.
+   *
+   * Idempotent: `grantCapability` is an insert-only upsert, so re-running is a
+   * no-op. `ADMIN` is tenant-local in this deployment (see `seedSystemGrants`),
+   * so granting it within a tenant is how a tenant administrator is expressed.
+   */
+  async function seedTenantAdmin(
+    tenantId: string,
+    roleName: string = SystemRoles.ADMIN,
+  ): Promise<void> {
+    const trimmedTenantId = tenantId?.trim();
+    if (!trimmedTenantId) {
+      throw new Error('seedTenantAdmin requires a tenantId');
+    }
+    const trimmedRole = roleName?.trim();
+    if (!trimmedRole) {
+      throw new Error('seedTenantAdmin requires a role name');
+    }
+    const tenantAdminCapabilities: BaseSystemCapability[] = [
+      SystemCapabilities.ACCESS_ADMIN,
+      SystemCapabilities.MANAGE_USERS,
+      SystemCapabilities.READ_USERS,
+      SystemCapabilities.MANAGE_GROUPS,
+      SystemCapabilities.READ_GROUPS,
+      SystemCapabilities.MANAGE_ROLES,
+      SystemCapabilities.READ_ROLES,
+    ];
+    await Promise.all(
+      tenantAdminCapabilities.map((capability) =>
+        grantCapability({
+          principalType: PrincipalType.ROLE,
+          principalId: trimmedRole,
+          capability,
+          tenantId: trimmedTenantId,
+        }),
+      ),
+    );
   }
 
   /**
@@ -593,6 +705,8 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
   return {
     grantCapability,
     seedSystemGrants,
+    bootstrapOperatorCapability,
+    seedTenantAdmin,
     revokeCapability,
     hasCapabilityForPrincipals,
     hasAnyConfigReadAccess,

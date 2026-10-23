@@ -11,6 +11,8 @@ export { default as chatProjectSchema } from './chatProject';
 export { default as codeEnvironmentSchema } from './codeEnvironment';
 export { default as conversationTagSchema } from './conversationTag';
 export { default as convoSchema } from './convo';
+export { default as tenantPolicySchema } from './tenantPolicy';
+export { default as tenantEntitlementSchema } from './tenantEntitlement';
 export { default as fileSchema } from './file';
 export { default as keySchema } from './key';
 export { default as messageSchema } from './message';

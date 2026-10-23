@@ -1390,7 +1390,29 @@ describe('refreshController – OpenID path', () => {
     );
   });
 
-  it('should not expose sensitive fields or federatedTokens in refresh response', async () => {
+  it('should not expose sensitive fields or family authorization metadata in refresh response', async () => {
+    findOpenIDUser.mockResolvedValue({
+      user: {
+        ...defaultUser,
+        familyAccountId: 'family-owner-id',
+        guardianId: 'guardian-id',
+        familyRole: 'minor',
+        seatToken: 'tk-secret',
+        privacyAssertion: 'signed-secret',
+        satchidaSeatAlias: 'opaque-seat-00000001',
+        tenantSeatCapabilities: ['mcp'],
+        privacyEntitled: true,
+        familyLimits: { imageGenEnabled: false, imageCreditsPerDay: 0 },
+        guardianProcessingConsentAt: new Date(),
+        guardianProcessingConsentVersion: 'processing-v1',
+        parentalTranscriptConsentAt: new Date(),
+        parentalTranscriptConsentVersion: 'transcript-v1',
+        imageGenerationConsentAt: new Date(),
+        imageGenerationConsentVersion: 'image-v1',
+      },
+      error: null,
+      migration: false,
+    });
     await refreshController(req, res);
 
     const sentPayload = res.send.mock.calls[0][0];
@@ -1403,6 +1425,21 @@ describe('refreshController – OpenID path', () => {
       }),
     });
     expect(sentPayload.user).not.toHaveProperty('federatedTokens');
+    expect(sentPayload.user).not.toHaveProperty('familyAccountId');
+    expect(sentPayload.user).not.toHaveProperty('familyRole');
+    expect(sentPayload.user).not.toHaveProperty('guardianId');
+    expect(sentPayload.user).not.toHaveProperty('familyLimits');
+    expect(sentPayload.user).not.toHaveProperty('guardianProcessingConsentAt');
+    expect(sentPayload.user).not.toHaveProperty('guardianProcessingConsentVersion');
+    expect(sentPayload.user).not.toHaveProperty('parentalTranscriptConsentAt');
+    expect(sentPayload.user).not.toHaveProperty('parentalTranscriptConsentVersion');
+    expect(sentPayload.user).not.toHaveProperty('imageGenerationConsentAt');
+    expect(sentPayload.user).not.toHaveProperty('imageGenerationConsentVersion');
+    expect(sentPayload.user).not.toHaveProperty('seatToken');
+    expect(sentPayload.user).not.toHaveProperty('privacyAssertion');
+    expect(sentPayload.user).not.toHaveProperty('satchidaSeatAlias');
+    expect(sentPayload.user).not.toHaveProperty('tenantSeatCapabilities');
+    expect(sentPayload.user).not.toHaveProperty('privacyEntitled');
     expect(sentPayload.user).not.toHaveProperty('password');
     expect(sentPayload.user).not.toHaveProperty('totpSecret');
     expect(sentPayload.user).not.toHaveProperty('backupCodes');

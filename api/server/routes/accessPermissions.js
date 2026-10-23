@@ -6,7 +6,7 @@ const {
   ResourceType,
   PermissionBits,
 } = require('librechat-data-provider');
-const { createAgentAdminPermissionAccess, isAgentPermissionsAdmin } = require('@librechat/api');
+const { createAgentAdminPermissionAccess } = require('@librechat/api');
 const {
   getUserEffectivePermissions,
   getAllEffectivePermissions,
@@ -50,79 +50,69 @@ router.get('/:resourceType/roles', getResourceRoles);
 
 /**
  * Middleware factory to check resource access for permission-related operations.
- * SECURITY: Users must have SHARE permission to view or modify resource permissions.
+ * SECURITY: Callers must pass resource SHARE and role SHARE checks to modify permissions.
  * @param {string} requiredPermission - The permission bit required (e.g., SHARE)
  * @returns Express middleware function
  */
 const checkResourcePermissionAccess = (requiredPermission) =>
-  createAgentAdminPermissionAccess({
-    getAgent: db.getAgent,
-    fallback: (req, res, next) => {
-      const { resourceType } = req.params;
-      let middleware;
+  createAgentAdminPermissionAccess((req, res, next) => {
+    const { resourceType } = req.params;
+    let middleware;
 
-      if (resourceType === ResourceType.AGENT) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.AGENT,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-        });
-      } else if (resourceType === ResourceType.REMOTE_AGENT) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.REMOTE_AGENT,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-        });
-      } else if (resourceType === ResourceType.PROMPTGROUP) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.PROMPTGROUP,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-        });
-      } else if (resourceType === ResourceType.MCPSERVER) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.MCPSERVER,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-          idResolver: findMCPServerByObjectId,
-        });
-      } else if (resourceType === ResourceType.SKILL) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.SKILL,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-          idResolver: getSkillById,
-        });
-      } else if (resourceType === ResourceType.CODE_ENVIRONMENT) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.CODE_ENVIRONMENT,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-        });
-      } else if (resourceType === ResourceType.SHARED_LINK) {
-        middleware = canAccessResource({
-          resourceType: ResourceType.SHARED_LINK,
-          requiredPermission,
-          resourceIdParam: 'resourceId',
-        });
-      } else {
-        return res.status(400).json({
-          error: 'Bad Request',
-          message: `Unsupported resource type: ${resourceType}`,
-        });
-      }
+    if (resourceType === ResourceType.AGENT) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.AGENT,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+      });
+    } else if (resourceType === ResourceType.REMOTE_AGENT) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.REMOTE_AGENT,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+      });
+    } else if (resourceType === ResourceType.PROMPTGROUP) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.PROMPTGROUP,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+      });
+    } else if (resourceType === ResourceType.MCPSERVER) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.MCPSERVER,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+        idResolver: findMCPServerByObjectId,
+      });
+    } else if (resourceType === ResourceType.SKILL) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.SKILL,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+        idResolver: getSkillById,
+      });
+    } else if (resourceType === ResourceType.CODE_ENVIRONMENT) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.CODE_ENVIRONMENT,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+      });
+    } else if (resourceType === ResourceType.SHARED_LINK) {
+      middleware = canAccessResource({
+        resourceType: ResourceType.SHARED_LINK,
+        requiredPermission,
+        resourceIdParam: 'resourceId',
+      });
+    } else {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: `Unsupported resource type: ${resourceType}`,
+      });
+    }
 
-      // Execute the middleware
-      middleware(req, res, next);
-    },
+    // Execute the middleware
+    middleware(req, res, next);
   });
-
-const checkShareAccessUnlessAgentAdmin = (req, res, next) => {
-  if (isAgentPermissionsAdmin(req)) {
-    return next();
-  }
-  return checkShareAccess(req, res, next);
-};
 
 const rejectSharedLinkOwnerPermissionChanges = async (req, res, next) => {
   if (req.params.resourceType !== ResourceType.SHARED_LINK) {
@@ -195,7 +185,7 @@ router.get(
 router.put(
   '/:resourceType/:resourceId',
   checkResourcePermissionAccess(PermissionBits.SHARE),
-  checkShareAccessUnlessAgentAdmin,
+  checkShareAccess,
   checkSharePublicAccess,
   rejectSharedLinkOwnerPermissionChanges,
   updateResourcePermissions,

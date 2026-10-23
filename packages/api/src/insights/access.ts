@@ -1,5 +1,5 @@
 import { SystemCapabilities } from '@librechat/data-schemas';
-import { PermissionBits, PrincipalType, ResourceType, SystemRoles } from 'librechat-data-provider';
+import { PermissionBits, PrincipalType, ResourceType } from 'librechat-data-provider';
 import type { TInsightsAgent } from 'librechat-data-provider';
 import type { Types } from 'mongoose';
 
@@ -47,12 +47,6 @@ export function createInsightsAgentAccessResolver(deps: InsightsAgentAccessDeps)
       ? { tenantId: user.tenantId }
       : { tenantId: { $exists: false } };
     const agentsPromise = deps.getAgents(tenantFilter, '_id id name tenantId');
-
-    if (user.role === SystemRoles.ADMIN) {
-      return (await agentsPromise)
-        .map(toChoice)
-        .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    }
 
     const principals = await deps.getUserPrincipals({
       userId: user.id,

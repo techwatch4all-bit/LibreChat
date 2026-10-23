@@ -352,6 +352,16 @@ describe('getUserController', () => {
         createdAt,
         updatedAt,
         tenantId: 'tenant-id',
+        familyAccountId: 'family-owner-id',
+        familyRole: 'minor',
+        familyLimits: { imageGenEnabled: false, imageCreditsPerDay: 0 },
+        guardianProcessingConsentAt: new Date('2026-01-03T00:00:00.000Z'),
+        guardianProcessingConsentVersion: 'processing-v1',
+        parentalTranscriptConsentAt: new Date('2026-01-04T00:00:00.000Z'),
+        parentalTranscriptConsentVersion: 'transcript-v1',
+        imageGenerationConsentAt: new Date('2026-01-05T00:00:00.000Z'),
+        imageGenerationConsentVersion: 'image-v1',
+        guardianId: 'guardian-id',
         password: 'hashed-password',
         __v: 1,
         totpSecret: 'totp-secret',
@@ -403,7 +413,18 @@ describe('getUserController', () => {
       createdAt,
       updatedAt,
       tenantId: 'tenant-id',
+      familyRole: 'minor',
     });
+    expect(sentUser).toHaveProperty('familyRole', 'minor');
+    expect(sentUser).not.toHaveProperty('familyAccountId');
+    expect(sentUser).not.toHaveProperty('guardianId');
+    expect(sentUser).not.toHaveProperty('familyLimits');
+    expect(sentUser).not.toHaveProperty('guardianProcessingConsentAt');
+    expect(sentUser).not.toHaveProperty('guardianProcessingConsentVersion');
+    expect(sentUser).not.toHaveProperty('parentalTranscriptConsentAt');
+    expect(sentUser).not.toHaveProperty('parentalTranscriptConsentVersion');
+    expect(sentUser).not.toHaveProperty('imageGenerationConsentAt');
+    expect(sentUser).not.toHaveProperty('imageGenerationConsentVersion');
     expect(sentUser).not.toHaveProperty('password');
     expect(sentUser).not.toHaveProperty('__v');
     expect(sentUser).not.toHaveProperty('totpSecret');

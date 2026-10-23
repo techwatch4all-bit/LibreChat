@@ -71,11 +71,19 @@ export async function loadEphemeralAgent(
   { req, spec, endpoint, model_parameters: _m }: Omit<LoadAgentParams, 'agent_id'>,
   deps: LoadAgentDeps,
 ): Promise<Agent | null> {
-  const { model, ...model_parameters } = _m ?? ({} as unknown as AgentModelParameters);
+  const { model: initialModel, ...model_parameters } =
+    _m ?? ({} as unknown as AgentModelParameters);
+  let model = initialModel;
   const modelSpecs = req.config?.modelSpecs as { list?: TModelSpec[] } | undefined;
   let modelSpec: TModelSpec | null = null;
   if (spec != null && spec !== '') {
     modelSpec = modelSpecs?.list?.find((s) => s.name === spec) ?? null;
+  }
+  if (!modelSpec && typeof model === 'string') {
+    modelSpec = modelSpecs?.list?.find((s) => s.name === model) ?? null;
+  }
+  if (modelSpec?.preset?.model && (!model || model === modelSpec.name)) {
+    model = modelSpec.preset.model;
   }
   const ephemeralAgent: TEphemeralAgent | undefined = req.body?.ephemeralAgent;
   const userId = req.user?.id ?? '';

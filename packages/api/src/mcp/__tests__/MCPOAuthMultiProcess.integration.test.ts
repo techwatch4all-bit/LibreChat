@@ -20,6 +20,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { ChildProcess } from 'child_process';
 import type { OAuthTestServer } from './helpers/oauthTestServer';
 import { createOAuthMCPServer } from './helpers/oauthTestServer';
+import { mongoInstanceArgs } from '~/test-support/mongo';
 
 const WORKER_BOOT = path.join(__dirname, 'helpers', 'mcpOAuthWorkerBoot.cjs');
 const CLIENT_ID = 'librechat-multiprocess-harness';
@@ -240,10 +241,13 @@ describeWithRedis('MCP OAuth credential lifecycle across separate replica proces
     /**
      * `--nounixsocket` keeps mongod off its hardcoded /tmp socket path, which a read-only root
      * filesystem rejects with an opaque fassert failure. It changes nothing about the server.
+     *
+     * The flag is Linux-only. mongod on Windows rejects it as an unrecognised option and
+     * exits, which surfaces as "Instance closed unexpectedly with code 2" rather than a
+     * message naming the flag, so it is only passed where it exists.
      */
-    mongod = await MongoMemoryServer.create({ instance: { args: ['--nounixsocket'] } });
+    mongod = await MongoMemoryServer.create({ instance: { args: mongoInstanceArgs() } });
   }, BOOT_TIMEOUT_MS);
-
   afterAll(async () => {
     await mongod?.stop();
   });

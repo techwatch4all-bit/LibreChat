@@ -2,11 +2,16 @@ import mongoose, { Types } from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import type { SystemCapability } from '~/types/admin';
+import type { IUser } from '~/types';
 import type * as t from '~/types';
 import { SystemCapabilities, CapabilityImplications } from '~/admin/capabilities';
+import { applyTenantIsolation } from '~/models/plugins/tenantIsolation';
 import { createSystemGrantMethods } from './systemGrant';
 import systemGrantSchema from '~/schema/systemGrant';
+import userSchema from '~/schema/user';
 import logger from '~/config/winston';
+
+let User: mongoose.Model<IUser>;
 
 jest.mock('~/config/winston', () => ({
   error: jest.fn(),
@@ -23,11 +28,14 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   SystemGrant =
     mongoose.models.SystemGrant || mongoose.model<t.ISystemGrant>('SystemGrant', systemGrantSchema);
+  applyTenantIsolation(userSchema);
+  User = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
   methods = createSystemGrantMethods(mongoose);
   await mongoose.connect(mongoServer.getUri());
   // Connecting does not wait for the unique index. Complete initialization
   // before any seeding or duplicate writes can race the background build.
   await SystemGrant.init();
+  await User.init();
 });
 
 afterAll(async () => {
@@ -37,24 +45,34 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await SystemGrant.deleteMany({});
+  await User.deleteMany({});
 });
 
 describe('systemGrant methods', () => {
   describe('seedSystemGrants', () => {
-    it('seeds every SystemCapabilities value for the ADMIN role', async () => {
+    it('removes platform-scoped grants from the ADMIN role', async () => {
+      await SystemGrant.create({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        capability: SystemCapabilities.MANAGE_USERS,
+      });
+
       await methods.seedSystemGrants();
 
       const grants = await SystemGrant.find({
         principalType: PrincipalType.ROLE,
         principalId: SystemRoles.ADMIN,
       }).lean();
-
-      const expected = Object.values(SystemCapabilities).sort();
-      const actual = grants.map((g) => g.capability).sort();
-      expect(actual).toEqual(expected);
+      expect(grants).toEqual([]);
     });
 
-    it('is idempotent — duplicate calls produce no extra documents', async () => {
+    it('is idempotent when removing legacy platform grants', async () => {
+      await SystemGrant.create({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        capability: SystemCapabilities.MANAGE_USERS,
+      });
+
       await methods.seedSystemGrants();
       await methods.seedSystemGrants();
       await methods.seedSystemGrants();
@@ -63,53 +81,348 @@ describe('systemGrant methods', () => {
         principalType: PrincipalType.ROLE,
         principalId: SystemRoles.ADMIN,
       });
-      expect(count).toBe(Object.values(SystemCapabilities).length);
+      expect(count).toBe(0);
     });
 
-    it('seeds platform-level grants (no tenantId field)', async () => {
-      await methods.seedSystemGrants();
-
-      const withTenant = await SystemGrant.countDocuments({
+    it('preserves tenant-scoped grants while removing platform grants', async () => {
+      await SystemGrant.create({
         principalType: PrincipalType.ROLE,
         principalId: SystemRoles.ADMIN,
-        tenantId: { $exists: true },
+        capability: SystemCapabilities.MANAGE_USERS,
+        tenantId: 'school-1',
       });
-      expect(withTenant).toBe(0);
+      await SystemGrant.create({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        capability: SystemCapabilities.MANAGE_USERS,
+      });
+
+      await methods.seedSystemGrants();
+
+      const grants = await SystemGrant.find({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+      }).lean();
+      expect(grants).toHaveLength(1);
+      expect(grants[0].tenantId).toBe('school-1');
+    });
+
+    it('never grants OPERATOR_CONTROL to the ADMIN role', async () => {
+      await methods.seedSystemGrants();
+      expect(
+        await SystemGrant.countDocuments({
+          principalType: PrincipalType.ROLE,
+          principalId: SystemRoles.ADMIN,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        }),
+      ).toBe(0);
+    });
+
+    it('leaves no platform-level ADMIN grants after cleanup', async () => {
+      await methods.seedSystemGrants();
+
+      const platformGrants = await SystemGrant.countDocuments({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        tenantId: { $exists: false },
+      });
+      expect(platformGrants).toBe(0);
     });
 
     it('does not throw when called (try-catch protects startup)', async () => {
       await expect(methods.seedSystemGrants()).resolves.not.toThrow();
     });
 
-    it('retries on transient failure and succeeds', async () => {
-      jest.useFakeTimers();
-      jest.spyOn(SystemGrant, 'bulkWrite').mockRejectedValueOnce(new Error('disk full'));
+    it('retries on transient cleanup failure and succeeds', async () => {
+      /*
+       * Real timers, not fake ones.
+       *
+       * The retry backoff is a real `setTimeout`, and the MongoDB driver schedules
+       * its own work on real timers too. Advancing fake timers does not let the
+       * driver's in-flight operation finish, so the awaited promise never settles
+       * and the suite hangs. The backoff is one second here, so the cost of
+       * real time is negligible next to a deadlock.
+       */
+      jest.spyOn(SystemGrant, 'deleteMany').mockRejectedValueOnce(new Error('disk full'));
 
-      const seedPromise = methods.seedSystemGrants();
-      await jest.advanceTimersByTimeAsync(5000);
-      await seedPromise;
+      await methods.seedSystemGrants();
 
       expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Attempt 1/3 failed'));
-      jest.useRealTimers();
     });
 
-    it('logs error after all retries exhausted', async () => {
-      jest.useFakeTimers();
+    it('logs error after all cleanup retries are exhausted', async () => {
       jest
-        .spyOn(SystemGrant, 'bulkWrite')
+        .spyOn(SystemGrant, 'deleteMany')
         .mockRejectedValueOnce(new Error('disk full'))
         .mockRejectedValueOnce(new Error('disk full'))
         .mockRejectedValueOnce(new Error('disk full'));
 
-      const seedPromise = methods.seedSystemGrants();
-      await jest.advanceTimersByTimeAsync(10000);
-      await seedPromise;
+      await expect(methods.seedSystemGrants()).rejects.toThrow('disk full');
 
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to seed capabilities after all retries'),
+        expect.stringContaining('Failed to remove legacy platform ADMIN grants'),
         expect.any(Error),
       );
-      jest.useRealTimers();
+    });
+  });
+
+  describe('operator capability', () => {
+    it('refuses to grant OPERATOR_CONTROL to a role', async () => {
+      await expect(
+        methods.grantCapability({
+          principalType: PrincipalType.ROLE,
+          principalId: SystemRoles.ADMIN,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        }),
+      ).rejects.toThrow('OPERATOR_CONTROL may only be granted directly to a USER principal');
+    });
+
+    it('does not seed operator control to any role', async () => {
+      await methods.seedSystemGrants();
+      expect(
+        await SystemGrant.countDocuments({
+          principalType: PrincipalType.ROLE,
+          principalId: SystemRoles.ADMIN,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        }),
+      ).toBe(0);
+    });
+
+    it('grants administrative capabilities directly to the configured master-tenant user', async () => {
+      const userId = new Types.ObjectId();
+      await User.create({
+        _id: userId,
+        email: 'operator@satchida.local',
+        tenantId: 'satchida-master',
+      });
+
+      await methods.bootstrapOperatorCapability(userId.toString());
+
+      const direct = await SystemGrant.findOne({
+        principalType: PrincipalType.USER,
+        principalId: userId,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+        tenantId: { $exists: false },
+      }).lean();
+      const roleGrant = await SystemGrant.findOne({
+        principalType: PrincipalType.ROLE,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+      }).lean();
+      const allOperatorGrants = await SystemGrant.find({
+        principalType: PrincipalType.USER,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+        tenantId: { $exists: false },
+      }).lean();
+      expect(direct).toBeTruthy();
+      expect(direct?.capability).toBe(SystemCapabilities.OPERATOR_CONTROL);
+      expect(roleGrant).toBeNull();
+      expect(allOperatorGrants).toHaveLength(1);
+      expect(allOperatorGrants[0].principalId).toEqual(userId);
+      expect(
+        await SystemGrant.countDocuments({
+          principalType: PrincipalType.USER,
+          principalId: userId,
+          capability: { $in: Object.values(SystemCapabilities) },
+          tenantId: { $exists: false },
+        }),
+      ).toBe(Object.values(SystemCapabilities).length);
+    });
+
+    it('refuses a tenant user other than the reserved master tenant', async () => {
+      const userId = new Types.ObjectId();
+      const existingOperatorId = new Types.ObjectId();
+      await User.create([
+        { _id: userId, email: 'tenant-admin@example.test', tenantId: 'school-1' },
+        { _id: existingOperatorId, email: 'operator@satchida.local', tenantId: 'satchida-master' },
+      ]);
+      await methods.grantCapability({
+        principalType: PrincipalType.USER,
+        principalId: existingOperatorId,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+      });
+      await expect(methods.bootstrapOperatorCapability(userId.toString())).rejects.toThrow(
+        'not the reserved master tenant',
+      );
+      await expect(
+        SystemGrant.countDocuments({
+          principalType: PrincipalType.USER,
+          principalId: existingOperatorId,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        }),
+      ).resolves.toBe(0);
+    });
+
+    it('revokes old direct operator grants before promoting the configured user', async () => {
+      const oldUserId = new Types.ObjectId();
+      const currentUserId = new Types.ObjectId();
+      await User.create([
+        { _id: oldUserId, email: 'old-operator@satchida.local', tenantId: 'satchida-master' },
+        { _id: currentUserId, email: 'operator@satchida.local', tenantId: 'satchida-master' },
+      ]);
+      await methods.grantCapability({
+        principalType: PrincipalType.USER,
+        principalId: oldUserId,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+      });
+
+      await methods.bootstrapOperatorCapability(currentUserId.toString());
+
+      const grants = await SystemGrant.find({
+        principalType: PrincipalType.USER,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+        tenantId: { $exists: false },
+      }).lean();
+      expect(grants).toHaveLength(1);
+      expect(grants[0].principalId).toEqual(currentUserId);
+    });
+
+    it('removes role and group operator grants when no operator ID is configured', async () => {
+      await SystemGrant.create([
+        {
+          principalType: PrincipalType.ROLE,
+          principalId: SystemRoles.ADMIN,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        },
+        {
+          principalType: PrincipalType.GROUP,
+          principalId: new Types.ObjectId(),
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+        },
+      ]);
+
+      await methods.bootstrapOperatorCapability(undefined);
+
+      await expect(
+        SystemGrant.countDocuments({ capability: SystemCapabilities.OPERATOR_CONTROL }),
+      ).resolves.toBe(0);
+    });
+
+    it('removes operator grants when no operator ID is configured', async () => {
+      const oldUserId = new Types.ObjectId();
+      await User.create({
+        _id: oldUserId,
+        email: 'old-operator@satchida.local',
+        tenantId: 'satchida-master',
+      });
+      await methods.grantCapability({
+        principalType: PrincipalType.USER,
+        principalId: oldUserId,
+        capability: SystemCapabilities.OPERATOR_CONTROL,
+      });
+
+      await methods.bootstrapOperatorCapability(undefined);
+
+      await expect(
+        SystemGrant.countDocuments({ capability: SystemCapabilities.OPERATOR_CONTROL }),
+      ).resolves.toBe(0);
+    });
+
+    it('refuses an unknown operator ID', async () => {
+      await expect(
+        methods.bootstrapOperatorCapability(new Types.ObjectId().toString()),
+      ).rejects.toThrow('does not exist');
+    });
+  });
+
+  describe('bootstrapOperatorCapability', () => {
+    it('is idempotent for the configured operator', async () => {
+      const userId = new Types.ObjectId();
+      await User.create({
+        _id: userId,
+        email: 'operator@satchida.local',
+        tenantId: 'satchida-master',
+      });
+      await methods.bootstrapOperatorCapability(userId.toString());
+      await methods.bootstrapOperatorCapability(userId.toString());
+      await expect(
+        SystemGrant.countDocuments({
+          principalType: PrincipalType.USER,
+          principalId: userId,
+          capability: SystemCapabilities.OPERATOR_CONTROL,
+          tenantId: { $exists: false },
+        }),
+      ).resolves.toBe(1);
+    });
+  });
+
+  describe('seedTenantAdmin', () => {
+    it('grants the tenant administrator capability set scoped to the tenant', async () => {
+      await methods.seedTenantAdmin('tenant-school');
+
+      const grants = await methods.getCapabilitiesForPrincipal({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        tenantId: 'tenant-school',
+      });
+      const capabilities = grants.map((g) => g.capability);
+
+      expect(capabilities).toContain(SystemCapabilities.ACCESS_ADMIN);
+      expect(capabilities).toContain(SystemCapabilities.MANAGE_USERS);
+      expect(capabilities).toContain(SystemCapabilities.READ_USERS);
+      expect(capabilities).toContain(SystemCapabilities.MANAGE_GROUPS);
+      expect(capabilities).toContain(SystemCapabilities.MANAGE_ROLES);
+      /** Every row carries the tenant — never a platform-scoped grant. */
+      expect(grants.every((g) => g.tenantId === 'tenant-school')).toBe(true);
+    });
+
+    it('never grants OPERATOR_CONTROL', async () => {
+      await methods.seedTenantAdmin('tenant-school');
+
+      await expect(
+        SystemGrant.countDocuments({ capability: SystemCapabilities.OPERATOR_CONTROL }),
+      ).resolves.toBe(0);
+    });
+
+    it('is idempotent', async () => {
+      await methods.seedTenantAdmin('tenant-school');
+      const first = await SystemGrant.countDocuments({ tenantId: 'tenant-school' });
+      await methods.seedTenantAdmin('tenant-school');
+      await expect(SystemGrant.countDocuments({ tenantId: 'tenant-school' })).resolves.toBe(first);
+    });
+
+    it('confers authority only inside its own tenant', async () => {
+      await methods.seedTenantAdmin('tenant-school');
+      const principals = [{ principalType: PrincipalType.ROLE, principalId: SystemRoles.ADMIN }];
+
+      /* A platform-level check must not see a tenant grant. */
+      await expect(
+        methods.hasCapabilityForPrincipals({
+          principals,
+          capability: SystemCapabilities.MANAGE_USERS,
+        }),
+      ).resolves.toBe(false);
+
+      await expect(
+        methods.hasCapabilityForPrincipals({
+          principals,
+          capability: SystemCapabilities.MANAGE_USERS,
+          tenantId: 'tenant-school',
+        }),
+      ).resolves.toBe(true);
+
+      /* Nor may another tenant inherit it. */
+      await expect(
+        methods.hasCapabilityForPrincipals({
+          principals,
+          capability: SystemCapabilities.MANAGE_USERS,
+          tenantId: 'tenant-other',
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it('rejects an empty tenantId', async () => {
+      await expect(methods.seedTenantAdmin('   ')).rejects.toThrow(/tenantId/);
+    });
+
+    it('honours a custom role name', async () => {
+      await methods.seedTenantAdmin('tenant-school', 'school-admin');
+
+      const grants = await methods.getCapabilitiesForPrincipal({
+        principalType: PrincipalType.ROLE,
+        principalId: 'school-admin',
+        tenantId: 'tenant-school',
+      });
+      expect(grants.length).toBeGreaterThan(0);
     });
   });
 
@@ -413,6 +726,9 @@ describe('systemGrant methods', () => {
     it('returns true when a role principal holds the capability', async () => {
       await methods.seedSystemGrants();
 
+      // The ADMIN role is tenant-local in this deployment, so it is granted the
+      // administrative capabilities scoped to a tenant rather than platform-wide.
+      await methods.seedTenantAdmin('tenant-a');
       const result = await methods.hasCapabilityForPrincipals({
         principals: [
           { principalType: PrincipalType.USER, principalId: new Types.ObjectId() },
@@ -420,8 +736,25 @@ describe('systemGrant methods', () => {
           { principalType: PrincipalType.PUBLIC },
         ],
         capability: SystemCapabilities.ACCESS_ADMIN,
+        tenantId: 'tenant-a',
       });
       expect(result).toBe(true);
+    });
+
+    it('does not confer a tenant-scoped capability outside its own tenant', async () => {
+      await methods.seedSystemGrants();
+      await methods.seedTenantAdmin('tenant-a');
+
+      const result = await methods.hasCapabilityForPrincipals({
+        principals: [
+          { principalType: PrincipalType.USER, principalId: new Types.ObjectId() },
+          { principalType: PrincipalType.ROLE, principalId: SystemRoles.ADMIN },
+          { principalType: PrincipalType.PUBLIC },
+        ],
+        capability: SystemCapabilities.ACCESS_ADMIN,
+        tenantId: 'tenant-b',
+      });
+      expect(result).toBe(false);
     });
 
     it('returns false when no principal has the capability', async () => {
@@ -690,7 +1023,7 @@ describe('systemGrant methods', () => {
   });
 
   describe('getCapabilitiesForPrincipal', () => {
-    it('lists all capabilities for the ADMIN role after seeding', async () => {
+    it('returns no platform capabilities for the ADMIN role', async () => {
       await methods.seedSystemGrants();
 
       const grants = await methods.getCapabilitiesForPrincipal({
@@ -698,9 +1031,7 @@ describe('systemGrant methods', () => {
         principalId: SystemRoles.ADMIN,
       });
 
-      expect(grants).toHaveLength(Object.values(SystemCapabilities).length);
-      const caps = grants.map((g) => g.capability).sort();
-      expect(caps).toEqual(Object.values(SystemCapabilities).sort());
+      expect(grants).toHaveLength(0);
     });
 
     it('returns empty array when principal has no grants', async () => {
@@ -753,7 +1084,12 @@ describe('systemGrant methods', () => {
       expect(grants[0].capability).toBe(SystemCapabilities.READ_CONFIGS);
     });
 
-    it('includes platform-level grants when called with a tenantId', async () => {
+    it('does not include platform grants for ADMIN after legacy grant cleanup', async () => {
+      await SystemGrant.create({
+        principalType: PrincipalType.ROLE,
+        principalId: SystemRoles.ADMIN,
+        capability: SystemCapabilities.ACCESS_ADMIN,
+      });
       await methods.seedSystemGrants();
 
       const grants = await methods.getCapabilitiesForPrincipal({
@@ -762,8 +1098,7 @@ describe('systemGrant methods', () => {
         tenantId: 'acme',
       });
 
-      expect(grants.some((g) => g.capability === SystemCapabilities.ACCESS_ADMIN)).toBe(true);
-      expect(grants).toHaveLength(Object.values(SystemCapabilities).length);
+      expect(grants).toHaveLength(0);
     });
 
     it('throws TypeError for invalid ObjectId string on USER principal', async () => {

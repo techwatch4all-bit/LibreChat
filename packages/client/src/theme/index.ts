@@ -9,6 +9,8 @@ export {
   isDark,
   isHighContrast,
   resolvesToHighContrast,
+  getActiveSeason,
+  type Season,
 } from './context/ThemeProvider';
 
 // Export utility functions

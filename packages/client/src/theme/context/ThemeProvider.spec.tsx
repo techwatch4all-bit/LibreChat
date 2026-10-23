@@ -41,6 +41,8 @@ function Controls() {
       <button onClick={() => setTheme('light')}>Light</button>
       <button onClick={() => setTheme('high-contrast-light')}>HC light</button>
       <button onClick={() => setTheme('high-contrast-dark')}>HC dark</button>
+      <button onClick={() => setTheme('satchida-dark')}>Satchida dark</button>
+      <button onClick={() => setTheme('satchida-light')}>Satchida light</button>
       <button onClick={() => setThemeName('renamed')}>Rename</button>
       <button onClick={() => setThemeName(undefined)}>Clear name</button>
       <button onClick={() => setThemeRGB({ 'rgb-accent-primary': '4 5 6' })}>Set legacy</button>
@@ -75,6 +77,31 @@ beforeEach(() => {
 });
 
 describe('ThemeProvider', () => {
+  it.each([
+    ['satchida-dark', 'dark'],
+    ['satchida-light', 'light'],
+  ])('applies the semantic Satchida %s palette', async (appearance, mode) => {
+    render(
+      <ThemeProvider>
+        <Controls />
+      </ThemeProvider>,
+    );
+
+    act(() =>
+      screen
+        .getByRole('button', {
+          name: appearance === 'satchida-dark' ? 'Satchida dark' : 'Satchida light',
+        })
+        .click(),
+    );
+
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('satchida');
+      expect(document.documentElement).toHaveClass(mode);
+    });
+    expect(localStorage.getItem('color-theme')).toBe(appearance);
+  });
+
   it('preserves CSS fallbacks for colors omitted by legacy RGB props', async () => {
     document.documentElement.style.setProperty('--text-primary', '9 9 9');
     render(

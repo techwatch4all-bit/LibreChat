@@ -22,6 +22,7 @@ export interface SharedLangfuseSessionParams {
 
 export interface SharedLangfuseSessionDeps {
   getHeldCapabilities: GetHeldCapabilitiesFn;
+  hasOperatorControl: (user: CapabilityUser) => Promise<boolean>;
   getMessages: LangfuseSessionLinkParams['getMessages'];
   resolveSessionUrl?: (params: LangfuseSessionLinkParams) => Promise<string | null>;
 }
@@ -58,13 +59,15 @@ export function createSharedLangfuseSessionResolver(deps: SharedLangfuseSessionD
       idOnTheSource: viewer.idOnTheSource ?? null,
     };
     const langfuseConfigCapability = configCapability('langfuse');
-    const heldCapabilities = await deps.getHeldCapabilities(capabilityUser, [
-      SystemCapabilities.ACCESS_ADMIN,
-      SystemCapabilities.MANAGE_CONFIGS,
-      langfuseConfigCapability,
+    const [isOperator, heldCapabilities] = await Promise.all([
+      deps.hasOperatorControl(capabilityUser),
+      deps.getHeldCapabilities(capabilityUser, [
+        SystemCapabilities.MANAGE_CONFIGS,
+        langfuseConfigCapability,
+      ]),
     ]);
     if (
-      !heldCapabilities.has(SystemCapabilities.ACCESS_ADMIN) ||
+      !isOperator ||
       (!heldCapabilities.has(SystemCapabilities.MANAGE_CONFIGS) &&
         !heldCapabilities.has(langfuseConfigCapability))
     ) {

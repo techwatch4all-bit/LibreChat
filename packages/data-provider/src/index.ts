@@ -27,6 +27,10 @@ export * from './mcp';
 /* RBAC */
 export * from './permissions';
 export * from './roles';
+/* Tenant-scoped enable/disable for agents, skills and MCP servers. */
+export * from './tenant-policy';
+/* Satchida tenant plans, account allocations, and semantic mode decisions. */
+export * from './tenant-entitlement';
 /* types (exports schemas from `./types` as they contain needed in other defs) */
 export * from './types';
 export * from './types/agents';

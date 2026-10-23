@@ -1,10 +1,30 @@
-import type {
+﻿import type {
   TUserFavorite,
   RefillIntervalUnit,
   StatefulCodeEnvironment,
 } from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
 import { CursorPaginationParams } from '~/common';
+
+export type FamilyRole = 'owner' | 'adult' | 'minor' | null;
+
+/**
+ * Account-type tiers, mirroring one-api's seeded policy groups. Lowercase
+ * because one-api resolves a seat's group with an exact match on the group name
+ * it seeded (`basic`/`pro`/`family`/`privacy`), and a mis-cased name silently
+ * bypasses that side's `MaxSeats` cap.
+ */
+export const ACCOUNT_TYPES = ['basic', 'pro', 'family', 'privacy'] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+
+export interface FamilyLimits {
+  imageGenEnabled: boolean;
+  imageCreditsPerDay?: number | null;
+  tokenCreditsPerDay?: number | null;
+  allowedHoursFrom?: string | null;
+  allowedHoursTo?: string | null;
+  timezone?: string | null;
+}
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
@@ -53,6 +73,10 @@ export interface IUser extends Document {
   expiresAt?: Date;
   termsAccepted?: boolean;
   termsAcceptedAt?: Date | null;
+  mustChangePassword?: boolean;
+  challengeQuestion?: string | null;
+  challengeAnswerHash?: string | null;
+  passwordChangedAt?: Date | null;
   /** Internal fence that prevents agent-trigger admission during account deletion. */
   agentTriggerDeletionStartedAt?: Date;
   /** Expiring fences closing subagent admission while bulk deletions drain. */
@@ -70,6 +94,26 @@ export interface IUser extends Document {
   pinnedOrder?: string[];
   /** Per-skill active/inactive overrides. Key = skillId, value = active state. */
   skillStates?: Record<string, boolean>;
+  familyAccountId?: Types.ObjectId | null;
+  guardianId?: Types.ObjectId | null;
+  familyRole?: FamilyRole;
+  seatToken?: string;
+  /** Operator-provisioned opaque seat alias; not a person identifier. */
+  satchidaSeatAlias?: string;
+  /** Local router assertion, kept server-side and never returned to clients. */
+  privacyAssertion?: string;
+  /** True only when the current local seat policy grants the Privacy add-on. */
+  privacyEntitled?: boolean;
+  tenantSeatCapabilities?: Array<'work_tools' | 'mcp' | 'agents' | 'code_execution'>;
+  /** Account type / one-api seat group this user is entitled under. */
+  accountType?: AccountType | null;
+  familyLimits?: FamilyLimits | null;
+  guardianProcessingConsentAt?: Date | null;
+  guardianProcessingConsentVersion?: string | null;
+  parentalTranscriptConsentAt?: Date | null;
+  parentalTranscriptConsentVersion?: string | null;
+  imageGenerationConsentAt?: Date | null;
+  imageGenerationConsentVersion?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
   /** Field for external source identification (for consistency with TPrincipal schema) */

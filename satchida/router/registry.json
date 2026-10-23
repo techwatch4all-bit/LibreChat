@@ -1,0 +1,316 @@
+{
+  "_comment": "Satchida autorouter registry. NO KEYS HERE. Keys: env var (keyEnv) or, on the HQ PC only, read live from the opencode auth store (keyFrom.opencodeAuth). Provider ids match opencode so free-exceptions.json can be shared. revenueSafe=false: ToS does not clearly permit powering paying customers (INFERENCE.md section 3), so only 'internal' traffic is served. retention: none|documented|unknown; unknown never serves privacy.",
+  "defaultTraffic": "internal",
+  "revenueGate": "off",
+  "visionRegex": "vl|vision|omni|gemma-4|qwen3\\.[5-9]|qwen3\\.8|muse|mimo|gpt-6|llama-4|pixtral|gemini|glm-.*v|kimi",
+  "freeListFile": "C:/Users/WinDiesel/.config/opencode/free-exceptions.json",
+  "freeListSkipRegex": "asr|parakeet|image|lyria|safety|embed|tts|rerank|whisper|lora|abliterated|--ep-",
+  "providers": {
+    "llama.cpp": {
+      "baseURL": "http://127.0.0.1:8080/v1",
+      "revenueSafe": true,
+      "retention": "none",
+      "locality": "local"
+    },
+    "llama.cpp-8091": {
+      "baseURL": "http://127.0.0.1:8091/v1",
+      "revenueSafe": true,
+      "retention": "none",
+      "locality": "local"
+    },
+    "openrouter": {
+      "baseURL": "https://openrouter.ai/api/v1",
+      "keyEnv": "OPENROUTER_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "openrouter"
+      },
+      "revenueSafe": false,
+      "retention": "documented",
+      "discover": {
+        "type": "openrouter",
+        "mode": ["chat", "work"]
+      }
+    },
+    "opencode": {
+      "baseURL": "https://opencode.ai/zen/v1",
+      "keyEnv": "OPENCODE_ZEN_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "opencode"
+      },
+      "revenueSafe": false,
+      "retention": "unknown",
+      "discover": {
+        "type": "openai-models",
+        "freeNameRegex": "free|bunny",
+        "mode": ["chat", "work"]
+      }
+    },
+    "command-code": {
+      "baseURL": "https://api.commandcode.ai/provider/v1",
+      "keyEnv": "COMMAND_CODE_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "command-code"
+      },
+      "revenueSafe": false,
+      "retention": "unknown"
+    },
+    "command-code-go": {
+      "baseURL": "https://api.commandcode.ai/provider/v1",
+      "keyEnv": "COMMAND_CODE_GO_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "command-code-go"
+      },
+      "revenueSafe": false,
+      "retention": "unknown"
+    },
+    "explabs": {
+      "baseURL": "https://api.experientiallabs.ai/v1",
+      "keyEnv": "EXPLABS_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "explabs"
+      },
+      "revenueSafe": false,
+      "retention": "unknown"
+    },
+    "tokenharbor": {
+      "baseURL": "https://tokenharbor.ai/v1",
+      "keyEnv": "TOKENHARBOR_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "tokenharbor"
+      },
+      "revenueSafe": false,
+      "retention": "unknown",
+      "note": ":free routes may log prompts; paid routes claim no persistent storage (unverified)"
+    },
+    "nvidia": {
+      "baseURL": "https://integrate.api.nvidia.com/v1",
+      "keyEnv": "NVIDIA_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "nvidia"
+      },
+      "revenueSafe": false,
+      "retention": "unknown"
+    },
+    "togetherai": {
+      "baseURL": "https://api.together.xyz/v1",
+      "keyEnv": "TOGETHER_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "togetherai"
+      },
+      "revenueSafe": true,
+      "retention": "documented"
+    },
+    "groq": {
+      "baseURL": "https://api.groq.com/openai/v1",
+      "keyEnv": "GROQ_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "groq"
+      },
+      "revenueSafe": false,
+      "retention": "unknown"
+    },
+    "novita": {
+      "baseURL": "https://api.novita.ai/openai/v1",
+      "keyEnv": "NOVITA_API_KEY",
+      "revenueSafe": true,
+      "retention": "unknown"
+    },
+    "modal": {
+      "baseURL": "https://techwatch4all--ep-deepseek-v4-1-flash-server.us-west.modal.direct/v1",
+      "keyEnv": "MODAL_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "modal"
+      },
+      "revenueSafe": true,
+      "retention": "unknown",
+      "note": "own dedicated endpoint only; shared Modal endpoints are excluded by policy"
+    },
+    "modal-glm": {
+      "baseURL": "https://techwatch4all--ep-glm-5-3-flash-server.us-west.modal.direct/v1",
+      "keyEnv": "MODAL_GLM_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "modal-glm"
+      },
+      "revenueSafe": true,
+      "retention": "unknown"
+    },
+    "openai-zdr": {
+      "baseURL": "https://api.openai.com/v1",
+      "keyEnv": "OPENAI_API_KEY",
+      "revenueSafe": true,
+      "retention": "none",
+      "enabled": false,
+      "note": "Enable ONLY after ZDR approval"
+    },
+    "deepinfra": {
+      "baseURL": "https://api.deepinfra.com/v1",
+      "keyEnv": "DEEPINFRA_API_KEY",
+      "keyFrom": {
+        "opencodeAuth": "deepinfra"
+      },
+      "revenueSafe": true,
+      "retention": "none"
+    }
+  },
+  "models": [
+    {
+      "id": "stealth/space-bunny-alpha",
+      "provider": "openrouter",
+      "tier": "free",
+      "modes": ["work", "chat"],
+      "priority": 1,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "stealth/space-bunny-alpha",
+      "provider": "command-code",
+      "tier": "free",
+      "modes": ["work", "chat"],
+      "priority": 2,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "stealth/space-bunny-alpha",
+      "provider": "command-code-go",
+      "tier": "free",
+      "modes": ["work", "chat"],
+      "priority": 3,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "space-bunny-free",
+      "provider": "opencode",
+      "tier": "free",
+      "modes": ["work", "chat"],
+      "priority": 4,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "provider": "explabs",
+      "tier": "paid",
+      "modes": ["work", "chat"],
+      "priority": 20,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "provider": "openrouter",
+      "tier": "paid",
+      "modes": ["work", "chat"],
+      "priority": 21,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "provider": "modal",
+      "tier": "paid",
+      "modes": ["work", "chat"],
+      "priority": 22,
+      "capabilities": ["text", "tools", "streaming"]
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "provider": "deepinfra",
+      "tier": "paid",
+      "modes": ["work"],
+      "priority": 15,
+      "capabilities": ["text", "streaming"],
+      "zdr": true
+    },
+    {
+      "id": "zai-org/GLM-5.3-Flash",
+      "provider": "deepinfra",
+      "tier": "paid",
+      "modes": ["work"],
+      "priority": 16,
+      "capabilities": ["text", "streaming"],
+      "zdr": true
+    },
+    {
+      "id": "Ternary-Bonsai-2-9B",
+      "provider": "llama.cpp",
+      "tier": "local",
+      "modes": ["chat", "study", "privacy"],
+      "priority": 950,
+      "capabilities": ["text", "streaming"]
+    },
+    {
+      "id": "Ternary-Bonsai-2-27B",
+      "provider": "llama.cpp-8091",
+      "tier": "local",
+      "modes": ["work", "privacy"],
+      "priority": 955,
+      "capabilities": ["text", "tools", "streaming", "code"]
+    },
+    {
+      "id": "Qwen2.5-Omni-7B-Q4_K_M",
+      "provider": "llama.cpp",
+      "tier": "local",
+      "modes": ["chat", "study", "privacy"],
+      "priority": 960,
+      "capabilities": ["text", "streaming", "audio"]
+    }
+  ],
+  "pins": [
+    {
+      "_comment": "Free models that keep changing: pin by regex over ids. Edit when a new stealth model appears.",
+      "idRegex": "space.?bunny",
+      "modes": ["work", "chat"],
+      "priority": 1
+    }
+  ],
+  "modeOrder": {
+    "chat": ["free", "paid"],
+    "work": ["paid", "local"],
+    "study": ["free"],
+    "privacy": ["local"]
+  },
+  "clientOverrides": {
+    "demo": {
+      "modeOrder": {
+        "chat": ["free", "local"],
+        "work": ["free", "local"],
+        "study": ["free", "local"],
+        "privacy": ["local"]
+      }
+    }
+  },
+  "limits": {
+    "_comment": "Per-user and per-client request caps. Overridable per plan later via licence. Counters are in-memory (reset on router restart).",
+    "user": {
+      "h5": {
+        "default": 60,
+        "chat": 80,
+        "work": 50,
+        "study": 60,
+        "privacy": 30
+      },
+      "day": {
+        "default": 200,
+        "chat": 250,
+        "work": 150,
+        "study": 200,
+        "privacy": 100
+      }
+    },
+    "client": {
+      "h5": {
+        "default": 1500
+      },
+      "day": {
+        "default": 6000
+      }
+    }
+  },
+  "localGate": {
+    "max": 8,
+    "maxQueue": 64,
+    "waitMs": 45000
+  },
+  "modePrompts": {
+    "style:plan": "PLAN MODE: analyse the request and produce a clear step-by-step plan with risks and open questions. Do not write final code or perform the work yet; end by asking for approval to proceed.",
+    "style:build": "BUILD MODE: carry out the task now. Produce the complete deliverable (code, document, or result) following any earlier plan; be concise about explanation.",
+    "study": "You are a patient tutor. Explain step by step, check understanding with a short question, adapt to the learner's level, and avoid just giving final answers to homework unless asked."
+  }
+}

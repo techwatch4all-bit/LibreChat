@@ -14,6 +14,8 @@ import type { TCustomConfig } from 'librechat-data-provider';
  * configSchema is available.
  */
 export const SystemCapabilities = {
+  /** Full Satchida operator access. Never granted to the blanket ADMIN role. */
+  OPERATOR_CONTROL: 'operator:control',
   ACCESS_ADMIN: 'access:admin',
   READ_USERS: 'read:users',
   MANAGE_USERS: 'manage:users',
@@ -87,6 +89,10 @@ export type CapabilityCategory = {
  */
 export const CapabilityImplications: Partial<Record<BaseSystemCapability, BaseSystemCapability[]>> =
   {
+    [SystemCapabilities.OPERATOR_CONTROL]: Object.values(SystemCapabilities).filter(
+      (capability): capability is BaseSystemCapability =>
+        capability !== SystemCapabilities.OPERATOR_CONTROL,
+    ),
     [SystemCapabilities.MANAGE_USERS]: [SystemCapabilities.READ_USERS],
     [SystemCapabilities.MANAGE_GROUPS]: [SystemCapabilities.READ_GROUPS],
     [SystemCapabilities.MANAGE_ROLES]: [SystemCapabilities.READ_ROLES],

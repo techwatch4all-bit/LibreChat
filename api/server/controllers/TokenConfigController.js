@@ -2,6 +2,7 @@ const { logger } = require('@librechat/data-schemas');
 const { resolveTokenConfigMap } = require('@librechat/api');
 const { getModelsConfig } = require('~/server/controllers/ModelController');
 const { getValueKey, getMultiplier, getCacheMultiplier } = require('~/models');
+const { hasOperatorControl } = require('~/server/middleware/roles/capabilities');
 
 /**
  * Returns server-resolved context windows (and pricing when
@@ -12,6 +13,15 @@ const { getValueKey, getMultiplier, getCacheMultiplier } = require('~/models');
  */
 async function tokenConfigController(req, res) {
   try {
+    const isOperator = await hasOperatorControl({
+      id: req.user?.id ?? req.user?._id?.toString(),
+      role: req.user?.role ?? '',
+      tenantId: req.user?.tenantId,
+      idOnTheSource: req.user?.idOnTheSource ?? null,
+    });
+    if (!isOperator) {
+      return res.json({});
+    }
     const modelsConfig = await getModelsConfig(req);
     const tokenConfigMap = await resolveTokenConfigMap(
       {

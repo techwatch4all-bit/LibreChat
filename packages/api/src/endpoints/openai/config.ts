@@ -1,5 +1,6 @@
 import { Providers } from '@librechat/agents';
 import { Agent, fetch as undiciFetch } from 'undici';
+import { getTenantId, getUserId } from '@librechat/data-schemas';
 import { KnownEndpoints, EModelEndpoint, ReasoningParameterFormat } from 'librechat-data-provider';
 import type { Dispatcher } from 'undici';
 import type * as t from '~/types';
@@ -241,6 +242,24 @@ export function getOpenAIConfig(
     );
   } else if (headers) {
     configOptions.defaultHeaders = headers;
+  }
+
+  // Inject telemetry headers when routing upstream to the Satchida Gateway (Bifrost OSS at :8700 / control.satchida.com).
+  // Header names use the Bifrost convention because the gateway reads them by that name.
+  if (
+    baseURL &&
+    (baseURL.includes(':8700') || baseURL.includes('satchida') || baseURL.includes('satchida.com'))
+  ) {
+    const tenantId = getTenantId() || 'satchida-master';
+    const userId = getUserId() || '';
+    const userRole =
+      (options as t.OpenAIConfigOptions & { user?: { role?: string } }).user?.role ?? 'USER';
+    configOptions.defaultHeaders = {
+      ...configOptions.defaultHeaders,
+      'X-Tenant-Id': tenantId,
+      'X-Bifrost-User-Id': userId,
+      'X-Bifrost-Role': userRole,
+    };
   }
 
   if (defaultQuery) {

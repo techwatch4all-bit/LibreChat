@@ -4,6 +4,7 @@ import { CacheKeys, PrincipalType, SystemRoles } from 'librechat-data-provider';
 import type { TPrincipalSearchResult } from 'librechat-data-provider';
 import type { Model, ClientSession, FilterQuery } from 'mongoose';
 import type { CacheStore, IGroup, IRole, IUser } from '~/types';
+import type { TenantAccountType } from '~/types/entitlement';
 import { isValidObjectIdString } from '~/utils/objectId';
 import { scopedCacheKey } from '~/config/tenantContext';
 import { escapeRegExp } from '~/utils/string';
@@ -261,13 +262,18 @@ export function createUserGroupMethods(
     filter?: {
       source?: 'local' | 'entra';
       search?: string;
+      accountType?: TenantAccountType;
       limit?: number;
       offset?: number;
     },
     session?: ClientSession,
   ) => Promise<IGroup[]>;
   countGroups: (
-    filter?: { source?: 'local' | 'entra'; search?: string },
+    filter?: {
+      source?: 'local' | 'entra';
+      search?: string;
+      accountType?: TenantAccountType;
+    },
     session?: ClientSession,
   ) => Promise<number>;
   deleteGroup: (
@@ -1305,10 +1311,14 @@ export function createUserGroupMethods(
   function buildGroupQuery(filter: {
     source?: 'local' | 'entra';
     search?: string;
+    accountType?: TenantAccountType;
   }): FilterQuery<IGroup> {
     const query: FilterQuery<IGroup> = {};
     if (filter.source) {
       query.source = filter.source;
+    }
+    if (filter.accountType) {
+      query.accountType = filter.accountType;
     }
     if (filter.search) {
       const regex = new RegExp(escapeRegExp(filter.search), 'i');
@@ -1327,6 +1337,7 @@ export function createUserGroupMethods(
     filter: {
       source?: 'local' | 'entra';
       search?: string;
+      accountType?: TenantAccountType;
       limit?: number;
       offset?: number;
     } = {},
@@ -1350,7 +1361,11 @@ export function createUserGroupMethods(
    * @param session - Optional MongoDB session for transactions
    */
   async function countGroups(
-    filter: { source?: 'local' | 'entra'; search?: string } = {},
+    filter: {
+      source?: 'local' | 'entra';
+      search?: string;
+      accountType?: TenantAccountType;
+    } = {},
     session?: ClientSession,
   ): Promise<number> {
     const Group = mongoose.models.Group as Model<IGroup>;

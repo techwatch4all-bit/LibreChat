@@ -27,6 +27,14 @@ import {
 } from './favorite';
 /* Agent Categories */
 import { createAgentCategoryMethods, type AgentCategoryMethods } from './agentCategory';
+import { createTenantPolicyMethods } from './tenantPolicy';
+import { createTenantEntitlementMethods } from './tenantEntitlement';
+import type { TenantEntitlementMethods } from './tenantEntitlement';
+import {
+  createPrivacyAssertionMethods,
+  type PrivacyAssertionMethods,
+  type PrivacyAssertionDeps,
+} from './privacyAssertion';
 /* Agent API Keys */
 import { createAgentApiKeyMethods, type AgentApiKeyMethods } from './agentApiKey';
 /* MCP Servers */
@@ -232,10 +240,13 @@ export type AllMethods = UserMethods &
   OpenIDRefreshFlightMethods &
   RoleMethods &
   KeyMethods &
+  PrivacyAssertionMethods &
   FileMethods &
   MemoryMethods &
   ToolFavoriteMethods &
   AgentCategoryMethods &
+  ReturnType<typeof createTenantPolicyMethods> &
+  TenantEntitlementMethods &
   AgentApiKeyMethods &
   MCPServerMethods &
   CodeEnvironmentMethods &
@@ -286,6 +297,14 @@ export interface CreateMethodsDeps {
   getCache?: RoleDeps['getCache'];
   /** Recognizes agent skill IDs supplied by an external, non-database registry. */
   isExternalSkillId?: AgentDeps['isExternalSkillId'];
+  /**
+   * Privacy assertion dependencies.
+   *
+   * The tenant's signing key is held on the tenant's own LibreChat server, so it
+   * is injected rather than read from a shared store. Without it no Privacy
+   * assertion can be minted and Privacy is refused.
+   */
+  privacyAssertion?: PrivacyAssertionDeps;
 }
 
 /**
@@ -466,6 +485,9 @@ export function createMethods(
     ...createMemoryMethods(mongoose),
     ...createToolFavoriteMethods(mongoose),
     ...createAgentCategoryMethods(mongoose),
+    ...createTenantPolicyMethods(mongoose),
+    ...createTenantEntitlementMethods(mongoose),
+    ...createPrivacyAssertionMethods(mongoose, deps.privacyAssertion ?? {}),
     ...createAgentApiKeyMethods(mongoose),
     ...createMCPServerMethods(mongoose),
     ...createCodeEnvironmentMethods(mongoose),
@@ -523,6 +545,7 @@ export type {
   MemoryMethods,
   ToolFavoriteMethods,
   AgentCategoryMethods,
+  TenantEntitlementMethods,
   AgentApiKeyMethods,
   MCPServerMethods,
   CodeEnvironmentMethods,

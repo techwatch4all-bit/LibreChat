@@ -7,7 +7,14 @@ const db = require('~/models');
 
 const router = express.Router();
 
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+/**
+ * Admin-surface gate. Satisfied by a platform operator (`operator:control`
+ * implies every capability) or by a tenant admin holding `access:admin` within
+ * their own tenant. `hasCapability` derives the tenant from the caller, so
+ * tenant-scoped authority never reaches another tenant's rows; the per-route
+ * capabilities below then narrow each action.
+ */
+const requireAdminSurface = requireCapability(SystemCapabilities.ACCESS_ADMIN);
 const requireReadRoles = requireCapability(SystemCapabilities.READ_ROLES);
 const requireManageRoles = requireCapability(SystemCapabilities.MANAGE_ROLES);
 
@@ -33,7 +40,7 @@ const handlers = createAdminRolesHandlers({
   invalidatePromptGroupAccessContext: db.invalidatePromptGroupAccessContext,
 });
 
-router.use(requireJwtAuth, requireAdminAccess);
+router.use(requireJwtAuth, requireAdminSurface);
 
 router.get('/', requireReadRoles, handlers.listRoles);
 router.post('/', requireManageRoles, handlers.createRole);

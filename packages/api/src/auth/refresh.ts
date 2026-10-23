@@ -57,14 +57,12 @@ export interface AdminRefreshDeps {
    */
   mintToken: (user: IUser, tokenset: RefreshTokenset) => Promise<MintedToken>;
   /**
-   * Authorizes the resolved user against the same admin-access invariant
-   * the initial OAuth callback enforces. The IdP refresh token can outlive
-   * a capability/role change, so the bearer must not be reissued for a
-   * user who no longer holds `ACCESS_ADMIN`. Optional only for backward
-   * compatibility with existing callers; route handlers that mint admin
-   * bearers should always inject this.
+   * Authorizes the resolved user against the direct platform-operator grant
+   * enforced by the initial OAuth callback. The IdP refresh token can outlive
+   * a capability change, so the bearer must not be reissued after operator
+   * authority is revoked. Required for all admin refresh routes.
    */
-  canAccessAdmin?: (user: IUser) => Promise<boolean>;
+  canAccessOperator?: (user: IUser) => Promise<boolean>;
   /**
    * Re-runs the deployment's `registration.allowedDomains` check against the
    * resolved user's email. Returns true to allow refresh, false to reject.
@@ -290,8 +288,8 @@ export async function applyAdminRefresh(
     );
   }
 
-  if (deps.canAccessAdmin && !(await deps.canAccessAdmin(user))) {
-    throw new AdminRefreshError('FORBIDDEN', 403, 'User does not have admin access');
+  if (!deps.canAccessOperator || !(await deps.canAccessOperator(user))) {
+    throw new AdminRefreshError('FORBIDDEN', 403, 'User does not have operator access');
   }
 
   const minted = await deps.mintToken(user, tokenset);

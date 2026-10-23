@@ -1,25 +1,10 @@
 import mongoose from 'mongoose';
 import { createModels } from '../index';
 
-/**
- * Global symbol set by applyTenantIsolation() on every schema it processes.
- * Recreated here via Symbol.for (the global registry) so the guard can detect
- * plugin application without the plugin exporting anything.
- */
+/** Global symbol set by applyTenantIsolation() on every schema it processes. */
 const TENANT_ISOLATION_APPLIED = Symbol.for('librechat:tenantIsolation');
 
-/**
- * Models that carry a `tenantId` field but intentionally do NOT use the
- * tenant-isolation plugin. SystemGrant scopes tenancy manually inside its
- * methods (see models/systemGrant). SkillSyncStatus stores both app-wide YAML
- * status rows and tenant-scoped override rows, so its methods apply explicit
- * tenant filters instead of ambient ALS scoping. AuditLog composes its tenant
- * filter from the JWT-resolved caller and uses `{ tenantId: { $exists: false } }`
- * for platform-level entries. RefreshTokenBridge resolves tenant context from
- * the signed OpenID marker cookie during unauthenticated refresh recovery, and
- * its methods apply explicit tenant filters. Adding an entry here must be a
- * deliberate, reviewed decision — that is the whole point of this guard.
- */
+/** Models with explicit cross-tenant query policy rather than ambient isolation. */
 const MANUAL_TENANT_SCOPING = new Set<string>([
   'SystemGrant',
   'SkillSyncStatus',
@@ -50,6 +35,21 @@ describe('tenant-isolation plugin coverage', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+
+  it('uses tenant-isolation for TenantEntitlement seat and plan records', () => {
+    const model = mongoose.models.TenantEntitlement;
+    expect(model).toBeDefined();
+    expect(Boolean(model.schema.path('tenantId'))).toBe(true);
+    expect(isPluginApplied(model.schema)).toBe(true);
+    expect(model.schema.indexes()).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          expect.objectContaining({ tenantId: 1 }),
+          expect.objectContaining({ unique: true }),
+        ]),
+      ]),
+    );
   });
 
   it('keeps the manual-scoping allowlist accurate (tenantId field, no plugin)', () => {

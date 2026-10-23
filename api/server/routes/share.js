@@ -55,7 +55,10 @@ const { createForkLimiters, createShareLimiters } = require('~/server/middleware
 const optionalShareFileAuth = require('~/server/middleware/optionalShareFileAuth');
 const optionalJwtAuth = require('~/server/middleware/optionalJwtAuth');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
-const { getHeldCapabilities } = require('~/server/middleware/roles/capabilities');
+const {
+  getHeldCapabilities,
+  hasOperatorControl,
+} = require('~/server/middleware/roles/capabilities');
 const configMiddleware = require('~/server/middleware/config/app');
 const { getAppConfig } = require('~/server/services/Config/app');
 const router = express.Router();
@@ -63,6 +66,7 @@ const sharedLinkConfigMiddleware = createSharedLinkConfigMiddleware({ getAppConf
 
 const getSharedLangfuseSessionUrl = createSharedLangfuseSessionResolver({
   getHeldCapabilities,
+  hasOperatorControl,
   getMessages,
 });
 

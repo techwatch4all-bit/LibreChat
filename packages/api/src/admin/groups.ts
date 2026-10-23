@@ -1,6 +1,12 @@
 import { Types } from 'mongoose';
 import { PrincipalType } from 'librechat-data-provider';
 import { logger, isValidObjectIdString } from '@librechat/data-schemas';
+import {
+  TENANT_ACCOUNT_TYPES,
+  TENANT_SEAT_CAPABILITIES,
+  isSemanticMode,
+  isTenantAccountType,
+} from 'librechat-data-provider';
 import type {
   IGroup,
   IUser,
@@ -15,7 +21,7 @@ import type { ValidationError } from '~/types/error';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
 
-type GroupListFilter = Pick<GroupFilterOptions, 'source' | 'search'>;
+type GroupListFilter = Pick<GroupFilterOptions, 'source' | 'search' | 'accountType'>;
 
 const VALID_GROUP_SOURCES: ReadonlySet<string> = new Set(['local', 'entra']);
 const MAX_CREATE_MEMBER_IDS = 500;
@@ -26,12 +32,65 @@ const MAX_EMAIL_LENGTH = 500;
 const MAX_AVATAR_LENGTH = 2000;
 const MAX_EXTERNAL_ID_LENGTH = 500;
 
+/**
+ * The Family seat model: two adults and at most two children.
+ *
+ * The children exist so a parent can supervise what a minor sends and receives,
+ * and so Study can be shared between a parent and a child. A Family group is
+ * therefore four seats, and the counts are part of the product rather than an
+ * accident of who happens to be enrolled.
+ */
+const MAX_FAMILY_ADULTS = 2;
+const MAX_FAMILY_CHILDREN = 2;
+
 interface GroupIdParams {
   id: string;
 }
 
 interface GroupMemberParams extends GroupIdParams {
   userId: string;
+}
+
+/**
+ * Validate the entitlement fields a group carries.
+ *
+ * These mirror the One-API group of the same name, so a group that cannot be
+ * expressed in the operator's model must not be accepted here either.
+ */
+function validateGroupEntitlement(
+  body: Partial<CreateGroupRequest> | Partial<UpdateGroupRequest>,
+): string | undefined {
+  if (body.accountType !== undefined && !isTenantAccountType(body.accountType)) {
+    return `accountType must be one of ${TENANT_ACCOUNT_TYPES.join(', ')}`;
+  }
+  if (body.familySeats !== undefined) {
+    const { maxAdults, maxChildren } = body.familySeats;
+    if (
+      !Number.isInteger(maxAdults) ||
+      !Number.isInteger(maxChildren) ||
+      maxAdults < 0 ||
+      maxChildren < 0 ||
+      maxAdults > MAX_FAMILY_ADULTS ||
+      maxChildren > MAX_FAMILY_CHILDREN
+    ) {
+      return `familySeats must be integers within 0-${MAX_FAMILY_ADULTS} adults and 0-${MAX_FAMILY_CHILDREN} children`;
+    }
+  }
+  if (body.allowedCapabilities !== undefined) {
+    const invalid = body.allowedCapabilities.filter(
+      (capability) => !TENANT_SEAT_CAPABILITIES.includes(capability),
+    );
+    if (invalid.length > 0) {
+      return `unsupported capability: ${invalid.join(', ')}`;
+    }
+  }
+  if (body.allowedModes !== undefined) {
+    const invalid = body.allowedModes.filter((mode) => !isSemanticMode(mode));
+    if (invalid.length > 0) {
+      return `unsupported mode: ${invalid.join(', ')}`;
+    }
+  }
+  return undefined;
 }
 
 export interface AdminGroupsDeps {
@@ -111,7 +170,11 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
 
   async function listGroupsHandler(req: ServerRequest, res: Response) {
     try {
-      const { search, source } = req.query as { search?: string; source?: string };
+      const { search, source, accountType } = req.query as {
+        search?: string;
+        source?: string;
+        accountType?: string;
+      };
       const filter: GroupListFilter = {};
       if (source && VALID_GROUP_SOURCES.has(source)) {
         filter.source = source as IGroup['source'];
@@ -123,6 +186,14 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       }
       if (search) {
         filter.search = search;
+      }
+      if (accountType) {
+        if (!isTenantAccountType(accountType)) {
+          return res.status(400).json({
+            error: `accountType must be one of ${TENANT_ACCOUNT_TYPES.join(', ')}`,
+          });
+        }
+        filter.accountType = accountType;
       }
       const { limit, offset } = parsePagination(req.query);
       const [groups, total] = await Promise.all([
@@ -187,6 +258,10 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
           .status(400)
           .json({ error: `idOnTheSource must not exceed ${MAX_EXTERNAL_ID_LENGTH} characters` });
       }
+      const entitlementError = validateGroupEntitlement(body);
+      if (entitlementError) {
+        return res.status(400).json({ error: entitlementError });
+      }
 
       const rawIds = Array.isArray(body.memberIds) ? body.memberIds : [];
       if (rawIds.length > MAX_CREATE_MEMBER_IDS) {
@@ -221,6 +296,14 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
         source: body.source || 'local',
         memberIds,
         ...(body.idOnTheSource ? { idOnTheSource: body.idOnTheSource } : {}),
+        ...(body.accountType ? { accountType: body.accountType } : {}),
+        ...(body.shared !== undefined ? { shared: body.shared } : {}),
+        ...(body.familySeats ? { familySeats: body.familySeats } : {}),
+        ...(body.localPrivacyEnabled !== undefined
+          ? { localPrivacyEnabled: body.localPrivacyEnabled }
+          : {}),
+        ...(body.allowedCapabilities ? { allowedCapabilities: body.allowedCapabilities } : {}),
+        ...(body.allowedModes ? { allowedModes: body.allowedModes } : {}),
       });
       return res.status(201).json({ group });
     } catch (error) {
@@ -266,8 +349,23 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
           .status(400)
           .json({ error: `avatar must not exceed ${MAX_AVATAR_LENGTH} characters` });
       }
+      const entitlementError = validateGroupEntitlement(body);
+      if (entitlementError) {
+        return res.status(400).json({ error: entitlementError });
+      }
 
-      const updateData: Partial<Pick<IGroup, 'name' | 'description' | 'email' | 'avatar'>> = {};
+      const updateData: Partial<Pick<IGroup, 'name' | 'description' | 'email' | 'avatar'>> &
+        Partial<
+          Pick<
+            IGroup,
+            | 'accountType'
+            | 'shared'
+            | 'familySeats'
+            | 'localPrivacyEnabled'
+            | 'allowedCapabilities'
+            | 'allowedModes'
+          >
+        > = {};
       if (body.name !== undefined) {
         updateData.name = body.name.trim();
       }
@@ -279,6 +377,24 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       }
       if (body.avatar !== undefined) {
         updateData.avatar = body.avatar;
+      }
+      if (body.accountType !== undefined) {
+        updateData.accountType = body.accountType;
+      }
+      if (body.shared !== undefined) {
+        updateData.shared = body.shared;
+      }
+      if (body.familySeats !== undefined) {
+        updateData.familySeats = body.familySeats;
+      }
+      if (body.localPrivacyEnabled !== undefined) {
+        updateData.localPrivacyEnabled = body.localPrivacyEnabled;
+      }
+      if (body.allowedCapabilities !== undefined) {
+        updateData.allowedCapabilities = body.allowedCapabilities;
+      }
+      if (body.allowedModes !== undefined) {
+        updateData.allowedModes = body.allowedModes;
       }
 
       if (Object.keys(updateData).length === 0) {

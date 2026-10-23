@@ -153,6 +153,14 @@ export type TSkill = {
    */
   userInvocable?: boolean;
   /**
+   * When `true`, this skill is restricted strictly to administrators.
+   */
+  adminOnly?: boolean;
+  /**
+   * Optional granular role allowlist for this skill.
+   */
+  allowedRoles?: string[];
+  /**
    * Skill-declared tool allowlist (mirrors the `allowed-tools` frontmatter
    * field). When the skill is invoked, these tools are unioned into the
    * agent's effective tool set for the turn. Tolerant of unknown names —
@@ -174,6 +182,7 @@ export type TSkill = {
   alwaysApply?: boolean;
   isPublic?: boolean;
   tenantId?: string;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   /**
@@ -315,6 +324,8 @@ export type TUpdateSkillPayload = {
   frontmatter?: Partial<SkillFrontmatter>;
   category?: string;
   alwaysApply?: boolean;
+  adminOnly?: boolean;
+  allowedRoles?: string[];
 };
 
 /** Variables passed into the update mutation: id + expectedVersion + partial payload. */
@@ -339,6 +350,7 @@ export type TSkillListRequest = {
   search?: string;
   limit?: number;
   cursor?: string;
+  deleted?: boolean | string;
 };
 
 /** Paginated list response. `after` is the cursor to pass for the next page. */

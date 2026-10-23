@@ -44,7 +44,14 @@ afterEach(async () => {
   await fs.promises.rm(base, { recursive: true, force: true });
 });
 
-describe('createReaper', () => {
+/**
+ * The reaper cases spawn a detached `bash` process group and inspect
+ * `/proc/<pid>/stat` for the zombie state. Neither exists on Windows, so the
+ * suite is skipped there rather than left failing.
+ */
+const describePosix = process.platform === 'win32' ? describe.skip : describe;
+
+describePosix('createReaper', () => {
   test('reap terminates a compliant process tree at SIGTERM', async () => {
     const child = run('sleep 30 & wait');
     await waitFor(() => typeof child.pid === 'number');

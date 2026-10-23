@@ -731,6 +731,24 @@ export function getOpenAILLMConfig({
 
       if (knownOpenAIParams.has(key)) {
         applyDefaultParams(llmConfig as Record<string, unknown>, { [key]: value });
+        if (key === 'stream' || key === 'streaming') {
+          if (value === false) {
+            llmConfig.streaming = false;
+            llmConfig.disableStreaming = true;
+          } else if (value === true) {
+            llmConfig.streaming = true;
+            llmConfig.disableStreaming = false;
+          }
+        } else if (key === 'disableStreaming') {
+          /**
+           * `disableStreaming` suppresses streamed *output*; it is not
+           * `streaming: false`, which stops the server streaming at all. The two
+           * flags are independent upstream, and coupling them forced every
+           * endpoint configured this way into non-streaming — the reply box sat
+           * empty until generation finished. See Bugs.md B34.
+           */
+          llmConfig.disableStreaming = value === true;
+        }
       } else {
         /** Apply to modelKwargs if not a known param */
         if (modelKwargs[key] === undefined) {
@@ -799,6 +817,24 @@ export function getOpenAILLMConfig({
       }
       if (knownOpenAIParams.has(key)) {
         (llmConfig as Record<string, unknown>)[key] = value;
+        if (key === 'stream' || key === 'streaming') {
+          if (value === false) {
+            llmConfig.streaming = false;
+            llmConfig.disableStreaming = true;
+          } else if (value === true) {
+            llmConfig.streaming = true;
+            llmConfig.disableStreaming = false;
+          }
+        } else if (key === 'disableStreaming') {
+          /**
+           * `disableStreaming` suppresses streamed *output*; it is not
+           * `streaming: false`, which stops the server streaming at all. The two
+           * flags are independent upstream, and coupling them forced every
+           * endpoint configured this way into non-streaming — the reply box sat
+           * empty until generation finished. See Bugs.md B34.
+           */
+          llmConfig.disableStreaming = value === true;
+        }
       } else {
         hasModelKwargs = true;
         modelKwargs[key] = value;

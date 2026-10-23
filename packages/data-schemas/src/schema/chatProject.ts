@@ -39,6 +39,11 @@ const chatProjectSchema: Schema<IChatProjectDocument> = new Schema<IChatProjectD
       type: String,
       index: true,
     },
+    localPath: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   { timestamps: true },
 );

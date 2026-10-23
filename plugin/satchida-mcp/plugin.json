@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "satchida-mcp",
+  "version": "1.0.0",
+  "description": "Satchida MCP server bundle: filesystem, memory, sequential thinking, browser automation, and documentation lookup. Every server is Windows-safe and path-scoped.",
+  "author": {
+    "name": "Satchida",
+    "email": "hello@satchida.com"
+  },
+  "homepage": "https://satchida.com",
+  "license": "MIT",
+  "keywords": ["satchida", "mcp", "filesystem", "memory", "browser"]
+}

@@ -1,6 +1,6 @@
 const { isEnabled } = require('@librechat/api');
-const { logger, SystemCapabilities } = require('@librechat/data-schemas');
-const { hasCapability } = require('~/server/middleware/roles/capabilities');
+const { logger } = require('@librechat/data-schemas');
+const { hasOperatorControl } = require('~/server/middleware/roles/capabilities');
 
 /**
  * Checks if the user can delete their account
@@ -20,22 +20,24 @@ const canDeleteAccount = async (req, res, next = () => {}) => {
   if (isEnabled(ALLOW_ACCOUNT_DELETION)) {
     return next();
   }
-  let hasAdminAccess = false;
+  let isOperator = false;
   if (user) {
     try {
       const id = user.id ?? user._id?.toString();
       if (id) {
-        hasAdminAccess = await hasCapability(
-          { id, role: user.role ?? '', tenantId: user.tenantId },
-          SystemCapabilities.ACCESS_ADMIN,
-        );
+        isOperator = await hasOperatorControl({
+          id,
+          role: user.role ?? '',
+          tenantId: user.tenantId,
+          idOnTheSource: user.idOnTheSource ?? null,
+        });
       }
     } catch (err) {
       logger.warn(`[canDeleteAccount] capability check failed, denying: ${err.message}`);
     }
   }
-  if (hasAdminAccess) {
-    logger.debug(`[canDeleteAccount] ACCESS_ADMIN bypass for user ${user.id}`);
+  if (isOperator) {
+    logger.debug(`[canDeleteAccount] operator account-deletion bypass for user ${user.id}`);
     return next();
   }
   logger.error(`[User] [Delete Account] [User cannot delete account] [User: ${user?.id}]`);

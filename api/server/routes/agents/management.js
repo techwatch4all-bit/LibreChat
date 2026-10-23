@@ -39,6 +39,7 @@ const readHandlers = createAgentManagementReadHandlers({
   findAccessibleResources,
   checkPermission,
   hasCapability,
+  getTenantPolicy: db.getTenantPolicy,
 });
 const createHandler = createAgentManagementCreateHandler({
   getRoleByName: db.getRoleByName,

@@ -7,7 +7,9 @@ const db = require('~/models');
 
 const router = express.Router();
 
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
+const requireAdminAccess = requireCapability(SystemCapabilities.OPERATOR_CONTROL, {
+  platformOnly: true,
+});
 const requireAuditLogRead = requireCapability(SystemCapabilities.READ_AUDIT_LOG);
 
 const handlers = createAdminAuditLogHandlers({

@@ -1,0 +1,20 @@
+{
+  "name": "satchida-rag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native Windows RAG service — LibreChat wire-compatible, standalone, no Docker, no Python",
+  "type": "module",
+  "main": "src/index.mjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node test/contract.test.mjs"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^6.4.299"
+  }
+}

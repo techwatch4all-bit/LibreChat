@@ -26,7 +26,29 @@ const STOP_DECISIONS: ReadonlySet<string> = new Set<StopDecision>(['continue', '
 const TOOL_INPUT_DECISIONS: ReadonlySet<string> = new Set([...TOOL_DECISIONS, 'approve', 'block']);
 const STOP_INPUT_DECISIONS: ReadonlySet<string> = STOP_DECISIONS;
 const STDOUT_CONTEXT_EVENTS: ReadonlySet<string> = new Set(['SessionStart', 'UserPromptSubmit']);
-const PASSTHROUGH_ENV_VARS = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TZ'] as const;
+/**
+ * Environment variables forwarded to a hook command.
+ *
+ * `PATH` is what lets a command find its executable. On Windows a child process
+ * only resolves a command from PATH when it also carries `ComSpec`, `PATHEXT` and
+ * the temporary-directory variables; without them PowerShell reports "The term
+ * 'node' is not recognized" even when PATH is correct, so every command hook
+ * failed to start. These are host variables rather than plugin data, and they
+ * carry no user content.
+ */
+const PASSTHROUGH_ENV_VARS = [
+  'PATH',
+  'HOME',
+  'LANG',
+  'LC_ALL',
+  'TZ',
+  'ComSpec',
+  'PATHEXT',
+  'SystemRoot',
+  'windir',
+  'TEMP',
+  'TMP',
+] as const;
 
 interface EventTraits {
   /** Whether the matcher queries a runtime tool name, enabling alias translation. */
@@ -298,14 +320,25 @@ function buildCommandEnv(
 ): NodeJS.ProcessEnv {
   const source = options.env ?? process.env;
   const env: NodeJS.ProcessEnv = {};
-  for (const name of PASSTHROUGH_ENV_VARS) {
-    if (source[name] !== undefined) {
-      env[name] = source[name];
+  const copy = (name: string): void => {
+    const value = readEnvVar(source, name);
+    if (value === undefined) {
+      return;
     }
+    const hostKey = findEnvKey(source, name) ?? name;
+    env[hostKey] = value;
+    // Both spellings are set on Windows so a lookup by either name succeeds.
+    if (hostKey !== name) {
+      env[name] = value;
+    }
+  };
+  for (const name of PASSTHROUGH_ENV_VARS) {
+    copy(name);
   }
   for (const name of allowedEnvVars ?? []) {
-    if (source[name] !== undefined) {
-      env[name] = source[name];
+    const value = readEnvVar(source, name);
+    if (value !== undefined) {
+      env[name] = value;
     }
   }
   /** Reserved names win last so an allowlist entry can never override them. */
@@ -313,6 +346,46 @@ function buildCommandEnv(
   env.PLUGIN_DATA = options.pluginData;
   env.CLAUDE_PLUGIN_ROOT = options.pluginRoot;
   return env;
+}
+
+/**
+ * Read an environment variable, matching the host's case rules.
+ *
+ * Windows environment variable names are case-insensitive, and Node exposes them
+ * under their original spelling. A process started on Windows commonly has `Path`
+ * rather than `PATH`, so a direct `source[name]` lookup misses it.
+ *
+ * The value is also stored under the key the host actually uses, because a
+ * Windows child process inherits the variable's original name and some tools look
+ * for the exact spelling.
+ */
+function readEnvVar(source: NodeJS.ProcessEnv, name: string): string | undefined {
+  const direct = source[name];
+  if (direct !== undefined) {
+    return direct;
+  }
+  if (process.platform !== 'win32') {
+    return undefined;
+  }
+  const wanted = name.toLowerCase();
+  for (const key of Object.keys(source)) {
+    if (key.toLowerCase() === wanted) {
+      return source[key];
+    }
+  }
+  return undefined;
+}
+
+/** The key a variable is actually stored under on this host, if any. */
+function findEnvKey(source: NodeJS.ProcessEnv, name: string): string | undefined {
+  if (source[name] !== undefined) {
+    return name;
+  }
+  if (process.platform !== 'win32') {
+    return undefined;
+  }
+  const wanted = name.toLowerCase();
+  return Object.keys(source).find((key) => key.toLowerCase() === wanted);
 }
 
 /**
@@ -401,6 +474,7 @@ function runCommand(
       cwd,
       env,
       detached: process.platform !== 'win32',
+      windowsHide: process.platform === 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const stdout: CapturedStream = { chunks: [], bytes: 0 };

@@ -613,6 +613,8 @@ export type CreateSkillInput = {
    */
   alwaysApply?: boolean;
   tenantId?: string;
+  adminOnly?: boolean;
+  allowedRoles?: string[];
 };
 
 export type UpdateSkillInput = {
@@ -625,6 +627,8 @@ export type UpdateSkillInput = {
   alwaysApply?: boolean;
   source?: 'inline' | 'github' | 'notion';
   sourceMetadata?: Record<string, unknown>;
+  adminOnly?: boolean;
+  allowedRoles?: string[];
 };
 
 export type GetAuthorSkillByNameParams = {
@@ -774,6 +778,20 @@ export type ListSkillsByAccessParams = {
   search?: string;
   limit: number;
   cursor?: string | null;
+  /**
+   * Whether the requesting user is an administrator. When false,
+   * skills with `adminOnly: true` are excluded from the listing.
+   */
+  isAdmin?: boolean;
+  /**
+   * The user's role name. If provided and not admin, skills with `allowedRoles`
+   * that do not include this role are excluded.
+   */
+  userRole?: string;
+  /** When true and isAdmin is true, soft-deleted skills are included in results. */
+  includeDeleted?: boolean;
+  /** When true and isAdmin is true, only soft-deleted skills are returned (trash bin). */
+  onlyDeleted?: boolean;
 };
 
 export type ListSkillsByAccessResult = {
@@ -1072,7 +1090,8 @@ export function createSkillMethods(
     expectedVersion: number;
     update: UpdateSkillInput;
   }) => Promise<UpdateSkillResult>;
-  deleteSkill: (id: string) => Promise<DeleteSkillResult>;
+  deleteSkill: (id: string, options?: { permanent?: boolean }) => Promise<DeleteSkillResult>;
+  restoreSkill: (id: string) => Promise<(ISkill & { _id: Types.ObjectId }) | null>;
   deleteUserSkills: (userId: Types.ObjectId | string) => Promise<number>;
   findSkillBySourceIdentity: (params: {
     source: 'github' | 'notion';
@@ -1114,12 +1133,53 @@ export function createSkillMethods(
   function buildSkillFilter(
     params: Pick<
       ListSkillsByAccessParams,
-      'accessibleIds' | 'category' | 'search' | 'manageTenantId'
+      | 'accessibleIds'
+      | 'category'
+      | 'search'
+      | 'manageTenantId'
+      | 'isAdmin'
+      | 'userRole'
+      | 'includeDeleted'
+      | 'onlyDeleted'
     >,
   ): FilterQuery<ISkillDocument> {
     const filter: FilterQuery<ISkillDocument> = params.manageTenantId
       ? { tenantId: params.manageTenantId }
       : { _id: { $in: params.accessibleIds } };
+
+    filter.$and = filter.$and || [];
+
+    // Soft delete filtering:
+    // By default, only active (deletedAt == null or absent) skills are returned.
+    // If onlyDeleted is true and user is admin, return only soft-deleted skills.
+    // If includeDeleted is true and user is admin, allow both.
+    if (params.isAdmin && params.onlyDeleted) {
+      filter.$and.push({ deletedAt: { $ne: null } });
+    } else if (!(params.isAdmin && params.includeDeleted)) {
+      filter.$and.push({
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      });
+    }
+
+    if (!params.isAdmin) {
+      filter.$and.push({
+        $or: [{ adminOnly: { $ne: true } }, { adminOnly: { $exists: false } }],
+      });
+      if (params.userRole) {
+        filter.$and.push({
+          $or: [
+            { allowedRoles: { $exists: false } },
+            { allowedRoles: { $size: 0 } },
+            { allowedRoles: params.userRole },
+          ],
+        });
+      }
+    }
+
+    if (filter.$and.length === 0) {
+      delete filter.$and;
+    }
+
     if (params.category && params.category.length > 0) {
       filter.category = params.category;
     }
@@ -1253,6 +1313,8 @@ export function createSkillMethods(
         false,
         bodyAlwaysApply,
       ),
+      adminOnly: data.adminOnly ?? false,
+      allowedRoles: data.allowedRoles,
       tenantId: data.tenantId,
       ...derived,
     });
@@ -1387,7 +1449,7 @@ export function createSkillMethods(
          still called below as defensive code; it short-circuits when
          `frontmatter` is undefined. */
       .select(
-        'name displayTitle description category author authorName version source sourceMetadata fileCount alwaysApply tenantId disableModelInvocation userInvocable allowedTools createdAt updatedAt',
+        'name displayTitle description category author authorName version source sourceMetadata fileCount alwaysApply tenantId disableModelInvocation userInvocable adminOnly allowedRoles allowedTools deletedAt createdAt updatedAt',
       )
       .lean();
 
@@ -1575,6 +1637,8 @@ export function createSkillMethods(
       }
     }
     if (update.category !== undefined) setPayload.category = update.category;
+    if (update.adminOnly !== undefined) setPayload.adminOnly = update.adminOnly;
+    if (update.allowedRoles !== undefined) setPayload.allowedRoles = update.allowedRoles;
     /**
      * Keep the indexed `alwaysApply` column in sync with whatever the update
      * is carrying: an explicit top-level `alwaysApply` always wins; a
@@ -1722,7 +1786,10 @@ export function createSkillMethods(
     }
   }
 
-  async function deleteSkill(id: string): Promise<DeleteSkillResult> {
+  async function deleteSkill(
+    id: string,
+    options?: { permanent?: boolean },
+  ): Promise<DeleteSkillResult> {
     if (!isValidObjectIdString(id)) {
       return {
         deleted: false,
@@ -1734,32 +1801,74 @@ export function createSkillMethods(
     const Skill = mongoose.models.Skill as Model<ISkillDocument>;
     const SkillFile = mongoose.models.SkillFile as Model<ISkillFileDocument>;
     const objectId = new ObjectId(id);
-    const res = await Skill.deleteOne({ _id: objectId });
+
+    // If permanent deletion requested, perform hard delete of document, files, and permissions
+    if (options?.permanent) {
+      const res = await Skill.deleteOne({ _id: objectId });
+      const failedCleanupSteps: DeleteSkillCleanupStep[] = [];
+      const allowlistsRemoved = await removeSkillsFromAgentAllowlists([id]);
+      if (!allowlistsRemoved) {
+        failedCleanupSteps.push('agent_allowlists');
+      }
+
+      const [filesResult, permissionsResult] = await Promise.allSettled([
+        SkillFile.deleteMany({ skillId: objectId }),
+        deps.removeAllPermissions({ resourceType: ResourceType.SKILL, resourceId: id }),
+      ]);
+      if (filesResult.status === 'rejected') {
+        failedCleanupSteps.push('skill_files');
+        logger.error(`[deleteSkill] Error removing files for ${id}:`, filesResult.reason);
+      }
+      if (permissionsResult.status === 'rejected') {
+        failedCleanupSteps.push('permissions');
+        logger.error(
+          `[deleteSkill] Error removing permissions for ${id}:`,
+          permissionsResult.reason,
+        );
+      }
+
+      return {
+        deleted: Boolean(res.deletedCount),
+        skillAbsent: true,
+        cleanupComplete: failedCleanupSteps.length === 0,
+        failedCleanupSteps,
+      };
+    }
+
+    // Default: Soft Delete!
+    // Set deletedAt timestamp, remove from active agent allowlists so agents don't invoke it,
+    // but preserve Skill document and associated SkillFiles in storage and DB so Admin can restore.
+    const res = await Skill.updateOne(
+      { _id: objectId, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+    );
     const failedCleanupSteps: DeleteSkillCleanupStep[] = [];
     const allowlistsRemoved = await removeSkillsFromAgentAllowlists([id]);
     if (!allowlistsRemoved) {
       failedCleanupSteps.push('agent_allowlists');
     }
 
-    const [filesResult, permissionsResult] = await Promise.allSettled([
-      SkillFile.deleteMany({ skillId: objectId }),
-      deps.removeAllPermissions({ resourceType: ResourceType.SKILL, resourceId: id }),
-    ]);
-    if (filesResult.status === 'rejected') {
-      failedCleanupSteps.push('skill_files');
-      logger.error(`[deleteSkill] Error removing files for ${id}:`, filesResult.reason);
-    }
-    if (permissionsResult.status === 'rejected') {
-      failedCleanupSteps.push('permissions');
-      logger.error(`[deleteSkill] Error removing permissions for ${id}:`, permissionsResult.reason);
-    }
-
     return {
-      deleted: Boolean(res.deletedCount),
+      deleted: Boolean(res.modifiedCount),
       skillAbsent: true,
       cleanupComplete: failedCleanupSteps.length === 0,
       failedCleanupSteps,
     };
+  }
+
+  async function restoreSkill(id: string): Promise<(ISkill & { _id: Types.ObjectId }) | null> {
+    if (!isValidObjectIdString(id)) {
+      return null;
+    }
+    const Skill = mongoose.models.Skill as Model<ISkillDocument>;
+    const objectId = new ObjectId(id);
+    const restored = await Skill.findOneAndUpdate(
+      { _id: objectId, deletedAt: { $ne: null } },
+      { $set: { deletedAt: null } },
+      { new: true },
+    ).lean();
+
+    return (restored as unknown as (ISkill & { _id: Types.ObjectId }) | null) ?? null;
   }
 
   async function deleteUserSkills(userId: Types.ObjectId | string): Promise<number> {
@@ -2020,6 +2129,7 @@ export function createSkillMethods(
     listAlwaysApplySkills,
     updateSkill,
     deleteSkill,
+    restoreSkill,
     deleteUserSkills,
     findSkillBySourceIdentity,
     listSkillsBySource,

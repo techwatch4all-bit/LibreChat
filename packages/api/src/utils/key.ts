@@ -61,9 +61,14 @@ export async function loadServiceKey(keyPath: string): Promise<GoogleServiceKey 
       return null;
     }
   } else if (!serviceKey) {
-    // It's a file path
+    // It's a file path.
+    //
+    // The path is always resolved. On Windows `path.isAbsolute('/etc/key.json')`
+    // is true even though the path is root-relative rather than fully qualified,
+    // so the previous conditional left the path unresolved and the reader was
+    // handed a different path than the one that was configured.
     try {
-      const absolutePath = path.isAbsolute(keyPath) ? keyPath : path.resolve(keyPath);
+      const absolutePath = path.resolve(keyPath);
       const { content: fileContent } = await readFileAsString(absolutePath);
       serviceKey = JSON.parse(fileContent);
     } catch (error) {

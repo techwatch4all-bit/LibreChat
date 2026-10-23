@@ -79,7 +79,29 @@ export interface AdminGrantsDeps {
     role: string;
     tenantId?: string;
   }) => ResolvedPrincipal[] | undefined;
-  checkRoleExists?: (roleId: string) => Promise<boolean>;
+  /** Rejects a grant targeting a principal that does not exist for its type. */
+  checkPrincipalExists?: (principalType: PrincipalType, principalId: string) => Promise<boolean>;
+  /**
+   * True when the caller holds platform-level `operator:control`. Only such a
+   * caller may name a target tenant in the grant body; everyone else writes
+   * grants against their own tenant.
+   */
+  isPlatformOperator?: (user: {
+    id?: string;
+    role?: string;
+    tenantId?: string;
+    idOnTheSource?: string;
+  }) => Promise<boolean>;
+  /**
+   * Resolves a human-readable label for USER/GROUP audit targets. ROLE grants
+   * already store the role name in `principalId`, so they need no lookup.
+   */
+  resolvePrincipalName?: (
+    principalType: PrincipalType,
+    principalId: string,
+  ) => Promise<string | undefined>;
+  /** One-shot tenant administrator provisioning (see `seedTenantAdmin`). */
+  seedTenantAdmin?: (tenantId: string, roleName?: string) => Promise<void>;
   /** Optional audit emission. Failure is logged but does not roll back the grant
    * unless `auditFailClosed` is set. */
   recordAuditEntry?: (
@@ -95,8 +117,13 @@ export interface AdminGrantsDeps {
   auditFailClosed?: boolean;
 }
 
-/** Currently ROLE-only; Record/Set structure preserved for future principal-type expansion. */
-export type GrantPrincipalType = PrincipalType.ROLE;
+/**
+ * Principal kinds the grants API can target. ROLE grants store the role name in
+ * `principalId`; USER and GROUP store the ObjectId. Each kind is gated by its own
+ * manage/read capability, so authority over one kind does not imply authority
+ * over another.
+ */
+export type GrantPrincipalType = PrincipalType.ROLE | PrincipalType.GROUP | PrincipalType.USER;
 
 /** Creates admin grant handlers with dependency injection for the /api/admin/grants routes. */
 export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
@@ -105,6 +132,7 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
   getPrincipalGrants: (req: ServerRequest, res: Response) => Promise<Response>;
   assignGrant: (req: ServerRequest, res: Response) => Promise<Response>;
   revokeGrant: (req: ServerRequest, res: Response) => Promise<Response>;
+  provisionTenantAdmin: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
   const {
     listGrants,
@@ -117,7 +145,10 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     hasCapabilityForPrincipals,
     getHeldCapabilities,
     getCachedPrincipals,
-    checkRoleExists,
+    checkPrincipalExists,
+    isPlatformOperator,
+    resolvePrincipalName,
+    seedTenantAdmin,
     recordAuditEntry,
     auditFailClosed,
   } = deps;
@@ -131,16 +162,21 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     context?: AuditContext;
   }): Promise<void> {
     if (!recordAuditEntry) return;
-    /** The grants surface is ROLE-only today (see `MANAGE_CAPABILITY_BY_TYPE`),
-     * and SystemGrant stores the human-readable role name in `principalId` for
-     * ROLE principals, so the audit target's id and name are both `principalId`.
-     * When USER and GROUP grants are enabled, resolve the display name here. */
+    /** SystemGrant stores the human-readable role name in `principalId` for ROLE
+     * principals, so the audit target's id and name are both `principalId`. USER
+     * and GROUP principals hold an ObjectId, so a display name is resolved when
+     * the dep is supplied. */
+    const targetName =
+      args.principalType === PrincipalType.ROLE
+        ? args.principalId
+        : ((await resolvePrincipalName?.(args.principalType, args.principalId)) ??
+          args.principalId);
     const input: RecordAuditEntryInput = {
       action: args.action,
       outcome: 'success',
       severity: 'warning',
       actor: { type: 'user', id: args.caller.userId, name: args.caller.actorName },
-      target: { type: args.principalType, id: args.principalId, name: args.principalId },
+      target: { type: args.principalType, id: args.principalId, name: targetName },
       metadata: { capability: args.capability },
       context: args.context,
       tenantId: args.caller.tenantId,
@@ -160,10 +196,14 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
 
   const MANAGE_CAPABILITY_BY_TYPE: Record<GrantPrincipalType, SystemCapability> = {
     [PrincipalType.ROLE]: SystemCapabilities.MANAGE_ROLES,
+    [PrincipalType.GROUP]: SystemCapabilities.MANAGE_GROUPS,
+    [PrincipalType.USER]: SystemCapabilities.MANAGE_USERS,
   };
 
   const READ_CAPABILITY_BY_TYPE: Record<GrantPrincipalType, SystemCapability> = {
     [PrincipalType.ROLE]: SystemCapabilities.READ_ROLES,
+    [PrincipalType.GROUP]: SystemCapabilities.READ_GROUPS,
+    [PrincipalType.USER]: SystemCapabilities.READ_USERS,
   };
 
   const VALID_PRINCIPAL_TYPES = new Set(
@@ -233,7 +273,39 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     if (!capability || typeof capability !== 'string' || !isValidCapability(capability)) {
       return 'Invalid capability';
     }
+    if (capability === SystemCapabilities.OPERATOR_CONTROL) {
+      return 'Operator control cannot be assigned through the admin grants API';
+    }
+    const bodyTenantId = (body as { tenantId?: unknown }).tenantId;
+    if (bodyTenantId !== undefined && typeof bodyTenantId !== 'string') {
+      return 'Invalid tenantId';
+    }
     return null;
+  }
+
+  /**
+   * Grants are written against the caller's own tenant unless the caller is a
+   * platform operator that explicitly names one, so a tenant admin cannot use
+   * the body to write into another tenant.
+   */
+  async function resolveTargetTenantId(
+    req: ServerRequest,
+    caller: { userId: string; role: string; tenantId?: string },
+  ): Promise<{ ok: true; tenantId?: string } | { ok: false }> {
+    const requested = (req.body as { tenantId?: string }).tenantId?.trim();
+    if (!requested) {
+      return { ok: true, tenantId: caller.tenantId };
+    }
+    const operator =
+      (await isPlatformOperator?.({
+        id: caller.userId,
+        role: caller.role,
+        tenantId: caller.tenantId,
+      })) ?? false;
+    if (!operator) {
+      return { ok: false };
+    }
+    return { ok: true, tenantId: requested };
   }
 
   async function listGrantsHandler(req: ServerRequest, res: Response) {
@@ -267,7 +339,18 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
         listGrants({ tenantId, principalTypes: allowedTypes, limit, offset }),
         countGrants({ tenantId, principalTypes: allowedTypes }),
       ]);
-      return res.status(200).json({ grants, total, limit, offset });
+      return res.status(200).json({
+        grants: grants.filter((grant) => grant.capability !== SystemCapabilities.OPERATOR_CONTROL),
+        total: Math.max(
+          0,
+          total -
+            (grants.some((grant) => grant.capability === SystemCapabilities.OPERATOR_CONTROL)
+              ? 1
+              : 0),
+        ),
+        limit,
+        offset,
+      });
     } catch (error) {
       logger.error('[adminGrants] listGrants error:', error);
       return res.status(500).json({ error: 'Failed to list grants' });
@@ -380,7 +463,13 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
         capability: SystemCapability;
       };
 
-      const { tenantId } = caller;
+      const target = await resolveTargetTenantId(req, caller);
+      if (!target.ok) {
+        return res
+          .status(403)
+          .json({ error: 'Only a platform operator may target another tenant' });
+      }
+      const { tenantId } = target;
       const principals = await resolvePrincipals(caller);
 
       const manageCap = MANAGE_CAPABILITY_BY_TYPE[principalType];
@@ -396,11 +485,11 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
         return res.status(403).json({ error: 'Cannot grant a capability you do not possess' });
       }
 
-      /** Reject grants targeting non-existent roles when the dep is provided. */
-      if (checkRoleExists) {
-        const exists = await checkRoleExists(principalId);
+      /** Reject a grant targeting a principal that does not exist, when provided. */
+      if (checkPrincipalExists) {
+        const exists = await checkPrincipalExists(principalType, principalId);
         if (!exists) {
-          return res.status(400).json({ error: 'Role not found' });
+          return res.status(400).json({ error: 'Target principal not found' });
         }
       }
 
@@ -528,11 +617,47 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     }
   }
 
+  /**
+   * Provision a tenant's administrator in one call.
+   *
+   * Operator-only at the route layer: this writes tenant-scoped grants, and only
+   * a platform operator may act on a tenant other than their own. `seedTenantAdmin`
+   * refuses `OPERATOR_CONTROL`, so this cannot mint a second platform operator.
+   */
+  async function provisionTenantAdminHandler(req: ServerRequest, res: Response) {
+    try {
+      const caller = resolveUser(req);
+      if (!caller) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      if (!seedTenantAdmin) {
+        return res.status(501).json({ error: 'Tenant admin provisioning is not configured' });
+      }
+      const { tenantId, roleName } = (req.body ?? {}) as {
+        tenantId?: unknown;
+        roleName?: unknown;
+      };
+      if (typeof tenantId !== 'string' || !tenantId.trim()) {
+        return res.status(400).json({ error: 'tenantId is required' });
+      }
+      if (roleName !== undefined && typeof roleName !== 'string') {
+        return res.status(400).json({ error: 'Invalid roleName' });
+      }
+      const trimmedTenantId = tenantId.trim();
+      await seedTenantAdmin(trimmedTenantId, roleName?.trim() || undefined);
+      return res.status(200).json({ success: true, tenantId: trimmedTenantId });
+    } catch (error) {
+      logger.error('[adminGrants] provisionTenantAdmin error:', error);
+      return res.status(500).json({ error: 'Failed to provision tenant administrator' });
+    }
+  }
+
   return {
     listGrants: listGrantsHandler,
     getEffectiveCapabilities: getEffectiveCapabilitiesHandler,
     getPrincipalGrants: getPrincipalGrantsHandler,
     assignGrant: assignGrantHandler,
     revokeGrant: revokeGrantHandler,
+    provisionTenantAdmin: provisionTenantAdminHandler,
   };
 }

@@ -866,7 +866,9 @@ const processAgentFileUpload = async ({ req, res, metadata, sseStream }) => {
   }
 
   if (!messageAttachment && !agent_id) {
-    throw new Error('No agent ID provided for agent file upload');
+    const error = new Error('No agent ID provided for agent file upload');
+    error.userErrorStatusCode = 400;
+    throw error;
   }
 
   const retentionExpiryPromise = getAgentFileRetentionExpiry({
@@ -1673,20 +1675,32 @@ function filterFile({ req, image, isAvatar, endpoint: endpointOverride }) {
   const endpointType = endpointOverride != null ? undefined : requestEndpointType;
 
   if (!file_id && !isAvatar) {
-    throw new Error('No file_id provided');
+    const error = new Error('No file_id provided');
+    error.userErrorStatusCode = 400;
+    throw error;
   }
 
   if (file.size === 0) {
-    throw new Error('Empty file uploaded');
+    const error = new Error('Empty file uploaded');
+    error.userErrorStatusCode = 400;
+    throw error;
   }
 
   /* parse to validate api call, throws error on fail */
   if (!isAvatar) {
-    isUUID.parse(file_id);
+    try {
+      isUUID.parse(file_id);
+    } catch {
+      const error = new Error('Invalid file_id format');
+      error.userErrorStatusCode = 400;
+      throw error;
+    }
   }
 
   if (!endpoint && !isAvatar) {
-    throw new Error('No endpoint provided');
+    const error = new Error('No endpoint provided');
+    error.userErrorStatusCode = 400;
+    throw error;
   }
 
   const appConfig = req.config;

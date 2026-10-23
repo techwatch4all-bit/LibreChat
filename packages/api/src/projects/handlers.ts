@@ -65,6 +65,7 @@ const createProjectInput = (req: ProjectRequest): CreateChatProjectInput | null 
   return {
     name,
     description: typeof req.body?.description === 'string' ? req.body.description : '',
+    localPath: typeof req.body?.localPath === 'string' ? req.body.localPath : '',
   };
 };
 
@@ -171,6 +172,9 @@ export function createProjectHandlers(deps: ProjectHandlerDependencies): {
     }
     if (req.body?.description !== undefined) {
       input.description = typeof req.body.description === 'string' ? req.body.description : '';
+    }
+    if (req.body?.localPath !== undefined) {
+      input.localPath = typeof req.body.localPath === 'string' ? req.body.localPath : '';
     }
 
     try {

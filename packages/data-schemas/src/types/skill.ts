@@ -50,6 +50,14 @@ export interface ISkill {
    */
   userInvocable?: boolean;
   /**
+   * When `true`, this skill is restricted strictly to administrators.
+   */
+  adminOnly?: boolean;
+  /**
+   * Optional granular role allowlist for this skill.
+   */
+  allowedRoles?: string[];
+  /**
    * Skill-declared tool allowlist (mirrors the `allowed-tools` frontmatter
    * field). When the skill is invoked **manually** (via `$` popover, or
    * always-apply once Phase 5 lands), these tools are unioned into the
@@ -90,6 +98,7 @@ export interface ISkill {
    */
   alwaysApply: boolean;
   tenantId?: string;
+  deletedAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
   /** Computed from ACL at read time, never persisted. */

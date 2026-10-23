@@ -16,40 +16,66 @@ let base: string;
 let pluginsDir: string;
 let dataDir: string;
 
-const HOOKS_DOCUMENT = {
-  hooks: {
-    PreToolUse: [
-      {
-        matcher: '^write_file$',
-        hooks: [
-          {
-            type: 'command',
-            command: `printf '%s' '{"decision":"deny","reason":"guarded"}'`,
-          },
-        ],
-      },
-      {
-        matcher: '^(Write|Edit)$',
-        hooks: [
-          {
-            type: 'command',
-            command: `node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{const p=JSON.parse(d);const claudeShaped=p.tool_name==="Write"&&p.tool_input.file_path==="/workspace/report.md"&&p.tool_input.path===undefined;console.log(JSON.stringify(claudeShaped?{decision:"deny",reason:"alias-guarded"}:{}));});'`,
-          },
-        ],
-      },
-    ],
-    SessionStart: [
-      {
-        hooks: [
-          { type: 'command', command: 'echo started >> "$PLUGIN_DATA/starts.log"' },
-          { type: 'command', command: 'echo sibling >> "$PLUGIN_DATA/starts.log"' },
-        ],
-      },
-    ],
-  },
-};
+/**
+ * The default hook document.
+ *
+ * It is built per test rather than held as a module constant because the Windows
+ * command variant points at a program file whose path is only known once the
+ * temporary directory exists.
+ */
+function hooksDocument(): Record<string, unknown> {
+  return {
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: '^write_file$',
+          hooks: [
+            {
+              type: 'command',
+              command: `printf '%s' '{"decision":"deny","reason":"guarded"}'`,
+              commandWindows: `Write-Output '{"decision":"deny","reason":"guarded"}'`,
+            },
+          ],
+        },
+        {
+          matcher: '^(Write|Edit)$',
+          hooks: [
+            {
+              type: 'command',
+              command: `node "${path.join(pluginsDir, 'guard.cjs')}" alias`,
+              // A Windows host runs the hook through PowerShell, which strips the
+              // double quotes around an inline program and hands node bare
+              // JavaScript. The program is therefore a file rather than an inline
+              // argument, so the same program runs under both shells.
+              commandWindows: `node "${path.join(pluginsDir, 'guard.cjs')}" alias`,
+            },
+          ],
+        },
+      ],
+      SessionStart: [
+        {
+          hooks: [
+            {
+              type: 'command',
+              command: 'echo started >> "$PLUGIN_DATA/starts.log"',
+              // The two handlers can run concurrently, and two shells appending to
+              // the same file at once can lose a write. A single program that
+              // appends atomically avoids the race.
+              commandWindows: `node "${path.join(pluginsDir, 'append.cjs')}" started`,
+            },
+            {
+              type: 'command',
+              command: 'echo sibling >> "$PLUGIN_DATA/starts.log"',
+              commandWindows: `node "${path.join(pluginsDir, 'append.cjs')}" sibling`,
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
 
-async function writePlugin(name: string, document: object = HOOKS_DOCUMENT): Promise<void> {
+async function writePlugin(name: string, document: object = hooksDocument()): Promise<void> {
   const root = path.join(pluginsDir, name);
   await fs.promises.mkdir(path.join(root, 'ai.librechat', 'hooks'), { recursive: true });
   await fs.promises.writeFile(
@@ -89,6 +115,66 @@ beforeEach(async () => {
   pluginsDir = path.join(base, 'plugin');
   dataDir = path.join(base, 'data');
   await fs.promises.mkdir(pluginsDir, { recursive: true });
+
+  /**
+   * The hook program is written to a file rather than inlined into the hook
+   * command. A Windows host runs the hook through PowerShell, which strips the
+   * double quotes around an inline program and hands node bare JavaScript, so an
+   * inline form cannot be portable. A file runs the same way under both shells.
+   *
+   * The program takes the check to apply as its first argument, so one file
+   * serves every hook variant in this suite.
+   */
+  await fs.promises.writeFile(
+    path.join(pluginsDir, 'guard.cjs'),
+    [
+      "let d = '';",
+      "process.stdin.on('data', (c) => { d += c; });",
+      "process.stdin.on('end', () => {",
+      '  const p = JSON.parse(d);',
+      '  const check = process.argv[2];',
+      "  if (process.env.SATCHIDA_DEBUG_HOOK_PAYLOAD) console.error('[hookpayload]' + d);",
+      "  const nativeShaped = p.tool_name === 'create_file'",
+      "    && p.tool_input.path === '/workspace/native.md'",
+      '    && p.tool_input.file_path === undefined;',
+      "  const mixedNativeShaped = p.tool_name === 'create_file'",
+      "    && p.tool_input.path === '/workspace/mixed.md'",
+      '    && p.tool_input.file_path === undefined;',
+      "  const claudeShaped = p.tool_name === 'Write'",
+      "    && p.tool_input.file_path === '/workspace/report.md'",
+      '    && p.tool_input.path === undefined;',
+      '  let reason = null;',
+      "  if (check === 'alias' && claudeShaped) reason = 'alias-guarded';",
+      "  if (check === 'native' && nativeShaped) reason = 'native-guarded';",
+      "  if (check === 'mixed' && mixedNativeShaped) reason = 'mixed-native';",
+      "  if (check === 'wild' && p.tool_name === 'Write'",
+      "    && p.tool_input.file_path === '/workspace/wild.md') reason = 'wildcard-guarded';",
+      "  if (check === 'cwd') {",
+      "    reason = [p.cwd, process.cwd()].filter(Boolean).join('|');",
+      '  }',
+      "  console.log(JSON.stringify(reason ? { decision: 'deny', reason } : {}));",
+      '});',
+    ].join('\n'),
+    'utf8',
+  );
+  /**
+   * A program that appends one line to a log file.
+   *
+   * It exists because two shells appending to the same file at once can lose a
+   * write, and the SessionStart handlers run concurrently. A single program that
+   * appends atomically avoids the race on every host.
+   */
+  await fs.promises.writeFile(
+    path.join(pluginsDir, 'append.cjs'),
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      'const value = process.argv[2];',
+      "const target = path.join(process.env.PLUGIN_DATA, process.argv[3] ?? 'starts.log');",
+      'fs.appendFileSync(target, value + String.fromCharCode(10));',
+    ].join('\n'),
+    'utf8',
+  );
 });
 
 afterEach(async () => {
@@ -192,7 +278,8 @@ describe('registerDeploymentPluginHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: `node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{const p=JSON.parse(d);const nativeShaped=p.tool_name==="create_file"&&p.tool_input.path==="/workspace/native.md"&&p.tool_input.file_path===undefined;console.log(JSON.stringify(nativeShaped?{decision:"deny",reason:"native-guarded"}:{}));});'`,
+                command: `node "${path.join(pluginsDir, 'guard.cjs')}" native`,
+                commandWindows: `node "${path.join(pluginsDir, 'guard.cjs')}" native`,
               },
             ],
           },
@@ -227,7 +314,8 @@ describe('registerDeploymentPluginHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: `node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{const p=JSON.parse(d);const nativeShaped=p.tool_name==="create_file"&&p.tool_input.path==="/workspace/mixed.md"&&p.tool_input.file_path===undefined;console.log(JSON.stringify(nativeShaped?{decision:"deny",reason:"mixed-native"}:{}));});'`,
+                command: `node "${path.join(pluginsDir, 'guard.cjs')}" mixed`,
+                commandWindows: `node "${path.join(pluginsDir, 'guard.cjs')}" mixed`,
               },
             ],
           },
@@ -257,6 +345,7 @@ describe('registerDeploymentPluginHooks', () => {
     const onceHandler = {
       type: 'command',
       command: 'echo fired >> "$PLUGIN_DATA/overlap.log"',
+      commandWindows: `node "${path.join(pluginsDir, 'append.cjs')}" fired overlap.log`,
       once: true,
     };
     await writePlugin('overlap', {
@@ -328,7 +417,13 @@ describe('registerDeploymentPluginHooks', () => {
     await fireRunStart('conversation-a', 'resume');
 
     const log = await fs.promises.readFile(path.join(dataDir, 'session', 'starts.log'), 'utf8');
-    const lines = log.trim().split('\n').sort();
+    // A Windows host writes CRLF line endings, so the carriage return is stripped
+    // before the lines are compared.
+    const lines = log
+      .trim()
+      .split('\n')
+      .map((line) => line.replace(/\r$/, ''))
+      .sort();
     expect(lines).toEqual(['sibling', 'sibling', 'sibling', 'started', 'started', 'started']);
   });
 
@@ -341,7 +436,8 @@ describe('registerDeploymentPluginHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: `node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{const p=JSON.parse(d);console.log(JSON.stringify({decision:"deny",reason:p.cwd+"|"+process.cwd()}));});'`,
+                command: `node "${path.join(pluginsDir, 'guard.cjs')}" cwd`,
+                commandWindows: `node "${path.join(pluginsDir, 'guard.cjs')}" cwd`,
               },
             ],
           },
@@ -383,7 +479,8 @@ describe('registerDeploymentPluginHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: `node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{const p=JSON.parse(d);const claudeShaped=p.tool_name==="Write"&&p.tool_input.file_path==="/workspace/wild.md"&&p.tool_input.path===undefined;console.log(JSON.stringify(claudeShaped?{decision:"deny",reason:"wildcard-guarded"}:{}));});'`,
+                command: `node "${path.join(pluginsDir, 'guard.cjs')}" wild`,
+                commandWindows: `node "${path.join(pluginsDir, 'guard.cjs')}" wild`,
               },
             ],
           },
@@ -415,6 +512,7 @@ describe('registerDeploymentPluginHooks', () => {
     const onceHandler = {
       type: 'command',
       command: 'echo fired >> "$PLUGIN_DATA/once.log"',
+      commandWindows: `node "${path.join(pluginsDir, 'append.cjs')}" fired once.log`,
       once: true,
     };
     await writePlugin('oncely', {

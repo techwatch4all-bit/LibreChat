@@ -51,6 +51,9 @@ function createParams(overrides: {
   userApiKey?: string;
   expiresAt?: string;
   headers?: Record<string, string>;
+  getPrivacyAssertion?: jest.Mock;
+  isPrivacyLocalReady?: jest.Mock;
+  authorizeTenantSeatRequest?: jest.Mock;
 }): BaseInitializeParams {
   const { apiKey = 'sk-test-key', baseURL = 'https://api.example.com/v1' } = overrides;
 
@@ -66,6 +69,11 @@ function createParams(overrides: {
       apiKey: overrides.userApiKey ?? 'sk-user-key',
       baseURL: overrides.userBaseURL ?? 'https://user-api.example.com/v1',
     }),
+    getPrivacyAssertion:
+      overrides.getPrivacyAssertion ?? jest.fn().mockResolvedValue('signed-local-assertion'),
+    isPrivacyLocalReady: overrides.isPrivacyLocalReady ?? jest.fn().mockResolvedValue(true),
+    authorizeTenantSeatRequest:
+      overrides.authorizeTenantSeatRequest ?? jest.fn().mockResolvedValue(true),
   } as unknown as BaseInitializeParams['db'];
 
   return {
@@ -173,6 +181,219 @@ describe('initializeCustom – Agents API user key resolution', () => {
     await initializeCustom(params);
 
     expect(params.db.getUserKeyValues).not.toHaveBeenCalled();
+  });
+});
+
+describe('initializeCustom – Satchida cloud/Privacy seat routing', () => {
+  it('uses the server seat bearer for cloud and the local assertion for Privacy', async () => {
+    mockGetCustomEndpointConfig.mockImplementation(({ endpoint }: { endpoint: string }) => ({
+      apiKey: 'operator-cloud-fallback',
+      baseURL: endpoint === 'Satchida' ? 'http://127.0.0.1:4000/v1' : 'https://one-api.example/v1',
+      models: {},
+    }));
+    const cloud = createParams({
+      apiKey: 'operator-cloud-fallback',
+      baseURL: 'https://one-api.example/v1',
+    });
+    cloud.endpoint = 'Satchida-Gateway';
+    (cloud.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-1',
+      tenantId: 'tenant-a',
+      accountType: 'family',
+      familyRole: 'adult',
+      seatToken: 'tk-cloud-seat',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    mockGetOpenAIConfig.mockClear();
+    cloud.model_parameters = { model: 'Chat', tools: [] };
+    await initializeCustom(cloud);
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'tk-cloud-seat',
+      expect.any(Object),
+      'Satchida-Gateway',
+    );
+
+    jest.clearAllMocks();
+    const privacy = createParams({
+      apiKey: 'operator-cloud-fallback',
+      baseURL: 'http://127.0.0.1:4000/v1',
+    });
+    privacy.endpoint = 'Satchida';
+    (privacy.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-1',
+      tenantId: 'tenant-a',
+      accountType: 'family',
+      familyRole: 'adult',
+      seatToken: 'tk-cloud-seat',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    mockGetOpenAIConfig.mockClear();
+    privacy.model_parameters = { model: 'Privacy', tools: [] };
+    await initializeCustom(privacy);
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'signed-local-assertion',
+      expect.objectContaining({ reverseProxyUrl: 'http://127.0.0.1:4000/v1' }),
+      'Satchida',
+    );
+    expect(privacy.db.getPrivacyAssertion).toHaveBeenCalledWith({
+      tenantId: 'tenant-a',
+      seatAlias: 'opaque-seat-00000001',
+      accountType: 'family',
+      profileType: 'adult',
+    });
+    expect(privacy.db.isPrivacyLocalReady).toHaveBeenCalledWith({
+      tenantId: 'tenant-a',
+      seatAlias: 'opaque-seat-00000001',
+    });
+  });
+
+  it('fails closed for Family child Work, Family Work tools and child tool requests', async () => {
+    for (const testCase of [
+      { accountType: 'family', familyRole: 'minor', model: 'Work', tools: [] },
+      {
+        accountType: 'family',
+        familyRole: 'adult',
+        model: 'Work',
+        tools: [{ type: 'function', function: { name: 'exec' } }],
+      },
+      {
+        accountType: 'family',
+        familyRole: 'minor',
+        model: 'Chat',
+        tools: [{ type: 'function', function: { name: 'exec' } }],
+      },
+    ]) {
+      const params = createParams({
+        apiKey: 'operator-fallback',
+        baseURL: 'https://one-api.example/v1',
+      });
+      params.endpoint = 'Satchida-Gateway';
+      mockGetOpenAIConfig.mockClear();
+      (params.req as unknown as { user: Record<string, unknown> }).user = {
+        id: 'user-1',
+        tenantId: 'tenant-a',
+        seatToken: 'tk-cloud-seat',
+        ...testCase,
+      };
+      params.model_parameters = { model: testCase.model, tools: testCase.tools };
+      (params.db.authorizeTenantSeatRequest as jest.Mock).mockResolvedValue(false);
+      await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+      if (
+        !(
+          (testCase.accountType === 'family' &&
+            testCase.familyRole === 'minor' &&
+            testCase.model === 'Work') ||
+          (testCase.accountType === 'family' && testCase.tools.length > 0) ||
+          (testCase.familyRole === 'minor' && testCase.tools.length > 0)
+        )
+      ) {
+        expect(params.db.authorizeTenantSeatRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: 'tenant-a',
+            mode: testCase.model.toLowerCase(),
+            hasTools: testCase.tools.length > 0,
+          }),
+        );
+      }
+    }
+  });
+
+  it('fails closed when local Privacy has no assertion or points at a non-loopback URL', async () => {
+    const noAssertion = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
+    noAssertion.endpoint = 'Satchida';
+    mockGetOpenAIConfig.mockClear();
+    (noAssertion.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'u',
+      accountType: 'pro',
+    };
+    noAssertion.model_parameters = { model: 'Privacy' };
+    (noAssertion.db.getPrivacyAssertion as jest.Mock).mockResolvedValue(undefined);
+    await expect(initializeCustom(noAssertion)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+
+    const remotePrivacy = createParams({
+      apiKey: 'fallback',
+      baseURL: 'https://operator.example/v1',
+    });
+    remotePrivacy.endpoint = 'Satchida';
+    mockGetOpenAIConfig.mockClear();
+    (remotePrivacy.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'u',
+      accountType: 'pro',
+      privacyAssertion: 'signed-local-assertion',
+    };
+    remotePrivacy.model_parameters = { model: 'Privacy' };
+    await expect(initializeCustom(remotePrivacy)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+  });
+
+  it('fails closed when local model readiness is unavailable', async () => {
+    const params = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
+    params.endpoint = 'Satchida';
+    (params.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'u',
+      tenantId: 'tenant-a',
+      accountType: 'pro',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    params.model_parameters = { model: 'Privacy' };
+    (params.db.isPrivacyLocalReady as jest.Mock).mockResolvedValue(false);
+    await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    expect(mockGetOpenAIConfig).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the seat has no tenant binding for Privacy', async () => {
+    // A Privacy request without a tenant and an opaque seat alias cannot be
+    // attributed to a seat, so the local router could not apply the fairness
+    // ladder to it. It is refused rather than forwarded unattributed.
+    for (const user of [
+      { id: 'u', accountType: 'pro' },
+      { id: 'u', tenantId: 'tenant-a', accountType: 'pro' },
+      { id: 'u', accountType: 'pro', satchidaSeatAlias: 'opaque-seat-00000001' },
+    ]) {
+      const params = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
+      params.endpoint = 'Satchida';
+      mockGetOpenAIConfig.mockClear();
+      (params.req as unknown as { user: Record<string, unknown> }).user = user;
+      params.model_parameters = { model: 'Privacy' };
+      await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+      expect(mockGetOpenAIConfig).not.toHaveBeenCalled();
+    }
+  });
+
+  it('fails closed when the assertion cannot be minted', async () => {
+    const params = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
+    params.endpoint = 'Satchida';
+    mockGetOpenAIConfig.mockClear();
+    (params.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'u',
+      tenantId: 'tenant-a',
+      accountType: 'pro',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    params.model_parameters = { model: 'Privacy' };
+    (params.db.getPrivacyAssertion as jest.Mock).mockResolvedValue(undefined);
+    await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    expect(mockGetOpenAIConfig).not.toHaveBeenCalled();
+  });
+
+  it('treats a minor seat as a child when minting the Privacy assertion', async () => {
+    // The profile decides which safety rules apply, so it must be derived from
+    // the server-side seat record rather than from anything the client sent.
+    const params = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
+    params.endpoint = 'Satchida';
+    (params.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'u',
+      tenantId: 'tenant-a',
+      accountType: 'family',
+      familyRole: 'minor',
+      satchidaSeatAlias: 'opaque-seat-00000001',
+    };
+    params.model_parameters = { model: 'Privacy' };
+    await initializeCustom(params);
+    expect(params.db.getPrivacyAssertion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileType: 'child',
+      }),
+    );
   });
 });
 

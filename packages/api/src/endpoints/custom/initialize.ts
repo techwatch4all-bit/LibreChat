@@ -1,4 +1,5 @@
-import { Providers } from '@librechat/agents';
+﻿import { Providers } from '@librechat/agents';
+import { logger } from '@librechat/data-schemas';
 import {
   ErrorTypes,
   envVarRegex,
@@ -6,8 +7,8 @@ import {
   FetchTokenConfig,
   extractEnvVariable,
 } from 'librechat-data-provider';
+import type { AppConfig, IUser } from '@librechat/data-schemas';
 import type { TEndpoint } from 'librechat-data-provider';
-import type { AppConfig } from '@librechat/data-schemas';
 import type {
   InitializeResultBase,
   EndpointTokenConfig,
@@ -36,7 +37,7 @@ function getTenantTokenScope(tenantId?: string | null): string {
 /**
  * Cache key for an endpoint's fetched token config. User-scoped when the
  * model fetch can resolve per-user: user-provided key/URL, or header
- * templates forwarded against an admin-trusted base URL — making the
+ * templates forwarded against an admin-trusted base URL â€” making the
  * response, and therefore the derived token config, user-specific. Otherwise
  * tenant-scoped when a tenant id is available because custom endpoint config
  * is resolved per tenant.
@@ -217,8 +218,140 @@ export async function initializeCustom(
     userValues = await db.getUserKeyValues({ userId: user?.id ?? '', name: endpoint });
   }
 
-  const apiKey = userProvidesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
-  const baseURL = userProvidesURL ? userValues?.baseURL : CUSTOM_BASE_URL;
+  const requestedModel = typeof model_parameters?.model === 'string' ? model_parameters.model : '';
+  const satchidaMode = typeof requestBody.model === 'string' ? requestBody.model : requestedModel;
+  const normalizedMode = satchidaMode.trim().toLowerCase();
+  const isSatchidaEndpoint =
+    endpoint.toLowerCase() === 'satchida' || endpoint.toLowerCase() === 'satchida-gateway';
+  const isPrivacyMode = isSatchidaEndpoint && normalizedMode === 'privacy';
+  const satchidaSeatAlias = (user as IUser & { satchidaSeatAlias?: string })?.satchidaSeatAlias;
+  // Operational trace for the Privacy path.
+  //
+  // The Privacy chain is fail-closed, so a refusal here is invisible from the
+  // outside: the seat simply sees "Privacy mode is unavailable". Without this
+  // trace there is no way to tell a misrouted request (the endpoint name never
+  // matched, so the local runtime was called with the operator's licence token
+  // instead of a seat assertion) from a genuine policy refusal. Only routing
+  // facts are logged. No token, key or prompt content.
+  logger.info(
+    `[satchida][custom] route endpoint=${endpoint} mode=${normalizedMode} ` +
+      `satchidaEndpoint=${isSatchidaEndpoint} privacyMode=${isPrivacyMode} ` +
+      `seatAlias=${Boolean(satchidaSeatAlias)} tenantId=${Boolean(user?.tenantId)}`,
+  );
+  if (isPrivacyMode && (userProvidesKey || userProvidesURL)) {
+    throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+  }
+  const isTenantCloudMode = !!user?.seatToken && !isPrivacyMode;
+  const isFamilySeat = user?.accountType === 'family';
+  const isChildSeat =
+    (user?.familyRole as string | null | undefined) === 'minor' ||
+    (user?.familyRole as string | null | undefined) === 'child';
+  const semanticMode =
+    normalizedMode === 'vibecoder' || normalizedMode === 'vibe_coding'
+      ? 'Work'
+      : normalizedMode.slice(0, 1).toUpperCase() + normalizedMode.slice(1);
+  const toolUseRequested =
+    Array.isArray(model_parameters?.tools) && model_parameters.tools.length > 0;
+  if (isTenantCloudMode && isSatchidaEndpoint) {
+    // The seat's allowed modes come from the operator's allocation for its
+    // account type, not from a table keyed by account type here. A type-based
+    // table would have to be duplicated here and would drift, and it would
+    // make a dedicated `privacy` seat unable to reach the cloud even when the
+    // operator had explicitly granted it.
+    const seatPolicy =
+      user?.tenantId && satchidaSeatAlias
+        ? await db.getTenantSeatPolicy?.({
+            tenantId: user.tenantId,
+            seatAlias: satchidaSeatAlias,
+          })
+        : undefined;
+    if (seatPolicy) {
+      const allowed = new Set(seatPolicy.allowedModes.map((mode) => mode.toLowerCase()));
+      if (!allowed.has(normalizedMode)) {
+        throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+      }
+    } else {
+      // Without a policy the seat's modes are unknown, so only the modes every
+      // tenant seat is guaranteed to hold are permitted. A dedicated
+      // `privacy` seat falls back to Privacy, which is its purpose.
+      const fallback = user?.accountType === 'privacy' ? ['privacy'] : ['chat'];
+      if (!fallback.includes(normalizedMode)) {
+        throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+      }
+    }
+    if (isChildSeat && (semanticMode === 'Work' || toolUseRequested))
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    if (isFamilySeat && toolUseRequested)
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    if (
+      toolUseRequested &&
+      !(user as IUser & { tenantSeatCapabilities?: string[] }).tenantSeatCapabilities?.some(
+        (capability) => ['work_tools', 'mcp', 'agents', 'code_execution'].includes(capability),
+      )
+    ) {
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    }
+    if (db.authorizeTenantSeatRequest && user?.tenantId && satchidaSeatAlias) {
+      const authorized = await db.authorizeTenantSeatRequest({
+        tenantId: user.tenantId,
+        seatAlias: satchidaSeatAlias,
+        accountType: user.accountType ?? 'basic',
+        profileType: isChildSeat ? 'child' : 'adult',
+        mode: normalizedMode,
+        hasTools: toolUseRequested,
+      });
+      if (!authorized) throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    }
+  }
+  let privacyAssertion = (user as IUser & { privacyAssertion?: string })?.privacyAssertion;
+  if (isPrivacyMode) {
+    // The Privacy path is fail-closed. Every one of these checks is unconditional:
+    // a Privacy request must never be forwarded to the local runtime without an
+    // assertion, without a healthy local model, or with a remote base URL.
+    if (!user?.tenantId || !satchidaSeatAlias) {
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    }
+    if (!privacyAssertion) {
+      privacyAssertion = await db.getPrivacyAssertion({
+        tenantId: user.tenantId,
+        seatAlias: satchidaSeatAlias,
+        accountType: user.accountType ?? 'basic',
+        profileType: isChildSeat ? 'child' : 'adult',
+      });
+    }
+    if (!privacyAssertion) {
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    }
+    const localReady = await db.isPrivacyLocalReady({
+      tenantId: user.tenantId,
+      seatAlias: satchidaSeatAlias,
+    });
+    if (!localReady) {
+      throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+    }
+    logger.info('[satchida][custom] privacy assertion minted and local runtime reachable');
+  }
+  const privacyBaseURL = userProvidesURL ? (userValues?.baseURL ?? '') : CUSTOM_BASE_URL;
+  if (
+    isPrivacyMode &&
+    (!privacyAssertion ||
+      !/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/i.test(privacyBaseURL))
+  ) {
+    throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
+  }
+  let apiKey: string | undefined;
+  if (isPrivacyMode) {
+    apiKey = privacyAssertion;
+  } else if (userProvidesKey || userProvidesURL) {
+    apiKey = userValues?.apiKey;
+  } else {
+    apiKey = user?.seatToken ?? CUSTOM_API_KEY;
+  }
+
+  let baseURL: string | undefined = CUSTOM_BASE_URL;
+  if (!isPrivacyMode && userProvidesURL) {
+    baseURL = userValues?.baseURL;
+  }
 
   if ((userProvidesKey || userProvidesURL) && !apiKey) {
     throw new Error(
@@ -258,7 +391,7 @@ export async function initializeCustom(
   const tokenKey = getTokenConfigKey(endpointConfig, endpoint, userId, tenantId);
 
   if (hasTokenConfig) {
-    /** A static override is authoritative — use it for the agent's billing
+    /** A static override is authoritative â€” use it for the agent's billing
      *  and balance checks, not just the advertised UI token config. Mirror
      *  the admin-facing `cacheWrite`/`cacheRead` keys onto the `write`/`read`
      *  keys the billing multiplier reads. */
@@ -288,7 +421,7 @@ export async function initializeCustom(
       tokenKey,
       userObject: user,
       // Mirror the security guard in `loadConfigModels`: never forward
-      // header overrides when the base URL is user-supplied — configured
+      // header overrides when the base URL is user-supplied â€” configured
       // templates like {{LIBRECHAT_OPENID_ID_TOKEN}} would otherwise resolve
       // and leak the user's identity token to a destination the user controls.
       headers: userProvidesURL ? undefined : endpointConfig.headers,
@@ -307,6 +440,27 @@ export async function initializeCustom(
     endpointTokenConfig,
     !userProvidesURL,
   );
+
+  /**
+   * The Satchida mode has to reach the operator's gateway.
+   *
+   * The gateway refuses a tenant credential that does not declare which mode
+   * it is serving, because the mode decides the seat's entitlement: a Privacy
+   * request must be refused at the cloud gateway and sent to the tenant's own
+   * router instead, and a Work request needs the tool set a Chat seat does
+   * not hold. Without the header every cloud request was refused with "A
+   * configured mode is required for tenant cloud inference".
+   *
+   * The mode is the server's own decision, taken from the model spec the
+   * request resolved to, and it is never taken from a header the caller sent.
+   * The Privacy mode is not sent: Privacy never reaches this gateway.
+   */
+  if (isSatchidaEndpoint && !isPrivacyMode && semanticMode) {
+    customOptions.headers = {
+      ...((customOptions.headers as Record<string, string> | undefined) ?? {}),
+      'X-Satchida-Mode': semanticMode,
+    };
+  }
 
   const clientOptions: Record<string, unknown> = {
     reverseProxyUrl: baseURL ?? null,

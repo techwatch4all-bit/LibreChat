@@ -30,3 +30,110 @@
 - **Agent event actor mailbox**: the automatic durable delivery-ordering lane for one authenticated source binding. It keeps later deliveries queued after transport admission until the current child turn records an authoritative terminal handling outcome. It serializes existing coalesced batches and individual events without becoming a second execution controller or actor checkpoint store.
 - **Agent trigger capability shield**: the durable mixed-version representation for internal trigger work that only a capability-aware worker may execute. Mongo uses an old-publishable `staging` shell; a queued `leased` shell without an owner or deadline, which old workers cannot claim but can use for bounded lane rechecks; a private lease only during execution; and a legacy-terminal `capability_dead` shell once dead. Private capability fields own current claiming, retry, and dead-letter truth. Redis uses a versioned fail-closed terminal status and recovery index that old replacement scripts and sweepers cannot consume. The shield is an implementation detail at the storage seam, never a deployment switch or user-configured product mode.
 - **Theme definition**: a versioned, data-only description of LibreChat semantic colors and shared appearance roles, optionally specialized by light or dark mode. The theme module validates and resolves partial definitions against bundled defaults before adapters apply them. A theme definition does not contain arbitrary CSS, application behavior, or alternate feature layouts.
+
+---
+
+## Satchida product domain
+
+Terms below are specific to this fork's subscription, quota, and payment layer. The upstream
+domain language above is unchanged. Design rationale is in `ARCHITECTURE.md`; divergence from
+upstream is tracked in `Customizations.md`.
+
+- **Plan**: a named, operator-defined bundle of exactly three things — an RBAC role, a balance
+  configuration, and an interface feature set. A plan is not an entitlement system and never
+  reimplements one; the role and balance primitives are upstream. Plans are operator data, not
+  code, so price and quota changes do not require a deploy.
+- **Subscription**: the durable link from a user (and their tenant) to the plan they currently
+  hold, with a lifecycle status of `pending_payment`, `active`, `expired`, or `revoked`. Only an
+  `active` subscription confers plan entitlements; a `pending_payment` subscription confers
+  exactly the Demo tier.
+- **Demo account**: a registered, authenticated user with no confirmed payment. It is a plan
+  tier, not a separate account type, and it is deliberately time-boxed — a small token
+  allowance refilling every 24 hours — so an unpaid user can try the product but cannot use it
+  as a free service. Demo is the only tier reachable without a payment confirmation.
+- **Payment attempt**: one user's act of selecting a plan and submitting proof of UPI
+  payment. It is created `pending` and is not a subscription; approval is what creates a
+  subscription. A failed or abandoned attempt leaves the user on Demo.
+- **Payment confirmation**: an operator's (or a gateway's) verified act of accepting one
+  payment attempt. It is the single point at which an account leaves Demo. Confirmation is
+  idempotent by attempt identity, so a replayed webhook or a double-click cannot grant two
+  subscriptions or two quota cycles.
+- **Manual UPI provider**: the live payment provider. The owner's static UPI QR carries no
+  webhook, so confirmation is a human act — the operator reconciles against a banking app and
+  approves in the reconciliation console. The user-visible state is identical to the gateway
+  state; only the confirmer differs.
+- **Razorpay provider**: the deferred payment provider, selected by the `payments.provider`
+  configuration lever rather than a code branch. It is implemented against the same interface
+  but inactive until an account and credentials exist. It never replaces the manual path's
+  semantics; it only changes who performs confirmation.
+- **Reconciliation console**: the operator surface listing every account with its registration
+  date, last authentication, selected plan, and payment status, filterable and exportable for
+  matching against a bank statement. It is required under either provider, because neither
+  LibreChat's native admin nor the AGPL admin-panel has any awareness of credits, plans, or
+  payments.
+- **Seat**: a Family-tier unit of pooled quota. A subscription carries a seat count; inviting a
+  member beyond it is refused. Seats govern sharing, not privilege — every seat holds the same
+  role.
+- **Mode**: the per-conversation execution mode chosen by the user — `Chat`, `Work`, or
+  `Privacy`. A mode is not a plan and not a tier; any plan may use any mode its entitlements
+  allow. A mode determines *routing and privacy posture*, never capability. It is chosen per
+  conversation and is never resolved to a provider or model name in anything the user can see.
+- **Chat mode**: the default. Routes to free cloud first, then paid cloud, then local. Makes no
+  privacy promise beyond the provider terms it routes to.
+- **Work mode**: prefers paid providers because the user is asking for the strongest available
+  answer. Same privacy posture as Chat; different ordering.
+- **Privacy mode**: the privacy mode. Routes to local inference only, so content never leaves
+  infrastructure we operate. Customer-facing description is **"Processed only on infrastructure
+  Satchida operates."** Never to a free route, never to a provider whose retention position is
+  unknown, and never to a public search engine.
+- **Non-retention**: the provider does not retain the prompt after the request completes. It is
+  a contractual property, distinct from locality, and it is obtained from the provider's terms —
+  never by routing through an intermediary that itself processes the content.
+- **Unlinkability**: the provider cannot determine which individual user sent a given prompt.
+  Achieved by architecture — one shared key per provider, mixed traffic, and distribution across
+  several providers so that no single provider holds a correlated slice of the user base. It is a
+  property of the routing design, not of any vendor.
+- **Locality**: the content never touches third-party infrastructure. Only local inference
+  provides it. A paid Privacy-mode subscriber is buying exactly this property.
+- **Privacy promise**: the exact claim the product may make. Always one or more of
+  non-retention, unlinkability, and locality — **never "anonymous"**, because Satchida holds the
+  credentials and runs the router and is therefore always an identifiable party. The full
+  claims ledger, including the claims we must never make, is `PRIVACY.md` §4.
+- **No-provider-marketing rule**: no model provider or model name may appear in any user-facing
+  surface — interface, responses, plan copy, feature lists, agent or preset names, or config
+  values a user can observe. This is a compliance requirement under the provider terms that
+  permit wrapping (§A.1) while restricting a competing product (§D.4), not merely a branding
+  preference. Adding a provider-branded tier later would breach it.
+- **Satchida-side retention**: conversations are stored in MongoDB so users can resume them.
+  This is disclosed in the privacy policy and the in-app notice, not concealed. It is also why
+  we cannot claim that nothing is retained by anyone.
+- **Provider licensing gate**: the checks a provider must pass before entering the routing
+  registry — no competing-product use, no multi-account quota stacking, retention documented.
+  Retention unknown means the entry is barred from Privacy mode. The gate fails closed.
+- **Recovery**: re-deriving a complete answer after a turn fails, by discarding the partial
+  buffer and re-executing the turn from its beginning on another route. It is a re-execution,
+  not a resume, so no side effect from the failed attempt carries over. Free routes are
+  preferred so recovery costs close to zero, with local inference as the terminal hop.
+- **Free-route budget**: the fixed daily request allowance shared between normal traffic and
+  recovery. Reserved deliberately between the two, because recovery fires precisely when
+  providers are failing and would otherwise consume the whole pool.
+- **Shared deployment** vs **dedicated instance**: the two tenancy modes. Community, Standard,
+  Pro, and Family share one installation separated by `tenantId`; Enterprise receives a
+  dedicated instance. A plan may exist in both modes; it is the tenancy, not the tier, that
+  changes isolation guarantees.
+
+---
+
+## 3. Distributed Edge Fleet & Ingress Domain Model
+
+Specific to the **Satchida Distributed Edge Deployment** over Jio CGNAT via Cloudflare Zero Trust on domain `satchida.com`:
+
+- **Master Fleet Controller (HQ)**: The central control-plane process running at Seller Central HQ on your Windows 11 machine (`127.0.0.1:8443`). It owns the tenant registry, client secret keys, license ledger, seat allocations, and master upstream API keys.
+- **HQ Ingress**: Exposed via `cloudflared.exe` Windows Service to:
+  - `control.satchida.com`: API endpoint for edge node telemetry, heartbeat polling, and policy dispatch.
+  - `office.satchida.com`: Direct LibreChat ingress on port 3080 for your internal office workers.
+- **Edge Execution Node**: An autonomous, native Windows 11 desktop running at a client site (school, SME, enterprise) behind symmetric Jio/Airtel CGNAT. It runs native LibreChat (`127.0.0.1:3080`), local MongoDB (`127.0.0.1:27017`), local LanceDB RAG service (`127.0.0.1:8000`), local AutoRouter (`127.0.0.1:4000`), and a dedicated `cloudflared.exe` service.
+- **Tenant Subdomain**: Each client receives an isolated named Cloudflare tunnel mapped to `https://<client-subdomain>.satchida.com` (e.g. `https://school-mum.satchida.com` or `https://sme-blr.satchida.com`).
+- **Heartbeat & Telemetry Loop**: Outbound HTTPS `POST` from the client's `node-sync-agent` to `https://control.satchida.com/api/v1/fleet/heartbeat` every 15–30 seconds. Carries telemetry and pending administrative expansion requests signed with HMAC-SHA256.
+- **Zero-Knowledge Key Custody**: Real provider API keys (OpenAI, Anthropic, Gemini, DeepSeek) never exist on edge nodes. Upstream prompts route through `control.satchida.com` where master keys are injected in-flight after license and quota verification.
+- **Physical Tenant Isolation**: Separate, dedicated MongoDB per client. No cross-tenant data mingling, satisfying India's Digital Personal Data Protection (DPDP) Act by design.

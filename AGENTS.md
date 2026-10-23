@@ -203,3 +203,99 @@ Run focused Jest tests from the owning workspace, not the entire monorepo. Prefe
 spies over mocked internals; use `mongodb-memory-server` for database queries and the real MCP SDK
 for MCP behavior. Mock only external HTTP APIs or uncontrollable services. For frontend tests use
 the component's colocated `__tests__` and `test/layout-test-utils` where applicable.
+
+---
+
+# Satchida AI Harness (this fork)
+
+Everything above is upstream LibreChat contributor guidance and still applies unchanged. This
+section describes the product layer added on top. Read `ARCHITECTURE.md` for the full design,
+`Implementation-plan.md` for sequencing, `Customizations.md` for divergence from upstream,
+`Changes.md` for history, and `Bugs.md` for known issues.
+
+## What this fork is
+
+A community and SMB AI harness served over VPN, with web and Android clients, Google-based
+registration, subscription tiers, and UPI payments.
+
+## Reuse upstream rather than rebuilding it
+
+Before writing any plan, quota, gating, or auth code, check whether it already exists:
+
+- **Feature gating by tier** — `packages/data-schemas/src/schema/role.ts` plus
+  `PermissionTypes` in `packages/data-provider/src/permissions.ts`. A plan is a named bundle
+  of a role, a balance configuration, and an interface feature set — not a new entitlement
+  system.
+- **Daily / weekly / monthly token quotas** — `packages/data-schemas/src/schema/balance.ts`.
+  `tokenCredits`, `autoRefillEnabled`, `refillIntervalValue`, `refillIntervalUnit`;
+  `REFILL_INTERVAL_UNITS` already covers `days`, `weeks`, `months`. Enforced by
+  `packages/api/src/middleware/checkBalance.ts`. Off by default (`balance.enabled`).
+- **Google registration** — configuration only. `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`,
+  the `googleId` field on the user schema, and `packages/api/src/auth/googleRefresh.ts`.
+- **Operator API surface** — `packages/api/src/admin/*` already serves users, roles, groups,
+  config, grants, and audit logs.
+
+## Components: never clone these
+
+- `LibreChat-AI/agents` is the npm package `@librechat/agents`, already a dependency at
+  `^4.0.1`. It is not a service. Do not add it to compose.
+- `LibreChat-AI/rag-api` is already wired in compose (`rag_api` service, `RAG_API_URL`,
+  `rag.yml`). Configuration only.
+- `LibreChat-AI/code-interpreter` is reached over HTTP via `CODE_API_KEY` and has **no** compose
+  service upstream. Deploying it is our work.
+- `LibreChat-AI/quickbooks-online-mcp` is an MCP server registration, not a code change.
+- `LibreChat-AI/static-browser-server` is obsolete (last pushed April 2025, zero references).
+  Do not integrate.
+- `LibreChat-AI/admin-panel` is **AGPL-3.0** and is deliberately not shipped. See
+  `ARCHITECTURE.md` §3.
+
+## Product-layer conventions
+
+- Plan, subscription, and payment records belong in `packages/data-schemas`. Business logic
+  belongs in `packages/api`. The service-failure and error-disclosure rules above apply in
+  full: typed discriminated results for expected failures, throws for operational failures, and
+  no raw exception text, provider payload, or stack reaching a user-visible status.
+- Payment provider choice is a `configSchema` lever (`payments.provider`, default `'manual'`),
+  not a branch in a handler. `ManualUpiProvider` is live; `RazorpayUpiProvider` is implemented
+  but inactive until an account exists.
+- Plan changes against `balance.lastRefill` need explicitly defined semantics (prorate, reset,
+  or preserve) before the assignment service is written. See `Bugs.md` §B2.
+- New user-facing copy goes through `useLocalize()` with English keys in
+  `client/src/locales/en/translation.json`, per the frontend rules above.
+- Rebranding swaps theme tokens and assets, never raw colors.
+
+## Workflow for this fork
+
+- `origin` currently points at upstream LibreChat, not a fork. Create the fork remote and a
+  `satchida/` branch off `dev` before writing code.
+- Record every divergence from upstream in `Customizations.md` and every state change in
+  `Changes.md`. The point is that an upstream-difference review stays auditable.
+- Run `git fetch --unshallow` if history is needed; the clone was made with `--depth=1`.
+
+---
+
+## Satchida Distributed Multi-Tenant Architecture Rules
+
+Applies to any AI agent or contributor modifying this tree for the Satchida distributed deployment:
+
+### 1. Zero Cloud VPS & Zero VPN Directive
+- Never suggest or configure paid cloud relays (Headscale, DERP, or WireGuard VPS).
+- All external connectivity runs over **Cloudflare Zero Trust Named Tunnels (`cloudflared`)** using domain `satchida.com`.
+- Traffic is outbound-only over HTTPS/QUIC, bypassing symmetric Jio/Airtel CGNAT.
+
+### 2. Physical Tenant Isolation
+- Each client (school, SME) runs a standalone edge node with its own native MongoDB database.
+- Never write multi-tenant sharing code that commingles different client organizations into one database.
+
+### 3. Master Credential Protection (Zero-Knowledge)
+- Real OpenAI, Anthropic, Gemini, and DeepSeek API keys **must NEVER exist on client machines**.
+- Client configurations point to the local AutoRouter (`127.0.0.1:4000`), which proxies through Seller Central HQ (`control.satchida.com`) where master keys are injected in-flight.
+
+### 4. Native Bare-Metal Windows Runtime
+- Docker is not used on Windows client machines.
+- All services (LibreChat, MongoDB, `cloudflared`, `rag-service`, PM2) execute natively on Windows 11 Pro/Enterprise.
+- Windows power management must be hardened (`standby-timeout-ac 0`) on every deployed node.
+
+### 5. Remote Policy & Heartbeat Protocol
+- Client nodes poll `https://control.satchida.com/api/v1/fleet/heartbeat` every 15–30s.
+- All requests must include an HMAC-SHA256 signature calculated from the client's provisioned secret.

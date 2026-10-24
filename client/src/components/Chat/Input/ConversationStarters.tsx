@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { EModelEndpoint, Constants } from 'librechat-data-provider';
+import { EModelEndpoint } from 'librechat-data-provider';
 import {
   useGetAssistantDocsQuery,
   useGetEndpointsQuery,
@@ -7,7 +7,7 @@ import {
 } from '~/data-provider';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
 import { getIconEndpoint, getEntity, getModelSpec, cn } from '~/utils';
-import { useSubmitMessage } from '~/hooks';
+import { useSubmitMessage, useLocalize } from '~/hooks';
 
 interface StarterCategory {
   id: string;
@@ -20,7 +20,7 @@ const CATEGORIES: StarterCategory[] = [
     id: 'school',
     label: '🎓 STEM & School',
     starters: [
-      'Explain Newton\'s laws of motion with interactive daily life examples',
+      "Explain Newton's laws of motion with interactive daily life examples",
       'Solve this calculus integration step-by-step with KaTeX formulas',
       'Explain DNA replication and transcription with a Mermaid lifecycle chart',
       'Teach me Python binary search trees with clean modular code',
@@ -64,6 +64,7 @@ const ConversationStarters = () => {
   const assistantMap = useAssistantsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();
   const { data: startupConfig } = useGetStartupConfig();
+  const localize = useLocalize();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const endpointType = useMemo(() => {
@@ -126,20 +127,20 @@ const ConversationStarters = () => {
   }, [selectedCategory, customStarters]);
 
   return (
-    <div className="mb-6 mt-1 flex w-full flex-col items-center gap-2.5 px-4 max-w-4xl mx-auto">
+    <div className="mx-auto mb-6 mt-1 flex w-full max-w-4xl flex-col items-center gap-2.5 px-4">
       {/* Category Tabs */}
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <button
           type="button"
           onClick={() => setSelectedCategory('all')}
           className={cn(
-            'rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+            'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
             selectedCategory === 'all'
-              ? 'bg-primary text-primary-foreground shadow-xs'
-              : 'bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary border border-border-light',
+              ? 'shadow-xs bg-surface-inverted text-text-inverted'
+              : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
           )}
         >
-          ✨ Suggested
+          {`✨ ${localize('com_ui_suggested')}`}
         </button>
         {CATEGORIES.map((cat) => (
           <button
@@ -147,10 +148,10 @@ const ConversationStarters = () => {
             type="button"
             onClick={() => setSelectedCategory(cat.id)}
             className={cn(
-              'rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+              'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
               selectedCategory === cat.id
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary border border-border-light',
+                ? 'shadow-xs bg-surface-inverted text-text-inverted'
+                : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
             )}
           >
             {cat.label}
@@ -166,7 +167,7 @@ const ConversationStarters = () => {
             type="button"
             onClick={() => sendConversationStarter(text)}
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
-            className="group flex max-w-[20rem] cursor-pointer items-center rounded-xl border border-border-light bg-surface-secondary/70 hover:bg-surface-tertiary hover:border-border-medium px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary shadow-2xs transition-all duration-150 fade-in"
+            className="shadow-2xs group flex max-w-[20rem] cursor-pointer items-center rounded-xl border border-border-light bg-surface-secondary/70 px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 fade-in hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary"
           >
             <span className="line-clamp-2 text-left">{text}</span>
           </button>

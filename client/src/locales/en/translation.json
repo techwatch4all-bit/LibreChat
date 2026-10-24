@@ -3120,5 +3120,6 @@
   "com_admin_groups_family_shared": "Share one seat allowance across the family",
   "com_admin_groups_save": "Save group",
   "com_admin_groups_remove_member": "Remove",
-  "com_admin_groups_delete": "Delete"
+  "com_admin_groups_delete": "Delete",
+  "com_ui_suggested": "Suggested"
 }

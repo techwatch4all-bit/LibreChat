@@ -50,6 +50,18 @@ Last updated: 2026-10-04
 - [x] Refactored `client/src/components/IDE/IdeView.tsx` to load via unified `/api/ide/` route without exposing separate ports.
 - [x] Built client production bundle (`npm run build:client`) and verified live on PM2.
 
+
+### Phase 8: One-API Gateway & Admin Control Panel Verification (Verified 2026-10-24)
+- [x] Verified One-API Binary online on port 4000 (`satchida-gateway.exe`, PID 37312) returning `Chat`, `Study`, `Work`.
+- [x] Fixed stale `SATCHIDA_GATEWAY_VK` token in `.env` mapped to active token in SQLite `one-api.db`.
+- [x] Verified Satchida Smart Router online on port 4001 (`satchida-router`, PID 37144) returning `Chat`, `Work`, `Study`, `Privacy`.
+- [x] Verified standalone vanilla-JS Admin Panel mounting at `http://localhost:3080/admin`.
+- [x] Verified Operator authentication via `POST /api/admin/login/local` yielding valid JWT.
+- [x] Verified Operator credentials and capability validation via `GET /api/admin/verify` (`isOperator: true`, `tenantId: 'satchida-master'`).
+- [x] Verified User Account creation and querying via `POST /api/admin/users` and `GET /api/admin/users`.
+- [x] Verified Group creation and querying via `POST /api/admin/groups` and `GET /api/admin/groups`.
+- [x] Verified Role and Grant querying via `GET /api/admin/roles` and `GET /api/admin/grants`.
+
 ---
 
 ## B. Active / next session

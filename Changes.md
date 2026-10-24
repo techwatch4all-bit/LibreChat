@@ -8,6 +8,30 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+
+## 2026-10-24 — Satchida One-API Gateway & Admin Control Panel Verification
+
+### 1. One-API Gateway & Satchida Router Verification
+- **One-API Binary (port 4000)**: Verified online (`satchida-gateway.exe`, PID 37312).
+  - Queried `GET /v1/models` successfully (HTTP 200). Returns mode models: `Chat`, `Study`, `Work`.
+  - Identified and fixed stale `SATCHIDA_GATEWAY_VK` token in `.env`. Replaced unmapped key with active master gateway token (`SPYfLW63OU6l04br13668aD230414eF2B2Ca38Ae8d35E9A7`) directly from SQLite `tokens` table.
+- **Satchida Router (port 4001)**: Verified online (`satchida-router`, PID 37144).
+  - Queried `GET /v1/models` using `Bearer sk-bifrost-master-key` (`ROUTER_TOKEN`) successfully (HTTP 200). Models: `Chat`, `Work`, `Study`, `Privacy`.
+  - Cleaned up obsolete comment in `fleet/ecosystem.config.cjs` referencing historical zombie port 4002 conflicts.
+- **LibreChat Upstream Proxying**: Restarted LibreChat PM2 instance (`pm2 restart librechat`) to load corrected `.env` gateway token without downtime.
+
+### 2. Admin Control Panel Audit & API Verification
+- **Admin Surface Mounted**: Standalone SPA properly served at `http://localhost:3080/admin` from `/admin`.
+- **Local Admin Authentication**: Authenticated successfully against `POST /api/admin/login/local` using `admin@satchida.local` / updated password. JWT token successfully acquired.
+- **Access & Operator Verification (`GET /api/admin/verify`)**: Confirmed operator status: `isOperator: true`, `tenantId: "satchida-master"`, and role `ADMIN`.
+- **User Account Management (`/api/admin/users`)**:
+  - `GET /api/admin/users`: Verified listing of registered users (17 USER, 2 ADMIN).
+  - `POST /api/admin/users`: Created new test account via API (HTTP 201 Created).
+- **Group Management (`/api/admin/groups`)**:
+  - `GET /api/admin/groups`: Verified existing tenant group (`Demo`).
+  - `POST /api/admin/groups`: Created test group via API (HTTP 201 Created).
+- **Role & Capability Grants (`/api/admin/roles`, `/api/admin/grants`)**: Verified ADMIN/USER roles and 25 capability grants including `access:admin`.
+
 ## 2026-10-23 - Restore the model list for authenticated tenant users
 
 `GET /api/models` had been put behind `OPERATOR_CONTROL`, which returned `403 Forbidden` for every

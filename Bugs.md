@@ -1006,6 +1006,19 @@ while completing it for a **single tenant of 4,000+ end users**.
   tenant. Do not rely on it for authorization in either direction.
 - **Verification:** open — no behaviour changed by this work.
 
+
+---
+
+### B36 — Stale SATCHIDA_GATEWAY_VK token caused HTTP 401 on One-API calls (RESOLVED)
+
+- **Severity:** High (upstream cloud proxy failure)
+- **Evidence:** Requests from LibreChat to `http://127.0.0.1:4000/v1/models` with token `sk-bf-a58cf342-9d1c-48a9-800f-c16594afaedf` returned HTTP 401 with one-api log `SELECT * FROM tokens WHERE key = 'bf' ... record not found`.
+- **Root Cause:** Token was an obsolete placeholder not present in the current `D:\LAN-AI-Infra\one-api\one-api.db` database.
+- **Remediation:** Queried SQLite `tokens` table for the valid active master token (`SPYfLW63OU6l04br13668aD230414eF2B2Ca38Ae8d35E9A7`), updated `.env`, and restarted the `librechat` PM2 service.
+- **Verification:** Verified `GET /v1/models` returns HTTP 200 with models `Chat`, `Study`, `Work`.
+
+---
+
 ### D1 — Verification environment: what genuinely cannot run here
 
 Recorded so a red suite is not mistaken for a regression. Two dependencies are simply absent on

@@ -352,9 +352,7 @@ export default defineConfig(({ command }) => ({
                   ) {
                     return 'animations';
                   }
-                  if (normalizedId.includes('react-select') || normalizedId.includes('downshift')) {
-                    return 'advanced-inputs';
-                  }
+
                   if (normalizedId.includes('heic-to')) {
                     return 'heic-converter';
                   }
@@ -380,6 +378,9 @@ export default defineConfig(({ command }) => ({
                   }
                   if (normalizedId.includes('node_modules/hast-util-raw')) {
                     return 'markdown_large';
+                  }
+                  if (normalizedId.includes('@tanstack/react-query')) {
+                    return 'tanstack-vendor';
                   }
                   if (
                     QUERY_DEVTOOLS_CHUNK_MODULES.some((moduleName) =>
@@ -441,7 +442,14 @@ export default defineConfig(({ command }) => ({
     chunkSizeWarningLimit: 1500,
   },
   resolve: {
-    dedupe: ['react', 'react-dom', '@ariakit/react', '@ariakit/core', 'react-resizable-panels'],
+    dedupe: [
+      'react',
+      'react-dom',
+      '@tanstack/react-query',
+      '@ariakit/react',
+      '@ariakit/core',
+      'react-resizable-panels',
+    ],
     alias: {
       '~': path.join(import.meta.dirname, 'src/'),
       $fonts: path.resolve(import.meta.dirname, 'public/fonts'),

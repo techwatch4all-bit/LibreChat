@@ -194,3 +194,24 @@ scripts/activity-labels/results/
 /.lighthouse/
 /e2e/lighthouse/.test-results/
 release/
+
+# Satchida local runtime, license, and IDE capture scripts
+satchida.lic
+.satchida-clock.dat
+roster-state.json.bak*
+*.out
+router-usage.jsonl
+server.mjs.bak*
+scripts/capture-*.mjs
+scripts/check-*.mjs
+scripts/debug-*.mjs
+scripts/trace-*.mjs
+gui-test-screenshots/
+docs-backup-*/
+backup/
+__pycache__/
+.commandcode/
+.v2c/
+.zcode/
+.zcodeignore
+

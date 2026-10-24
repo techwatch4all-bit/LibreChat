@@ -1,0 +1,284 @@
+/* ============================================================================
+   Atmosphere — the 3D field behind the console.
+
+   Three cooperating layers:
+
+   1. `.field`   deep base wash. Establishes the colour floor.
+   2. `.aurora`  four large gradient masses at different Z. Each breathes on
+                 its own cycle and hue-rotates continuously, so brand colours
+                 cross-fade into one another instead of sitting still.
+   3. `.horizon` a perspective grid floor that gives the parallax something
+                 fixed to move against — without it, motion over a gradient
+                 reads as a slideshow rather than as depth.
+
+   The canvas particle field (see Atmosphere.tsx) supplies the fine detail and
+   the per-frame colour cycling.
+   ========================================================================= */
+
+.field {
+  position: absolute;
+  z-index: -3;
+  inset: -20%;
+  transform: translateZ(var(--depth-z-far)) scale(1.15);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(var(--s-indigo) / 0.9) 0%, transparent 62%),
+    linear-gradient(180deg, rgb(var(--s-bg-deep)) 0%, rgb(var(--s-bg-base)) 58%, rgb(var(--s-navy)) 100%);
+  animation: field-breathe var(--cycle-breathe) var(--ease-in-out) infinite;
+}
+
+.aurora {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.aurora__mass {
+  position: absolute;
+  border-radius: 50%;
+  opacity: calc(0.5 * var(--aurora-alpha));
+  filter: saturate(var(--aurora-saturation));
+  will-change: transform, opacity, filter;
+}
+
+/* Masses are offset in 3D and counter-tilted, so pointer parallax moves each
+   one by a different amount — the difference between them is the depth cue. */
+.aurora__mass--1 {
+  top: -22%;
+  left: -12%;
+  width: 78vmax;
+  height: 78vmax;
+  transform: translate3d(var(--depth-shift-x), var(--depth-shift-y), var(--depth-z-far));
+  background: radial-gradient(
+    circle,
+    rgb(var(--s-violet) / 0.62) 0%,
+    rgb(var(--s-purple) / 0.34) 34%,
+    transparent 68%
+  );
+  animation:
+    aurora-drift-a var(--cycle-drift) var(--ease-in-out) infinite,
+    aurora-fade var(--cycle-fade) var(--ease-in-out) infinite,
+    aurora-hue var(--cycle-hue) linear infinite;
+}
+
+.aurora__mass--2 {
+  top: -30%;
+  right: -18%;
+  width: 70vmax;
+  height: 70vmax;
+  transform: translate3d(calc(var(--depth-shift-x) * -0.7), calc(var(--depth-shift-y) * -0.5), var(--depth-z-mid));
+  background: radial-gradient(
+    circle,
+    rgb(var(--s-cyan) / 0.5) 0%,
+    rgb(var(--s-blue) / 0.3) 38%,
+    transparent 70%
+  );
+  animation:
+    aurora-drift-b calc(var(--cycle-drift) * 1.18) var(--ease-in-out) infinite,
+    aurora-fade calc(var(--cycle-fade) * 1.4) var(--ease-in-out) infinite reverse,
+    aurora-hue calc(var(--cycle-hue) * 1.3) linear infinite reverse;
+}
+
+.aurora__mass--3 {
+  bottom: -34%;
+  left: 18%;
+  width: 74vmax;
+  height: 74vmax;
+  transform: translate3d(calc(var(--depth-shift-x) * 0.45), calc(var(--depth-shift-y) * 0.6), var(--depth-z-mid));
+  background: radial-gradient(
+    circle,
+    rgb(var(--s-pink) / 0.42) 0%,
+    rgb(var(--s-magenta) / 0.24) 40%,
+    transparent 72%
+  );
+  animation:
+    aurora-drift-c calc(var(--cycle-drift) * 0.86) var(--ease-in-out) infinite,
+    aurora-fade calc(var(--cycle-fade) * 1.2) var(--ease-in-out) infinite,
+    aurora-hue calc(var(--cycle-hue) * 0.82) linear infinite;
+}
+
+.aurora__mass--4 {
+  top: 26%;
+  left: 32%;
+  width: 46vmax;
+  height: 46vmax;
+  transform: translate3d(calc(var(--depth-shift-x) * 0.25), calc(var(--depth-shift-y) * 0.3), var(--depth-z-near));
+  background: radial-gradient(
+    circle,
+    rgb(var(--s-coral) / 0.26) 0%,
+    rgb(var(--s-rose) / 0.16) 42%,
+    transparent 70%
+  );
+  animation:
+    aurora-drift-b calc(var(--cycle-drift) * 0.74) var(--ease-in-out) infinite reverse,
+    aurora-fade calc(var(--cycle-fade) * 0.86) var(--ease-in-out) infinite reverse,
+    aurora-hue calc(var(--cycle-hue) * 0.6) linear infinite;
+}
+
+/* --- Horizon grid --------------------------------------------------------- */
+
+.horizon {
+  position: absolute;
+  z-index: -1;
+  right: -60%;
+  bottom: -46%;
+  left: -60%;
+  height: 92%;
+  transform: translate3d(var(--depth-shift-x), var(--depth-shift-y), var(--depth-z-mid));
+  background-image:
+    linear-gradient(to right, rgb(var(--s-cyan-soft) / 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--s-cyan-soft) / 0.16) 1px, transparent 1px);
+  background-size: 68px 68px;
+  /* The fade is what turns a flat grid into a floor: density and contrast fall
+     off with distance instead of stopping at a hard edge. */
+  mask-image: radial-gradient(ellipse 62% 78% at 50% 100%, #000 12%, transparent 72%);
+  opacity: 0.5;
+  animation: horizon-breathe 9s var(--ease-in-out) infinite;
+}
+
+/* Bright horizon line where the grid plane meets the field. */
+.horizon::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgb(var(--s-cyan-soft) / 0.32) 0%,
+    rgb(var(--s-violet-soft) / 0.12) 22%,
+    transparent 52%
+  );
+  content: '';
+  mask-image: radial-gradient(ellipse 70% 40% at 50% 100%, #000 0%, transparent 70%);
+}
+
+/* --- Particle canvas ------------------------------------------------------ */
+
+.particles {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: var(--star-alpha);
+}
+
+/* --- Vignette + scanline sheen ------------------------------------------- */
+
+.scene::after {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(130% 100% at 50% 45%, transparent 42%, rgb(var(--s-bg-deep) / 0.82) 100%),
+    linear-gradient(180deg, rgb(var(--s-cyan-pale) / 0.05) 0%, transparent 32%);
+  content: '';
+}
+
+/* --- Keyframes ------------------------------------------------------------ */
+
+@keyframes field-breathe {
+  0%,
+  100% {
+    opacity: 0.86;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Hue rotation is what produces the sustained colour fade: each mass walks the
+   brand ramp continuously instead of holding one stop. */
+@keyframes aurora-hue {
+  from {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(0deg);
+  }
+  to {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(360deg);
+  }
+}
+
+@keyframes aurora-fade {
+  0%,
+  100% {
+    opacity: calc(0.3 * var(--aurora-alpha));
+  }
+  50% {
+    opacity: calc(0.62 * var(--aurora-alpha));
+  }
+}
+
+@keyframes aurora-drift-a {
+  0%,
+  100% {
+    margin: 0 0 0 0;
+  }
+  50% {
+    margin: 4% 3% -3% 5%;
+  }
+}
+
+@keyframes aurora-drift-b {
+  0%,
+  100% {
+    margin: 0 0 0 0;
+  }
+  50% {
+    margin: -5% -4% 4% -3%;
+  }
+}
+
+@keyframes aurora-drift-c {
+  0%,
+  100% {
+    margin: 0 0 0 0;
+  }
+  50% {
+    margin: 3% -5% -4% 4%;
+  }
+}
+
+@keyframes horizon-breathe {
+  0%,
+  100% {
+    opacity: 0.36;
+  }
+  50% {
+    opacity: 0.58;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion — hold a composed, still frame. The colour story is carried
+   by fixed stops rather than removed, so the theme does not collapse into a
+   flat black rectangle for users who ask for less motion.
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .field,
+  .aurora__mass,
+  .horizon {
+    animation: none;
+  }
+
+  .aurora__mass {
+    opacity: calc(0.45 * var(--aurora-alpha));
+  }
+
+  .aurora__mass--1 {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(0deg);
+  }
+  .aurora__mass--2 {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(40deg);
+  }
+  .aurora__mass--3 {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(320deg);
+  }
+  .aurora__mass--4 {
+    filter: saturate(var(--aurora-saturation)) hue-rotate(200deg);
+  }
+
+  .horizon {
+    opacity: 0.42;
+  }
+
+  .content {
+    transition: none;
+  }
+}

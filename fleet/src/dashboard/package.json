@@ -1,0 +1,25 @@
+{
+  "name": "satchida-operator-console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Satchida Tier-1 operator console. Served from the control service, never from LibreChat.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,0 +1,160 @@
+/* ============================================================================
+   Base layer — reset, shell layout, and the shared 3D scene rig.
+   ========================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#console-root {
+  min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: rgb(var(--s-bg-base));
+  color: rgb(var(--s-text));
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-synthesis-weight: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--s-cyan-soft) / 0.9);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ---------------------------------------------------------------------------
+   The scene rig.
+
+   One `perspective` on `.stage` establishes the shared vanishing point for
+   every depth layer beneath it. Children are positioned with `translateZ`
+   against `--depth-perspective`, which is what turns the flat gradient stack
+   into actual geometry: near layers travel further under pointer tilt than far
+   ones, so the field parallaxes instead of sliding as a single plane.
+   ------------------------------------------------------------------------ */
+.stage {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  perspective: var(--depth-perspective);
+  perspective-origin: 50% 42%;
+  background: rgb(var(--s-bg-base));
+}
+
+/* Fades the 3D scene into the solid page colour at the far edge, so the depth
+   stack reads as atmosphere rather than as a texture pasted on top. */
+.stage::after {
+  position: fixed;
+  z-index: 3;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--s-bg-base) / 0) 0%,
+    rgb(var(--s-bg-base) / 0.22) 62%,
+    rgb(var(--s-bg-base) / 0.72) 100%
+  );
+  content: '';
+  pointer-events: none;
+}
+
+/* The layer holding 3D-transformed children. Kept non-interactive so the
+   parallax scene can never intercept a click meant for the console. */
+.scene {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.content {
+  position: relative;
+  z-index: 4;
+  transform-style: preserve-3d;
+  /* A few degrees of counter-tilt keeps the panels feeling like they are
+     standing in the scene rather than pasted over it. */
+  transform: rotateX(calc(var(--depth-tilt-x) * -0.35)) rotateY(calc(var(--depth-tilt-y) * -0.35));
+  transition: transform var(--t-slow) var(--ease-out);
+  transform-origin: 50% 0%;
+}
+
+/* Shared glass panel used by every surface in the console. */
+.panel {
+  position: relative;
+  border: 1px solid rgb(var(--s-glass-edge) / var(--s-glass-edge-alpha));
+  border-radius: var(--r-lg);
+  background:
+    linear-gradient(
+      160deg,
+      rgb(var(--s-glass-fill) / calc(var(--s-glass-alpha) * 1.9)) 0%,
+      rgb(var(--s-glass-fill) / var(--s-glass-alpha)) 38%,
+      rgb(var(--s-glass-fill) / calc(var(--s-glass-alpha) * 0.5)) 100%
+    );
+  backdrop-filter: blur(var(--s-glass-blur)) saturate(1.25);
+  box-shadow: var(--lift-3);
+}
+
+/* Specular edge: a thin highlight that tracks the pointer via --spec-x/y.
+   This is what makes the panels read as bevelled glass under the aurora
+   rather than as flat translucent rectangles. */
+.panel::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    42% 120% at var(--spec-x, 50%) var(--spec-y, 0%),
+    rgb(var(--s-cyan-pale) / 0.16) 0%,
+    rgb(var(--s-violet-soft) / 0.07) 34%,
+    transparent 70%
+  );
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
+.panel:hover::before {
+  opacity: 1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

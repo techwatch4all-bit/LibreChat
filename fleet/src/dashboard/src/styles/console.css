@@ -1,0 +1,769 @@
+/* ============================================================================
+   Console — the landing page surfaces.
+
+   Panels are placed on the shared perspective rig rather than sitting in flat
+   document flow, so they genuinely float above the aurora. Everything that
+   moves here reads from the token layer; no literal colour appears below.
+   ========================================================================= */
+
+.landing {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 3.2vw, 3.25rem) clamp(1.15rem, 3vw, 3rem) 5rem;
+}
+
+/* --- Masthead ------------------------------------------------------------- */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  animation: rise-in var(--t-reveal) var(--ease-out) both;
+}
+
+.masthead__brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* Brand mark: a small 3D ringed core rather than a flat glyph. */
+.masthead__mark {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      rgb(var(--s-cyan)),
+      rgb(var(--s-purple)),
+      rgb(var(--s-pink)),
+      rgb(var(--s-coral)),
+      rgb(var(--s-cyan))
+    );
+  box-shadow:
+    0 0 0 1px rgb(var(--s-cyan-pale) / 0.28),
+    0 0 26px -4px rgb(var(--s-purple) / 0.85);
+  animation: mark-spin 14s linear infinite;
+}
+
+.masthead__mark::after {
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgb(var(--s-cyan-pale)), rgb(var(--s-indigo)));
+  box-shadow: inset 0 0 12px rgb(var(--s-bg-deep) / 0.9);
+  content: '';
+}
+
+.masthead__title {
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  font-weight: 620;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  background: linear-gradient(
+    100deg,
+    rgb(var(--s-text)) 0%,
+    rgb(var(--s-cyan-pale)) 42%,
+    rgb(var(--s-text)) 78%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: title-sheen 9s var(--ease-in-out) infinite;
+}
+
+.masthead__sub {
+  margin-top: 0.3rem;
+  color: rgb(var(--s-text-muted));
+  font-size: 0.875rem;
+}
+
+.masthead__demo {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid rgb(var(--s-warning) / 0.45);
+  border-radius: var(--r-pill);
+  background: rgb(var(--s-warning) / 0.14);
+  color: rgb(var(--s-warning));
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.masthead__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.masthead__stamp {
+  color: rgb(var(--s-text-faint));
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.masthead__clock {
+  color: rgb(var(--s-text-muted));
+  font-family: var(--font-mono);
+}
+
+.masthead__refresh,
+.state__action {
+  padding: 0.5rem 1rem;
+  border: 1px solid rgb(var(--s-cyan-soft) / 0.28);
+  border-radius: var(--r-pill);
+  background: rgb(var(--s-cyan-soft) / 0.08);
+  color: rgb(var(--s-text));
+  font-size: 0.8125rem;
+  font-weight: 550;
+  transition:
+    transform var(--t-fast) var(--ease-spring),
+    background var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out),
+    box-shadow var(--t-base) var(--ease-out);
+}
+
+.masthead__refresh:hover,
+.state__action:hover {
+  border-color: rgb(var(--s-cyan-soft) / 0.6);
+  background: rgb(var(--s-cyan-soft) / 0.16);
+  box-shadow: 0 0 24px -8px rgb(var(--s-cyan) / 0.9);
+  transform: translateY(-1px);
+}
+
+/* --- Appearance toggle ---------------------------------------------------- */
+
+.appearance-toggle {
+  position: fixed;
+  z-index: 20;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid rgb(var(--s-glass-edge) / var(--s-glass-edge-alpha));
+  border-radius: 50%;
+  background: rgb(var(--s-glass-fill) / calc(var(--s-glass-alpha) * 1.6));
+  backdrop-filter: blur(var(--s-glass-blur));
+  place-items: center;
+}
+
+.appearance-toggle__orb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: linear-gradient(140deg, rgb(var(--s-cyan-pale)), rgb(var(--s-violet)));
+  box-shadow: 0 0 14px rgb(var(--s-violet) / 0.9);
+  transition: transform var(--t-slow) var(--ease-spring);
+}
+
+.appearance-toggle__orb[data-appearance='light'] {
+  background: radial-gradient(circle at 32% 28%, rgb(var(--s-warning)), rgb(var(--s-coral)));
+  transform: scale(0.82);
+}
+
+/* --- Health bar ----------------------------------------------------------- */
+
+.health {
+  display: grid;
+  gap: clamp(0.85rem, 1.4vw, 1.15rem);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin-bottom: clamp(1.1rem, 2vw, 1.6rem);
+}
+
+.health__tile {
+  position: relative;
+  overflow: hidden;
+  padding: 1.15rem 1.25rem 1.3rem;
+  transform: translateZ(var(--depth-z-panel));
+  animation: rise-in var(--t-reveal) var(--ease-out) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+/* Tone rail: a coloured edge keyed to the tile's meaning. */
+.health__tile::after {
+  position: absolute;
+  top: 0;
+  right: 1.25rem;
+  left: 1.25rem;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, transparent, rgb(var(--tone, var(--s-cyan-soft))), transparent);
+  content: '';
+  opacity: 0.85;
+  animation: rail-pulse 4.5s var(--ease-in-out) infinite;
+}
+
+.health__tile[data-tone='good'] {
+  --tone: var(--s-active);
+}
+.health__tile[data-tone='warn'] {
+  --tone: var(--s-warning);
+}
+.health__tile[data-tone='bad'] {
+  --tone: var(--s-blocked);
+}
+.health__tile[data-tone='info'] {
+  --tone: var(--s-cyan);
+}
+.health__tile[data-tone='neutral'] {
+  --tone: var(--s-violet-soft);
+}
+
+/* Sheen sweeps across the tile on a slow loop — the "alive" cue that a static
+   gradient cannot give. */
+.health__sheen {
+  position: absolute;
+  inset: -40% -10%;
+  background: linear-gradient(
+    104deg,
+    transparent 38%,
+    rgb(var(--s-cyan-pale) / 0.09) 48%,
+    rgb(var(--s-violet-soft) / 0.05) 52%,
+    transparent 62%
+  );
+  pointer-events: none;
+  animation: sheen-sweep 7.5s var(--ease-in-out) infinite;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+.health__label {
+  color: rgb(var(--s-text-faint));
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.health__value {
+  margin-top: 0.4rem;
+  font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+  font-weight: 640;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(160deg, rgb(var(--s-snow)), rgb(var(--s-cyan-soft)) 70%, rgb(var(--s-violet-soft)));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+:root[data-appearance='light'] .health__value {
+  background: linear-gradient(160deg, rgb(var(--s-indigo-deep)), rgb(var(--s-blue)) 70%, rgb(var(--s-violet)));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* The title gradient is built from near-white stops for the dark field, which
+   erases it against a light one. Re-point it at the dark end of the ramp. */
+:root[data-appearance='light'] .masthead__title {
+  background: linear-gradient(
+    100deg,
+    rgb(var(--s-indigo-deep)) 0%,
+    rgb(var(--s-blue)) 45%,
+    rgb(var(--s-violet)) 80%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.health__detail {
+  margin-top: 0.55rem;
+  color: rgb(var(--s-text-muted));
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* --- Filters -------------------------------------------------------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  transform: translateZ(calc(var(--depth-z-panel) * 0.6));
+  animation: rise-in var(--t-reveal) var(--ease-out) both;
+  animation-delay: 320ms;
+}
+
+.filters__field--search {
+  flex: 1 1 16rem;
+}
+
+.filters__input,
+.filters__select {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgb(var(--s-hairline) / 0.28);
+  border-radius: var(--r-md);
+  background: rgb(var(--s-surface-sunken) / 0.55);
+  color: rgb(var(--s-text));
+  font-size: 0.85rem;
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out);
+}
+
+.filters__select {
+  min-width: 9.5rem;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, rgb(var(--s-text-muted)) 50%),
+    linear-gradient(135deg, rgb(var(--s-text-muted)) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) calc(50% + 1px),
+    calc(100% - 10px) calc(50% + 1px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+.filters__input::placeholder {
+  color: rgb(var(--s-text-faint));
+}
+
+.filters__input:focus,
+.filters__select:focus {
+  border-color: rgb(var(--s-cyan-soft) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--s-cyan) / 0.16);
+  outline: none;
+}
+
+.filters__count {
+  margin-left: auto;
+  color: rgb(var(--s-text-faint));
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Table ---------------------------------------------------------------- */
+
+.table-scroll {
+  overflow-x: auto;
+  transform: translateZ(calc(var(--depth-z-panel) * 0.35));
+  animation: rise-in var(--t-reveal) var(--ease-out) both;
+  animation-delay: 400ms;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.table thead th {
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid rgb(var(--s-hairline) / 0.22);
+  color: rgb(var(--s-text-faint));
+  font-size: 0.68rem;
+  font-weight: 640;
+  letter-spacing: 0.085em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid rgb(var(--s-hairline) / 0.1);
+  animation: rise-in 620ms var(--ease-out) both;
+  animation-delay: var(--enter-delay, 0ms);
+  transition: background var(--t-base) var(--ease-out);
+}
+
+.table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+/* Row hover lifts the row off the surface — a small, real Z change rather
+   than a background tint, which keeps the table feeling inside the scene. */
+.table tbody tr {
+  position: relative;
+}
+
+.table tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--s-cyan-soft) / 0.09),
+    rgb(var(--s-violet) / 0.05) 45%,
+    transparent
+  );
+}
+
+.table td {
+  padding: 0.85rem 1rem;
+  vertical-align: middle;
+}
+
+.table__num {
+  text-align: right;
+}
+
+.cell-client {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.cell-client__name {
+  font-weight: 550;
+}
+
+.cell-client__sub {
+  color: rgb(var(--s-text-faint));
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.cell-seats {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 6.5rem;
+}
+
+.cell-seats__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-seats__of {
+  color: rgb(var(--s-text-faint));
+}
+
+.meter {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: rgb(var(--s-hairline) / 0.18);
+}
+
+.meter__fill {
+  display: block;
+  width: calc(var(--ratio) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(var(--s-cyan)), rgb(var(--s-violet)));
+  animation: meter-grow var(--t-slow) var(--ease-out) both;
+}
+
+.meter__fill[data-level='mid'] {
+  background: linear-gradient(90deg, rgb(var(--s-cyan)), rgb(var(--s-warning)));
+}
+
+.meter__fill[data-level='high'] {
+  background: linear-gradient(90deg, rgb(var(--s-warning)), rgb(var(--s-expired)));
+}
+
+.cell-countdown {
+  color: rgb(var(--s-text-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-countdown[data-expired='true'] {
+  color: rgb(var(--s-expired));
+  font-weight: 560;
+}
+
+.cell-heartbeat {
+  color: rgb(var(--s-text-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-heartbeat[data-stale='true'] {
+  color: rgb(var(--s-warning));
+}
+
+.cell-ip {
+  color: rgb(var(--s-text-faint));
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.cell-spend {
+  font-variant-numeric: tabular-nums;
+}
+
+.plan {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgb(var(--s-hairline) / 0.3);
+  border-radius: var(--r-sm);
+  color: rgb(var(--s-text-muted));
+  font-size: 0.72rem;
+  font-weight: 550;
+}
+
+.plan[data-plan='enterprise'] {
+  border-color: rgb(var(--s-violet) / 0.5);
+  background: rgb(var(--s-violet) / 0.14);
+  color: rgb(var(--s-violet-soft));
+}
+
+.plan[data-plan='family'] {
+  border-color: rgb(var(--s-pink) / 0.45);
+  background: rgb(var(--s-pink) / 0.12);
+  color: rgb(var(--s-rose));
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.row-actions__btn {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgb(var(--s-hairline) / 0.28);
+  border-radius: var(--r-sm);
+  color: rgb(var(--s-text-muted));
+  font-size: 0.72rem;
+  font-weight: 550;
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+.row-actions__btn:hover {
+  border-color: rgb(var(--s-cyan-soft) / 0.6);
+  background: rgb(var(--s-cyan-soft) / 0.12);
+  color: rgb(var(--s-text));
+}
+
+/* --- Status badge --------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.5rem;
+  border: 1px solid rgb(var(--badge, var(--s-suspended)) / 0.45);
+  border-radius: var(--r-pill);
+  background: rgb(var(--badge, var(--s-suspended)) / 0.13);
+  color: rgb(var(--badge, var(--s-suspended)));
+  font-size: 0.72rem;
+  font-weight: 580;
+}
+
+.badge[data-status='ACTIVE'] {
+  --badge: var(--s-active);
+}
+.badge[data-status='EXPIRED'] {
+  --badge: var(--s-expired);
+}
+.badge[data-status='BLOCKED'] {
+  --badge: var(--s-blocked);
+}
+.badge[data-status='SUSPENDED'] {
+  --badge: var(--s-suspended);
+}
+
+/* Breathing dot — motion carries the status even for a colour-blind reader,
+   because BLOCKED pulses and SUSPENDED does not. */
+.badge__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: badge-pulse 2.4s var(--ease-out) infinite;
+}
+
+.badge[data-status='BLOCKED'] .badge__pulse {
+  animation-duration: 1.1s;
+}
+
+.badge[data-status='SUSPENDED'] .badge__pulse {
+  animation: none;
+  opacity: 0.55;
+}
+
+/* --- States --------------------------------------------------------------- */
+
+.state {
+  padding: clamp(2.5rem, 6vw, 4rem) 2rem;
+  text-align: center;
+  animation: rise-in var(--t-slow) var(--ease-out) both;
+}
+
+.state__glyph {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1.25rem;
+  border: 1px dashed rgb(var(--s-hairline) / 0.5);
+  border-radius: 50%;
+  animation: glyph-breathe 4s var(--ease-in-out) infinite;
+}
+
+.state__title {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.state__body {
+  max-width: 34rem;
+  margin: 0.6rem auto 1.4rem;
+  color: rgb(var(--s-text-muted));
+  font-size: 0.875rem;
+}
+
+.state[data-tone='bad'] {
+  border-color: rgb(var(--s-expired) / 0.4);
+}
+
+/* --- Skeletons ------------------------------------------------------------ */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  min-height: 5.5rem;
+  background: rgb(var(--s-surface) / 0.5);
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(var(--s-cyan-pale) / 0.09) 50%,
+    transparent 70%
+  );
+  content: '';
+  animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
+}
+
+.table-scroll--tall {
+  min-height: 20rem;
+}
+
+/* --- Keyframes ------------------------------------------------------------ */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes title-sheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes mark-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rail-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sheen-sweep {
+  0% {
+    transform: translateX(-62%);
+  }
+  100% {
+    transform: translateX(62%);
+  }
+}
+
+@keyframes meter-grow {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(currentColor / 0.5);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgb(currentColor / 0);
+  }
+}
+
+@keyframes glyph-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion — content still arrives, it simply arrives without travel.
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .masthead,
+  .health__tile,
+  .filters,
+  .table-scroll,
+  .table tbody tr,
+  .state {
+    animation: none;
+  }
+
+  .masthead__mark,
+  .health__tile::after,
+  .health__sheen,
+  .meter__fill,
+  .badge__pulse,
+  .state__glyph,
+  .skeleton::after,
+  .masthead__title {
+    animation: none;
+  }
+
+  .masthead__refresh:hover,
+  .state__action:hover {
+    transform: none;
+  }
+}

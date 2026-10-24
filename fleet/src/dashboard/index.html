@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-appearance="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content="Satchida operator console — fleet overview" />
+    <title>Satchida · Fleet</title>
+    <script>
+      /* Applies the stored appearance before first paint so the atmosphere
+         never flashes the wrong palette. */
+      (function () {
+        try {
+          var stored = localStorage.getItem('satchida-console-appearance');
+          var mode =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.dataset.appearance = mode;
+        } catch (e) {
+          document.documentElement.dataset.appearance = 'dark';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="console-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

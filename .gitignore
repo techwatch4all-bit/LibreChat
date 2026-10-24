@@ -215,3 +215,4 @@ __pycache__/
 .zcode/
 .zcodeignore
 
+satchida/router/roster-state.json

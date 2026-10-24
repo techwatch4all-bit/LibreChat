@@ -18,12 +18,11 @@ module.exports = {
       env: { PORT: '3080', HOST: '0.0.0.0', NODE_ENV: 'production' },
     },
     {
-      // Fixed roster engine with the 2026-10-09 pricing directives (0.60 auto,
-      // 1.30 ban, 20% price-change guard, 24h staleness, 6h refresh). Runs on
-      // 4002 because a stale pre-fix instance still holds 4001 (zombie, not
-      // killable from this shell); SATCHIDA_ROUTER_URL in LibreChat/.env points
-      // here. server.mjs loads LibreChat/.env itself (dotenv), so the VK and
-      // token config travel with the process.
+      // Satchida smart router - OpenAI-compatible proxy with free-model discovery
+      // (OpenRouter, OpenCode). Binds to 127.0.0.1:4001 (ROUTER_PORT).
+      // Port 4000 is reserved for satchida-gateway (one-api binary).
+      // SATCHIDA_ROUTER_URL in LibreChat/.env points here.
+      // server.mjs loads LibreChat/.env itself via dotenv on startup.
       name: 'satchida-router',
       script: 'satchida/router/src/server.mjs',
       cwd: 'D:/LAN-AI-Infra/LibreChat',

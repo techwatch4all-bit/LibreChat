@@ -70,6 +70,10 @@ import StopButton from './StopButton';
 import SendButton from './SendButton';
 import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
+import SatchiStyleSelector from './SatchiStyleSelector';
+import SatchiToolbar from './SatchiToolbar';
+import SatchiModeSelector from './SatchiModeSelector';
+import useSatchiExtraBody from '~/hooks/useSatchiExtraBody';
 import Mention from './Mention';
 import store from '~/store';
 
@@ -620,12 +624,18 @@ const ChatForm = memo(function ChatForm({
     bottomClearance = 'sm:mb-10';
   }
 
+  const { stylePromptPrefix } = useSatchiExtraBody();
+
   /** Answer mode, then during-run steering or queueing (a run in flight, or a
    *  queued follow-up about to start), then an ordinary send: the same route
    *  for typed, dictated, and shortcut-bound submissions. */
   const submitComposerText = useCallback(
-    (data: { text: string }): false | void =>
-      submitFromComposer(
+    (data: { text: string }): false | void => {
+      const trimmed = data.text.trim();
+      const effectiveText =
+        stylePromptPrefix && trimmed ? `${stylePromptPrefix}\n\n${data.text}` : data.text;
+
+      return submitFromComposer(
         {
           answerMode,
           steering,
@@ -638,9 +648,10 @@ const ChatForm = memo(function ChatForm({
           },
           reset: () => methods.reset(),
         },
-        data,
-      ),
-    [answerMode, steering, submitMessage, methods, index],
+        { ...data, text: effectiveText },
+      );
+    },
+    [answerMode, steering, submitMessage, methods, index, stylePromptPrefix],
   );
 
   return (
@@ -852,15 +863,6 @@ const ChatForm = memo(function ChatForm({
                   isRTL ? 'flex-row-reverse' : 'flex-row',
                 )}
               >
-                <div className="shrink-0">
-                  <AttachFileChat
-                    conversation={conversation}
-                    disableInputs={disableInputs}
-                    files={files}
-                    setFiles={setFiles}
-                    setFilesLoading={setFilesLoading}
-                  />
-                </div>
                 <BadgeRow
                   showEphemeralBadges={
                     !!endpoint &&
@@ -876,6 +878,25 @@ const ChatForm = memo(function ChatForm({
                     Array.isArray(conversation?.messages) && conversation.messages.length >= 1
                   }
                 />
+                <div className="shrink-0">
+                  <AttachFileChat
+                    conversation={conversation}
+                    disableInputs={disableInputs}
+                    files={files}
+                    setFiles={setFiles}
+                    setFilesLoading={setFilesLoading}
+                  />
+                </div>
+                <SatchiStyleSelector disabled={disableInputs || isSubmitting} />
+                <SatchiToolbar
+                  getText={() => methods.getValues('text')}
+                  setText={(text) => {
+                    methods.setValue('text', text);
+                    const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
+                    textarea?.focus();
+                  }}
+                  disabled={disableInputs || isSubmitting}
+                />
                 <CodeApprovalMenu
                   conversation={conversation}
                   addedConversation={addedConvo}
@@ -886,6 +907,11 @@ const ChatForm = memo(function ChatForm({
                   <PendingToolApprovalButton conversationId={conversationId} />
                 )}
                 <div className="grow" />
+                <SatchiModeSelector
+                  conversation={conversation}
+                  setConversation={setConversation}
+                  disabled={disableInputs || isSubmitting}
+                />
                 <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
                 {SpeechToText && (
                   <AudioRecorder

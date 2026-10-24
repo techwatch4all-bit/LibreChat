@@ -23,18 +23,9 @@ function WebSearch() {
   const { toggleState: webSearch, debouncedChange, isPinned, authData } = webSearchData;
   const { badgeTriggerRef } = searchApiKeyForm;
 
-  return (
-    (isPinned || (webSearch && authData?.authenticated)) && (
-      <CheckboxButton
-        ref={badgeTriggerRef}
-        checked={webSearch}
-        setValue={debouncedChange}
-        label={localize('com_ui_search')}
-        isCheckedClassName={badgeAccents.blue}
-        icon={<Globe className="icon-md" aria-hidden="true" />}
-      />
-    )
-  );
+  // The unified circular globe toggle in SatchiToolbar is the single control surface for web search.
+  // We return null here to avoid duplicate, conflicting controls in the composer row.
+  return null;
 }
 
 export default memo(WebSearch);

@@ -22,11 +22,13 @@ export const ThemeSelector = ({
   const localize = useLocalize();
 
   const themeOptions = [
-    { value: 'system', label: localize('com_nav_theme_system') },
+    { value: 'satchida-dark', label: localize('com_nav_theme_satchida_dark') },
+    { value: 'satchida-light', label: localize('com_nav_theme_satchida_light') },
     { value: 'dark', label: localize('com_nav_theme_dark') },
     { value: 'light', label: localize('com_nav_theme_light') },
-    { value: 'high-contrast-light', label: localize('com_nav_theme_high_contrast_light') },
+    { value: 'system', label: localize('com_nav_theme_system') },
     { value: 'high-contrast-dark', label: localize('com_nav_theme_high_contrast_dark') },
+    { value: 'high-contrast-light', label: localize('com_nav_theme_high_contrast_light') },
   ];
 
   const labelId = 'theme-selector-label';
@@ -39,7 +41,7 @@ export const ThemeSelector = ({
         value={theme}
         onChange={onChange}
         options={themeOptions}
-        sizeClasses={cn('z-50 w-[180px]', popoverClassName)}
+        sizeClasses={cn('z-[60] w-[180px]', popoverClassName)}
         testId="theme-selector"
         aria-labelledby={labelId}
         portal={portal}

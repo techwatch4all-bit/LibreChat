@@ -5,9 +5,10 @@ import { useLocalize } from '~/hooks';
 
 type ProjectsNavBarProps = {
   onCreate: () => void;
+  onOpenFolder?: () => void;
 };
 
-export default function ProjectsNavBar({ onCreate }: ProjectsNavBarProps) {
+export default function ProjectsNavBar({ onCreate, onOpenFolder }: ProjectsNavBarProps) {
   const localize = useLocalize();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
@@ -20,10 +21,24 @@ export default function ProjectsNavBar({ onCreate }: ProjectsNavBarProps) {
             {localize('com_ui_projects')}
           </h1>
         </div>
-        <Button type="button" variant="default" size="sm" onClick={onCreate} className="shrink-0">
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {localize('com_ui_new_project')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {onOpenFolder ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onOpenFolder}
+              className="shrink-0 gap-1.5"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Open Existing Project
+            </Button>
+          ) : null}
+          <Button type="button" variant="default" size="sm" onClick={onCreate} className="shrink-0 gap-1.5">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {localize('com_ui_new_project')}
+          </Button>
+        </div>
       </div>
     </header>
   );

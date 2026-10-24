@@ -6,11 +6,13 @@ import type { editor } from 'monaco-editor';
 import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
 import { MermaidRenderer } from '~/components/Messages/Content/Mermaid/Mermaid';
 import { MERMAID_ARTIFACT_TYPE, type Artifact } from '~/common/artifacts';
+import { PROJECT_ARTIFACT_TYPE } from '~/utils/artifacts';
 import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useCodeState } from '~/Providers/EditorContext';
 import { useLocalize } from '~/hooks';
 
 const SandboxArtifactTabs = lazy(() => import('./SandboxArtifactTabs'));
+const ProjectArtifactTabs = lazy(() => import('./ProjectArtifactTabs'));
 
 interface ArtifactTabsProps {
   artifact: Artifact;
@@ -101,6 +103,18 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
         isSharedConvo={props.isSharedConvo}
         onMermaidExportReady={props.onMermaidExportReady}
       />
+    );
+  }
+
+  /* Multi-file project artifacts get their own IDE renderer (file tree +
+   * per-file editor + live preview + Run). Everything else — HTML, React,
+   * markdown, code, svg, office previews — falls through to the
+   * single-file Sandpack/code-split pipeline. */
+  if (props.artifact.type === PROJECT_ARTIFACT_TYPE) {
+    return (
+      <Suspense fallback={<LoadingArtifactTabs />}>
+        <ProjectArtifactTabs {...props} />
+      </Suspense>
     );
   }
 

@@ -45,8 +45,27 @@ export default function ProjectCreateDialog({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [localPath, setLocalPath] = useState('');
   const createProject = useCreateProjectMutation();
   const { showToast } = useToastContext();
+
+  const handlePickDirectory = async () => {
+    try {
+      if ('showDirectoryPicker' in window) {
+        const handle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+        if (handle && handle.name) {
+          if (!name) {
+            setName(handle.name);
+          }
+          setLocalPath(handle.name);
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Directory picker error:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!open) {
@@ -59,6 +78,7 @@ export default function ProjectCreateDialog({
   const resetForm = () => {
     setName('');
     setDescription('');
+    setLocalPath('');
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -80,6 +100,7 @@ export default function ProjectCreateDialog({
       const project = await createProject.mutateAsync({
         name: trimmedName,
         ...(trimmedDescription ? { description: trimmedDescription } : {}),
+        ...(localPath.trim() ? { localPath: localPath.trim() } : {}),
       });
       resetForm();
       onOpenChange(false);
@@ -114,6 +135,29 @@ export default function ProjectCreateDialog({
                 maxLength={MAX_CHAT_PROJECT_NAME_LENGTH}
                 className="w-full"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-localPath`} className="text-sm font-medium text-text-primary">
+                Local Folder Path (Vibe Coding Workspace)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id={`${formId}-localPath`}
+                  value={localPath}
+                  onChange={(event) => setLocalPath(event.target.value)}
+                  placeholder="e.g. D:\MyProject or click Browse"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePickDirectory}
+                  className="shrink-0"
+                >
+                  Browse...
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label

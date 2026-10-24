@@ -6,6 +6,7 @@ import {
   FileCode2,
   FileSpreadsheet,
   FileText,
+  FolderCode,
   Presentation,
   Workflow,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ const FALLBACK_GLYPHS: Record<ArtifactGlyph, React.ComponentType<{ className?: s
   document: FileText,
   spreadsheet: FileSpreadsheet,
   presentation: Presentation,
+  project: FolderCode,
 };
 
 interface ArtifactRowProps {

@@ -1,0 +1,599 @@
+/* ============================================================================
+   Satchida landing page.
+
+   One screen. The mandala holds the centre, the pitch flanks it, sign-in sits
+   in the corner. Everything resolves from the theme's own tokens — the
+   categorical `--series-*` scale and the surface ramp — so the page follows the
+   active appearance rather than carrying a second palette.
+   ========================================================================= */
+
+.landing-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(0.7rem, 1.6vh, 1.15rem);
+  /* `width: 100%` is load-bearing. As a column flex item, `margin-inline: auto`
+     alone makes this shrink-to-fit, which left the page 1000px wide inside a
+     1600px viewport and starved the mark of the room its callouts need. */
+  width: 100%;
+  max-width: 96rem;
+  margin-inline: auto;
+  padding: clamp(2.25rem, 4vh, 3rem) clamp(1.15rem, 3vw, 2.5rem) clamp(0.75rem, 2vh, 1.25rem);
+  color: rgb(var(--text-primary));
+}
+
+/* --- Pitch icon palette ---------------------------------------------------
+   Tuned per appearance rather than taken from the destructive/status tokens,
+   which are dark enough to disappear against a card surface. */
+:root[data-theme='satchida'].dark,
+html.dark {
+  --landing-risk: 248 113 113;
+  --landing-safe: 52 211 153;
+}
+
+html.light,
+:root[data-theme='satchida'].light {
+  --landing-risk: 220 38 38;
+  --landing-safe: 5 150 105;
+}
+
+/* --- Sign-in corner ------------------------------------------------------- */
+
+.landing-auth {
+  position: absolute;
+  z-index: 6;
+  top: clamp(1rem, 3vh, 1.75rem);
+  right: clamp(1rem, 3vw, 2rem);
+  width: min(23rem, 90vw);
+  animation: landing-card-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (max-width: 1180px) {
+  .landing-auth {
+    position: static;
+    width: min(23rem, 100%);
+    margin: 0 auto clamp(1.5rem, 4vw, 2.5rem);
+  }
+}
+
+.landing-signin {
+  padding: 0.55rem 1.3rem;
+  border: 1px solid rgb(var(--border-light) / 0.4);
+  border-radius: 999px;
+  background: rgb(var(--surface-primary) / 0.5);
+  backdrop-filter: blur(14px);
+  color: rgb(var(--text-primary));
+  font-size: 0.85rem;
+  font-weight: 580;
+  transition:
+    background var(--t-base, 280ms) ease,
+    border-color var(--t-base, 280ms) ease,
+    transform var(--t-fast, 160ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.landing-signin:hover {
+  border-color: rgb(var(--series-2) / 0.8);
+  background: rgb(var(--surface-tertiary) / 0.7);
+  transform: translateY(-1px);
+}
+
+.landing-signin:focus-visible {
+  outline: 2px solid rgb(var(--ring-primary));
+  outline-offset: 3px;
+}
+
+.landing-corner {
+  position: fixed;
+  z-index: 7;
+  bottom: 1rem;
+  left: 1rem;
+}
+
+@keyframes landing-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- The stage: pitch · mandala · pitch ------------------------------------ */
+
+.landing-stage {
+  display: grid;
+  align-items: center;
+  gap: clamp(1.5rem, 3vw, 3rem);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+@media (min-width: 1181px) {
+  .landing-stage {
+    grid-template-columns: minmax(13rem, 1fr) auto minmax(13rem, 1fr);
+  }
+}
+
+.landing-centre {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* --- Rails ---------------------------------------------------------------- */
+
+.rail {
+  width: 100%;
+  min-width: 0;
+}
+
+.rail__eyebrow {
+  margin-bottom: 0.9rem;
+  color: rgb(var(--text-tertiary));
+  font-size: 0.63rem;
+  font-weight: 660;
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.rail__list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rail__item {
+  display: grid;
+  align-items: start;
+  gap: 0.8rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgb(var(--border-light) / 0.16);
+  border-radius: 0.7rem;
+  background: rgb(var(--surface-secondary) / 0.42);
+  backdrop-filter: blur(6px);
+  transition: border-color var(--t-base, 280ms) ease;
+}
+
+.rail__item:hover {
+  border-color: rgb(var(--border-light) / 0.34);
+}
+
+.rail__icon {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 auto;
+  border-radius: 0.5rem;
+  place-items: center;
+  background: rgb(var(--surface-tertiary) / 0.7);
+}
+
+.rail__text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rail__title {
+  color: rgb(var(--text-primary));
+  font-size: 0.9rem;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+}
+
+.rail__body {
+  color: rgb(var(--text-secondary));
+  font-size: 0.815rem;
+  line-height: 1.5;
+}
+
+/* --- Hero strap ----------------------------------------------------------- */
+
+.landing-hero {
+  max-width: 56rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.landing-hero__eyebrow {
+  margin-bottom: 0.6rem;
+  color: rgb(var(--text-secondary-alt));
+  font-size: 0.66rem;
+  font-weight: 640;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.landing-hero__title {
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  font-weight: 650;
+  letter-spacing: -0.026em;
+  line-height: 1.12;
+  background: linear-gradient(
+    100deg,
+    rgb(var(--text-primary)) 0%,
+    rgb(var(--text-secondary-alt)) 46%,
+    rgb(var(--text-primary)) 82%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: landing-title-sheen 11s ease-in-out infinite;
+}
+
+.landing-hero__lede {
+  margin-top: 0.45rem;
+  color: rgb(var(--text-secondary));
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+@keyframes landing-title-sheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* --- Reduced motion ------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-auth,
+  .landing-hero__title {
+    animation: none;
+  }
+
+  .landing-signin:hover {
+    transform: none;
+  }
+}
+
+/* ============================================================================
+   Mandala stage — tags flying out of the petals.
+
+   The artwork is fixed, so each tag is matched to the petal that already
+   carries the same words and is flown out from that petal along a measured
+   dotted path. One at a time, then the set settles into full coverage, then
+   the cycle restarts.
+
+   `--dx` / `--dy` are the vector from a tag's resting place back to its petal,
+   written by the stage after it measures both. That is what makes a tag start
+   *on* the artwork rather than merely fading in beside it.
+   ========================================================================= */
+
+.mandala-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(34rem, 64vh, 42rem);
+}
+
+.mandala-stage .satchida-auth-brand {
+  margin: 0;
+}
+
+.mandala-stage__disc {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.mandala-lines {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Faint base guide line */
+.mandala-line-track {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.18);
+  stroke-width: 1;
+  stroke-linecap: round;
+  animation: callout-line-life var(--cycle) linear infinite;
+  animation-delay: var(--stagger);
+}
+
+/* Slim white line carrying a travelling bright segment matching the sweep ring */
+.mandala-line-pulse {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.96);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 22 78;
+  animation:
+    mandala-pulse-flow 2.4s linear infinite,
+    callout-line-life var(--cycle) linear infinite;
+  animation-delay: 0s, var(--stagger);
+}
+
+@keyframes mandala-pulse-flow {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes callout-line-life {
+  0%,
+  2% {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 0.85;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.mandala-tags {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.mandala-tag {
+  position: absolute;
+  /* left/top carry the chip's centre. */
+  transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)), 0) scale(0.68);
+  transform-origin: center;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: var(--chip-w, auto);
+  height: 2.125rem;
+  overflow: hidden;
+  padding: 0 0.75rem 0 0.55rem;
+  border: 1px solid rgb(var(--border-light) / 0.36);
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    rgb(var(--surface-secondary) / 0.76),
+    rgb(var(--surface-primary) / 0.88) 55%,
+    rgb(var(--surface-tertiary) / 0.76)
+  );
+  backdrop-filter: blur(14px) saturate(1.2);
+  white-space: nowrap;
+  opacity: 0;
+  animation: callout-fly var(--cycle) cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  animation-delay: var(--stagger);
+}
+
+/* A small lit mark, so the chip reads as a node in the ring rather than a
+   floating label. */
+.mandala-tag__mark {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgb(var(--text-secondary-alt)), rgb(var(--series-2)));
+  box-shadow: 0 0 8px rgb(var(--text-secondary-alt) / 0.9);
+  animation: callout-mark 3.4s var(--ease-in-out, ease) infinite;
+}
+
+.mandala-tag__label {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  color: rgb(var(--text-primary));
+  font-size: 0.735rem;
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  text-overflow: ellipsis;
+}
+
+/* Shading that moves across the chip, so the set feels lit rather than
+   pasted. */
+.mandala-tag__sheen {
+  position: absolute;
+  z-index: 0;
+  inset: -60% -30%;
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.16) 50%,
+    transparent 60%
+  );
+  animation: callout-sheen 6.5s var(--ease-in-out, ease) infinite;
+  animation-delay: var(--stagger);
+  pointer-events: none;
+}
+
+@keyframes callout-mark {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes callout-sheen {
+  0% {
+    transform: translateX(-70%);
+  }
+  100% {
+    transform: translateX(70%);
+  }
+}
+
+@keyframes callout-fly {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)), 0) scale(0.68);
+  }
+  1.5% {
+    opacity: 0.85;
+    transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)), 0) scale(0.76);
+  }
+  /* Lands in the ring fast, ~1 second (5.5% of 17s = ~0.95s) */
+  5.5%,
+  88% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+  94% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px)), 0) scale(0.68);
+  }
+}
+
+/* --- Stacked: below the ring threshold, the tags sit under the mark --------- */
+
+.mandala-tags--stacked {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: clamp(1rem, 3vh, 1.75rem);
+  pointer-events: auto;
+}
+
+.mandala-tags--stacked .mandala-tag {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.32rem 0.75rem 0.32rem 0.6rem;
+  transform: none;
+  opacity: 1;
+  animation: callout-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+.mandala-tags--stacked .mandala-tag__sheen {
+  display: none;
+}
+
+@keyframes callout-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mandala-line-track,
+  .mandala-line-pulse,
+  .mandala-tag,
+  .mandala-tag__mark,
+  .mandala-tag__sheen {
+    animation: none;
+  }
+
+  .mandala-tag {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0);
+  }
+
+  .mandala-line-track {
+    opacity: 0.5;
+  }
+
+  .mandala-line-pulse {
+    opacity: 0.8;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ============================================================================
+   Narrow layouts.
+
+   Two things were colliding: the fixed theme selector sat on top of the hero
+   text, and the sign-in control was clipped by the viewport edge. Both are put
+   back into flow here, where there is room for them.
+   ========================================================================= */
+
+@media (max-width: 1023px) {
+  .landing-auth {
+    position: static;
+    order: -1;
+    width: auto;
+    margin: 0 0 clamp(1rem, 3vh, 1.5rem);
+    animation: none;
+  }
+
+  .landing-signin {
+    width: 100%;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.7rem;
+  }
+
+  /* Fixed positioning only has room to overlap once the page stops being a
+     single screen. */
+  .landing-corner {
+    position: static;
+    display: flex;
+    justify-content: center;
+    padding-top: 1rem;
+  }
+
+  .landing-main {
+    padding-top: clamp(1.5rem, 4vh, 2.5rem);
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-main {
+    gap: clamp(1rem, 3vh, 1.5rem);
+    padding-inline: 1rem;
+  }
+
+  .mandala-tag__label {
+    font-size: 0.7rem;
+  }
+}
+
+.landing-wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: clamp(0.1rem, 1vh, 0.6rem);
+}

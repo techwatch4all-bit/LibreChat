@@ -253,7 +253,7 @@ export default function ProjectsView() {
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-auto bg-presentation text-text-primary">
-      <ProjectsNavBar onCreate={() => setIsCreating(true)} />
+      <ProjectsNavBar onCreate={() => setIsCreating(true)} onOpenFolder={() => setIsCreating(true)} />
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10 pt-6 md:px-6 md:pt-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -338,16 +338,26 @@ export default function ProjectsView() {
                   <p className="mt-1 max-w-sm text-pretty text-sm text-text-secondary">
                     {localize('com_ui_add_first_project')}
                   </p>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="mt-5"
-                    onClick={() => setIsCreating(true)}
-                  >
-                    <FolderPlus className="h-4 w-4" aria-hidden="true" />
-                    {localize('com_ui_new_project')}
-                  </Button>
+                  <div className="mt-5 flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCreating(true)}
+                    >
+                      <Folder className="h-4 w-4" aria-hidden="true" />
+                      Open Existing Folder
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => setIsCreating(true)}
+                    >
+                      <FolderPlus className="h-4 w-4" aria-hidden="true" />
+                      {localize('com_ui_new_project')}
+                    </Button>
+                  </div>
                 </>
               ) : null}
             </div>

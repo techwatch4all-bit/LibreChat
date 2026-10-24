@@ -244,9 +244,10 @@ const Summary = memo(
 
     const meta = useMemo(() => {
       const parts: string[] = [];
-      if (provider || model) {
-        parts.push([provider, model].filter(Boolean).join('/'));
-      }
+      // Deliberately omit `provider`/`model` from the visible summary metadata.
+      // Rendering them would expose the exact backing model (e.g. a provider
+      // slug + model id) to the end user, which is disallowed for this Satchida
+      // deployment. Only the opaque token count is surfaced.
       if (tokenCount != null && tokenCount > 0) {
         parts.push(`${tokenCount} ${localize('com_ui_tokens')}`);
       }

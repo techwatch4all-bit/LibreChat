@@ -42,7 +42,7 @@ export default function useSkillPermissions(
       isOwner,
       isAdmin,
       canEdit: privileged || hasPermission(PermissionBits.EDIT),
-      canDelete: privileged || hasPermission(PermissionBits.DELETE),
+      canDelete: isOwner || isAdmin,
       canShare: privileged || hasPermission(PermissionBits.SHARE),
     };
   }, [skill, user?.id, user?.role, hasPermission, isLoading]);

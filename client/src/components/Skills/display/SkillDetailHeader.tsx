@@ -1,11 +1,12 @@
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { Button, TooltipAnchor, useToastContext } from '@librechat/client';
+import { Pencil, Pin, User, Calendar, EarthIcon, Sparkles, ShieldAlert } from 'lucide-react';
 import { InvocationMode } from 'librechat-data-provider';
-import { Button, TooltipAnchor } from '@librechat/client';
-import { Pencil, Pin, User, Calendar, EarthIcon, Sparkles } from 'lucide-react';
 import type { TSkill } from 'librechat-data-provider';
 import type { TranslationKeys } from '~/hooks';
 import { useLocalize, useAuthContext } from '~/hooks';
+import { useUpdateSkillMutation } from '~/data-provider';
 import DeleteSkill from '../dialogs/DeleteSkill';
 import { ShareSkill } from '../buttons';
 
@@ -24,6 +25,8 @@ const SkillDetailHeader = ({ skill, showActions = true }: SkillDetailHeaderProps
   const localize = useLocalize();
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const { showToast } = useToastContext();
+  const updateSkillMutation = useUpdateSkillMutation();
   const formattedDate = skill.createdAt ? format(new Date(skill.createdAt), 'MMM d, yyyy') : null;
   const isOwner = skill.author === user?.id;
   const isShared = !isOwner && Boolean(skill.authorName);
@@ -36,15 +39,30 @@ const SkillDetailHeader = ({ skill, showActions = true }: SkillDetailHeaderProps
           <h2 className="truncate text-xl font-bold text-text-primary" title={skill.name}>
             {skill.name}
           </h2>
-          {isPublic && (
+          {isPublic && !skill.adminOnly && (
             <TooltipAnchor
-              description={localize('com_ui_sr_public_skill')}
+              description="Status: Public (Available to standard tenant users)"
               side="top"
               render={
-                <EarthIcon
-                  className="h-5 w-5 shrink-0 text-accent-primary"
-                  aria-label={localize('com_ui_sr_public_skill')}
-                />
+                <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <EarthIcon
+                    className="h-4 w-4 shrink-0 text-accent-primary"
+                    aria-label="Public Skill"
+                  />
+                  <span>Public</span>
+                </span>
+              }
+            />
+          )}
+          {skill.adminOnly === true && (
+            <TooltipAnchor
+              description="Admin-Only Skill (Hidden from standard users)"
+              side="top"
+              render={
+                <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-semibold text-amber-500">
+                  <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                  Admin Only
+                </span>
               }
             />
           )}
@@ -86,6 +104,51 @@ const SkillDetailHeader = ({ skill, showActions = true }: SkillDetailHeaderProps
       </div>
       {showActions && (
         <div className="flex shrink-0 items-center gap-2">
+          {user?.role === 'ADMIN' && (
+            <TooltipAnchor
+              description={skill.adminOnly ? 'Make available to all users' : 'Restrict to Administrators only'}
+              side="bottom"
+              render={
+                <Button
+                  variant={skill.adminOnly ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="h-9 gap-1.5 px-3 text-xs font-medium"
+                  aria-label="Toggle Admin Only status"
+                  onClick={() => {
+                    const newAdminOnly = !skill.adminOnly;
+                    updateSkillMutation.mutate(
+                      {
+                        id: skill._id,
+                        expectedVersion: skill.version ?? 1,
+                        payload: {
+                          adminOnly: newAdminOnly,
+                        },
+                      },
+                      {
+                        onSuccess: () => {
+                          showToast({
+                            message: newAdminOnly
+                              ? 'Skill is now restricted to Administrators only.'
+                              : 'Skill is now available to standard users.',
+                            status: 'success',
+                          });
+                        },
+                        onError: (error: any) => {
+                          showToast({
+                            message: error?.response?.data?.message || error?.message || 'Failed to update skill access.',
+                            status: 'error',
+                          });
+                        },
+                      },
+                    );
+                  }}
+                >
+                  <ShieldAlert className="size-4" aria-hidden="true" />
+                  {skill.adminOnly ? 'Admin Only: Active' : 'Make Admin Only'}
+                </Button>
+              }
+            />
+          )}
           <ShareSkill skill={skill} />
           {isOwner && (
             <>

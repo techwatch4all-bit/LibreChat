@@ -54,12 +54,14 @@ export const useSkillsInfiniteQuery = (
       params?.category ?? '',
       params?.search ?? '',
       params?.limit ?? 20,
+      params?.deleted ?? '',
     ],
     ({ pageParam }) => {
       const request: TSkillListRequest = {
         category: params?.category,
         search: params?.search,
         limit: params?.limit,
+        deleted: params?.deleted,
       };
       if (typeof pageParam === 'string' && pageParam.length > 0) {
         request.cursor = pageParam;

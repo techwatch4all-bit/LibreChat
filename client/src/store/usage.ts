@@ -9,7 +9,7 @@ import { createStorageAtom } from './jotai-utils';
  *  The gauge alone is the default; a user who wants the detail sets it once. */
 export const contextBreakdownExpandedAtom = createStorageAtom<boolean>(
   'contextBreakdownExpanded',
-  false,
+  true,
 );
 
 /** Latest backend context snapshot, anchored to the run's user message for staleness checks */

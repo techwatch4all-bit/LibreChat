@@ -601,9 +601,20 @@ export default function Breakdown({
               <>
                 <div className="border-t border-border-light" role="separator" />
                 <div className="space-y-1.5" data-testid="token-usage-totals">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
-                    {localize('com_ui_context_totals')}
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                      {localize('com_ui_context_totals')}
+                    </h3>
+                    <span className="text-xs font-bold text-text-primary">
+                      {formatTokens(
+                        normalizeTokenCount(branchUsage.input) +
+                          normalizeTokenCount(branchUsage.output) +
+                          normalizeTokenCount(branchUsage.cacheRead) +
+                          normalizeTokenCount(branchUsage.cacheWrite) +
+                          subagentTokens,
+                      )} {localize('com_ui_tokens') || 'Tokens'}
+                    </span>
+                  </div>
                   <Row label={localize('com_ui_input')} value={branchUsage.input} />
                   <Row label={localize('com_ui_output')} value={branchUsage.output} />
                   {normalizeTokenCount(branchUsage.cacheRead) > 0 && (

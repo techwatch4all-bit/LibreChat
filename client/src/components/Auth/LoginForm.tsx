@@ -40,7 +40,11 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
     'size-9 rounded-xl text-text-secondary-alt hover:bg-transparent hover:text-text-primary';
 
   useEffect(() => {
-    if (error && error.includes('422') && !showResendLink) {
+    if (!error) {
+      setShowResendLink(false);
+      return;
+    }
+    if (error.includes('422') && !showResendLink) {
       setShowResendLink(true);
     }
   }, [error, showResendLink]);

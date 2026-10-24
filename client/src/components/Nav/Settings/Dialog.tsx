@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { X, ChevronLeft } from 'lucide-react';
 import { Button, useMediaQuery } from '@librechat/client';
@@ -40,9 +40,10 @@ export default function SettingsDialog({ open, onOpenChange }: TDialogProps) {
   };
 
   return (
-    <Transition appear show={open}>
+    <Transition appear show={open} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={() => onOpenChange(false)}>
         <TransitionChild
+          as={Fragment}
           enter="ease-out duration-200"
           enterFrom="opacity-0"
           enterTo="opacity-100"
@@ -52,21 +53,23 @@ export default function SettingsDialog({ open, onOpenChange }: TDialogProps) {
         >
           <div className="fixed inset-0 bg-black opacity-50 dark:opacity-80" aria-hidden="true" />
         </TransitionChild>
-        <TransitionChild
-          enter="ease-out duration-200"
-          enterFrom="opacity-0 scale-95"
-          enterTo="opacity-100 scale-100"
-          leave="ease-in duration-100"
-          leaveFrom="opacity-100 scale-100"
-          leaveTo="opacity-0 scale-95"
-        >
-          <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4">
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-100"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
             <DialogPanel
               className={cn(
                 /** Headless UI panel, so it bypasses the shared dialog primitives
                  *  and needs the contrast edge declared here. `shadow-2xl` is a
                  *  black shadow with nothing to separate against on a black canvas. */
-                'flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl bg-surface-dialog shadow-2xl high-contrast:border high-contrast:border-solid high-contrast:border-border-medium high-contrast:shadow-none',
+                'my-auto flex max-h-[85vh] w-full shrink-0 flex-col overflow-hidden rounded-2xl bg-surface-dialog shadow-2xl high-contrast:border high-contrast:border-solid high-contrast:border-border-medium high-contrast:shadow-none',
                 'md:h-[85vh] md:w-[900px]',
               )}
             >
@@ -134,8 +137,8 @@ export default function SettingsDialog({ open, onOpenChange }: TDialogProps) {
                 )}
               </Tabs.Root>
             </DialogPanel>
-          </div>
-        </TransitionChild>
+          </TransitionChild>
+        </div>
       </Dialog>
     </Transition>
   );

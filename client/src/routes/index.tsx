@@ -56,6 +56,16 @@ const loadProjectWorkspace = () =>
     Component: m.ProjectWorkspace,
   }));
 
+const loadIdeView = () =>
+  import('~/components/IDE/IdeView').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadAdminGroupsView = () =>
+  import('~/components/Admin/GroupsPanel').then((m) => ({
+    Component: m.default,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -179,6 +189,14 @@ export const router = createBrowserRouter(
             {
               path: 'projects/:projectId',
               lazy: loadProjectWorkspace,
+            },
+            {
+              path: 'ide',
+              lazy: loadIdeView,
+            },
+            {
+              path: 'admin/groups',
+              lazy: loadAdminGroupsView,
             },
             {
               path: 'agents',

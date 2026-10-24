@@ -1530,6 +1530,26 @@ html {
   background-color: rgba(23, 23, 23, var(--tw-bg-opacity));
 }
 
+/**
+ * Satchida base surfaces.
+ *
+ * This previously painted the brand field on `#root::before` at `z-index: -1`
+ * and pinned every `#root` child to `z-index: 0`. The auth shell is
+ * `bg-surface-primary` and `min-h-screen`, so it covered the field completely —
+ * the gradient was live the whole time and never once visible. The field now
+ * lives on `body::before`; see `style/satchida.css`, which owns the whole
+ * atmosphere layer. What remains here is only the opaque base fill, and `#root`
+ * must stay transparent so it does not bury that field in turn.
+ */
+html[data-theme='satchida'].dark,
+html[data-theme='satchida'].dark body {
+  background-color: rgb(var(--surface-primary));
+}
+
+html[data-theme='satchida'].dark #root {
+  background-color: transparent;
+}
+
 #__next,
 #root {
   height: 100%;

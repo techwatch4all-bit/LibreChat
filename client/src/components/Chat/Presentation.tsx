@@ -141,7 +141,7 @@ export default function Presentation({ children }: { children: React.ReactNode }
   const panelElement = artifactsElement ?? subagentElement;
 
   return (
-    <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
+    <DragDropWrapper className="satchida-chat-surface relative flex w-full grow overflow-hidden bg-presentation">
       <AppChatSurface>
         <ParentSubagentsProvider
           conversationId={conversationId ?? ''}
@@ -149,9 +149,15 @@ export default function Presentation({ children }: { children: React.ReactNode }
           isSubmitting={isSubmitting}
         >
           <SidePanelGroup panel={panelElement}>
-            <main className="flex h-full flex-col overflow-y-auto" role="main">
-              {children}
-            </main>
+            <div className="relative flex h-full flex-1 flex-col overflow-hidden">
+              <div
+                className="satchida-chat-watermark pointer-events-none select-none"
+                aria-hidden="true"
+              />
+              <main className="relative z-[1] flex h-full flex-col overflow-y-auto" role="main">
+                {children}
+              </main>
+            </div>
           </SidePanelGroup>
         </ParentSubagentsProvider>
       </AppChatSurface>

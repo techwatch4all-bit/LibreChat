@@ -19,6 +19,15 @@ import type { Artifact } from '~/common';
 import { MERMAID_ARTIFACT_TYPE } from '~/common/artifacts';
 import { getCodeBlockFilename } from './downloadFile';
 
+/**
+ * A model-authored, multi-file software project (emitted by the VibeCoder
+ * spec). Its `content` is a delimited manifest whose file sections are
+ * introduced by `===FILE: <path>===` markers; the IDE artifact renderer
+ * expands those into a collapsible folder tree, a per-file editor, and a
+ * live Sandpack preview behind a Run button.
+ */
+export const PROJECT_ARTIFACT_TYPE = 'application/vnd.librechat.project' as const;
+
 const artifactFilename = {
   'application/vnd.react': 'App.tsx',
   'application/vnd.ant.react': 'App.tsx',
@@ -36,6 +45,9 @@ const artifactFilename = {
    * companion HTML shell; the editor/download file stays `index.svg`. */
   'image/svg+xml': 'index.svg',
   'image/svg': 'index.svg',
+  /* Multi-file project manifest (VibeCoder). The IDE renderer parses the
+   * manifest into a file map; this name is only the download fallback. */
+  'application/vnd.librechat.project': 'App.tsx',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -75,6 +87,10 @@ const artifactTemplate: Record<
   'application/vnd.librechat.presentation-preview': 'static',
   'image/svg+xml': 'static',
   'image/svg': 'static',
+  /* Project template is resolved per-manifest in `parseProjectManifest`;
+   * this default only backs generic consumers that ask `getTemplate`
+   * without going through the project renderer. */
+  'application/vnd.librechat.project': 'react-ts',
   default: 'static',
   // 'css': 'css',
   // 'javascript': 'js',
@@ -237,7 +253,7 @@ ${svg}
   };
 }
 
-const standardDependencies = {
+export const standardDependencies = {
   three: '^0.167.1',
   'lucide-react': '^0.394.0',
   'react-router-dom': '^6.11.2',
@@ -316,6 +332,13 @@ const dependenciesMap: Record<
   /* SVG preview is a static HTML shell + the source file; no npm deps. */
   'image/svg+xml': {},
   'image/svg': {},
+  /* Multi-file project manifests ship their own package.json, so the
+   * IDE renderer merges the model-authored dependency list with the
+   * shadcn runtime baseline (`standardDependencies`) before handing the
+   * result to Sandpack's `customSetup`. An empty map here keeps
+   * `getProps` from re-injecting a default the manifest already carries,
+   * while the project renderer supplies the resolved union itself. */
+  [PROJECT_ARTIFACT_TYPE]: {},
   default: standardDependencies,
 };
 
@@ -505,6 +528,72 @@ export function isCodeOnlyArtifact(type: string | null | undefined): boolean {
 }
 
 /**
+ * Whether an artifact is a model-authored, multi-file software project
+ * (emitted by the VibeCoder spec). Such artifacts are rendered by the
+ * dedicated IDE panel rather than the single-file code/preview split.
+ */
+export function isProjectArtifact(type: string | null | undefined): boolean {
+  return type === PROJECT_ARTIFACT_TYPE;
+}
+
+/**
+ * Parse a VibeCoder project manifest into a Sandpack file map.
+ *
+ * The manifest (the body of a ``` ```project ``` code fence inside a
+ * `:::artifact{type="application/vnd.librechat.project"}` directive) is a
+ * sequence of file sections, each introduced by a header line:
+ *
+ *   ===FILE: package.json===
+ *   { "name": "my-app", "dependencies": { ... } }
+ *   ===FILE: App.tsx===
+ *   export default function App() { ... }
+ *
+ * Each non-empty path introduces the verbatim text that follows it, up to
+ * the next `===FILE:` marker (or end of input). Paths are normalised to a
+ * leading slash — Sandpack keys its virtual file tree on absolute paths.
+ * An empty/blank manifest yields an empty object, which the renderer
+ * treats as "nothing to show" without crashing.
+ */
+export function parseProjectManifest(content: string | undefined | null): Record<string, string> {
+  if (!content || content.length === 0) {
+    return {};
+  }
+  const files: Record<string, string> = {};
+  /* Anchored at line start so `===FILE:` inside a code sample body never
+   * starts a new section. Non-greedy capture of the path up to the closing
+   * `===` on the same header line; trailing/leading whitespace is trimmed
+   * so `===FILE:  src/App.tsx ===` and `===FILE:src/App.tsx===` resolve
+   * identically. */
+  const markerRe = /^===FILE:\s*(.+?)\s*===\s*$/gm;
+  const markers = Array.from(content.matchAll(markerRe));
+  for (let i = 0; i < markers.length; i++) {
+    const m = markers[i]!;
+    const nextStart = i + 1 < markers.length ? markers[i + 1]!.index! : content.length;
+    const bodyStart = m.index! + m[0].length;
+    let body = content.slice(bodyStart, nextStart);
+    /* Drop the single newline that follows the header line so the file's
+     * first real line isn't a blank, and strip trailing blank lines that
+     * the author (or our slice) left at the boundary. Inner content is
+     * preserved verbatim — leading indentation matters for code. */
+    body = body.replace(/^\n/, '').replace(/[\t ]+$/gm, '').replace(/\n+$/, '');
+    let path = m[1].trim();
+    if (path.length === 0) {
+      continue;
+    }
+    if (path.startsWith('./') || path.startsWith('.\\')) {
+      path = path.slice(2);
+    }
+    if (!path.startsWith('/') && !path.startsWith('\\')) {
+      path = '/' + path;
+    } else if (path.startsWith('\\')) {
+      path = '/' + path.slice(1);
+    }
+    files[path] = body;
+  }
+  return files;
+}
+
+/**
  * Glyph buckets an artifact row falls back to when the file type has no
  * brand icon in `LANG_ICON_PATHS` (React, the office previews, mermaid,
  * and every code language without a logo).
@@ -516,7 +605,8 @@ export type ArtifactGlyph =
   | 'diagram'
   | 'document'
   | 'spreadsheet'
-  | 'presentation';
+  | 'presentation'
+  | 'project';
 
 /**
  * How a chat row presents one artifact.
@@ -552,6 +642,7 @@ type ArtifactFormatKey = Extract<
   | 'com_ui_artifact_format_document'
   | 'com_ui_artifact_format_spreadsheet'
   | 'com_ui_artifact_format_presentation'
+  | 'com_ui_artifact_format_project'
   | 'com_ui_code'
   | 'com_ui_preview'
 >;
@@ -619,6 +710,16 @@ const ARTIFACT_ROW_KINDS: Record<string, ArtifactRowKind> = {
      * on its rendered preview tab — the row must say so. */
     rendersPreview: true,
     fallbackGlyph: 'text',
+  },
+  /* Multi-file VibeCoder projects — opened in the full IDE renderer, not
+   * the single-file code/preview split. `rendersPreview: true` so the row
+   * advertises a rendered view (the live Sandpack preview) and the
+   * "Run" affordance is surfaced. */
+  [PROJECT_ARTIFACT_TYPE]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_project' },
+    rendersPreview: true,
+    fallbackGlyph: 'project',
   },
 };
 

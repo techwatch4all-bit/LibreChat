@@ -373,13 +373,13 @@ function BadgeRow({
         )}
         {showEphemeralBadges === true && (
           <>
+            <MCPSelect />
             <WebSearch />
             <CodeInterpreter />
             <FileSearch />
             <Skills />
             <Memory />
             <Artifacts />
-            <MCPSelect />
           </>
         )}
         {ghostBadge && (

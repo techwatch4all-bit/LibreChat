@@ -194,7 +194,9 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     });
   }
 
-  if (canUseWebSearch && webSearchEnabled) {
+  const isAdmin = user?.role === 'ADMIN';
+
+  if (isAdmin && canUseWebSearch && webSearchEnabled) {
     dropdownItems.push({
       onClick: handleWebSearchToggle,
       hideOnClick: false,

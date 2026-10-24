@@ -253,7 +253,31 @@ export const useDeleteSkillMutation = (
       queryClient.removeQueries([QueryKeys.skill, variables.id]);
       queryClient.removeQueries([QueryKeys.skillFiles, variables.id]);
       removeSkillFromCachedLists(queryClient, variables.id);
+      void queryClient.invalidateQueries([QueryKeys.skills]);
       if (onSuccess) onSuccess(response, variables, context);
+    },
+  });
+};
+
+/**
+ * Restore a soft-deleted skill. Invalidates and updates skill queries.
+ */
+export const useRestoreSkillMutation = (
+  options?: {
+    onSuccess?: (skill: TSkill, variables: { id: string }, context: unknown) => void;
+    onError?: (error: unknown, variables: { id: string }, context: unknown) => void;
+  },
+): UseMutationResult<TSkill, unknown, { id: string }> => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ...rest } = options ?? {};
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) => dataService.restoreSkill(id),
+    ...rest,
+    onSuccess: (skill, variables, context) => {
+      queryClient.setQueryData<TSkill>([QueryKeys.skill, skill._id], skill);
+      addSkillToCachedLists(queryClient, skill);
+      void queryClient.invalidateQueries([QueryKeys.skills]);
+      if (onSuccess) onSuccess(skill, variables, context);
     },
   });
 };

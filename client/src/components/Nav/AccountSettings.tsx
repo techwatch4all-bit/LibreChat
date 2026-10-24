@@ -1,14 +1,16 @@
-import { useState, memo, useRef } from 'react';
+import { useState, memo, useRef, useContext } from 'react';
 import { useSetRecoilState } from 'recoil';
 import * as Menu from '@ariakit/react/menu';
-import { GearIcon, DropdownMenuSeparator, Avatar } from '@librechat/client';
+import { GearIcon, DropdownMenuSeparator, Avatar, ThemeContext } from '@librechat/client';
 import {
   Archive,
+  Check,
   ChevronRight,
   CircleHelp,
   Keyboard,
   LifeBuoy,
   LogOut,
+  Palette,
   Scale,
   ShieldCheck,
 } from 'lucide-react';
@@ -91,6 +93,75 @@ function HelpSubmenu({
   );
 }
 
+function ThemeSubmenu() {
+  const { theme, setTheme } = useContext(ThemeContext);
+  const localize = useLocalize();
+
+  return (
+    <Menu.MenuProvider placement="right-start">
+      <Menu.MenuItem
+        hideOnClick={false}
+        render={
+          <Menu.MenuButton className="select-item flex w-full cursor-pointer items-center gap-2 text-sm" />
+        }
+      >
+        <Palette className="icon-md" aria-hidden="true" />
+        <span className="flex-1 text-left">{localize('com_nav_theme')}</span>
+        <ChevronRight className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+      </Menu.MenuItem>
+      <Menu.Menu
+        portal
+        gutter={12}
+        className="account-settings-popover popover-ui popover-from-left z-[126] max-h-[85vh] w-[244px] overflow-y-auto rounded-lg"
+      >
+        <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+          Satchida
+        </div>
+        <Menu.MenuItem
+          onClick={() => setTheme('satchida-dark')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_satchida_dark')}</span>
+          {theme === 'satchida-dark' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+        <Menu.MenuItem
+          onClick={() => setTheme('satchida-light')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_satchida_light')}</span>
+          {theme === 'satchida-light' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+
+        <DropdownMenuSeparator />
+        <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+          Standard
+        </div>
+        <Menu.MenuItem
+          onClick={() => setTheme('dark')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_dark')}</span>
+          {theme === 'dark' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+        <Menu.MenuItem
+          onClick={() => setTheme('light')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_light')}</span>
+          {theme === 'light' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+        <Menu.MenuItem
+          onClick={() => setTheme('system')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_system')}</span>
+          {theme === 'system' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+      </Menu.Menu>
+    </Menu.MenuProvider>
+  );
+}
+
 function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const localize = useLocalize();
   const { user, isAuthenticated, logout } = useAuthContext();
@@ -104,78 +175,81 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const accountSettingsButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <Menu.MenuProvider placement={collapsed ? 'right-end' : undefined}>
-      <Menu.MenuButton
-        ref={accountSettingsButtonRef}
-        aria-label={localize('com_nav_account_settings')}
-        data-testid="nav-user"
-        className={
-          collapsed
-            ? 'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-surface-active-alt aria-[expanded=true]:bg-surface-active-alt'
-            : 'mt-text-sm flex h-auto w-full items-center gap-2 rounded-xl p-2 text-sm transition-all duration-200 ease-in-out hover:bg-surface-active-alt aria-[expanded=true]:bg-surface-active-alt'
-        }
-      >
-        <div
-          className={collapsed ? 'size-7 flex-shrink-0' : '-ml-0.9 -mt-0.8 h-8 w-8 flex-shrink-0'}
+    <>
+      <Menu.MenuProvider placement={collapsed ? 'right-end' : undefined}>
+        <Menu.MenuButton
+          ref={accountSettingsButtonRef}
+          aria-label={localize('com_nav_account_settings')}
+          data-testid="nav-user"
+          className={
+            collapsed
+              ? 'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-surface-active-alt aria-[expanded=true]:bg-surface-active-alt'
+              : 'mt-text-sm flex h-auto w-full items-center gap-2 rounded-xl p-2 text-sm transition-all duration-200 ease-in-out hover:bg-surface-active-alt aria-[expanded=true]:bg-surface-active-alt'
+          }
         >
-          <div className="relative flex">
-            <Avatar user={user} size={collapsed ? 28 : 32} />
-          </div>
-        </div>
-        {!collapsed && (
           <div
-            className="mt-2 grow overflow-hidden text-ellipsis whitespace-nowrap text-left text-text-primary"
-            style={{ marginTop: '0', marginLeft: '0' }}
+            className={collapsed ? 'size-7 flex-shrink-0' : '-ml-0.9 -mt-0.8 h-8 w-8 flex-shrink-0'}
           >
-            {user?.name ?? user?.username ?? localize('com_nav_user')}
-          </div>
-        )}
-      </Menu.MenuButton>
-      <Menu.Menu
-        portal
-        className="account-settings-popover popover-ui z-[125] w-[305px] rounded-lg md:w-[244px]"
-        style={{
-          transformOrigin: collapsed ? 'left bottom' : 'bottom',
-          translate: collapsed ? '4px 0' : '0 -4px',
-        }}
-      >
-        <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">
-          {user?.email ?? localize('com_nav_user')}
-        </div>
-        <DropdownMenuSeparator />
-        {startupConfig?.balance?.enabled === true && balanceQuery.data != null && (
-          <>
-            <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">
-              {localize('com_nav_balance')}:{' '}
-              {new Intl.NumberFormat().format(Math.round(balanceQuery.data.tokenCredits))}
+            <div className="relative flex">
+              <Avatar user={user} size={collapsed ? 28 : 32} />
             </div>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <HelpSubmenu
-          helpAndFaqURL={startupConfig?.helpAndFaqURL}
-          termsOfServiceURL={startupConfig?.interface?.termsOfService?.externalUrl}
-          privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
-          onShowShortcuts={() => setShowShortcutsDialog(true)}
-        />
-        <Menu.MenuItem onClick={() => setShowArchived(true)} className="select-item text-sm">
-          <Archive className="icon-md" aria-hidden="true" />
-          {localize('com_nav_archived_chats')}
-        </Menu.MenuItem>
-        <Menu.MenuItem
-          onClick={() => setShowSettings(true)}
-          className="select-item text-sm"
-          data-testid="nav-settings"
+          </div>
+          {!collapsed && (
+            <div
+              className="mt-2 grow overflow-hidden text-ellipsis whitespace-nowrap text-left text-text-primary"
+              style={{ marginTop: '0', marginLeft: '0' }}
+            >
+              {user?.name ?? user?.username ?? localize('com_nav_user')}
+            </div>
+          )}
+        </Menu.MenuButton>
+        <Menu.Menu
+          portal
+          className="account-settings-popover popover-ui z-[125] w-[305px] rounded-lg md:w-[244px]"
+          style={{
+            transformOrigin: collapsed ? 'left bottom' : 'bottom',
+            translate: collapsed ? '4px 0' : '0 -4px',
+          }}
         >
-          <GearIcon className="icon-md" aria-hidden="true" />
-          {localize('com_nav_settings')}
-        </Menu.MenuItem>
-        <DropdownMenuSeparator />
-        <Menu.MenuItem onClick={() => logout()} className="select-item text-sm">
-          <LogOut className="icon-md" aria-hidden="true" />
-          {localize('com_nav_log_out')}
-        </Menu.MenuItem>
-      </Menu.Menu>
+          <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">
+            {user?.email ?? localize('com_nav_user')}
+          </div>
+          <DropdownMenuSeparator />
+          {startupConfig?.balance?.enabled === true && balanceQuery.data != null && (
+            <>
+              <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">
+                {localize('com_nav_balance')}:{' '}
+                {new Intl.NumberFormat().format(Math.round(balanceQuery.data.tokenCredits))}
+              </div>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <HelpSubmenu
+            helpAndFaqURL={startupConfig?.helpAndFaqURL}
+            termsOfServiceURL={startupConfig?.interface?.termsOfService?.externalUrl}
+            privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
+            onShowShortcuts={() => setShowShortcutsDialog(true)}
+          />
+          <Menu.MenuItem onClick={() => setShowArchived(true)} className="select-item text-sm">
+            <Archive className="icon-md" aria-hidden="true" />
+            {localize('com_nav_archived_chats')}
+          </Menu.MenuItem>
+          <ThemeSubmenu />
+          <Menu.MenuItem
+            onClick={() => setShowSettings(true)}
+            className="select-item text-sm"
+            data-testid="nav-settings"
+          >
+            <GearIcon className="icon-md" aria-hidden="true" />
+            {localize('com_nav_settings')}
+          </Menu.MenuItem>
+          <DropdownMenuSeparator />
+          <Menu.MenuItem onClick={() => logout()} className="select-item text-sm">
+            <LogOut className="icon-md" aria-hidden="true" />
+            {localize('com_nav_log_out')}
+          </Menu.MenuItem>
+        </Menu.Menu>
+      </Menu.MenuProvider>
       {showArchived && (
         <ArchivedChatsModal
           open={showArchived}
@@ -184,7 +258,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
         />
       )}
       {showSettings && <Settings open={showSettings} onOpenChange={setShowSettings} />}
-    </Menu.MenuProvider>
+    </>
   );
 }
 

@@ -12,6 +12,8 @@ import {
   languageForFilename,
   wrapAsFencedCodeBlock,
   TOOL_ARTIFACT_TYPES,
+  PROJECT_ARTIFACT_TYPE,
+  parseProjectManifest,
 } from '~/utils/artifacts';
 import { withOfficeContrast } from '~/utils/officePreview';
 import { getMarkdownFiles } from '~/utils/markdown';
@@ -24,6 +26,15 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
   const [fileKey, files] = useMemo(() => {
     const key = getKey(artifact.type ?? '', artifact.language);
     const type = artifact.type ?? '';
+
+    /* Multi-file VibeCoder projects: the model emits a delimited manifest
+     * (`===FILE: <path>===` sections). Parse it into the Sandpack file map
+     * and let `ProjectArtifactTabs` merge the shadcn shared files on top.
+     * The template comes from `artifactTemplate` (`react-ts`), so
+     * `getTemplate` returns it via the normal path. */
+    if (type === PROJECT_ARTIFACT_TYPE) {
+      return [getArtifactFilename(type, artifact.language), parseProjectManifest(artifact.content)];
+    }
 
     if (key.includes('mermaid')) {
       return ['diagram.mmd', getMermaidFiles(artifact.content ?? '', isDarkMode, highContrast)];

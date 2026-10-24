@@ -1,7 +1,7 @@
 import { memo, useState, useMemo, useCallback } from 'react';
 import { FixedSizeTree } from 'react-vtree';
 import { useNavigate } from 'react-router-dom';
-import { ScrollText, ChevronDown, ChevronRight, Folder, Pin } from 'lucide-react';
+import { ScrollText, ChevronDown, ChevronRight, Folder, Pin, ShieldAlert } from 'lucide-react';
 import type { FixedSizeNodeData, TreeWalkerValue, TreeWalker } from 'react-vtree';
 import type { TSkillSummary, TSkillFile } from 'librechat-data-provider';
 import { useListSkillFilesQuery } from '~/data-provider';
@@ -325,6 +325,12 @@ function SkillListItem({
 
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="truncate">{skill.name}</span>
+          {skill.adminOnly === true && (
+            <ShieldAlert
+              className="size-3 shrink-0 text-amber-500"
+              aria-label="Admin Only"
+            />
+          )}
           {skill.alwaysApply === true && (
             <Pin
               className="size-3 shrink-0 text-status-info"

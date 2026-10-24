@@ -40,6 +40,8 @@ const FORCED_COLORS = '(forced-colors: active)';
 
 describe('loading canvas', () => {
   it.each([
+    ['satchida-dark', [], '#060816'],
+    ['satchida-light', [], '#eff6ff'],
     ['high-contrast-dark', [], '#000000'],
     ['high-contrast-light', [], '#ffffff'],
     ['dark', [], '#0d0d0d'],
@@ -69,8 +71,8 @@ describe('loading canvas', () => {
   /** An unset or unrecognised value is what `getInitialTheme` resolves as
    *  `system`, so the canvas has to resolve it the same way. */
   it('treats an unset or unknown mode as system', () => {
-    expect(canvasFor(null, [DARK_SCHEME])).toBe('#0d0d0d');
-    expect(canvasFor(null, [DARK_SCHEME, MORE_CONTRAST])).toBe('#000000');
+    expect(canvasFor(null, [DARK_SCHEME])).toBe('#060816');
+    expect(canvasFor(null, [DARK_SCHEME, MORE_CONTRAST])).toBe('#060816');
     expect(canvasFor('sepia', [DARK_SCHEME, MORE_CONTRAST])).toBe('#000000');
   });
 });

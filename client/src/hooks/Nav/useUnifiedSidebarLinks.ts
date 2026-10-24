@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { BarChart3, MessagesSquare } from 'lucide-react';
+import { BarChart3, MessagesSquare, Code2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
@@ -72,11 +72,28 @@ export default function useUnifiedSidebarLinks() {
       Component: ConversationsSection,
     };
 
+    const isIdeRoute = location.pathname.startsWith('/ide');
+    // IDE link is accessible to admins or the dcode demo account (Dchat intentionally has no VSCode access)
+    const showIdeLink = user?.role === 'ADMIN' || user?.email === 'dcode@satchida.local';
+    const ideLink: NavLink = {
+      title: 'VibeStudio IDE' as any,
+      label: '',
+      icon: Code2,
+      id: 'ide',
+      onClick: () => {
+        if (!isIdeRoute) {
+          navigate('/ide');
+        }
+      },
+    };
+
+    const navLinks = showIdeLink ? [conversationLink, ideLink, ...sideNavLinks] : [conversationLink, ...sideNavLinks];
+
     if (
       !insightsFeatureEnabled ||
       (!isInsightsRoute && !isInsightsAccessLoading && insightsAccess?.access !== true)
     ) {
-      return [conversationLink, ...sideNavLinks];
+      return navLinks;
     }
 
     const insightsLink: NavLink = {
@@ -95,7 +112,9 @@ export default function useUnifiedSidebarLinks() {
     const nextLinks = [...sideNavLinks];
     nextLinks.splice(mcpIndex >= 0 ? mcpIndex + 1 : nextLinks.length, 0, insightsLink);
 
-    return [conversationLink, ...nextLinks];
+    return showIdeLink
+      ? [conversationLink, ideLink, ...nextLinks]
+      : [conversationLink, ...nextLinks];
   }, [
     insightsAccess?.access,
     insightsFeatureEnabled,
@@ -104,6 +123,7 @@ export default function useUnifiedSidebarLinks() {
     location.pathname,
     navigate,
     sideNavLinks,
+    user?.email,
   ]);
 
   return links;

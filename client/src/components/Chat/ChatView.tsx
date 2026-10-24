@@ -183,7 +183,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                                together, so it holds the same band back here. Without
                                it the composer lands 4px right of where a conversation
                                puts it and slides sideways on the way in. */
-                              'scrollbar-gutter-spacer flex-1 items-center justify-end sm:justify-center'
+                              'scrollbar-gutter-spacer flex-1 items-center justify-end pb-8 sm:pb-12'
                             : 'h-full overflow-y-auto',
                         )}
                       >

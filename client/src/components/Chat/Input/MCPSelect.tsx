@@ -90,28 +90,20 @@ function MCPSelectContent() {
     <>
       <Ariakit.MenuProvider store={menuStore}>
         <TooltipAnchor
-          description={placeholderText}
+          description={placeholderText || localize('com_ui_mcp_servers')}
           disabled={isOpen}
           render={
             <Ariakit.MenuButton
+              aria-label={placeholderText || 'MCP Servers'}
               className={cn(
-                composerControlClasses(),
-                'min-w-theme-control px-2.5 md:w-fit md:justify-start md:px-theme-normal',
-                isOpen && 'bg-surface-hover',
+                'relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-secondary/70 p-0 text-text-secondary transition-all shadow-xs shrink-0',
+                'hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+                isOpen && 'bg-surface-hover border-border-medium text-text-primary ring-1 ring-primary/40',
               )}
             />
           }
         >
-          <StackedMCPIcons selectedServers={selectedServers} maxIcons={3} iconSize="sm" />
-          <span className="hidden truncate text-text-primary md:block">
-            {displayText || placeholderText}
-          </span>
-          <ChevronDown
-            className={cn(
-              'hidden h-3 w-3 text-text-secondary transition-transform md:block',
-              isOpen && 'rotate-180',
-            )}
-          />
+          <StackedMCPIcons selectedServers={selectedServers} maxIcons={1} iconSize="sm" />
         </TooltipAnchor>
 
         <Ariakit.Menu

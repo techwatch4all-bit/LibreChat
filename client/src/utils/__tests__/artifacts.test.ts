@@ -12,8 +12,11 @@ import {
   fileToArtifact,
   isCodeOnlyArtifact,
   isPreviewOnlyArtifact,
+  isProjectArtifact,
   isSvgArtifactType,
   languageForFilename,
+  parseProjectManifest,
+  PROJECT_ARTIFACT_TYPE,
   TOOL_ARTIFACT_TYPES,
 } from '../artifacts';
 
@@ -1302,5 +1305,77 @@ describe('artifactRowKind', () => {
       fallbackGlyph: 'preview',
     });
     expect(artifactRowKind({})).toMatchObject({ rendersPreview: true });
+  });
+});
+
+describe('VibeCoder multi-file project manifest parsing', () => {
+  /* Mirrors the manifest body the VibeCoder `promptPrefix` emits inside a
+   * ``` ```project ``` fence: `===FILE: <path>===` headers each introduce
+   * the verbatim text that follows, up to the next header or end of input. */
+  const manifest = [
+    '===FILE: package.json===',
+    '{ "name": "quiz-app", "dependencies": { "react": "^18.0.0" } }',
+    '===FILE: App.tsx===',
+    "import React from 'react'",
+    'export default function App() { return <div /> }',
+    '===FILE: src/lib/Button.tsx===',
+    'export default function Button() { return null }',
+  ].join('\n');
+
+  it('parses the ===FILE: marker sections into a leading-slash file map', () => {
+    const files = parseProjectManifest(manifest);
+    expect(Object.keys(files).sort()).toEqual(
+      ['/package.json', '/App.tsx', '/src/lib/Button.tsx'].sort(),
+    );
+    expect(files['/package.json']).toContain('"quiz-app"');
+    expect(files['/App.tsx']).toContain("export default function App()");
+  });
+
+  it('normalises relative paths and trims boundary newlines', () => {
+    const files = parseProjectManifest(manifest);
+    expect(files['/src/lib/Button.tsx']).toBe('export default function Button() { return null }');
+  });
+
+  it('reads the declared package.json dependencies', () => {
+    const files = parseProjectManifest(manifest);
+    const pkg = JSON.parse(files['/package.json']);
+    expect(pkg.dependencies.react).toBe('^18.0.0');
+  });
+
+  it('returns an empty map for empty/null/undefined input', () => {
+    expect(parseProjectManifest('')).toEqual({});
+    expect(parseProjectManifest(undefined)).toEqual({});
+    expect(parseProjectManifest(null)).toEqual({});
+  });
+
+  it('does not treat a `===FILE:` line inside file content as a new section', () => {
+    /* Backtick fences inside the manifest must be passed through verbatim —
+     * they are content, not delimiters. Only a line-start `===FILE:` opens
+     * a section. */
+    const nested = [
+      '===FILE: notes.md===',
+      'Here is a fake header: ===FILE: not-a-file=== inside code.',
+      '===FILE: real.txt===',
+      'only this file counts',
+    ].join('\n');
+    const files = parseProjectManifest(nested);
+    expect(Object.keys(files).sort()).toEqual(['/notes.md', '/real.txt']);
+    expect(files['/notes.md']).toContain('===FILE: not-a-file===');
+  });
+
+  it('flags the project MIME as a project artifact', () => {
+    expect(isProjectArtifact(PROJECT_ARTIFACT_TYPE)).toBe(true);
+    expect(isProjectArtifact(TOOL_ARTIFACT_TYPES.REACT)).toBe(false);
+    expect(isProjectArtifact(undefined)).toBe(false);
+  });
+
+  it('registers a project row kind with a folder glyph', () => {
+    expect(
+      artifactRowKind({ type: PROJECT_ARTIFACT_TYPE, title: 'my-app' }),
+    ).toMatchObject({
+      rendersPreview: true,
+      fallbackGlyph: 'project',
+      label: { key: 'com_ui_artifact_format_project' },
+    });
   });
 });

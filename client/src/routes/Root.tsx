@@ -38,6 +38,7 @@ import useDrawerDismiss from '~/hooks/Nav/useDrawerDismiss';
 import useSidebarToggle from '~/hooks/Nav/useSidebarToggle';
 import useSidebarState from '~/hooks/Nav/useSidebarState';
 import { TermsAndConditionsModal } from '~/components/ui';
+import FirstLoginClaimModal from '~/components/Auth/FirstLoginClaimModal';
 import useDrawerSwipe from '~/hooks/Nav/useDrawerSwipe';
 import { useHealthCheck } from '~/data-provider';
 import { Banner } from '~/components/Banners';
@@ -94,9 +95,18 @@ export default function Root() {
     },
     [setSidebarExpanded],
   );
-  const { isAuthenticated, logout } = useAuthContext();
+  const { isAuthenticated, logout, user } = useAuthContext();
+  const [showFirstLoginClaim, setShowFirstLoginClaim] = useState(false);
   /** Releases feature-catalog queries after first paint on browser idle. */
   useCatalogWarmup(isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated && (user as any)?.mustChangePassword === true) {
+      setShowFirstLoginClaim(true);
+    } else {
+      setShowFirstLoginClaim(false);
+    }
+  }, [isAuthenticated, user]);
 
   useDrawerSwipe({
     paneRef,
@@ -137,6 +147,13 @@ export default function Root() {
   const handleDeclineTerms = () => {
     setShowTerms(false);
     logout('/login?redirect=false');
+  };
+
+  const handleSuccessFirstLogin = () => {
+    setShowFirstLoginClaim(false);
+    if (user) {
+      (user as any).mustChangePassword = false;
+    }
   };
 
   if (!isAuthenticated) {
@@ -218,6 +235,10 @@ export default function Root() {
                 modalContent={config.interface.termsOfService.modalContent}
               />
             )}
+            <FirstLoginClaimModal
+              open={showFirstLoginClaim}
+              onSuccess={handleSuccessFirstLogin}
+            />
           </AssistantsMapContext.Provider>
         </FileMapContext.Provider>
       </SetConvoProvider>

@@ -6,7 +6,7 @@ import { Button, Spinner, useMediaQuery, Radio } from '@librechat/client';
 import { Code, Maximize2, Minimize2, Play, RefreshCw, X } from 'lucide-react';
 import type { SandpackPreviewRef } from '@codesandbox/sandpack-react';
 import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
-import { TOOL_ARTIFACT_TYPES, isCodeOnlyArtifact, isPreviewOnlyArtifact } from '~/utils/artifacts';
+import { TOOL_ARTIFACT_TYPES, isCodeOnlyArtifact, isPreviewOnlyArtifact, isProjectArtifact } from '~/utils/artifacts';
 import { displayFilename } from '~/components/Chat/Messages/Content/Parts/attachmentTypes';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import { useShareContext, useMutationState } from '~/Providers';
@@ -189,11 +189,18 @@ export default function Artifacts() {
    * "Code" / "Preview" choices. */
   const isPreviewOnly = isPreviewOnlyArtifact(currentArtifact?.type);
   const isCodeOnly = isCodeOnlyArtifact(currentArtifact?.type);
+  const isProject = isProjectArtifact(currentArtifact?.type);
   let constrainedTab: 'preview' | 'code' | null = null;
   if (isPreviewOnly) {
     constrainedTab = 'preview';
   } else if (isCodeOnly) {
     constrainedTab = 'code';
+  } else if (isProject) {
+    /* Project artifacts render a full IDE (file tree + editor + live
+     * preview + Run) in a single surface, so the panel's Code/Preview
+     * radio split doesn't apply — collapse to the one surface
+     * `ProjectArtifactTabs` lays out. */
+    constrainedTab = 'preview';
   }
   const displayedTab = constrainedTab ?? activeTab;
   const tabOptions = useMemo(() => {

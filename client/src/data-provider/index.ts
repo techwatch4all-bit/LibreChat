@@ -18,6 +18,8 @@ export * from './Tools';
 export * from './Traces';
 export * from './connection';
 export * from './Favorites';
+/* Tenant admin surface */
+export * from './admin/groups';
 export * from './CodeEnvironments';
 export * from './mutations';
 export * from './prompts';

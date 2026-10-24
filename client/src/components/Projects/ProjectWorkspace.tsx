@@ -4,7 +4,7 @@ import * as Ariakit from '@ariakit/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Constants, QueryKeys } from 'librechat-data-provider';
-import { ArrowLeft, ArrowUpDown, Check, Folder, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Check, Folder, Pencil, Plus, Trash2, Terminal, Code2 } from 'lucide-react';
 import { Button, Spinner, DropdownPopup, TooltipAnchor, useMediaQuery } from '@librechat/client';
 import type { ConversationListResponse } from 'librechat-data-provider';
 import type { MenuItemProps, RenderProp } from '~/common';
@@ -12,6 +12,7 @@ import { useConversationsInfiniteQuery, useProjectQuery } from '~/data-provider'
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import ProjectDeleteDialog from './ProjectDeleteDialog';
 import ProjectEditDialog from './ProjectEditDialog';
+import VibeWorkspace from './VibeWorkspace';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { cn, clearMessagesCache } from '~/utils';
 import ProjectChatList from './ProjectChatList';
@@ -40,6 +41,7 @@ export default function ProjectWorkspace() {
   const queryClient = useQueryClient();
   const { projectId = '' } = useParams();
   const [sortBy, setSortBy] = useState<ChatSortField>('updatedAt');
+  const [viewMode, setViewMode] = useState<'chats' | 'vibe'>('vibe');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const sortMenuId = useId();
@@ -213,63 +215,111 @@ export default function ProjectWorkspace() {
         <ProjectEditDialog open={isEditOpen} onOpenChange={setIsEditOpen} project={project} />
         <ProjectDeleteDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} project={project} />
 
-        <button
-          type="button"
-          onClick={startProjectChat}
-          className={cn(
-            'mt-7 flex w-full items-center gap-3 rounded-2xl border border-border-light bg-surface-secondary px-3.5 py-3 text-left',
-            'transition-colors duration-150 hover:bg-surface-hover',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
+        <div className="mt-6 flex items-center justify-between border-b border-border-light pb-3">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={viewMode === 'vibe' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('vibe')}
+              className="gap-1.5"
+            >
+              <Code2 className="size-4" />
+              Vibe Coding & OpenCode
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === 'chats' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('chats')}
+              className="gap-1.5"
+            >
+              Chats ({project.conversationCount})
+            </Button>
+          </div>
+          {viewMode === 'chats' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={startProjectChat}
+              className="gap-1.5"
+            >
+              <Plus className="size-4" />
+              New Chat
+            </Button>
           )}
-          aria-label={localize('com_ui_new_chat_in_project', { name: project.name })}
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-tertiary text-text-primary">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
-            {localize('com_ui_new_chat_in_project', { name: project.name })}
-          </span>
-        </button>
+        </div>
 
-        <section className="mt-8 flex min-h-0 flex-1 flex-col">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="flex items-baseline gap-2 text-sm font-medium text-text-primary">
-              {localize('com_ui_chats')}
-              <span className="tabular-nums text-text-secondary">{project.conversationCount}</span>
-            </h2>
-            <DropdownPopup
-              portal={true}
-              focusLoop={true}
-              unmountOnHide={true}
-              menuId={sortMenuId}
-              isOpen={isSortMenuOpen}
-              setIsOpen={setIsSortMenuOpen}
-              className="z-[125] min-w-44"
-              trigger={
-                <Ariakit.MenuButton
-                  aria-label={localize('com_ui_sort_chats_by')}
-                  className={cn(
-                    'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
-                    isSortMenuOpen && 'bg-surface-hover text-text-primary',
-                  )}
-                >
-                  <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-                  {selectedSortLabel}
-                </Ariakit.MenuButton>
-              }
-              items={sortMenuItems}
+        {viewMode === 'vibe' ? (
+          <div className="mt-5 flex-1 min-h-[580px] flex flex-col">
+            <VibeWorkspace
+              projectId={project._id}
+              projectName={project.name}
+              localPath={project.localPath}
             />
           </div>
-          <ProjectChatList
-            conversations={conversations}
-            isLoading={isConversationsLoading}
-            isFetchingNextPage={isFetchingNextPage}
-            hasNextPage={hasNextPage}
-            sortBy={sortBy}
-            emptyLabel={localize('com_ui_no_project_chats')}
-            loadMore={() => fetchNextPage()}
-          />
-        </section>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={startProjectChat}
+              className={cn(
+                'mt-6 flex w-full items-center gap-3 rounded-2xl border border-border-light bg-surface-secondary px-3.5 py-3 text-left',
+                'transition-colors duration-150 hover:bg-surface-hover',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
+              )}
+              aria-label={localize('com_ui_new_chat_in_project', { name: project.name })}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-tertiary text-text-primary">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                {localize('com_ui_new_chat_in_project', { name: project.name })}
+              </span>
+            </button>
+
+            <section className="mt-6 flex min-h-0 flex-1 flex-col">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="flex items-baseline gap-2 text-sm font-medium text-text-primary">
+                  {localize('com_ui_chats')}
+                  <span className="tabular-nums text-text-secondary">{project.conversationCount}</span>
+                </h2>
+                <DropdownPopup
+                  portal={true}
+                  focusLoop={true}
+                  unmountOnHide={true}
+                  menuId={sortMenuId}
+                  isOpen={isSortMenuOpen}
+                  setIsOpen={setIsSortMenuOpen}
+                  className="z-[125] min-w-44"
+                  trigger={
+                    <Ariakit.MenuButton
+                      aria-label={localize('com_ui_sort_chats_by')}
+                      className={cn(
+                        'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
+                        isSortMenuOpen && 'bg-surface-hover text-text-primary',
+                      )}
+                    >
+                      <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                      {selectedSortLabel}
+                    </Ariakit.MenuButton>
+                  }
+                  items={sortMenuItems}
+                />
+              </div>
+              <ProjectChatList
+                conversations={conversations}
+                isLoading={isConversationsLoading}
+                isFetchingNextPage={isFetchingNextPage}
+                hasNextPage={hasNextPage}
+                sortBy={sortBy}
+                emptyLabel={localize('com_ui_no_project_chats')}
+                loadMore={() => fetchNextPage()}
+              />
+            </section>
+          </>
+        )}
       </div>
     </main>
   );

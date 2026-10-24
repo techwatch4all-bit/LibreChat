@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import {
   useGetAssistantDocsQuery,
@@ -6,8 +6,57 @@ import {
   useGetStartupConfig,
 } from '~/data-provider';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
-import { getIconEndpoint, getEntity, getModelSpec } from '~/utils';
+import { getIconEndpoint, getEntity, getModelSpec, cn } from '~/utils';
 import { useSubmitMessage } from '~/hooks';
+
+interface StarterCategory {
+  id: string;
+  label: string;
+  starters: string[];
+}
+
+const CATEGORIES: StarterCategory[] = [
+  {
+    id: 'school',
+    label: '🎓 STEM & School',
+    starters: [
+      'Explain Newton\'s laws of motion with interactive daily life examples',
+      'Solve this calculus integration step-by-step with KaTeX formulas',
+      'Explain DNA replication and transcription with a Mermaid lifecycle chart',
+      'Teach me Python binary search trees with clean modular code',
+    ],
+  },
+  {
+    id: 'finance',
+    label: '📈 Markets & Wealth',
+    starters: [
+      'Compare 24K physical gold vs sovereign gold bonds vs silver ETFs in India',
+      'Analyze Nifty 50 and Bank Nifty support/resistance levels for this week',
+      'Explain Bitcoin halving mechanics and Ethereum L2 rollup economics',
+      'Calculate compounding growth on ₹15,000 monthly SIP over 15 years',
+    ],
+  },
+  {
+    id: 'office',
+    label: '💼 Office & Tech',
+    starters: [
+      'Draft an executive project delivery update email for senior management',
+      'Generate a system architecture Mermaid diagram for a microservices gateway',
+      'Write a Python script to automate messy Excel sheet reconciliation',
+      'Review this code snippet for edge cases, null pointers and race conditions',
+    ],
+  },
+  {
+    id: 'home',
+    label: '🏡 Family & Daily Life',
+    starters: [
+      'Plan a balanced, budget-friendly 7-day North/South Indian family meal plan',
+      'How to test milk and honey for adulteration using standard home tests',
+      'Calculate electricity bill savings for a 3kW residential rooftop solar net meter',
+      'Suggest a gentle morning flexibility and core strengthening routine for elders',
+    ],
+  },
+];
 
 const ConversationStarters = () => {
   const { conversation } = useChatContext();
@@ -15,6 +64,7 @@ const ConversationStarters = () => {
   const assistantMap = useAssistantsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();
   const { data: startupConfig } = useGetStartupConfig();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const endpointType = useMemo(() => {
     let ep = conversation?.endpoint ?? '';
@@ -45,19 +95,16 @@ const ConversationStarters = () => {
     [conversation?.spec, startupConfig],
   );
 
-  const conversation_starters = useMemo(() => {
+  const customStarters = useMemo(() => {
     if (entity?.conversation_starters?.length) {
       return entity.conversation_starters;
     }
-
     if (modelSpec?.conversation_starters?.length) {
       return modelSpec.conversation_starters;
     }
-
     if (isAgent) {
       return [];
     }
-
     return documentsMap.get(entity?.id ?? '')?.conversation_starters ?? [];
   }, [documentsMap, isAgent, entity, modelSpec]);
 
@@ -67,24 +114,64 @@ const ConversationStarters = () => {
     [submitMessage],
   );
 
-  if (!conversation_starters.length) {
-    return null;
-  }
+  const displayedStarters = useMemo(() => {
+    if (selectedCategory === 'all') {
+      if (customStarters.length > 0) {
+        return customStarters.slice(0, 6);
+      }
+      return CATEGORIES.flatMap((c) => c.starters.slice(0, 1));
+    }
+    const cat = CATEGORIES.find((c) => c.id === selectedCategory);
+    return cat ? cat.starters : [];
+  }, [selectedCategory, customStarters]);
 
   return (
-    <div className="mb-8 mt-2 flex w-full flex-wrap items-stretch justify-center gap-2 px-4">
-      {conversation_starters
-        .slice(0, Constants.MAX_CONVO_STARTERS)
-        .map((text: string, index: number) => (
+    <div className="mb-6 mt-1 flex w-full flex-col items-center gap-2.5 px-4 max-w-4xl mx-auto">
+      {/* Category Tabs */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setSelectedCategory('all')}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+            selectedCategory === 'all'
+              ? 'bg-primary text-primary-foreground shadow-xs'
+              : 'bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary border border-border-light',
+          )}
+        >
+          ✨ Suggested
+        </button>
+        {CATEGORIES.map((cat) => (
           <button
-            key={index}
-            onClick={() => sendConversationStarter(text)}
-            style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'backwards' }}
-            className="flex max-w-[16rem] cursor-pointer items-center justify-center rounded-2xl border border-border-medium bg-surface-secondary px-4 py-2.5 text-center text-sm text-text-secondary shadow-sm transition-colors duration-200 fade-in hover:border-border-heavy hover:bg-surface-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary"
+            key={cat.id}
+            type="button"
+            onClick={() => setSelectedCategory(cat.id)}
+            className={cn(
+              'rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+              selectedCategory === cat.id
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary border border-border-light',
+            )}
           >
-            <span className="line-clamp-2 text-balance break-words">{text}</span>
+            {cat.label}
           </button>
         ))}
+      </div>
+
+      {/* Compact Starter Pills */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {displayedStarters.map((text: string, index: number) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => sendConversationStarter(text)}
+            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
+            className="group flex max-w-[20rem] cursor-pointer items-center rounded-xl border border-border-light bg-surface-secondary/70 hover:bg-surface-tertiary hover:border-border-medium px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary shadow-2xs transition-all duration-150 fade-in"
+          >
+            <span className="line-clamp-2 text-left">{text}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

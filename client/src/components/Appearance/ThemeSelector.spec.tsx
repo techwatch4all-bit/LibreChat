@@ -59,6 +59,24 @@ describe('ThemeSelector', () => {
     });
   });
 
+  it('offers both Satchida themes', async () => {
+    global.ResizeObserver = class MockedResizeObserver {
+      observe = jest.fn();
+      unobserve = jest.fn();
+      disconnect = jest.fn();
+    };
+    const { getByRole, getByTestId } = render(
+      <RecoilRoot>
+        <ThemeSelector theme="satchida-dark" onChange={mockOnChange} />
+      </RecoilRoot>,
+    );
+
+    fireEvent.click(getByTestId('theme-selector'));
+
+    expect(getByRole('option', { name: 'Satchida dark' })).toBeInTheDocument();
+    expect(getByRole('option', { name: 'Satchida light' })).toBeInTheDocument();
+  });
+
   it('offers both high contrast options and reports the selected one', async () => {
     global.ResizeObserver = class MockedResizeObserver {
       observe = jest.fn();

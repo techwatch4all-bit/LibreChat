@@ -59,6 +59,7 @@ export default defineConfig(({ command }) => ({
       '/api': {
         target: backendURL,
         changeOrigin: true,
+        ws: true,
       },
       '/oauth': {
         target: backendURL,
@@ -107,6 +108,7 @@ export default defineConfig(({ command }) => ({
           /** `manifest.webmanifest` is not listed: vite-plugin-pwa always appends it as an
            * additional manifest entry, so globbing it too duplicates the precache entry. */
           'assets/maskable-icon.png',
+          'favicon.ico',
         ],
         globIgnores: [
           'images/**/*',
@@ -151,11 +153,11 @@ export default defineConfig(({ command }) => ({
       },
       includeAssets: [],
       manifest: {
-        name: 'LibreChat',
-        short_name: 'LibreChat',
+        name: 'Satchida',
+        short_name: 'Satchida',
         display: 'standalone',
-        background_color: '#000000',
-        theme_color: '#009688',
+        background_color: '#060816',
+        theme_color: '#060816',
         icons: [
           {
             src: 'assets/favicon-32x32.png',
@@ -173,12 +175,12 @@ export default defineConfig(({ command }) => ({
             type: 'image/png',
           },
           {
-            src: 'assets/icon-192x192.png',
+            src: 'assets/satchida/icon-192x192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: 'assets/maskable-icon.png',
+            src: 'assets/satchida/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -226,6 +228,14 @@ export default defineConfig(({ command }) => ({
               name(id: string) {
                 const normalizedId = id.replace(/\\/g, '/');
                 if (normalizedId.includes('node_modules')) {
+                  if (
+                    normalizedId.includes('/node_modules/react/') ||
+                    normalizedId.includes('/node_modules/react-dom/') ||
+                    normalizedId.includes('/node_modules/scheduler/')
+                  ) {
+                    return 'vendor';
+                  }
+
                   if (normalizedId.includes('/node_modules/regenerator-runtime/')) {
                     return 'polyfills';
                   }
@@ -431,6 +441,7 @@ export default defineConfig(({ command }) => ({
     chunkSizeWarningLimit: 1500,
   },
   resolve: {
+    dedupe: ['react', 'react-dom', '@ariakit/react', '@ariakit/core', 'react-resizable-panels'],
     alias: {
       '~': path.join(import.meta.dirname, 'src/'),
       $fonts: path.resolve(import.meta.dirname, 'public/fonts'),
@@ -488,6 +499,10 @@ export function copyPublicAssets(): Plugin {
       await fs.promises.copyFile(
         path.join(publicDir, 'robots.txt'),
         path.join(outDir, 'robots.txt'),
+      );
+      await fs.promises.copyFile(
+        path.join(publicDir, 'favicon.ico'),
+        path.join(outDir, 'favicon.ico'),
       );
     },
   };

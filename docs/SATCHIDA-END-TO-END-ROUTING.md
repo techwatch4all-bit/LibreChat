@@ -27,8 +27,9 @@
 
 1. **Tenant LibreChat** authenticates tenant users and stores PII, family membership, and the mapping from local user to opaque seat alias. It is the tenant data custodian.
 2. **Central One-API** owns tenant/seat entitlements, opaque seat aliases, account/profile policy, cloud spend reservations, per-seat usage limits, and tenant-to-Bifrost-VK references. It receives no end-user email, name, conversation, prompt, or response.
-3. **Central Bifrost** stores provider credentials and executes allowlisted cloud inference under a distinct VK per tenant. A VK is a tenant-level upstream ceiling, not end-user identity. No provider key or Bifrost management credential is sent to LibreChat.
-4. **Tenant-local Privacy router** verifies a short-lived operator-signed Privacy assertion and routes only to that tenant's loopback/local GPU. The signing private key remains on the operator host; the tenant receives only a public verification key and a short-lived assertion. The local router has no cloud route for Privacy.
+3. **AnythingLLM Sovereign Vault Engine (:3012)** acts as the headless, tenant-segregated document intelligence and RAG provider for LibreChat via the satchida-knowledge-vault MCP bridge (anythingllm_mcp_server.py). It enforces strict per-user LanceDB vector isolation (vault-user-{id}), multi-format document generation (PDF, DOCX, XLSX, PPTX), and semantic search with citations. See [SATCHIDA-ANYTHINGLLM-MCP-ARCHITECTURE.md](./SATCHIDA-ANYTHINGLLM-MCP-ARCHITECTURE.md).
+4. **Central Bifrost** stores provider credentials and executes allowlisted cloud inference under a distinct VK per tenant. A VK is a tenant-level upstream ceiling, not end-user identity. No provider key or Bifrost management credential is sent to LibreChat.
+5. **Tenant-local Privacy router** verifies a short-lived operator-signed Privacy assertion and routes only to that tenant's loopback/local GPU. The signing private key remains on the operator host; the tenant receives only a public verification key and a short-lived assertion. The local router has no cloud route for Privacy.
 
 Credential types remain separate:
 

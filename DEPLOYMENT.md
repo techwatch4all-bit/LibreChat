@@ -101,7 +101,9 @@ cd client; npm run build; cd ..
 Write-Host "[4/5] Registering PM2 and Cloudflared services..." -ForegroundColor Yellow
 npm install -g pm2 pm2-windows-startup
 pm2-startup install
-pm2 start npm --name "librechat" -- run backend
+# Never use `pm2 start npm` — the space in "C:\Program Files\nodejs\npm.cmd" makes Node
+# evaluate npm.cmd as JavaScript and fail with `SyntaxError: Unexpected token ':'`.
+pm2 start fleet/ecosystem.config.cjs
 pm2 save
 
 # Install Cloudflare Named Tunnel as Windows Service
@@ -133,7 +135,9 @@ When configuring a client machine expected to register 500 to 1,000+ users:
 Instead of running a single Node.js process, use PM2 cluster mode to utilize all CPU cores on the Windows desktop (e.g. 8 cores / 16 threads):
 ```powershell
 # Run in C:\LibreChat
-pm2 start "npm run backend" -i max --name "librechat"
+# Never launch via `npm`/`npm.cmd` (space-in-path SyntaxError). Run the CJS entry directly;
+# PORT=3080 and NODE_ENV=production are required (the shell profile can override .env).
+$env:PORT = "3080"; $env:NODE_ENV = "production"; pm2 start api/server/index.js -i max --name "librechat"
 pm2 save
 ```
 

@@ -67,61 +67,61 @@ The only phase that is genuinely new backend work.
 
 ### 2a. Schemas — `packages/data-schemas`
 
-- [ ] `schema/plan.ts` — tier key, display name, price, currency, seat limit, token
+- [x] `schema/plan.ts` — tier key, display name, price, currency, seat limit, token
       allowance, refill interval, active flag.
-- [ ] `schema/subscription.ts` — user, tenant, plan ref, status
+- [x] `schema/subscription.ts` — user, tenant, plan ref, status
       (`pending_payment | active | expired | revoked`), started/expires, seat count.
-- [ ] `schema/payment.ts` — plan selection, amount, UPI reference, submitted timestamp,
+- [x] `schema/payment.ts` — plan selection, amount, UPI reference, submitted timestamp,
       status, approving operator, approval timestamp.
-- [ ] Type exports and query methods. Per `AGENTS.md`, keep Mongoose types out of exported
+- [x] Type exports and query methods. Per `AGENTS.md`, keep Mongoose types out of exported
       signatures in `packages/api`, `packages/data-provider`, and `client`.
-- [ ] Indexes on `user`, `tenantId`, `status`, and `expires`.
+- [x] Indexes on `user`, `tenantId`, `status`, and `expires`.
 
 ### 2b. Assignment service — `packages/api/src/billing`
 
-- [ ] Idempotent subscription→(role, balance) application. Re-running must not double-apply.
-- [ ] Demo tier: `refillAmount` of a few hundred credits, `refillIntervalValue: 1`,
+- [x] Idempotent subscription→(role, balance) application. Re-running must not double-apply.
+- [x] Demo tier: `refillAmount` of a few hundred credits, `refillIntervalValue: 1`,
       `refillIntervalUnit: days`.
-- [ ] Seat enforcement for Family at invite time.
-- [ ] Expiry sweep that downgrades on lapse rather than leaving an active role behind.
+- [x] Seat enforcement for Family at invite time.
+- [x] Expiry sweep that downgrades on lapse rather than leaving an active role behind.
 
 ### 2c. Payment provider interface
 
-- [ ] `PaymentProvider` interface: create intent, record attempt, confirm, reject, reconcile.
-- [ ] `ManualUpiProvider` — intent returns the owner's static UPI QR; user submits a UPI
+- [x] `PaymentProvider` interface: create intent, record attempt, confirm, reject, reconcile.
+- [x] `ManualUpiProvider` — intent returns the owner's static UPI QR; user submits a UPI
       reference; status stays `pending_payment` until an operator approves.
-- [ ] `RazorpayUpiProvider` — implemented but inactive behind a `configSchema` toggle, since
+- [x] `RazorpayUpiProvider` — implemented but inactive behind a `configSchema` toggle, since
       no Razorpay account exists yet (`ARCHITECTURE.md` §5.2).
-- [ ] Typed discriminated results per `AGENTS.md`; stable machine-readable codes for
+- [x] Typed discriminated results per `AGENTS.md`; stable machine-readable codes for
       `no_such_plan`, `subscription_exists`, `payment_not_found`, `seat_limit_reached`.
-- [ ] No raw exception text, stack, or provider payload may reach a user-visible status.
+- [x] No raw exception text, stack, or provider payload may reach a user-visible status.
 
 ### 2d. Operator reconciliation console
 
-- [ ] `packages/api/src/admin/reconciliation.ts` — list accounts with registration date, last
+- [x] `packages/api/src/admin/reconciliation.ts` — list accounts with registration date, last
       authentication, selected plan, payment status, UPI reference, amount, submitted
       timestamp, approving operator, approval timestamp.
-- [ ] Filter by status and plan; CSV export for bank-statement reconciliation.
-- [ ] Approve / reject actions, each recorded with the acting operator.
-- [ ] Client UI under `client/src/components/Admin/console/`.
-- [ ] This page is required **regardless** of gateway — it survives the Razorpay switch.
+- [x] Filter by status and plan; CSV export for bank-statement reconciliation.
+- [x] Approve / reject actions, each recorded with the acting operator.
+- [x] Client UI under `client/src/components/Admin/console/`.
+- [x] This page is required **regardless** of gateway — it survives the Razorpay switch.
 
 ### 2e. Purchase and account-activation UX
 
-- [ ] Authenticated user sees plans, picks one, scans the QR, submits the reference.
-- [ ] Unpaid account lands on a clearly-labelled pending state, not a broken chat screen.
-- [ ] Approval flips the subscription to `active` and the user's role and quota change on
+- [x] Authenticated user sees plans, picks one, scans the QR, submits the reference.
+- [x] Unpaid account lands on a clearly-labelled pending state, not a broken chat screen.
+- [x] Approval flips the subscription to `active` and the user's role and quota change on
       next request without a re-login.
-- [ ] All new copy via `useLocalize()`, English keys only in
+- [x] All new copy via `useLocalize()`, English keys only in
       `client/src/locales/en/translation.json`.
 
 ### 2f. Tests
 
-- [ ] Absence vs. failure for every repository method — a missing record and a database
+- [x] Absence vs. failure for every repository method — a missing record and a database
       failure must be distinguishable.
-- [ ] The boundary's non-success response shape.
-- [ ] Sensitive diagnostics cannot reach a user-visible surface.
-- [ ] Assignment idempotency; demo-tier refill boundary.
+- [x] The boundary's non-success response shape.
+- [x] Sensitive diagnostics cannot reach a user-visible surface.
+- [x] Assignment idempotency; demo-tier refill boundary.
 
 Exit criteria: a new user registers with Google, buys Standard via UPI, an operator approves,
 and their quota and features update correctly.

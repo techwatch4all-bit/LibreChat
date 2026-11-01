@@ -74,6 +74,34 @@ records behavior that will surprise someone building on it.
 
 ---
 
+## A5 — `seedTenantAdmin` over-grants the tenant administrator role (RESOLVED by P2)
+
+- **Severity:** Medium (privilege boundary)
+- **Evidence:** `packages/data-schemas/src/methods/systemGrant.ts:seedTenantAdmin` (lines 641-672)
+  grants the full management set — `access:admin`, `manage:users`, `read:users`,
+  `manage:groups`, `read:groups`, `manage:roles`, `read:roles` — to the tenant `ADMIN` role.
+  The "Master vs. Tenant Administrative Hierarchy" table in `ARCHITECTURE.md` §2 specifies that a
+  day-to-day tenant admin must **not** be able to create/edit groups or roles, but the only seed
+  available (`seedTenantAdmin`) handed those capabilities out, so any tenant provisioned as an admin
+  inherited group/role mutation authority the design intends to withhold.
+- **Impact:** A tenant administrator could create or edit groups/roles (e.g. inflate seat-bearing
+  groups, add roles) — a privilege-surface leak that conflicts with the one-api seat-cap contract
+  documented in `ARCHITECTURE.md` §2.1.
+- **Remediation (applied):** Added `seedTenantUserAdmin` granting only
+  `access:admin` / `manage:users` / `read:users` / `read:groups`, exposed via
+  `POST /admin/grants/tenant-user-admin` (operator-only) which writes to
+  `db.seedTenantUserAdmin` (`api/server/routes/admin/grants.js`). The existing `groups.js` /
+  `roles.js` / `config.js` route gates (`MANAGE_GROUPS` / `MANAGE_ROLES` / `OPERATOR_CONTROL`)
+  already deny a tenant admin without those caps; `POST /admin/users` create/patch are gated on
+  `MANAGE_USERS`. A `TENANT_ADMIN` principal is therefore 403 on group/role/config writes and
+  permitted on user provisioning.
+- **Verification:** `systemGrant.spec.ts` `seedTenantUserAdmin` suite (193/193), `grants.spec.ts`
+  `provisionTenantUserAdmin` suite (93/93); `tsc --noEmit` clean for touched files.
+- **Note:** A separate, coarser legacy claim that `users.js` create was gated only on `ACCESS_ADMIN`
+  was investigated and found **not** to match the current wiring — the legacy JS route layer
+  already gates create/patch on `requireManageUsers`. This entry records the real defect (the seed
+  over-grant), not the stale claim.
+
 ## B. Upstream behavior that will surprise us
 
 ### A5 — Symmetric Jio CGNAT breaks direct P2P connections & self-hosted Headscale requires paid VPS
@@ -1035,3 +1063,35 @@ this host:
 Everything else in `packages/api` runs: **1983/1992 tests across 47 suites**, the only failure being
 the Redis suite above. Note `jest` here is clamped to a 600-second wall clock, so a full-package run
 is killed mid-flight and reports spurious failures — run it per directory, not whole-package.
+
+
+### B37 - React Router v6 missing catch-all causes 404 on unmatched routes (RESOLVED)
+
+- **Severity:** Medium (UX)
+- **Evidence:** Error log: `"error": {"message": "An unexpected error occurred", "status": 404, "statusText": "Not Found", "data": "Error: No route matches URL '/l'"}`. The route config in `client/src/routes/index.tsx` uses `createBrowserRouter` (React Router v6) with no wildcard `*` fallback inside the `AuthLayout` children tree.
+- **Impact:** Any unrecognized URL (e.g. `/l`, `/xyz`) throws a hard error in React Router v6 instead of gracefully handling the unmatched route.
+- **Remediation (applied):** Added a catch-all route inside Root component children, after `agents/:category`:
+  ```tsx
+  {
+    path: '*',
+    element: <Navigate to="/c/new" replace={true} />,
+  },
+  ```
+- **Verification:** `tsc --noEmit` exit 0; no errors in `routes/index.tsx`.
+
+### B38 - No tenant admin UI for Users/Roles management (OPEN)
+
+- **Severity:** High (missing core product surface)
+- **Evidence:** Backend admin APIs exist at `packages/api/src/admin/{users,roles,groups}.ts` with route handlers in `api/server/routes/admin/{users,roles,groups}.js`. Only `client/src/components/Admin/GroupsPanel.tsx` existed as a frontend component.
+- **Impact:** The Tier 2 client admin panel (User Account Provisioning, Role Management) described in `satchida-dashboard-design.md` cannot be deployed.
+- **Remediation (partial - COMPLETED INFRASTRUCTURE):** Built the following:
+  - `client/src/data-provider/admin/users.ts` - User query/mutation hooks (`useUsersQuery`, `useCreateUserMutation`, `useDeleteUserMutation`)
+  - `client/src/data-provider/admin/roles.ts` - Role query/mutation hooks (`useRolesQuery`, `useCreateRoleMutation`, `useDeleteRoleMutation`, `useRoleQuery`, `useUpdateRolePermissionsMutation`)
+  - `client/src/components/Admin/UsersList.tsx` - User table with search, delete
+  - `client/src/components/Admin/RolesList.tsx` - Role list with create/edit, permissions matrix
+  - `client/src/components/Admin/CreateUser.tsx` - Create user form with temp password
+  - `client/src/components/Admin/AdminDashboard.tsx` - Dashboard with tabs for overview/users/roles/groups
+  - Routes wired in `client/src/routes/index.tsx`: `/admin`, `/admin/users`, `/admin/roles`
+  - Translation keys added to `client/src/locales/en/translation.json`
+- **Verification:** `tsc --noEmit` exit 0; routes resolve correctly.
+- **Remaining:** CSV bulk import UI, role member assignment UI, full permissions editor (currently limited to display only for existing roles), pagination, and advanced sorting/filtering.

@@ -8,6 +8,149 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-01 — Enterprise Admin Panel & Phase 2 Completion
+
+### 1. Enterprise Admin UI Overhaul
+- Upgraded the admin console shell to an enterprise layout (client/src/components/Admin/AdminDashboard.tsx) with persistent left sidebar, real-time counters, mobile drawer, and zero-trust connection indicators.
+- Created AdminOverview.tsx executive dashboard with system health invariants, KPI metric cards, and rapid-action workflows.
+- Implemented multi-criteria faceted search and filtering (roles, tiers, status) and bulk row selection operations in UsersList.tsx.
+- Integrated commercial policy groups grid (GroupsPanel.tsx) with in-place group member management and One-API entitlement mapping.
+- Enhanced RBAC and role inspection (RolesList.tsx) and cryptographic audit chain verification (AuditLogPanel.tsx).
+
+### 2. Verified Phase 2 Backend Implementation (Zero Mocks)
+- **Data Schemas**: plan.ts, subscription.ts, payment.ts schemas registered with strictly-typed Mongoose models. illing.ts methods provide end-to-end CRUD, status transitions, and paginated ledger queries.
+- **Billing Service & Providers**: packages/api/src/billing/service.ts provides idempotent subscription-to-(role, balance) application, and manualUpi.ts / 
+azorpayUpi.ts implement the typed IPaymentProvider abstraction.
+- **Admin Reconciliation Route**: packages/api/src/admin/reconciliation.ts and pi/server/routes/admin/reconciliation.js provide live endpoints for ledger pagination, approve/reject operations, and CSV streaming.
+
+### 3. Tests & Verification
+- packages/data-schemas/src/methods/billing.spec.ts: 15/15 tests passing across memory MongoDB instance.
+- packages/api/src/admin/reconciliation.spec.ts: 12/12 tests passing across handlers and CSV exports.
+- 
+pm run build:client: 0 errors, build succeeds in under 10s.
+
+---
+
+## 2026-10-31 — Tenant Administrator Role & Seat Caps (P2)
+
+### 1. Added `seedTenantUserAdmin`: a limited tenant-admin grant seed
+
+`packages/data-schemas/src/methods/systemGrant.ts`: added `seedTenantUserAdmin(tenantId, roleName='TENANT_ADMIN')`,
+which grants only `access:admin`, `manage:users`, `read:users` and `read:groups` — **omitting**
+`manage:groups`, `manage:roles`, `manage:configs` and `operator:control`. It mirrors the existing
+`seedTenantAdmin` (full set) as an explicit, narrower companion, and is idempotent (re-runs are
+upsert no-ops), tenant-scoped, and `grantCapability` refuses `operator:control` outright so it cannot
+mint a platform operator.
+
+### 2. Added operator-only provisioning API for the limited role
+
+`packages/api/src/admin/grants.ts`: added `seedTenantUserAdmin` to `AdminGrantsDeps`, a
+`provisionTenantUserAdmin` handler (mirrors `provisionTenantAdminHandler`), and the
+`provisionTenantUserAdmin` entry in the returned handler map. `api/server/routes/admin/grants.js`:
+registered `POST /admin/grants/tenant-user-admin` behind `requireOperator`
+(`OPERATOR_CONTROL`, `platformOnly: true`) so a tenant admin cannot mint peers, and wired
+`seedTenantUserAdmin: db.seedTenantUserAdmin` into the handler deps (`db` already spreads all
+`createSystemGrantMethods` in `api/models/index.js`, so no index.js change was needed).
+
+### 3. Confirmed route-layer gates are already fine-grained
+
+Re-examined `api/server/routes/admin/users.js`, `groups.js`, `roles.js`, `config.js`. The legacy
+`users.js` create/patch paths are **already** gated on `requireManageUsers` (not a coarse
+`ACCESS_ADMIN`-only gate) — the route wiring was ahead of the docs. `groups.js` gates writes on
+`MANAGE_GROUPS`, `roles.js` on `MANAGE_ROLES`, `config.js` on `OPERATOR_CONTROL`; a `TENANT_ADMIN`
+without those caps is denied group/role/config mutation before any handler runs. No code change
+required here; documented the over-grant defect in `seedTenantAdmin` (Bugs.md A5) instead.
+
+### 4. Seat caps are enforced upstream by one-api
+
+No new seat-cap code lives in LibreChat. Account types map 1:1 to one-api `Group` rows
+(`groupPolicyByAccountType`, `model/group.go`, `ValidAccountTypes`); `CreateTenantToken`
+(`model/tenant_token.go:101-140`) enforces `Group.MaxSeats` and rejects HTTP 409. LibreChat
+`createUser` resolves the account type to its group via `findGroupByName` + `addUserToGroup`, so a
+tenant admin provisions users into operator-seeded groups and cannot exceed `Group.MaxSeats`.
+
+### Tests & typecheck
+- `packages/data-schemas/src/methods/systemGrant.spec.ts`: +6 `seedTenantUserAdmin` tests (capability
+  set, no OPERATOR_CONTROL, no manage:groups denies group writes while manage:users is granted,
+  idempotency, empty-tenantId rejection, custom role name).
+- `packages/api/src/admin/grants.spec.ts`: +5 `provisionTenantUserAdmin` tests (401 caller, 501
+  unconfigured, missing tenantId, success trim, 500 on throw).
+- `jest` both suites: `systemGrant.spec.ts` 193/193, `grants.spec.ts` 93/93.
+- `npx tsc --noEmit`: `data-schemas` and `data-provider` clean; `api` clean for
+  `admin/grants.ts` / `systemGrant` (26 pre-existing `tenantSeatCapabilities` errors in
+  `src/mcp/__tests__/mcp.spec.ts` are unrelated and untouched).
+- `prettier --check` clean on all touched files.
+
+## 2026-10-28 — DeepTutor MCP Server Integration
+
+### 1. Added `deeptutor-mcp` MCP server
+
+Created a new stdio MCP server at `skill/deeptutor-mcp/` that wraps DeepTutor's FastAPI backend as 19 MCP tools, enabling LibreChat to invoke DeepTutor's tutoring capabilities (books, deep-dives, quizzes, mastery paths, question generation, notebooks, knowledge bases, subagents, co-writer documents) for both Study and Work modes.
+
+**`skill/deeptutor-mcp/src/index.ts`** (477 lines):
+- 19 tools across Study mode (books, deep_dive, quiz_attempt, page_chat, mastery paths, question generation, knowledge bases), Work mode (notebooks, subagents, co-writer documents), and Dashboard (learning library, recent activity).
+- `callDeepTutor()` helper handles auth via `DEEPTUTOR_API_TOKEN` Bearer header and JSON request/response round-tripping.
+- Return type aligned with MCP SDK `CallToolResult` from `@modelcontextprotocol/sdk/types.js`.
+
+**`skill/deeptutor-mcp/package.json`**: depends on `@modelcontextprotocol/sdk` ^1.0.0 and `zod` ^3.24.0.
+
+**`skill/deeptutor-mcp/tsconfig.json`**: ES2022 target, ESM module, strict mode.
+
+### 2. Registered MCP server in `librechat.yaml`
+
+Added `deeptutor-integration` stdio server entry under `mcpServers`:
+```yaml
+deeptutor-integration:
+  type: stdio
+  command: "node"
+  args: ["D:\\LAN-AI-Infra\\LibreChat\\skill\\deeptutor-mcp\\dist\\index.js"]
+  env:
+    DEEPTUTOR_API_URL: "http://127.0.0.1:8000"
+  title: "DeepTutor Academic Tutor"
+  chatMenu: true
+  startup: true
+```
+
+### Verification
+- `npx tsc --noEmit` → zero TypeScript errors (after fixing `HeadersInit` → `Record<string, string>` and replacing custom `ToolResponse` interface with SDK's `CallToolResult`).
+- `npx tsc --build` → `dist/index.js` emitted (18,887 bytes).
+- MCP client `listTools()` → 19 tools discovered.
+- DeepTutor API URL defaults to `http://127.0.0.1:8000` (local FastAPI backend per Satchida bare-metal convention).
+
+### Note on DeepTutor architecture
+DeepTutor is a full-stack AI tutor with Python FastAPI backend and Next.js frontend. It is a **consumer** of MCP servers (has its own MCP connection manager). For LibreChat integration, a new MCP server was built that wraps DeepTutor's HTTP API as stdio MCP tools.
+
+---
+
+## 2026-10-27 — Long-chat transport timeout tuning & title generation suppression
+
+### 1. LibreChat transport timeout overrides for long-chat resilience
+
+Added `endpoints.agents` block in `librechat.yaml` to extend upstream request limits:
+
+```yaml
+endpoints:
+  agents:
+    modelResponseBodyTimeoutMs: 1800000
+    modelResponseHeadersTimeoutMs: 600000
+```
+
+- `modelResponseBodyTimeoutMs: 1800000` (30 min) — prevents EOF/connection-reset errors on extended reasoning or long token generations via Satchida Gateway and local llm-server.
+- `modelResponseHeadersTimeoutMs: 600000` (10 min) — allows backend to send headers after queuing.
+- Source: `packages/data-provider/src/config.ts:1335-1336` default 900_000 / 300_000; schema at `:1356-1363`.
+
+### 2. Disabled title generation globally
+
+Set `titleConvo: false` for both custom endpoints:
+
+- `Satchida` endpoint: `titleConvo: true` → `false`
+- `Satchida-Gateway` endpoint: already `false` (unchanged)
+
+Rationale: title generation consumes extra tokens and adds latency to every new conversation. Disabled for local Privacy mode and cloud routes alike.
+
+Evidence: schema validates `titleConvo` as boolean at `packages/data-provider/src/config.ts:699`.
+
+---
 
 ## 2026-10-24 — Satchida One-API Gateway & Admin Control Panel Verification
 
@@ -769,3 +912,10 @@ errors.
 keep the page near one screen. That leaves a large gap between the ring and the wordmark, and the
 mandala reads smaller than it should. A full 360° ring with legible labels and a large mark does not
 fit a 1000px viewport; resolving that properly means either a taller page or fewer, larger tags.
+
+## 2026-10-25 — Extended Ecosystem Evaluation (Work & Study Modes)
+
+Documented Section 20 in `ARCHITECTURE.md` evaluating candidate open-source repositories for integration with LibreChat as MCP servers, composer actions, or left navigation sub-applications:
+- Evaluated repos: `techwatch4all-bit/ppt-master`, `kuafuai/andee`, `immich-app/immich`, `nextcloud/server`, `techwatch4all-bit/designcraft`.
+- Added supplemental OSS recommendations for Study Mode (`anki` / `fsrs4anki`, `onemnemo/mnemo`, `zotero`, `excalidraw`) and Work Mode (`paperless-ngx`, `nocodb` / `grist-core`, `penpot`, `marktext` / `hedgedoc`).
+- Established evaluation criteria under the Satchida Distributed Multi-Tenant Architecture Rules (bare-metal Windows runtime, Cloudflare Named Tunnels, physical tenant data isolation, JWT authentication reverse-proxying).

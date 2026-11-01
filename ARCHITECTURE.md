@@ -255,6 +255,28 @@ Agreed sequencing:
 3. **Full native Android (later)** — a Kotlin/Compose client against the REST and streaming
    endpoints. Deferred.
 
+### 6.1 SPA shell serving — the loading page, the login page, and the admin page
+
+These three surfaces are distinct and must not be conflated:
+
+- **The mandala loading page** is the unauthenticated SPA shell. The Express fallback in
+  `api/server/index.js` reads `client/dist/index.html` once at startup and serves it (with a
+  per-request CSP nonce and locale) for every non-API route. The mandala animation and the login
+  box both live in this single shell; the client-side router (`client/src/routes/index.tsx`)
+  renders `StartupLayout` at `/` and the account form at `/login`. They are part of the **same**
+  build output — there is no separate "login page" build.
+- **The admin page** (`/admin*`) is the operator console (roles, plans, subscriptions, audit). It is
+  the same SPA shell as above, just a different route, role-gated (`ADMIN`) on both the client and the
+  server. It is **not** a separate login flow and **not** a separate build. An operator therefore
+  signs in through the mandala shell and navigates to `/admin`.
+
+**Pitfall — stale shell cache (how the loading page was "lost").** The shell is read into memory
+once per process. When `client/dist` is rebuilt without the server restarting, the in-memory
+`indexHTML` still references the old content-hashed bundles, which the rebuild deleted from disk, so
+the browser receives HTTP 404 for `index.<oldhash>.js` and the page hangs on the mandala. The server
+now re-reads `client/dist/index.html` whenever its mtime changes, so a client rebuild is served
+without a restart. A PM2 restart is still required when `api/server/index.js` itself changes.
+
 ---
 
 ## 7. Rebranding
@@ -510,6 +532,19 @@ Established by running it on 2026-10-04:
 `librechat.yaml` validation notes: `fileConfig.endpoints` is keyed by **endpoint name**, not
 endpoint type; and there is no `disabled` field on endpoints — an unconfigured endpoint is simply
 unavailable.
+
+Launch command (do not vary):
+
+```powershell
+pm2 start fleet/ecosystem.config.cjs   # name: librechat (api/server/index.js), PORT=3080
+```
+
+> **Never launch via `npm` / `npm.cmd`.** The path `C:\Program Files\nodejs\npm.cmd` contains a
+> space, so PM2 running it makes Node evaluate `npm.cmd` as JavaScript, which dies with
+> `SyntaxError: Unexpected token ':'`. The fleet config runs the CJS entry directly and pins
+> `PORT=3080`, `HOST=0.0.0.0`, `NODE_ENV=production` in `env`. A process restart is only required
+> when `api/server/index.js` changes; `client/dist` rebuilds are picked up automatically by the
+> mtime-gated shell re-read (§6.1).
 
 ---
 
@@ -916,7 +951,7 @@ In a school (1,000 students) or an enterprise SME (1,000 employees), **registere
 | Subsystem | 1,000 Users Load Profile | Bottleneck Risk? | Solution in Our Stack |
 | :--- | :--- | :--- | :--- |
 | **Cloudflare Named Tunnel** | HTTP/2 & HTTP/3 multiplexing | **Zero bottleneck** | Cloudflare Edge handles TLS termination, DDoS mitigation, and connection pooling. Only lightweight SSE text streams pass through. |
-| **LibreChat Web Server** | Node.js asynchronous I/O | **Low risk** | Node.js easily handles 500+ idle SSE connections. For peak loads, run 2–4 cluster workers via PM2 (`pm2 start npm -i max`). |
+| **LibreChat Web Server** | Node.js asynchronous I/O | **Low risk** | Node.js easily handles 500+ idle SSE connections. For peak loads, run 2–4 cluster workers via PM2 (`pm2 start api/server/index.js -i max`; see §11.9 for the launch command and the `npm.cmd` pitfall). |
 | **Local MongoDB Community** | User auth & conversation history | **Zero bottleneck** | 1,000 user profiles and chat collections consume <500 MB RAM. WiredTiger engine handles thousands of reads/sec on NVMe SSD. |
 | **Local RAG Service (LanceDB)** | File search & vector queries | **Low risk** | LanceDB is an in-process, disk-backed vector store (built in Rust). Combined with SQLite FTS5, queries complete in <15 ms. |
 | **Inference Compute** | Model token generation | **HIGH BOTTLENECK IF UNMANAGED** | See §9.3 below for our routing strategy. |
@@ -1097,6 +1132,76 @@ the mode label and the concrete backend:
 Privacy must **fail closed**: with no local route the correct response is a 503-style
 `no_local_route`, never a transparent fall-through to a cloud provider. A silent fallback
 would break a promise made in writing to a school.
+
+### 4.1 Privacy routing chain — end-to-end (verified)
+
+A Privacy turn never leaves the node. The contract and the observed data path, in order:
+
+1. **Spec → endpoint.** `api/server/middleware/buildEndpointOption.js` (`SPEC_TO_MODE`,
+   `Satchida-Gateway → Satchida` operator remap) turns `spec:"Privacy"` into the
+   `Satchida` custom endpoint with `model:"Privacy"` on the conversation.
+2. **Agent init.** `packages/api/src/endpoints/custom/initialize.ts`
+   `initializeCustom`: `isPrivacyMode = isSatchidaEndpoint && normalizedMode==='privacy'`
+   (l.224-226). The synthetic `Satchida__Privacy___Privacy 🔒` agent has its top-level
+   `agent.model` unset (it is generated, not a DB document); the Privacy label reaches the
+   LLM client through `model_parameters.model` instead, *not* through `agent.model`. The
+   assertion is minted via `db.getPrivacyAssertion` (l.314-321), fail-closed on
+   `!user.tenantId || !satchidaSeatAlias`, on `!isPrivacyLocalReady` (l.325-331), and on a
+   non-loopback baseURL (l.335-341). `apiKey = privacyAssertion` (l.343-344);
+   `baseURL = CUSTOM_BASE_URL` = `librechat.yaml` `http://127.0.0.1:4099/v1`
+   (l.334); `getOpenAIConfig(apiKey=privacyAssertion, finalClientOptions, endpoint)` (l.495).
+   `agent.model_parameters = {...options.llmConfig}` with `configuration = options.configOptions`
+   is assembled in `packages/api/src/agents/initialize.ts` (l.2256-2259).
+3. **v2 Generation API.** `api/server/routes/agents/chat.js` (`router.use(buildEndpointOption)`
+   l.87; POST l.126) hands off to `packages/api/src/agents/run.ts`, which builds
+   `clientOptions: llmConfig` (l.2559) and dispatches to `@librechat/agents`
+   `createLegacyGraph`. `api/server/controllers/agents/request.js` emits the
+   `status:started` envelope (`res.json` closes the response) with the `streamId`
+   (l.1811-1837); tokens are then streamed over
+   `GET /api/agents/chat/stream/:streamId` (`api/server/routes/agents/index.js` l.164).
+4. **ChatOpenAI → privacy router.** `ChatOpenAI(clientOptions)` sends
+   `Authorization: Bearer <assertion>` + `model:"Privacy"` to `:4099/v1/chat/completions`.
+   The assertion is a **two-part** `base64url(payload).base64url(Ed25519-signature)` minted by
+   `fleet/src/privacy/router.mjs` `issuePrivacyAssertion` (payload `{"iss":"satchida-control",
+   "tid":<tenant>, "seat":<seatAlias>, "modes":["Privacy"], ...}`), *not* a 3-part JWT.
+   The router's `verifyPrivacyAssertion` rejects anything that is not exactly two parts
+   (l.169-170), which is why a 3-part bearer token is logged as "assertion is malformed".
+5. **Verify + rewrite.** `fleet/scripts/dev-gateway.mjs` boots the router on `:4099` with
+   `upstreams.Privacy = SATCHIDA_LOCAL_URL || http://127.0.0.1:8080`, the Ed25519 public key
+   loaded from `fleet/.state/signing.key.pem` (single-key fallback id `tenant-local`),
+   audience `satchida-control`, tenant `satchida-master`. The router checks `body.model === 'Privacy'`
+   (else `403 privacy_mode_required`) and rewrites the label (l.447) via `resolveModel`
+   (`fleet/src/models.mjs`) to the tenant's local model
+   **`Ternary-Bonsai-2-9B-PQ2_0-MTP-Q8_0`** — *not* `Qwen2.5-Omni-7B-Q4_K_M`, *not* the
+   `Bonsai-2-27B-PQ2_0-CRACK` alias, *not* Ollama `:11434`.
+6. **Local inference.** The router proxies the (rewritten) body to `:8080/v1/chat/completions`
+   (llama.cpp). `:8080` is reached only over loopback (`router.mjs` `loopbackURL`
+   l.225-232 rejects anything else).
+
+**Signing-key ownership (never printed):** the operator-side key in `.env`
+(`SATCHIDA_PRIVACY_SIGNING_KEY`) and the on-disk key the router uses
+(`fleet/.state/signing.key.pem`) are held to be the same key by comparing their **derived
+Ed25519 public-key SHA-256** only; the private key bytes are never emitted to any log.
+
+**Live verification (satchida-master, admin privacy seat provisioned):**
+- Router inbound trace: `model="Privacy" authPresent=true bearerParts=2
+  bearerPrefix=eyJpc3MiOi bodyKeys=["model","stream","tools","chat_template_kwargs","messages"]`.
+- Router post-rewrite trace: `forwarded to local upstream as model=Ternary-Bonsai-2-9B-PQ2_0-MTP-Q8_0`
+  followed by `upstream status=200 ct=text/event-stream`.
+- End-to-end probe (clean, no router instrumentation): `POST /api/agents/chat/Satchida` →
+  `200` `status:started`; `GET /…/stream/<id>` → `200 text/event-stream`; the 9B streamed
+  `I am ready. How can I assist you?` (`sender:"Privacy 🔒"`, `model:"Privacy"`,
+  `agent_id:"Satchida__Privacy___Privacy 🔒"`) with no `upstream_model_error`.
+
+**Secondary calls (known, non-blocking):** the summarisation / title-generation path issues
+secondary `POST /v1/chat/completions` bodies with only `["messages","max_tokens"]` and no
+`model`, so the router refuses them as `privacy_mode_required` (`bodyKeys:["messages","max_tokens"]`,
+model `undefined`). They do not block the main Privacy turn (the turn above completed from
+`:8080`), but they are the source of the "refusing non-Privacy request" noise and must not be
+treated as evidence the main chain is broken.
+
+See `INFERENCE.md` §8.2 / §3 for the mode→provider policy table that makes
+Chat/Work cloud-by-design while Privacy is local-and-fail-closed.
 
 ## 5. What ships on a tenant node
 
@@ -1809,7 +1914,68 @@ Inside each client installation, there is a strict two-tier privilege boundary:
 | **Dashboard & Metrics** | Global seat counts, usage across roles, node health | Organization-wide seat usage, department/student consumption |
 | **Satchida Gateway Proxy Config** | **Full**: Configures tenant virtual keys & upstream routes | **None**: Zero access to upstream provider configs |
 
+### 2.1 Tenant Administrator Role & One-API Seat Caps (P2)
+
+The hierarchy table above describes the *ideal* tenant-admin posture. This subsection documents
+how that posture is **mechanically enforced** in the code, and where the seat cap lives.
+
+**The limited role.** A tenant administrator provisioned for day-to-day user management is a
+`TENANT_ADMIN` role principal granted a deliberately restricted capability set:
+
+| Capability | Held? | Why |
+|---|---|---|
+| `access:admin` | yes | opens the shared admin surface (`/api/admin/*` routes are behind `requireAdminSurface`) |
+| `manage:users` | yes | create/edit users, assign to pre-seeded groups |
+| `read:users` | implied | `MANAGE_USERS` implies `read:users` (`CapabilityImplications`) |
+| `read:groups` | yes | list groups so the operator can assign users into them |
+| `manage:groups` | **no** | cannot create/edit groups — the over-grant defect in `seedTenantAdmin` |
+| `manage:roles` | **no** | cannot promote users or mutate role policy |
+| `manage:configs` / `assign:configs` | **no** | cannot change YAML/endpoint config |
+| `operator:control` | **no** | cannot mint platform operators; refused outright by `grantCapability` |
+
+The pre-existing `seedTenantAdmin` (route `POST /admin/grants/tenant-admin`, operator-only) grants
+the **full** set including `manage:groups` + `manage:roles` — that remains the provisioning path for
+a *super* tenant admin. `seedTenantUserAdmin` is the limited companion used for the day-to-day admin.
+
+**Enforcement is layered, not trusted to the seed alone:**
+- Route wiring already denials by capability, independent of who holds the grant:
+  `api/server/routes/admin/groups.js` gates every group write on `requireCapability(MANAGE_GROUPS)`;
+  `roles.js` gates role writes on `MANAGE_ROLES`; `config.js` is `OPERATOR_CONTROL`-only. A `TENANT_ADMIN`
+  principal (no `manage:groups`) is therefore 403 on `POST /admin/groups`, `POST /admin/roles`, and
+  all config mutation, *before* any handler runs.
+- `POST /admin/users` (create) and `PATCH /admin/users/:id` (update) are gated on
+  `requireCapability(MANAGE_USERS)` — the coarse `ACCESS_ADMIN`-only create path that previously
+  admitted any tenant admin is retired.
+- `grantCapability` itself refuses `operator:control` for any `ROLE`/`GROUP` principal, so neither
+  seed can escalate a tenant admin to platform operator.
+
+**Seat caps are enforced upstream, not in LibreChat.** Account types
+(`Standard`/`Family`/`Pro-Family`/`Pro`/`Enterprise`/`Privacy`) map 1:1 to one-api `Group` rows via
+`groupPolicyByAccountType` (`D:/LAN-AI-Infra/one-api/model/group.go`, `ValidAccountTypes`). Seats live
+on `Group.MaxSeats`. `CreateTenantToken` (`model/tenant_token.go:101-140`) performs a hard
+seat-cap transaction and rejects with HTTP 409 `group seat cap exceeded`
+(`controller/tenant_token.go:60-95`) once allocation is exhausted. LibreChat mirrors the account-type
+set as `ACCOUNT_TYPES` (`packages/api/src/admin/users.ts`); `createUser` resolves the account type to
+its group via `findGroupByName(accountType.value)` then `addUserToGroup(userId, group._id)`, so a
+tenant admin provisions users *into* operator-seeded groups and can never exceed `Group.MaxSeats`
+because one-api, not LibreChat, is the authority of record for seat counts.
+
+**Provisioning API.** Operator-only (gated at the route layer by
+`requireCapability(OPERATOR_CONTROL, { platformOnly: true })` so a tenant admin cannot mint peers):
+
+| Method | Route | Handler | Seeds |
+|---|---|---|---|
+| `POST` | `/admin/grants/tenant-admin` | `provisionTenantAdmin` | `seedTenantAdmin` (full: +manage:groups, +manage:roles) |
+| `POST` | `/admin/grants/tenant-user-admin` | `provisionTenantUserAdmin` (new) | `seedTenantUserAdmin` (limited: manage:users + reads only) |
+
+Both delegates call through to `db.seedTenantAdmin` / `db.seedTenantUserAdmin`, which are
+`createSystemGrantMethods` upserts spread onto the legacy `db` object in `api/models/index.js`
+(`...methods`). Grants are tenant-scoped (`tenantId` set on every row), so a tenant admin's authority
+is invisible to platform checks and to every other tenant.
+
 ## 3. End-to-End User Lifecycle & Automated Bulk Provisioning
+
+
 
 To handle institutions with 1,000 to 5,000+ end users efficiently without manual overhead:
 
@@ -2134,5 +2300,64 @@ Whether a tenant deploys **LibreChat**, **LobeChat**, **Satchida Harness**, or *
    - Casbin policies gate vector collection retrieval: a "Student" role cannot query "Teacher Exam Keys" or "Board Minutes".
    - Retrieval queries hitting Satchida Gateway cloud models only forward the synthesized context with synthetic pseudonymous seat tokens.
 
+---
 
+## 20. Extended Ecosystem Evaluation: Productivity, "Work", and "Study" Modules
 
+To elevate the Satchida AI Harness into a self-contained productivity and learning environment, candidate open-source repositories must be continuously evaluated across three surface integration tiers:
+1. **Model Context Protocol (MCP) Server**: Headless tool invocation directly from the LibreChat chat composer prompt.
+2. **Chat Composer / Canvas Action**: Inline capabilities (e.g. quick slide generator, visual artifact renderer, prompt-to-card generator).
+3. **Left Navigation Full-Page / Embedded Sub-App**: Unified sub-router embedding (similar to `/api/ide/` in Section 18) using an iframe or proxy view with JWT authentication.
+
+### 20.1 Candidate Repositories for Direct Evaluation
+
+| Repository | Primary Capability | Integration Surface | Integration Mode & Strategy | Target Mode |
+| :--- | :--- | :--- | :--- | :--- |
+| **`techwatch4all-bit/ppt-master`** *(Hugo He)* [github](https://github.com/hugohe3/ppt-master) | AI presentation generator emitting native `.pptx` decks (slide masters, editable shapes, tables, charts). | **Chat Box Action & MCP Tool** | Provide an MCP tool or quick composer action (`/ppt`) that ingests active conversation notes or attached documents and triggers local pptx generation; artifact preview rendered in chat. | **Work & Study** |
+| **`kuafuai/andee`** [github](https://github.com/kuafuai/andee) | On-device autonomous agent for Android automation via accessibility APIs (screen parsing, gestures, cross-app execution). | **MCP Tool & Mobile Companion Bridge** | Connects to the Satchida mobile edge client. LibreChat agents issue MCP action goals to `andee` running on-device for automating student/work tasks across Android apps without cloud telemetry. | **Work** (Task Automation) |
+| **`immich-app/immich`** [github](https://github.com/immich-app/immich) | High-performance self-hosted photo, image, and media management platform with facial recognition and vector semantic search. | **Left Nav Page + MCP Tool** | **Left Nav**: Embedded dedicated visual asset gallery (`/api/media/` or webview) with reverse proxying and JWT session sharing.<br>**MCP Tool**: Agent search queries for local tenant images, school event archives, or diagram references. | **Work & Study** (Media Archive) |
+| **`nextcloud/server`** [github](https://github.com/nextcloud/server) | Enterprise-grade self-hosted collaboration platform (files, WebDAV, office doc editing, calendars, contacts). | **Left Nav Page + MCP Tool** | **Left Nav**: Complete cloud workspace tab (`/workspace/files`).<br>**MCP Tool**: Agent file browsing, WebDAV document read/write, and calendar meeting scheduling. | **Work & Study** (Knowledge Base & Storage) |
+| **`techwatch4all-bit/designcraft`** *(storytold)* [github](https://github.com/storytold/designcraft) | Rust-based desktop publishing & layout studio (InDesign alternative) featuring Knuth-Plass typesetting, PDF/EPUB export, and agent JSON/MCP control. | **Chat Canvas / Left Nav Studio & MCP Tool** | Connects directly via its native MCP server. The agent generates layout blueprints and document designs; a dedicated Left Nav or Artifact Canvas displays interactive layout proofs. | **Work** (Publishing, Report Design) |
+
+---
+
+### 20.2 Supplemental OSS Repositories for "Work" & "Study" Capabilities
+
+To systematically deepen the platform's utility across enterprise/office ("Work") and school/academic ("Study") modes, the following open-source projects are identified for integration:
+
+#### A. Study Mode (Academics, Memorization & Research)
+1. **`ankitects/anki` / `open-spaced-repetition/fsrs4anki`**:
+   - **Capability**: Spaced repetition, active recall, flashcard generation.
+   - **Integration Tier**: Chat Box tool (auto-synthesizes flashcards from chat notes into `.apkg` files) + Left Nav review deck interface.
+2. **`onemnemo/mnemo`**:
+   - **Capability**: Local-first note-taking, mind-mapping, and flashcard ecosystem with FSRS and Anki import/export.
+   - **Integration Tier**: Left Nav study dashboard and interactive mind-map canvas.
+3. **`zotero/zotero` (Ecosystem / API / MCP)**:
+   - **Capability**: Academic citation management, bibliography tracking, PDF annotation.
+   - **Integration Tier**: MCP Server allowing agents to cite papers, fetch research metadata, and parse reference libraries.
+4. **`excalidraw/excalidraw`**:
+   - **Capability**: Hand-drawn whiteboard, conceptual diagramming, brainstorming.
+   - **Integration Tier**: Chat Artifact viewer or Left Nav whiteboard tab where the agent can generate and stream Excalidraw JSON schematics.
+
+#### B. Work Mode (SMB Operations, Management & Knowledge Automation)
+1. **`paperless-ngx/paperless-ngx`**:
+   - **Capability**: Automated document indexing, OCR, invoice/contract management, and full-text archiving.
+   - **Integration Tier**: Native ingest pipeline into Sovereign RAG + Left Nav document archive. MCP tools allow chat querying of invoices and contracts.
+2. **`nocodb/nocodb`** or **`gristlabs/grist-core`**:
+   - **Capability**: Smart relational database spreadsheets (Airtable / Excel alternatives).
+   - **Integration Tier**: Left Nav data table studio + MCP tool for querying and mutating tenant records (e.g. fee registers, RWA dues).
+3. **`penpot/penpot`**:
+   - **Capability**: Open-source web-based UI/UX design and prototyping tool (Figma alternative).
+   - **Integration Tier**: Left Nav design studio for marketing assets, mockups, and collaborative wireframing.
+4. **`marktext/marktext`** / **`hedgedoc/hedgedoc`**:
+   - **Capability**: Real-time collaborative Markdown editing and publication.
+   - **Integration Tier**: Integrated document editor paired with the agent for drafting policy papers, essays, and reports.
+
+---
+
+### 20.3 Architectural Evaluation Criteria for Proposed Modules
+Every candidate repository added to the harness must pass the **Satchida Distributed Multi-Tenant Architecture Rules**:
+1. **Bare-Metal Windows Compatibility**: The service must execute natively on Windows 11 Pro/Enterprise (via Node.js, Python, Rust, Go, or Win32 binary) without mandatory Docker virtualization.
+2. **Zero Cloud VPS / CGNAT Compliance**: External access must route strictly through Cloudflare Zero Trust Named Tunnels (`cloudflared`) on `*.satchida.com`.
+3. **Strict Physical Tenant Isolation**: Data stores must be partitioned per tenant edge node without multi-tenant database co-mingling.
+4. **JWT & Identity Passthrough**: Web interfaces must integrate into LibreChat's authentication gate via reverse-proxy headers (`x-forwarded-user`, `Authorization`) or sub-route embedding (`/api/<service>/`).

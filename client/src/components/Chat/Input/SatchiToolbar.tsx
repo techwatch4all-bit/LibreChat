@@ -25,6 +25,10 @@ import {
   ChevronDown,
   Wrench,
   BookOpen,
+  FolderLock,
+  FileText,
+  Presentation,
+  Table2,
 } from 'lucide-react';
 import {
   satchiModeAtom,
@@ -119,6 +123,42 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
       message: current.trim()
         ? 'Prompt expanded to expert format!'
         : 'Loaded Satchida executive prompt template!',
+      status: 'info',
+    });
+  }, [disabled, getText, setText, showToast]);
+
+  // Knowledge Vault & Document Synthesis Quick-Tools
+  const handleDocSynthesis = useCallback(
+    (format: 'pdf' | 'docx' | 'xlsx' | 'pptx') => {
+      if (disabled || !getText || !setText) return;
+      const current = getText();
+      const formatNames = {
+        pdf: 'Executive PDF Report',
+        docx: 'Formatted Word Document (.docx)',
+        xlsx: 'Financial/Data Spreadsheet (.xlsx)',
+        pptx: 'Presentation Slide Deck (.pptx)',
+      };
+      const instructions = {
+        pdf: `Generate a comprehensive, professionally formatted Executive Report as a PDF file named "Executive_Report_${Date.now()}.pdf". Ingest it into my private AnythingLLM vault upon completion. Body context:\n${current || 'Provide strategic industry analysis, SWOT evaluation, and executive milestones.'}`,
+        docx: `Compile a complete Microsoft Word document (.docx) named "Project_Brief_${Date.now()}.docx" with structured headings, executive summary, and bullet points based on the following:\n${current || 'Scope of work, technical architecture, and risk mitigations.'}`,
+        xlsx: `Build an Excel spreadsheet (.xlsx) named "Financial_Model_${Date.now()}.xlsx" with clean tabular matrix data, column headers, and financial summaries for:\n${current || 'Quarterly revenue, operational expenses, and net profit projections.'}`,
+        pptx: `Create a PowerPoint slide presentation (.pptx) named "Pitch_Deck_${Date.now()}.pptx" with a title slide and structured bullet slides detailing:\n${current || 'Problem statement, proposed AI solution, system architecture, and go-to-market plan.'}`,
+      };
+      setText(instructions[format]);
+      showToast({
+        message: `Prepared ${formatNames[format]} prompt for AnythingLLM engine!`,
+        status: 'info',
+      });
+    },
+    [disabled, getText, setText, showToast],
+  );
+
+  const handleVaultSearch = useCallback(() => {
+    if (disabled || !getText || !setText) return;
+    const current = getText();
+    setText(`Query my AnythingLLM private knowledge vault using semantic RAG for: "${current || 'latest uploaded reports and documentation'}" and synthesize the answer with exact source citations.`);
+    showToast({
+      message: 'Configured Knowledge Vault RAG query!',
       status: 'info',
     });
   }, [disabled, getText, setText, showToast]);
@@ -314,6 +354,106 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   {imageGen && <span className="text-[10px] text-emerald-400 font-medium">ON</span>}
                 </div>
                 <div className="text-[11px] text-text-secondary leading-tight">Photorealistic visual synthesis</div>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+                {/* 🏛️ Satchida Knowledge Vault (AnythingLLM MCP Trigger) */}
+        <DropdownMenu>
+          <TooltipAnchor
+            description="Knowledge Vault (AnythingLLM Vector Search & Multi-Format Document Generation)"
+            side="top"
+            render={
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  aria-label="Knowledge Vault & Document Generation"
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 text-xs font-medium text-purple-400 shadow-xs transition-all',
+                    'hover:border-purple-500 hover:bg-purple-950/40 hover:text-purple-300 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+                  )}
+                >
+                  <FolderLock className="h-3.5 w-3.5 text-purple-400" />
+                  <span className="font-semibold">Vault</span>
+                  <ChevronDown className="h-3 w-3 text-purple-400/70" />
+                </button>
+              </DropdownMenuTrigger>
+            }
+          />
+          <DropdownMenuContent
+            align="start"
+            side="top"
+            className="w-68 rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl select-none"
+          >
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              AnythingLLM Sovereign Vault
+            </div>
+
+            {/* 🔍 Query Vault RAG */}
+            <DropdownMenuItem
+              onClick={handleVaultSearch}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+            >
+              <FolderLock className="h-4 w-4 text-purple-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-text-primary">Search Knowledge Vault</div>
+                <div className="text-[11px] text-text-secondary leading-tight">Semantic RAG & verified source citations</div>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="my-1 bg-border-light/60" />
+
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Generate Formatted Document
+            </div>
+
+            {/* 📄 PDF Report */}
+            <DropdownMenuItem
+              onClick={() => handleDocSynthesis('pdf')}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+            >
+              <FileText className="h-4 w-4 text-rose-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-text-primary">Generate PDF Report</div>
+                <div className="text-[11px] text-text-secondary leading-tight">ReportLab typographical layout</div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 📊 PPTX Slides */}
+            <DropdownMenuItem
+              onClick={() => handleDocSynthesis('pptx')}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+            >
+              <Presentation className="h-4 w-4 text-amber-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-text-primary">Generate PPTX Deck</div>
+                <div className="text-[11px] text-text-secondary leading-tight">Multi-slide presentation deck</div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 📈 Excel Spreadsheet */}
+            <DropdownMenuItem
+              onClick={() => handleDocSynthesis('xlsx')}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+            >
+              <Table2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-text-primary">Generate Excel (.xlsx)</div>
+                <div className="text-[11px] text-text-secondary leading-tight">Formatted data rows & formulas</div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 📝 Word Document */}
+            <DropdownMenuItem
+              onClick={() => handleDocSynthesis('docx')}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+            >
+              <FileText className="h-4 w-4 text-blue-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-text-primary">Generate Word (.docx)</div>
+                <div className="text-[11px] text-text-secondary leading-tight">Styled Microsoft Word document</div>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>

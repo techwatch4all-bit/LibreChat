@@ -112,6 +112,15 @@ const groupSchema: Schema<IGroup> = new Schema<IGroup>(
       type: [String],
       default: undefined,
     },
+
+    /**
+     * AnythingLLM Knowledge Vault slugs assigned to this group.
+     * Members of this group are permitted to query, search, and contribute to these vaults.
+     */
+    assignedKnowledgeVaults: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true },
 );

@@ -20,4 +20,8 @@ export default defineConfig({
   deps: {
     neverBundle: (id) => !id.startsWith('.') && !id.startsWith('~') && !path.isAbsolute(id),
   },
+  // Skip problematic files during DTS generation (rolldown DTS plugin issues).
+  skip: [
+    '**/src/stream/jobStoreCapabilities.ts',
+  ],
 });

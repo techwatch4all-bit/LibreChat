@@ -295,6 +295,19 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       type: String,
       default: null,
     },
+    suspended: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    dailyMessageLimit: {
+      type: Number,
+      default: null,
+    },
+    assignedKnowledgeVaults: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true },
 );

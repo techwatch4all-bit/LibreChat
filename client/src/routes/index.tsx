@@ -66,6 +66,26 @@ const loadAdminGroupsView = () =>
     Component: m.default,
   }));
 
+const loadAdminUsersView = () =>
+  import('~/components/Admin/UsersList').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadAdminRolesView = () =>
+  import('~/components/Admin/RolesList').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadAdminAuditView = () =>
+  import('~/components/Admin/AuditLogPanel').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadAdminDashboard = () =>
+  import('~/components/Admin/AdminDashboard').then((m) => ({
+    Component: m.default,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -199,6 +219,22 @@ export const router = createBrowserRouter(
               lazy: loadAdminGroupsView,
             },
             {
+              path: 'admin/users',
+              lazy: loadAdminUsersView,
+            },
+            {
+              path: 'admin/roles',
+              lazy: loadAdminRolesView,
+            },
+            {
+              path: 'admin/audit',
+              lazy: loadAdminAuditView,
+            },
+            {
+              path: 'admin',
+              lazy: loadAdminDashboard,
+            },
+            {
               path: 'agents',
               element: (
                 <MarketplaceProvider>
@@ -213,6 +249,11 @@ export const router = createBrowserRouter(
                   <AgentMarketplace />
                 </MarketplaceProvider>
               ),
+            },
+            { /* Catch-all: unmatched routes inside AuthLayout (e.g. /l, /xyz) now */
+              /* redirects to the default chat instead of 404 */
+              path: '*',
+              element: <Navigate to="/c/new" replace={true} />,
             },
           ],
         },

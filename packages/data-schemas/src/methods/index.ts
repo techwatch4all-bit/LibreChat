@@ -1,3 +1,4 @@
+import { createBillingMethods, type BillingMethods } from './billing';
 import type { RoleMethods, RoleDeps } from './role';
 import {
   createOpenIDRefreshFlightMethods,
@@ -487,6 +488,7 @@ export function createMethods(
     ...createAgentCategoryMethods(mongoose),
     ...createTenantPolicyMethods(mongoose),
     ...createTenantEntitlementMethods(mongoose),
+    ...createBillingMethods(mongoose),
     ...createPrivacyAssertionMethods(mongoose, deps.privacyAssertion ?? {}),
     ...createAgentApiKeyMethods(mongoose),
     ...createMCPServerMethods(mongoose),
@@ -546,6 +548,7 @@ export type {
   ToolFavoriteMethods,
   AgentCategoryMethods,
   TenantEntitlementMethods,
+  BillingMethods,
   AgentApiKeyMethods,
   MCPServerMethods,
   CodeEnvironmentMethods,

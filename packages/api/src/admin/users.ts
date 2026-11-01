@@ -151,7 +151,7 @@ function firstString(...values: unknown[]): string | null {
 
 const USER_LIST_FIELDS =
   '_id name username email avatar role provider createdAt updatedAt ' +
-  'tenantId accountType familyAccountId familyRole mustChangePassword seatToken';
+  'tenantId accountType familyAccountId familyRole mustChangePassword seatToken suspended dailyMessageLimit assignedKnowledgeVaults';
 
 /**
  * Last four characters only. The seat token is a bearer credential for the
@@ -382,6 +382,9 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       mustChangePassword: u.mustChangePassword ?? false,
       seatAssigned: Boolean(u.seatToken),
       seatTokenHint: maskSeatToken(u.seatToken),
+      suspended: u.suspended ?? false,
+      dailyMessageLimit: u.dailyMessageLimit ?? null,
+      assignedKnowledgeVaults: u.assignedKnowledgeVaults ?? [],
     };
   }
 
@@ -945,6 +948,24 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           return res.status(400).json({ error: 'Invalid mustChangePassword' });
         }
         update.mustChangePassword = body.mustChangePassword;
+      }
+      if (body.suspended !== undefined) {
+        if (typeof body.suspended !== 'boolean') {
+          return res.status(400).json({ error: 'Invalid suspended field' });
+        }
+        update.suspended = body.suspended;
+      }
+      if (body.dailyMessageLimit !== undefined) {
+        if (body.dailyMessageLimit !== null && (typeof body.dailyMessageLimit !== 'number' || body.dailyMessageLimit < 0)) {
+          return res.status(400).json({ error: 'Invalid dailyMessageLimit' });
+        }
+        update.dailyMessageLimit = body.dailyMessageLimit;
+      }
+      if (body.assignedKnowledgeVaults !== undefined) {
+        if (!Array.isArray(body.assignedKnowledgeVaults)) {
+          return res.status(400).json({ error: 'Invalid assignedKnowledgeVaults' });
+        }
+        update.assignedKnowledgeVaults = body.assignedKnowledgeVaults.filter(v => typeof v === 'string');
       }
       if (body.accountType !== undefined) {
         const parsed = parseAccountType(body.accountType);

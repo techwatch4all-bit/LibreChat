@@ -426,6 +426,87 @@ describe('systemGrant methods', () => {
     });
   });
 
+  describe('seedTenantUserAdmin', () => {
+    it('grants the limited tenant user-admin capability set, scoped to the tenant', async () => {
+      await methods.seedTenantUserAdmin('tenant-school');
+
+      const grants = await methods.getCapabilitiesForPrincipal({
+        principalType: PrincipalType.ROLE,
+        principalId: 'TENANT_ADMIN',
+        tenantId: 'tenant-school',
+      });
+      const capabilities = grants.map((g) => g.capability);
+
+      expect(capabilities).toContain(SystemCapabilities.ACCESS_ADMIN);
+      expect(capabilities).toContain(SystemCapabilities.MANAGE_USERS);
+      expect(capabilities).toContain(SystemCapabilities.READ_USERS);
+      expect(capabilities).toContain(SystemCapabilities.READ_GROUPS);
+      /** The limited seed must NOT hand out group/role/config/operator caps. */
+      expect(capabilities).not.toContain(SystemCapabilities.MANAGE_GROUPS);
+      expect(capabilities).not.toContain(SystemCapabilities.MANAGE_ROLES);
+      expect(capabilities).not.toContain(SystemCapabilities.READ_ROLES);
+      expect(capabilities).not.toContain(SystemCapabilities.MANAGE_CONFIGS);
+      expect(capabilities).not.toContain(SystemCapabilities.OPERATOR_CONTROL);
+      /** Every row carries the tenant — never a platform-scoped grant. */
+      expect(grants.every((g) => g.tenantId === 'tenant-school')).toBe(true);
+    });
+
+    it('never grants OPERATOR_CONTROL', async () => {
+      await methods.seedTenantUserAdmin('tenant-school');
+
+      await expect(
+        SystemGrant.countDocuments({ capability: SystemCapabilities.OPERATOR_CONTROL }),
+      ).resolves.toBe(0);
+    });
+
+    it('cannot edit groups: MANAGE_GROUPS is absent so a tenant user-admin is denied group writes', async () => {
+      await methods.seedTenantUserAdmin('tenant-school');
+      const principals = [{ principalType: PrincipalType.ROLE, principalId: 'TENANT_ADMIN' }];
+
+      /* MANAGE_GROUPS is not granted... */
+      await expect(
+        methods.hasCapabilityForPrincipals({
+          principals,
+          capability: SystemCapabilities.MANAGE_GROUPS,
+          tenantId: 'tenant-school',
+        }),
+      ).resolves.toBe(false);
+
+      /* ...while MANAGE_USERS (user provisioning) is granted. */
+      await expect(
+        methods.hasCapabilityForPrincipals({
+          principals,
+          capability: SystemCapabilities.MANAGE_USERS,
+          tenantId: 'tenant-school',
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it('is idempotent', async () => {
+      await methods.seedTenantUserAdmin('tenant-school');
+      const first = await SystemGrant.countDocuments({ tenantId: 'tenant-school' });
+      await methods.seedTenantUserAdmin('tenant-school');
+      await expect(SystemGrant.countDocuments({ tenantId: 'tenant-school' })).resolves.toBe(first);
+    });
+
+    it('rejects an empty tenantId', async () => {
+      await expect(methods.seedTenantUserAdmin('   ')).rejects.toThrow(/tenantId/);
+    });
+
+    it('honours a custom role name', async () => {
+      await methods.seedTenantUserAdmin('tenant-school', 'school-user-admin');
+
+      const grants = await methods.getCapabilitiesForPrincipal({
+        principalType: PrincipalType.ROLE,
+        principalId: 'school-user-admin',
+        tenantId: 'tenant-school',
+      });
+      const capabilities = grants.map((g) => g.capability);
+      expect(capabilities).toContain(SystemCapabilities.MANAGE_USERS);
+      expect(capabilities).not.toContain(SystemCapabilities.MANAGE_GROUPS);
+    });
+  });
+
   describe('grantCapability', () => {
     it('creates a grant and returns the document', async () => {
       const userId = new Types.ObjectId();

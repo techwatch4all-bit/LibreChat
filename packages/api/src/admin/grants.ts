@@ -102,6 +102,8 @@ export interface AdminGrantsDeps {
   ) => Promise<string | undefined>;
   /** One-shot tenant administrator provisioning (see `seedTenantAdmin`). */
   seedTenantAdmin?: (tenantId: string, roleName?: string) => Promise<void>;
+  /** Limited tenant admin provisioning (see `seedTenantUserAdmin`). */
+  seedTenantUserAdmin?: (tenantId: string, roleName?: string) => Promise<void>;
   /** Optional audit emission. Failure is logged but does not roll back the grant
    * unless `auditFailClosed` is set. */
   recordAuditEntry?: (
@@ -133,6 +135,7 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
   assignGrant: (req: ServerRequest, res: Response) => Promise<Response>;
   revokeGrant: (req: ServerRequest, res: Response) => Promise<Response>;
   provisionTenantAdmin: (req: ServerRequest, res: Response) => Promise<Response>;
+  provisionTenantUserAdmin: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
   const {
     listGrants,
@@ -149,6 +152,7 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     isPlatformOperator,
     resolvePrincipalName,
     seedTenantAdmin,
+    seedTenantUserAdmin,
     recordAuditEntry,
     auditFailClosed,
   } = deps;
@@ -652,6 +656,48 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     }
   }
 
+  /**
+   * Provision a limited tenant administrator in one call.
+   *
+   * Operator-only at the route layer (the route is registered behind
+   * `requireCapability(OPERATOR_CONTROL, { platformOnly: true })`): like
+   * `provisionTenantAdmin`, this writes tenant-scoped grants and only a platform
+   * operator may name a target tenant. `seedTenantUserAdmin` grants a
+   * deliberately restricted capability set (ACCESS_ADMIN, MANAGE_USERS,
+   * READ_USERS, READ_GROUPS) that excludes group/role/config management and
+   * operator control, so the resulting tenant administrator can provision users
+   * into operator-seeded account-type groups without creating new groups or
+   * raising their own authority. See `seedTenantUserAdmin` for the seat-cap
+   * contract enforced upstream by one-api.
+   */
+  async function provisionTenantUserAdminHandler(req: ServerRequest, res: Response) {
+    try {
+      const caller = resolveUser(req);
+      if (!caller) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      if (!seedTenantUserAdmin) {
+        return res.status(501).json({ error: 'Tenant user admin provisioning is not configured' });
+      }
+      const { tenantId, roleName } = (req.body ?? {}) as {
+        tenantId?: unknown;
+        roleName?: unknown;
+      };
+      if (typeof tenantId !== 'string' || !tenantId.trim()) {
+        return res.status(400).json({ error: 'tenantId is required' });
+      }
+      if (roleName !== undefined && typeof roleName !== 'string') {
+        return res.status(400).json({ error: 'Invalid roleName' });
+      }
+      const trimmedTenantId = tenantId.trim();
+      await seedTenantUserAdmin(trimmedTenantId, roleName?.trim() || undefined);
+      return res.status(200).json({ success: true, tenantId: trimmedTenantId });
+    } catch (error) {
+      logger.error('[adminGrants] provisionTenantUserAdmin error:', error);
+      return res.status(500).json({ error: 'Failed to provision tenant user administrator' });
+    }
+  }
+
   return {
     listGrants: listGrantsHandler,
     getEffectiveCapabilities: getEffectiveCapabilitiesHandler,
@@ -659,5 +705,6 @@ export function createAdminGrantsHandlers(deps: AdminGrantsDeps): {
     assignGrant: assignGrantHandler,
     revokeGrant: revokeGrantHandler,
     provisionTenantAdmin: provisionTenantAdminHandler,
+    provisionTenantUserAdmin: provisionTenantUserAdminHandler,
   };
 }

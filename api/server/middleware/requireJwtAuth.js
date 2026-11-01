@@ -182,6 +182,12 @@ const requireJwtAuth = (req, res, next) => {
         logAuthenticationFailure({ strategy, info, status: 401, err });
         return res.status(401).json({ message: 'Unauthorized' });
       }
+      if (user && user.suspended === true) {
+        return res.status(403).json({
+          message: 'Your account has been suspended by an administrator.',
+          code: 'ACCOUNT_SUSPENDED'
+        });
+      }
       req.user = user;
       req.authStrategy = strategy;
       logFallbackSuccess(strategy);

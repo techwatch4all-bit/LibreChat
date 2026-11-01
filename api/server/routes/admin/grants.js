@@ -64,6 +64,8 @@ const handlers = createAdminGrantsHandlers({
     return undefined;
   },
   seedTenantAdmin: db.seedTenantAdmin,
+  /** Limited tenant user-admin seed (ACCESS_ADMIN + MANAGE_USERS + reads). */
+  seedTenantUserAdmin: db.seedTenantUserAdmin,
   recordAuditEntry: db.recordAuditEntry,
   /** Opt-in: fail the grant request if its audit entry can't be persisted. */
   auditFailClosed: process.env.AUDIT_LOG_FAIL_CLOSED === 'true',
@@ -80,6 +82,12 @@ router.post('/', handlers.assignGrant);
  * must not be able to mint further tenant administrators.
  */
 router.post('/tenant-admin', requireOperator, handlers.provisionTenantAdmin);
+/**
+ * Operator-only. Provisions a LIMITED tenant administrator — create/edit users
+ * and assign them to pre-seeded account-type groups, but NOT create/edit groups
+ * or roles. Seat caps are enforced upstream by one-api (Group.MaxSeats, HTTP 409).
+ */
+router.post('/tenant-user-admin', requireOperator, handlers.provisionTenantUserAdmin);
 /** Callers should encodeURIComponent the capability for client compatibility (e.g. manage%3Aconfigs%3Aendpoints). */
 router.delete('/:principalType/:principalId/:capability', handlers.revokeGrant);
 

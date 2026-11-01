@@ -33,6 +33,7 @@ export type AdminGroup = {
   localPrivacyEnabled?: boolean;
   allowedCapabilities?: TenantSeatCapability[];
   allowedModes?: string[];
+  assignedKnowledgeVaults?: string[];
   createdAt?: string;
   updatedAt?: string;
 };

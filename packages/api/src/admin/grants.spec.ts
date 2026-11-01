@@ -1531,4 +1531,68 @@ describe('createAdminGrantsHandlers', () => {
       expect(json).toHaveBeenCalledWith({ error: 'Failed to provision tenant administrator' });
     });
   });
+
+  describe('provisionTenantUserAdmin', () => {
+    it('returns 401 without an authenticated caller', async () => {
+      const handlers = createAdminGrantsHandlers(createDeps());
+      const { req, res, status, json } = createReqRes();
+      req.user = undefined;
+
+      await handlers.provisionTenantUserAdmin(req, res);
+
+      expect(status).toHaveBeenCalledWith(401);
+      expect(json).toHaveBeenCalledWith({ error: 'Authentication required' });
+    });
+
+    it('returns 501 when provisioning is not configured', async () => {
+      const handlers = createAdminGrantsHandlers(createDeps());
+      const { req, res, status, json } = createReqRes({ body: { tenantId: 'tenant-a' } });
+
+      await handlers.provisionTenantUserAdmin(req, res);
+
+      expect(status).toHaveBeenCalledWith(501);
+      expect(json).toHaveBeenCalledWith({
+        error: 'Tenant user admin provisioning is not configured',
+      });
+    });
+
+    it('requires a tenantId', async () => {
+      const seedTenantUserAdmin = jest.fn().mockResolvedValue(undefined);
+      const handlers = createAdminGrantsHandlers(createDeps({ seedTenantUserAdmin }));
+      const { req, res, status, json } = createReqRes({ body: {} });
+
+      await handlers.provisionTenantUserAdmin(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'tenantId is required' });
+      expect(seedTenantUserAdmin).not.toHaveBeenCalled();
+    });
+
+    it('seeds the limited tenant user admin and returns the tenant', async () => {
+      const seedTenantUserAdmin = jest.fn().mockResolvedValue(undefined);
+      const handlers = createAdminGrantsHandlers(createDeps({ seedTenantUserAdmin }));
+      const { req, res, status, json } = createReqRes({
+        body: { tenantId: ' tenant-a ', roleName: 'TENANT_ADMIN' },
+      });
+
+      await handlers.provisionTenantUserAdmin(req, res);
+
+      expect(seedTenantUserAdmin).toHaveBeenCalledWith('tenant-a', 'TENANT_ADMIN');
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith({ success: true, tenantId: 'tenant-a' });
+    });
+
+    it('returns 500 when provisioning throws', async () => {
+      const deps = createDeps({
+        seedTenantUserAdmin: jest.fn().mockRejectedValue(new Error('db down')),
+      });
+      const handlers = createAdminGrantsHandlers(deps);
+      const { req, res, status, json } = createReqRes({ body: { tenantId: 'tenant-a' } });
+
+      await handlers.provisionTenantUserAdmin(req, res);
+
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({ error: 'Failed to provision tenant user administrator' });
+    });
+  });
 });

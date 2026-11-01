@@ -114,6 +114,9 @@ export interface IUser extends Document {
   parentalTranscriptConsentVersion?: string | null;
   imageGenerationConsentAt?: Date | null;
   imageGenerationConsentVersion?: string | null;
+  suspended?: boolean;
+  dailyMessageLimit?: number | null;
+  assignedKnowledgeVaults?: string[];
   createdAt?: Date;
   updatedAt?: Date;
   /** Field for external source identification (for consistency with TPrincipal schema) */

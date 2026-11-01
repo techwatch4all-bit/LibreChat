@@ -70,6 +70,8 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
   seedSystemGrants: () => Promise<void>;
   bootstrapOperatorCapability: (userId?: string) => Promise<void>;
   seedTenantAdmin: (tenantId: string, roleName?: string) => Promise<void>;
+  /** Limited tenant admin: user CRUD + group read, no group/role/config/operator caps. */
+  seedTenantUserAdmin: (tenantId: string, roleName?: string) => Promise<void>;
   revokeCapability: (
     {
       principalType,
@@ -681,6 +683,72 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
    * When `tenantId` is omitted, ALL grants for the principal are removed
    * regardless of tenant scope.
    */
+  /**
+   * Provision a limited tenant administrator.
+   *
+   * Unlike `seedTenantAdmin` (which grants the full management set, including
+   * `manage:groups`, `manage:roles` and `manage:configs`), this grants only the
+   * capabilities a tenant day-to-day admin needs: `access:admin`, `manage:users`,
+   * `read:users` and `read:groups`. It deliberately omits `manage:groups`,
+   * `manage:roles`, `manage:configs` and `operator:control`, so a tenant admin
+   * provisioned this way cannot create or edit groups/roles, cannot change
+   * config, and cannot raise their own authority.
+   *
+   * Seat enforcement lives upstream in one-api: `Group.MaxSeats` is checked in
+   * `CreateTenantToken` (which rejects with HTTP 409 once a group's allocation is
+   * exhausted). The tenant admin therefore cannot exceed the operator-provisioned
+   * seat count for an account-type group. Account types
+   * (Standard/Family/Pro/Pro-Family/Enterprise/Privacy) map 1:1 to one-api
+   * `Group` rows (`groupPolicyByAccountType`); a tenant admin assigns new users
+   * into those pre-created groups via the account-type → group lookup in
+   * `createUser`, never by minting new groups.
+   *
+   * Idempotent: `grantCapability` is an insert-only upsert, so re-running is a
+   * no-op. Tenant-scoped rows are invisible to platform checks and to every other
+   * tenant (see `tenantCondition`), so this can never confer cross-tenant
+   * authority; `grantCapability` refuses `operator:control` outright, so this
+   * cannot escalate a tenant admin to platform operator either.
+   */
+  async function seedTenantUserAdmin(
+    tenantId: string,
+    roleName: string = 'TENANT_ADMIN',
+  ): Promise<void> {
+    const trimmedTenantId = tenantId?.trim();
+    if (!trimmedTenantId) {
+      throw new Error('seedTenantUserAdmin requires a tenantId');
+    }
+    const trimmedRole = roleName?.trim();
+    if (!trimmedRole) {
+      throw new Error('seedTenantUserAdmin requires a role name');
+    }
+    const tenantUserAdminCapabilities: BaseSystemCapability[] = [
+      SystemCapabilities.ACCESS_ADMIN,
+      SystemCapabilities.MANAGE_USERS,
+      SystemCapabilities.READ_USERS,
+      SystemCapabilities.READ_GROUPS,
+    ];
+    await Promise.all(
+      tenantUserAdminCapabilities.map((capability) =>
+        grantCapability({
+          principalType: PrincipalType.ROLE,
+          principalId: trimmedRole,
+          capability,
+          tenantId: trimmedTenantId,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Delete system grants for a principal.
+   * Used for cascade cleanup when a principal (group, role) is deleted.
+   *
+   * When `tenantId` is provided, only grants scoped to **exactly** that
+   * tenant are removed — platform-level grants (no tenantId) are left
+   * intact so they continue to serve other tenants.
+   * When `tenantId` is omitted, ALL grants for the principal are removed
+   * regardless of tenant scope.
+   */
   async function deleteGrantsForPrincipal(
     principalType: PrincipalType,
     principalId: string | Types.ObjectId,
@@ -707,6 +775,7 @@ export function createSystemGrantMethods(mongoose: typeof import('mongoose')): {
     seedSystemGrants,
     bootstrapOperatorCapability,
     seedTenantAdmin,
+    seedTenantUserAdmin,
     revokeCapability,
     hasCapabilityForPrincipals,
     hasAnyConfigReadAccess,

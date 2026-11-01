@@ -279,30 +279,60 @@ const startServer = async () => {
   const routes = require('./routes');
 
   const indexPath = path.join(appConfig.paths.dist, 'index.html');
-  let indexHTML = fs.readFileSync(indexPath, 'utf8');
 
-  // In order to provide support to serving the application in a sub-directory
-  // We need to update the base href if the DOMAIN_CLIENT is specified and not the root path
-  if (process.env.DOMAIN_CLIENT) {
+  // The SPA shell is served from memory for every request, but the on-disk
+  // `client/dist/index.html` changes whenever the client is rebuilt. Cache the
+  // parsed base href once; re-read the shell only when the file's mtime moves so
+  // a freshly rebuilt client is picked up without a server restart. If a re-read
+  // fails (the dist file is mid-replace), fall back to the last good shell
+  // instead of returning a 500 to every visitor mid-deploy.
+  const baseHref = (() => {
+    if (!process.env.DOMAIN_CLIENT) {
+      return null;
+    }
     const clientUrl = new URL(process.env.DOMAIN_CLIENT);
-    const baseHref = clientUrl.pathname.endsWith('/')
+    const base = clientUrl.pathname.endsWith('/')
       ? clientUrl.pathname
       : `${clientUrl.pathname}/`;
-    if (baseHref !== '/') {
-      logger.info(`Setting base href to ${baseHref}`);
-      indexHTML = indexHTML.replace(/base href="\/"/, `base href="${baseHref}"`);
+    if (base === '/') {
+      return null;
     }
-  }
+    logger.info(`Setting base href to ${base}`);
+    return base;
+  })();
 
-  /* The composer lays out against whether a footer bar sits beneath it, and
-     `/api/config` answers that only after it has painted. One shell serves every
-     request, before there is a caller whose overrides could be resolved, so the
-     answer is the deployment's base configuration; `/api/config` resolves the
-     caller's and the client prefers it. */
-  indexHTML = injectConfiguredFooterBootstrap(indexHTML, {
-    customFooter: process.env.CUSTOM_FOOTER,
-    interfaceConfig: appConfig?.interfaceConfig,
-  });
+  let indexHTML = '';
+  let indexMtime = -1;
+  const renderIndexHtml = () => {
+    let mtime = indexMtime;
+    try {
+      mtime = fs.statSync(indexPath).mtimeMs;
+    } catch {
+      /* dist not present yet / briefly gone; keep whatever we last have */
+    }
+    if (indexHTML && mtime === indexMtime) {
+      return indexHTML;
+    }
+    try {
+      const fresh = fs.readFileSync(indexPath, 'utf8');
+      const withBase = baseHref
+        ? fresh.replace(/base href="\/"/, `base href="${baseHref}"`)
+        : fresh;
+      /* The composer lays out against whether a footer bar sits beneath it, and
+       * `/api/config` answers that only after it has painted. One shell serves
+       * every request, before there is a caller whose overrides could be
+       * resolved, so the answer is the deployment's base configuration;
+       * `/api/config` resolves the caller's and the client prefers it. */
+      indexHTML = injectConfiguredFooterBootstrap(withBase, {
+        customFooter: process.env.CUSTOM_FOOTER,
+        interfaceConfig: appConfig?.interfaceConfig,
+      });
+      indexMtime = mtime;
+    } catch (err) {
+      logger.error(`[indexHtml] failed to re-read shell, serving cached copy: ${err.message}`);
+    }
+    return indexHTML;
+  };
 
   const cspPolicy = createCspPolicy();
   const shellCache = shellCacheHeaders(cspPolicy != null);
@@ -313,7 +343,7 @@ const startServer = async () => {
 
     const lang = req.cookies.lang || req.headers['accept-language']?.split(',')[0] || 'en-US';
     const saneLang = escapeHtmlAttribute(lang);
-    let updatedIndexHtml = indexHTML.replace(/lang="en-US"/g, () => `lang="${saneLang}"`);
+    let updatedIndexHtml = renderIndexHtml().replace(/lang="en-US"/g, () => `lang="${saneLang}"`);
     updatedIndexHtml = maybeInjectQueryDevtoolsBootstrap(updatedIndexHtml, req);
 
     /* Nonce last: every injected script above must be stamped too. */
@@ -420,6 +450,8 @@ const startServer = async () => {
   app.use('/api/admin/skills', routes.adminSkills);
   app.use('/api/admin/users', routes.adminUsers);
   app.use('/api/admin/audit-log', routes.adminAuditLog);
+  app.use('/api/admin/reconciliation', routes.adminReconciliation);
+  app.use('/api/admin/vaults', routes.adminVaults);
   app.use('/api/actions', routes.actions);
   app.use('/api/keys', routes.keys);
   app.use('/api/api-keys', routes.apiKeys);

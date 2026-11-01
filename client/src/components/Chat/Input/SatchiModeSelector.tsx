@@ -60,9 +60,9 @@ const MODES: ModeDef[] = [
   },
   {
     id: 'VibeCoder',
-    labelKey: 'com_satchi_mode_work',
+    labelKey: 'com_satchi_mode_vibecoder',
     defaultLabel: 'Vibe Coder',
-    descKey: 'com_satchi_mode_work_desc',
+    descKey: 'com_satchi_mode_vibecoder_desc',
     defaultDesc: 'Rapid full-stack web app synthesis & interactive in-browser preview',
     icon: Code2,
     accentColor: 'text-violet-500 dark:text-violet-400',
@@ -100,7 +100,7 @@ function SatchiModeSelector({
   const isChild = user?.familyRole === 'minor';
   const [upgradeModal, setUpgradeModal] = React.useState<{
     open: boolean;
-    feature: 'vibecoding' | 'privacy';
+    feature: 'work' | 'study' | 'vibecoding' | 'privacy';
   }>({ open: false, feature: 'vibecoding' });
 
   // UI affordances reflect server-provisioned account/profile. API and tool
@@ -120,8 +120,13 @@ function SatchiModeSelector({
   // the chat mode, with the other modes visible but locked.
   const effectiveType = resolveTenantAccountType(accountType);
   const allowedModes = accountTypeModes(effectiveType);
+  // The operator (ADMIN role) manages the fleet and is entitled to every cloud
+  // mode and work tool regardless of its seat allocation. The server enforces the
+  // same bypass: an operator session carries no `seatToken`, so it is processed
+  // outside the tenant-seat policy block in the custom-initialize handler.
+  const isAdmin = user?.role === 'ADMIN';
   const isPro = Boolean(
-    user?.role === 'ADMIN' || ['pro', 'pro_family', 'enterprise', 'privacy'].includes(accountType),
+    isAdmin || ['pro', 'pro_family', 'enterprise', 'privacy'].includes(accountType),
   );
   const isFamily = effectiveType === 'family';
   // A dedicated `privacy` seat is a local product. It may also reach the cloud
@@ -129,10 +134,16 @@ function SatchiModeSelector({
   // server-provided capability list rather than by the account type, so the
   // client never decides on its own that a Privacy seat cannot use Work.
   const isPrivacySeat = effectiveType === 'privacy';
-  const allowWork = !isChild && allowedModes.includes('Work');
-  const allowStudy = allowedModes.includes('Study');
+  // Operator bypasses the account-type mode table and the work-tool capability
+  // gate (which is what greys out the pptx/docx/host/write/attach tools). Privacy
+  // is intentionally NOT bypassed: it is a fail-closed local product that needs
+  // a provisioned per-node assertion, so it stays gated by the seat policy.
+  const allowWork = isAdmin || (!isChild && allowedModes.includes('Work'));
+  const allowStudy = isAdmin || allowedModes.includes('Study');
   const canUseWorkTools =
-    (isPro || isPrivacySeat) && !isFamily && !isChild && (user?.tenantSeatCapabilities?.length ?? 0) > 0;
+    isAdmin ||
+    ((isPro || isPrivacySeat) && !isFamily && !isChild && (user?.tenantSeatCapabilities?.length ?? 0) > 0);
+  const canUsePrivacy = allowedModes.includes('Privacy') && !(isFamily && user?.privacyEntitled !== true);
 
   // If conversation has a spec, keep currentMode in sync if matching
   const activeMode = (conversation?.spec as SatchiMode) || currentMode;
@@ -148,18 +159,18 @@ function SatchiModeSelector({
     if (disabled) return;
 
     if (mode === 'Work' && !allowWork) {
-      setUpgradeModal({ open: true, feature: 'vibecoding' });
+      setUpgradeModal({ open: true, feature: 'work' });
       return;
     }
     if (mode === 'Study' && !allowStudy) {
-      setUpgradeModal({ open: true, feature: 'vibecoding' });
+      setUpgradeModal({ open: true, feature: 'study' });
       return;
     }
     if (mode === 'VibeCoder' && !canUseWorkTools) {
       setUpgradeModal({ open: true, feature: 'vibecoding' });
       return;
     }
-    if (mode === 'Privacy' && (!isPro || isFamily && user?.privacyEntitled !== true)) {
+    if (mode === 'Privacy' && !canUsePrivacy) {
       setUpgradeModal({ open: true, feature: 'privacy' });
       return;
     }
@@ -243,14 +254,10 @@ function SatchiModeSelector({
                 (mode.id === 'Work' && !allowWork) ||
                 (mode.id === 'Study' && !allowStudy) ||
                 (mode.id === 'VibeCoder' && !canUseWorkTools) ||
-                // The privacy mode follows the same table as the others, so a
-                // seat that the table does not give it sees it greyed out like
-                // any other mode it cannot use. A family seat additionally
-                // needs the server's privacy entitlement, because the local
-                // model is the tenant's own.
-                (mode.id === 'Privacy' &&
-                  (!allowedModes.includes('Privacy') ||
-                    (isFamily && user?.privacyEntitled !== true)));
+                // Privacy is a fail-closed local product: the same seat-policy
+                // gate applies to every account, including the operator, because a
+                // local-runtime assertion must be provisioned per node.
+                (mode.id === 'Privacy' && !canUsePrivacy);
 
               return (
                 <DropdownMenuRadioItem

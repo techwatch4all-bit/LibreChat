@@ -223,6 +223,9 @@ export type AdminUserListItem = {
   seatTokenHint?: string | null;
   /** Groups this user belongs to, as ids. */
   groupIds?: string[];
+  suspended?: boolean;
+  dailyMessageLimit?: number | null;
+  assignedKnowledgeVaults?: string[];
 };
 
 /** A group membership as returned by the admin user-groups endpoint. */

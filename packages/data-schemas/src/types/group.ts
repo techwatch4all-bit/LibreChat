@@ -90,6 +90,7 @@ export interface CreateGroupRequest {
   localPrivacyEnabled?: boolean;
   allowedCapabilities?: TenantSeatCapability[];
   allowedModes?: string[];
+  assignedKnowledgeVaults?: string[];
 }
 
 export interface UpdateGroupRequest {

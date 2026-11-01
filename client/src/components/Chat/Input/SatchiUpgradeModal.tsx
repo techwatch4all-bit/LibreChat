@@ -6,7 +6,7 @@ import { useLocalize } from '~/hooks';
 interface SatchiUpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  featureName: 'vibecoding' | 'research' | 'privacy';
+  featureName: 'work' | 'study' | 'vibecoding' | 'research' | 'privacy';
 }
 
 function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeModalProps) {
@@ -14,14 +14,20 @@ function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeMo
 
   const title = localize('com_satchi_upgrade_pro_title') || 'Pro Subscription Required';
   const description =
-    featureName === 'vibecoding'
-      ? localize('com_satchi_upgrade_pro_vibecoding') ||
-        'Vibe-Coding is reserved for Pro and Enterprise accounts. Upgrade your plan to unlock automated full-stack code synthesis and live browser artifacts.'
-      : featureName === 'privacy'
-        ? localize('com_satchi_upgrade_pro_privacy') ||
-          'On-device sovereign privacy mode is reserved for Pro and Enterprise accounts. Upgrade your plan to enable 100% on-device local execution.'
-        : localize('com_satchi_upgrade_pro_research') ||
-          'Deep Research is reserved for Pro and Enterprise accounts. Upgrade your plan to unlock exhaustive multi-turn web search and deep synthesis.';
+    featureName === 'work'
+      ? localize('com_satchi_upgrade_pro_work') ||
+        'Work mode is reserved for Pro, Enterprise, and Privacy accounts. Upgrade your plan to unlock business analysis, planning, and the developer tool chain.'
+      : featureName === 'study'
+        ? localize('com_satchi_upgrade_pro_study') ||
+          'Study mode is reserved for Family, Pro, Enterprise, and Privacy accounts. Upgrade your plan to unlock the educational tutor and deep-research tools.'
+        : featureName === 'vibecoding'
+          ? localize('com_satchi_upgrade_pro_vibecoding') ||
+            'Vibe Coder is reserved for Pro, Enterprise, and Privacy accounts. Upgrade your plan to unlock automated full-stack code synthesis and live browser artifacts.'
+          : featureName === 'privacy'
+            ? localize('com_satchi_upgrade_pro_privacy') ||
+              'On-device sovereign privacy mode is reserved for Enterprise and Privacy accounts plus a healthy local model. Upgrade your plan to unlock 100% on-device local execution.'
+            : localize('com_satchi_upgrade_pro_research') ||
+              'Deep Research is reserved for Pro, Enterprise, and Privacy accounts. Upgrade your plan to unlock exhaustive multi-turn web search and deep synthesis.';
 
   return (
     <OGDialog open={open} onOpenChange={onOpenChange}>

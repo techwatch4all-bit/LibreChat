@@ -46,6 +46,7 @@
     "axios": "^1.20.0",
     "croner": "^10.0.1",
     "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
     "js-yaml": "^4.3.2",
     "re2js": "^2.8.6",
     "zod": "^3.22.4"
@@ -58,7 +59,7 @@
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.1.0",
-    "@rollup/plugin-replace": "^5.0.5",
+    "@rollup/plugin-replace": "^5.0.7",
     "@types/jest": "^29.5.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.12.4",

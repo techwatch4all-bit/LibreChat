@@ -1,0 +1,16 @@
+{
+  "name": "deeptutor-mcp",
+  "version": "0.1.0",
+  "description": "MCP server wrapping DeepTutor's tutoring API for use in LibreChat",
+  "bin": { "deeptutor-mcp": "dist/index.js" },
+  "type": "module",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

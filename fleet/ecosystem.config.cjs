@@ -29,5 +29,18 @@ module.exports = {
       interpreter: 'C:/Program Files/nodejs/node.exe',
       env: { ROUTER_PORT: '4001', ROUTER_HOST: '127.0.0.1' },
     },
+    {
+      // Satchida tenant-local Privacy router (fleet/scripts/dev-gateway.mjs).
+      // Verifies the seat assertion minted by LibreChat and relays the Privacy
+      // model to the local llama.cpp runtime on :8080. Loads LibreChat/.env
+      // itself via dotenv, so no env vars are required here. Running under PM2
+      // (rather than as a detached orphan) so per-request logs are captured and
+      // the process survives a reboot after `pm2 save`.
+      name: 'satchida-privacy-router',
+      script: 'fleet/scripts/dev-gateway.mjs',
+      cwd: 'D:/LAN-AI-Infra/LibreChat',
+      interpreter: 'C:/Program Files/nodejs/node.exe',
+      env: {},
+    },
   ],
 };

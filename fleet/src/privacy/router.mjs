@@ -483,6 +483,22 @@ export async function createPrivacyRouter({
       // was never sent.
       rawBody = Buffer.from(JSON.stringify(body), 'utf8');
     }
+
+    // Dynamic Temporal Anchoring: guarantee model knows current real date without hardcoding
+    {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const anchorTag = `[Current Temporal Anchor: Today is ${todayStr}]`;
+      const sysIdx = body.messages.findIndex((m) => m?.role === 'system');
+      if (sysIdx >= 0) {
+        if (!body.messages[sysIdx].content?.includes('Temporal Anchor')) {
+          body.messages[sysIdx].content = `${anchorTag}\n${body.messages[sysIdx].content}`;
+        }
+      } else {
+        body.messages.unshift({ role: 'system', content: anchorTag });
+      }
+      rawBody = Buffer.from(JSON.stringify(body), 'utf8');
+    }
+
     if (payload.profile === 'child') {
       const inputAllowed = await childSafety.checkInput(body.messages);
       if (inputAllowed !== true) return safeError(res, 403, 'child_safety_denied');

@@ -241,9 +241,7 @@
       "katex": "^0.16.21"
     },
     "remark-math": {
-      "micromark-extension-math": {
-        "katex": "^0.16.21"
-      }
+      "micromark-extension-math": "^0.16.21"
     },
     "eslint": {
       "ajv": "6.14.0"
@@ -273,5 +271,10 @@
       "admin/",
       "packages/"
     ]
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "module-alias": "^2.3.4",
+    "mongoid": "^0.0.1"
   }
 }

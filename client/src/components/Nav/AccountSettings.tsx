@@ -238,7 +238,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
             {localize('com_nav_archived_chats')}
           </Menu.MenuItem>
           <ThemeSubmenu />
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'ADMIN') && (
             <Menu.MenuItem
               onClick={() => navigate('/admin')}
               className="select-item text-sm"

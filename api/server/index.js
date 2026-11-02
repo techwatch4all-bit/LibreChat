@@ -473,6 +473,16 @@ const startServer = async () => {
   app.use('/api/config', preAuthTenantMiddleware, optionalJwtAuth, routes.config);
   app.use('/api/assistants', routes.assistants);
   app.use('/api/files', await routes.files.initialize());
+
+  // Direct download route for AnythingLLM generated documents & presentations
+  const generatedDocsPath = path.resolve('D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated');
+  if (fs.existsSync(generatedDocsPath)) {
+    app.use('/generated', express.static(generatedDocsPath, {
+      setHeaders: (res, filePath) => {
+        res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+      }
+    }));
+  }
   app.use(
     '/images/',
     createValidateImageRequest({

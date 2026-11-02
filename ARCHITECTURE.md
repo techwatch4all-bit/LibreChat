@@ -2361,3 +2361,35 @@ Every candidate repository added to the harness must pass the **Satchida Distrib
 2. **Zero Cloud VPS / CGNAT Compliance**: External access must route strictly through Cloudflare Zero Trust Named Tunnels (`cloudflared`) on `*.satchida.com`.
 3. **Strict Physical Tenant Isolation**: Data stores must be partitioned per tenant edge node without multi-tenant database co-mingling.
 4. **JWT & Identity Passthrough**: Web interfaces must integrate into LibreChat's authentication gate via reverse-proxy headers (`x-forwarded-user`, `Authorization`) or sub-route embedding (`/api/<service>/`).
+
+
+---
+
+## Part III — MCP Ecosystem, VibeStudio IDE & Mode Architecture (Updated 2026-11)
+
+### 1. Verified Model Modes & Spec Configuration
+The top-level model specifications have been streamlined to 4 distinct user-facing modes:
+- **Chat**: Universal everyday conversational mode with live keyless web search (satchida-web-search), content fetching (web-fetch), and date/time awareness (	ime-server).
+- **Work**: Professional enterprise workspace combining git-librechat (repository inspection), satchida-work-suite (tabular analytics), devops-security (file hashing/integrity), and legal-research (eCFR Federal Regulations).
+- **Study & Study-Local**: Educational mode powered by deeptutor-integration (port 8001; interactive books & quizzes), satchida-stem-study (symbolic KaTeX math), rxiv-search, and cademic-search.
+- **Privacy**: 100% offline, zero-telemetry local sovereign execution.
+*(Note: VibeCoder was formally deprecated and removed from the chat mode dropdown to eliminate UI confusion for standard/family accounts; all software engineering workflows are consolidated under Work mode and VibeStudio IDE).*
+
+### 2. Multi-Engine Keyless Web Search Architecture (satchida-web-search)
+- **Backend Service**: satchida-search (PM2 ID: 2, port 8880).
+- **Engines Aggregated**: DuckDuckGo HTML, Google News RSS, Bing News RSS, Yandex RSS, and Wikipedia.
+- **Protocol**: FastMCP StdIO server wrapper (skill/satchida-web-search-server.py).
+- **Constraints**: 100% keyless, zero SearxNG dependency, 5-minute TTL LRU caching, and circuit breakers.
+
+### 3. VibeStudio IDE Integration (code-server)
+- **Port Allocation**: Code-server daemon bound to 127.0.0.1:8085 (PM2 ID: 5), proxied via LibreChat at /api/ide/ and accessible under /ide.
+- **Gateway Binding**: All editor AI extensions (Continue, Cline / Roo-Code) are natively mapped to satchida-gateway (One-API, port 4000) using permanent Virtual Key (SATCHIDA_GATEWAY_VK).
+- **Preconfigured Models**:
+  - Work: Primary chat, refactoring, and code generation model.
+  - DeepWork: Long-horizon reasoning and multi-file code planning.
+  - Privacy: Local sovereign model used for tab-autocomplete with zero data egress.
+- **Zero-Friction Client Defaults**: Workspace trust popups disabled, telemetry forced off, auto-fetch enabled, and clean terminal profile defaulted to PowerShell.
+
+### 4. 21/21 MCP Verified Execution Matrix
+All 21 registered MCP servers in librechat.yaml are verified active with live JSON-RPC execution (initialize, 
+otifications/initialized, 	ools/list, and real 	ools/call).

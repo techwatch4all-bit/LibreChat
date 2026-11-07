@@ -2382,13 +2382,166 @@ The top-level model specifications have been streamlined to 4 distinct user-faci
 - **Constraints**: 100% keyless, zero SearxNG dependency, 5-minute TTL LRU caching, and circuit breakers.
 
 ### 3. VibeStudio IDE Integration (code-server)
-- **Port Allocation**: Code-server daemon bound to 127.0.0.1:8085 (PM2 ID: 5), proxied via LibreChat at /api/ide/ and accessible under /ide.
-- **Gateway Binding**: All editor AI extensions (Continue, Cline / Roo-Code) are natively mapped to satchida-gateway (One-API, port 4000) using permanent Virtual Key (SATCHIDA_GATEWAY_VK).
+- **Port Allocation**: Code-server daemon bound to 127.0.0.1:8085 (PM2 ID: 5), proxied via LibreChat at `/api/ide/` and accessible under `/ide`.
+- **Gateway Binding**: All editor AI extensions (Continue, Cline / Roo-Code) are natively mapped to satchida-gateway (One-API, port 4000) using permanent Virtual Key (`SATCHIDA_GATEWAY_VK`).
+- **Client-Facing Provider Branding**: Configured as `Satchida-SI` (`Satchida-SI:Work`). Generic "OpenAI-compatible" labels and non-enterprise `$0.00` spend badges are suppressed.
 - **Preconfigured Models**:
-  - Work: Primary chat, refactoring, and code generation model.
-  - DeepWork: Long-horizon reasoning and multi-file code planning.
-  - Privacy: Local sovereign model used for tab-autocomplete with zero data egress.
+  - `Work`: Primary chat, refactoring, and code generation model.
+  - `DeepWork`: Long-horizon reasoning and multi-file code planning.
+  - `Privacy`: Local sovereign model used for tab-autocomplete with zero data egress.
 - **Zero-Friction Client Defaults**: Workspace trust popups disabled, telemetry forced off, auto-fetch enabled, and clean terminal profile defaulted to PowerShell.
+
+---
+
+## 21. Multi-Tenant Edge Clone & Massive Multi-User Scaling Architecture (4,000+ Users)
+
+### 21.1 Architectural Topology: Tenant PC vs. Operator PC
+
+To eliminate ambiguity across all modules in the Satchida AI Harness, the operational boundary between the **Tenant PC** (Client Edge Node) and the **Operator PC** (Central Sovereign Hub) is strictly defined:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        TENANT PC (Client Edge Node)                    │
+│             Cloned & Deployed onto Client Windows 11 Hardware          │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ LibreChat Core (Edge Gateway & Multi-User Identity Router)       │  │
+│  └────────┬────────────────────────────────┬────────────────────────┘  │
+│           │ (Dynamic User Workspace Proxy) │ (/api/science Proxy)      │
+│           ▼                                ▼                           │
+│  ┌──────────────────────┐        ┌──────────────────────────────────┐  │
+│  │ VS Code Server       │        │ Open Science Upstream            │  │
+│  │ (VibeStudio IDE)     │        │ (Satchida Workbench)             │  │
+│  │ - Root: %WORKSPACES% │        │ - Root: %WORKSPACES%             │  │
+│  │   /user_{id}/ide     │        │   /user_{id}/science             │  │
+│  │ - Profile: user_{id} │        │ - Projects: user_{id} Scoped     │  │
+│  └────────┬─────────────┘        └─────────┬────────────────────────┘  │
+│           │ (AI Token Calls)               │ (AI Token Calls)          │
+│           └────────────────┬───────────────┘                           │
+│                            │                                           │
+└────────────────────────────┼───────────────────────────────────────────┘
+                             │ Outbound Token Stream (mTLS / Cloudflare Zero Trust)
+                             ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                      OPERATOR PC (Seller Central HQ)                   │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ One-API / Satchida-Gateway (:4000 / :8700)                       │  │
+│  │ - Master Key Injection & Multi-Tenant Quota Control              │  │
+│  │ - Tenant Virtual Keys, Account Tiers, Rate Limits & Ledger       │  │
+│  │ - Model Upstream Dispatch (Gemini, Claude, DeepSeek, Local GPUs) │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Architectural Rules:
+1. **Tenant PC Host Scope**:
+   - **LibreChat**, **VS Code Server (VibeStudio IDE)**, **Open Science Upstream (Satchida Workbench)**, and all future OSS tools are **installed, copied, and execute locally on the Tenant PC**.
+   - Client data, file systems, codebases, lab datasets, and user state **never leave the Tenant PC**.
+2. **Operator PC Host Scope**:
+   - **One-API (Satchida-Gateway)** resides **exclusively on the Operator PC**.
+   - The Tenant PC connects to One-API over secure Cloudflare Zero Trust Named Tunnels (`*.satchida.com`) or direct edge mTLS.
+   - One-API functions as the sovereign controlling gateway: managing tenant quotas, virtual API keys, model rate limits, billing tiers, and master provider credentials.
+
+---
+
+### 21.2 Universal Directive: Per-User Segregated Workspaces for ALL Tools
+
+A critical mandate for enterprise client deployments (where a single tenant PC or server supports **4,000+ registered users**) is the **Universal Per-User Workspace Directive**:
+
+> [!IMPORTANT]
+> **Universal Per-User Isolation Directive:**
+> No OSS tool, IDE, scientific suite, or runtime environment running on the Tenant PC may execute in a global, unsegregated directory. Every tool must have its working directory, session state, cache, and project files completely partitioned under that specific user's isolated path:
+> `%TENANT_WORKSPACES_ROOT%\users\user_{userId}\`
+
+#### Universal Directory Layout on Tenant PC:
+```text
+%SATCHIDA_HOME%\ (e.g., D:\LAN-AI-Infra or C:\Satchida)
+└── data\
+    └── workspaces\
+        └── users\
+            └── user_{userId}\                      <-- Isolated Sandbox for User
+                ├── ide\                             <-- VS Code Server Root
+                │   ├── .vscode\
+                │   └── projects\
+                ├── science\                         <-- Open Science Upstream Root
+                │   ├── .openscience-projects\
+                │   ├── datasets\
+                │   ├── notebooks\
+                │   └── runs\
+                ├── oss_tools\                       <-- Future OSS Tools
+                └── state\                           <-- Tool Settings & Profiles
+                    ├── vscode-profile\              <-- User Code-Server Profile
+                    └── open-science-config\         <-- User Science Config
+```
+
+#### Zero Hardcoded Paths Requirement:
+All tools and orchestration scripts must resolve paths strictly from environment variables:
+- `SATCHIDA_HOME` (stack install root, e.g. `D:\LAN-AI-Infra`)
+- `TENANT_WORKSPACES_ROOT` (defaults to `%SATCHIDA_HOME%\data\workspaces`)
+- `TENANT_USERDATA_ROOT` (defaults to `%SATCHIDA_HOME%\data\users`)
+
+---
+
+### 21.3 Per-Tool Implementation & Isolation Strategies
+
+#### 1. VS Code Server (VibeStudio IDE)
+- **Routing**: LibreChat reverse proxy intercepts `/api/ide` requests.
+- **Directory Isolation**: Automatically provisions and routes the user to `/?folder=%TENANT_WORKSPACES_ROOT%/users/user_{id}/ide`.
+- **Profile Segregation**: Uses `--user-data-dir %TENANT_USERDATA_ROOT%/user_{id}/vscode` and `--profile user_{id}` so open tabs, recent files, and Cline AI conversation histories are completely isolated.
+- **Safety Guardrails**: Cline action templates verify that the agent is not operating on the root server folder.
+
+#### 2. Open Science Upstream (Satchida Workbench)
+- **Current Limitation**: Native `open-science-upstream` / `crates/osd-core` daemons are single-tenant per process (workspace-global SSE events and project switching).
+- **Enforced Multi-User Architecture**:
+  - **Dynamic Workspace Scoping**: When accessed via LibreChat's left sidebar, the reverse proxy maps the request to `%TENANT_WORKSPACES_ROOT%/users/user_{id}/science`.
+  - **Process-per-Active-User or Session-Scoped Gateway**: Either spawn a lightweight headless `osd-cli server` bound to the user's isolated workspace (with an inactivity timeout), or route through an authenticated adapter passing `X-Forwarded-User` to scope projects and SSE events.
+
+#### 3. Future OSS Tools & Utilities
+Any upcoming web tool added to the left navigation must follow this identical contract:
+1. Reverse proxy through LibreChat with JWT authentication.
+2. Root directory pinned to `%TENANT_WORKSPACES_ROOT%/users/user_{id}/<tool-name>`.
+3. Inactivity reclamation to support high concurrency on edge Windows hardware.
+
+---
+
+### 21.4 User Entitlement, Gating & Marketing-First UX
+
+#### 1. Capability-Based vs. Name-Based Gating
+In Community / On-Premise deployments of LibreChat, user accounts cannot be restricted by ad-hoc plan names alone. Satchida AI Harness uses **Capability-Based Entitlement** anchored in One-API (`groups` and `tenant_account_plans`):
+- `basic` / `standard`: Standard chat only (no IDE or Science capability).
+- `family`: Educational and child-safe conversational modes (no IDE or Science capability).
+- `pro`: Contains capability `code_execution` and `work_tools`.
+- `privacy`: Sovereign local compute + `code_execution` + `science_workbench`.
+- `enterprise`: Full capability set (`*`).
+- **Future Account Tiers (`pro_family`, etc.)**: By defining entitlement around `user.capabilities.includes('code_execution')` alongside the plan set `['pro', 'enterprise', 'privacy', 'pro_family']`, new tier combinations immediately inherit VibeStudio IDE and Open Science Workbench access without code changes.
+
+#### 2. Marketing-First "Locked Preview" UX
+Rather than hiding the `</>` VibeStudio IDE or Science Workbench icons from unentitled users (which hides product value), the icons remain **permanently visible** in the left navigation panel for all users.
+- **Entitled Users (`pro`, `enterprise`, `privacy`, `pro_family`)**: Clicking the icon seamlessly loads their authenticated, personal, and isolated workspace.
+- **Unentitled Users (`basic`, `family`, `standard`)**: Clicking the icon displays a high-conversion **Locked Tool Preview** card with a blurred UI background and an **"Upgrade to Pro / Privacy"** call-to-action detailing the premium capabilities.
+
+---
+
+### 21.5 Storage & Resource Quotas for 4,000+ Users on Edge Windows Nodes
+
+1. **NTFS / Directory Quotas**: Default disk allocation limit of 5 GB to 20 GB per user folder.
+2. **Idle Process Reaper**: A background supervisor script monitors active user tool daemons and terminates processes idle for > 20 minutes, preserving RAM on the Tenant PC.
+3. **One-API Token Quotas**: All LLM calls from user workspaces route out to One-API on the Operator PC using Virtual Keys tied to their respective One-API quota group.
+
+---
+
+### 21.6 Cloning & Portability Checklist for Edge Tenant Deployment
+
+When bundling the Satchida AI harness for new client systems:
+- [ ] **Configurable Environment Variables**: Set `SATCHIDA_HOME=D:\LAN-AI-Infra` (or `C:\Satchida`) in `.env`.
+- [ ] **No Absolute Path Bindings**: Relative paths used in `ecosystem.config.cjs`, `start-vscoder.ps1`, and proxy middleware.
+- [ ] **Automated Per-User Workspace Provisioner**: System automatically creates `data/workspaces/users/user_{id}` upon first tool launch.
+- [ ] **Automated Patch Reapplication**: `scripts/customization/apply_satchida_customizations.js` automatically syncs branding and guardrails post-install.
+- [ ] **Pre-seeded Group Capabilities**: One-API initialization seed contains `code_execution` and `work_tools` for `pro`, `privacy`, and `pro_family`.
+- [ ] **Service Daemon Orchestration**: Managed by PM2 or native Windows services for automatic boot recovery.
+
+---
 
 ### 4. 21/21 MCP Verified Execution Matrix
 All 21 registered MCP servers in librechat.yaml are verified active with live JSON-RPC execution (initialize, 

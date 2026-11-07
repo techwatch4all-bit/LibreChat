@@ -8,6 +8,21 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-07 — Upstream Token Reservation Fix (Eliminated 402 Error)
+
+### 1. Root Cause Analysis
+- Investigated 402 This request requires more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 15418.
+- In librechat.yaml, the Satchida local endpoint specified max_tokens: 2000 in ddParams, but Satchida-Gateway had omitted max_tokens.
+- Without an explicit completion cap, OpenRouter calculated the required upfront credit reservation by assuming the maximum possible generation length equal to the full context window (131072 tokens). This caused upstream to reject the request with HTTP 402 whenever the key's balance was lower than the full 128k reservation cost, even for a 1-sentence prompt.
+
+### 2. Resolution Applied
+- Added max_tokens: 4096 to endpoints.custom.Satchida-Gateway.addParams in librechat.yaml.
+- Verified live via local gateway test (http://127.0.0.1:4000/v1/chat/completions) that requests now pass with HTTP 200 OK.
+- Restarted LibreChat in PM2 and saved process state (pm2 save).
+- Documented incident in Bugs.md (§B3).
+
+---
+
 ## 2026-11-01 — Enterprise Admin Panel & Phase 2 Completion
 
 ### 1. Enterprise Admin UI Overhaul
@@ -919,3 +934,10 @@ Documented Section 20 in `ARCHITECTURE.md` evaluating candidate open-source repo
 - Evaluated repos: `techwatch4all-bit/ppt-master`, `kuafuai/andee`, `immich-app/immich`, `nextcloud/server`, `techwatch4all-bit/designcraft`.
 - Added supplemental OSS recommendations for Study Mode (`anki` / `fsrs4anki`, `onemnemo/mnemo`, `zotero`, `excalidraw`) and Work Mode (`paperless-ngx`, `nocodb` / `grist-core`, `penpot`, `marktext` / `hedgedoc`).
 - Established evaluation criteria under the Satchida Distributed Multi-Tenant Architecture Rules (bare-metal Windows runtime, Cloudflare Named Tunnels, physical tenant data isolation, JWT authentication reverse-proxying).
+
+## 2026-11-07 — Architecture Note: Same-Tenant Collaboration & OSS License Governance
+
+Added Section 20.4 to `ARCHITECTURE.md`:
+- **Collaboration Audit Requirement**: Precludes premature integration of multi-user sub-apps (`excalidraw`, `penpot`, `nextcloud`, `onemnemo`, `anki`/`fsrs4anki`) until LibreChat's same-tenant inter-user communication and sharing capabilities are verified.
+- **License Policy Restriction**: Strict mandate restricting prospective OSS tools to permissive licenses (MIT / Apache-2.0 / BSD) to avoid copyleft (AGPLv3/GPLv3) compliance liabilities.
+- Action deferred to focus exclusively on upstream safe merge in a dedicated release folder.

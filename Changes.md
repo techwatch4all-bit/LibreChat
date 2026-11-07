@@ -941,3 +941,17 @@ Added Section 20.4 to `ARCHITECTURE.md`:
 - **Collaboration Audit Requirement**: Precludes premature integration of multi-user sub-apps (`excalidraw`, `penpot`, `nextcloud`, `onemnemo`, `anki`/`fsrs4anki`) until LibreChat's same-tenant inter-user communication and sharing capabilities are verified.
 - **License Policy Restriction**: Strict mandate restricting prospective OSS tools to permissive licenses (MIT / Apache-2.0 / BSD) to avoid copyleft (AGPLv3/GPLv3) compliance liabilities.
 - Action deferred to focus exclusively on upstream safe merge in a dedicated release folder.
+
+## 2026-11-07 — Selective Upstream Sync: Database Indices & Model Pricing
+
+Adopted verified upstream improvements tested in `D:\LAN-AI-Infra\release\LibreChat-upstream-sync`:
+- **Database Query Indices (`4c710a38f` / Upstream `#17464`)**:
+  - `messageSchema`: Added `{ conversationId: 1, user: 1, updatedAt: 1, _id: 1 }` to optimize cursor-paginated reads by `updatedAt`.
+  - `sessionSchema`: Added `{ refreshTokenHash: 1 }` index to eliminate collection scans on user-less session deletions.
+  - `toolCallSchema`: Added `{ user: 1 }` index to optimize account cleanup and bulk tool-call deletions.
+  - `queuedTurnSchema`: Added partial indexes for `deliveryKey` and `reconciliationClaimId` to accelerate worker claim reconciliations.
+  - `agentSchema`: Added partial indexes for `code_environment_id` and `code_environment_ids` to speed up reference integrity checks.
+- **Model Valuation Pricing (`da50260ed` / Upstream `#17028`)**:
+  - Updated `packages/data-schemas/src/methods/tx.ts` to include official rates for `mistral-large-4` ($1.36 prompt / $4.18 completion), `mistral-large-3`, `mistral-large-2411`, and `mistral-large-2512`.
+- **Build Verification**:
+  - Full end-to-end multi-workspace compilation clean (`packages/data-provider`, `packages/data-schemas`, `packages/api`, and `client`).

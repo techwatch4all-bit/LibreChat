@@ -693,9 +693,8 @@ html[data-theme='satchida-light'] .satchida-loader__wordmark--light {
 
 /**
  * Chat background mandala watermark.
- * Faint, centered watermark that shows gracefully across all themes (satchida-dark,
- * satchida-light, default dark, default light) without interfering with chat messages,
- * code blocks, or input areas.
+ * Centered brand watermark tuned to be distinct yet subtle without interfering
+ * with message readability, code blocks, or input areas.
  */
 .satchida-chat-watermark {
   position: absolute;
@@ -711,15 +710,15 @@ html[data-theme='satchida-light'] .satchida-loader__wordmark--light {
   pointer-events: none;
   user-select: none;
   z-index: 0;
-  opacity: 0.045;
-  filter: saturate(1.1);
+  opacity: 0.16;
+  filter: saturate(1.15) contrast(1.05);
   transition: opacity 0.3s ease;
 }
 
 .light .satchida-chat-watermark,
 html:not(.dark) .satchida-chat-watermark {
-  opacity: 0.038;
-  filter: grayscale(25%) contrast(1.1);
+  opacity: 0.14;
+  filter: grayscale(15%) contrast(1.15);
   background-image: url('/assets/satchida/satchida-splash-mandala.png?v=clean4');
 }
 

@@ -13,12 +13,19 @@ import { SidePanelGroup } from '~/components/SidePanel';
 import AppChatSurface from '~/components/Chat/Surface';
 import { useSetFilesToDelete } from '~/hooks';
 import { failedFileIdsFrom } from '~/utils';
+import { cn } from '~/utils';
 import store from '~/store';
 
 const Artifacts = lazy(() => import('~/components/Artifacts/Artifacts'));
 const SubagentThreadPanel = lazy(() => import('~/components/Chat/Subagents/SubagentThreadPanel'));
 
-export default function Presentation({ children }: { children: React.ReactNode }) {
+export default function Presentation({
+  children,
+  isLandingPage = false,
+}: {
+  children: React.ReactNode;
+  isLandingPage?: boolean;
+}) {
   const artifacts = useRecoilValue(store.artifactsState);
   const artifactsVisibility = useRecoilValue(store.artifactsVisibility);
   // Render-gating the panel on `currentArtifactId != null` (in addition
@@ -151,7 +158,10 @@ export default function Presentation({ children }: { children: React.ReactNode }
           <SidePanelGroup panel={panelElement}>
             <div className="relative flex h-full flex-1 flex-col overflow-hidden">
               <div
-                className="satchida-chat-watermark pointer-events-none select-none"
+                className={cn(
+                  'satchida-chat-watermark pointer-events-none select-none',
+                  isLandingPage && 'satchida-chat-watermark--landing',
+                )}
                 aria-hidden="true"
               />
               <main className="relative z-[1] flex h-full flex-col overflow-y-auto" role="main">

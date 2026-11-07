@@ -163,7 +163,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
           <AddedChatContext.Provider value={addedChatHelpers}>
             <ApprovalProvider pendingAction={pendingAction}>
               <QueuedTurnPortalProvider>
-                <Presentation>
+                <Presentation isLandingPage={isLandingPage}>
                   <TraceSurface conversationId={conversationId}>
                     <h1 className="sr-only">{pageHeading}</h1>
                     <Header

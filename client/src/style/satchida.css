@@ -710,16 +710,28 @@ html[data-theme='satchida-light'] .satchida-loader__wordmark--light {
   pointer-events: none;
   user-select: none;
   z-index: 0;
-  opacity: 0.16;
-  filter: saturate(1.15) contrast(1.05);
-  transition: opacity 0.3s ease;
+  opacity: 0.085;
+  filter: saturate(1.1) contrast(1.05);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hero / Blank Chat State: prominently visible brand mandala watermark */
+.satchida-chat-watermark--landing {
+  opacity: 0.18;
+  filter: saturate(1.2) contrast(1.1);
 }
 
 .light .satchida-chat-watermark,
 html:not(.dark) .satchida-chat-watermark {
-  opacity: 0.14;
-  filter: grayscale(15%) contrast(1.15);
+  opacity: 0.07;
+  filter: grayscale(20%) contrast(1.1);
   background-image: url('/assets/satchida/satchida-splash-mandala.png?v=clean4');
+}
+
+.light .satchida-chat-watermark--landing,
+html:not(.dark) .satchida-chat-watermark--landing {
+  opacity: 0.15;
+  filter: grayscale(10%) contrast(1.15);
 }
 
 /**

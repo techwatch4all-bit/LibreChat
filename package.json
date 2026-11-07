@@ -273,8 +273,15 @@
     ]
   },
   "dependencies": {
+    "@colors/colors": "1.6.0",
+    "@img/sharp-win32-x64": "^0.35.5",
+    "@opentelemetry/api-logs": "0.220.0",
+    "@opentelemetry/sdk-logs": "0.220.0",
+    "@opentelemetry/sdk-node": "0.220.0",
     "dotenv": "^18.0.9",
     "module-alias": "^2.3.4",
-    "mongoid": "^0.0.1"
+    "mongoid": "^0.0.1",
+    "sharp": "^0.35.5",
+    "winston-daily-rotate-file": "^5.0.0"
   }
 }

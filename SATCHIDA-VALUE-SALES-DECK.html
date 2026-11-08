@@ -6,27 +6,27 @@
   <title>Satchida Productivity AI — Value & Team Sales Deck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    /* ============================================================
-       SATCHIDA PRODUCTIVITY AI — VALUE SLIDE DECK (PRINT-READY)
-       ============================================================ */
     :root {
-      --bg: #090d16;
-      --bg-card: rgba(17, 24, 39, 0.75);
-      --bg-card-border: rgba(255, 255, 255, 0.08);
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --text-dim: #6b7280;
-      --accent-cyan: #0ea5e9;
-      --accent-emerald: #10b981;
-      --accent-amber: #f59e0b;
-      --accent-indigo: #6366f1;
-      --accent-rose: #f43f5e;
-      --gradient-brand: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #10b981 100%);
-      --gradient-value: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
-      --font-body: 'Inter', system-ui, sans-serif;
+      --bg: #090e17;
+      --surface: #111827;
+      --surface-elevated: #152033;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(5, 150, 105, 0.3);
+      --text-head: #ffffff;
+      --text-body: #94a3b8;
+      --text-dim: #64748b;
+      --emerald: #059669;
+      --emerald-soft: rgba(5, 150, 105, 0.12);
+      --cyan: #0284c7;
+      --cyan-soft: rgba(2, 132, 199, 0.12);
+      --indigo: #4f46e5;
+      --indigo-soft: rgba(79, 70, 229, 0.12);
+      --amber: #d97706;
+      --rose: #e11d48;
+      --font-heading: 'Plus Jakarta Sans', sans-serif;
+      --font-body: 'Inter', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
 
@@ -40,8 +40,10 @@
       width: 100%;
       height: 100%;
       background: var(--bg);
-      color: var(--text-main);
+      color: var(--text-body);
       font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
@@ -62,54 +64,71 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: clamp(1.5rem, 3.5vw, 3rem) clamp(2rem, 5vw, 4.5rem);
+      padding: 32px 56px 28px 56px;
       position: relative;
-      background: radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
-                  radial-gradient(circle at 10% 90%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
-                  var(--bg);
+      background: var(--bg);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
       overflow: hidden;
       page-break-after: always;
       break-after: page;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
     }
 
     .slide-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--bg-card-border);
-      padding-bottom: 0.75rem;
-      flex-shrink: 0;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 2;
     }
 
     .brand-mark {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 10px;
       font-family: var(--font-heading);
       font-weight: 800;
-      font-size: 1.1rem;
-      letter-spacing: -0.02em;
+      font-size: 1.05rem;
+      color: #ffffff;
+      letter-spacing: -0.01em;
     }
 
     .brand-logo-icon {
-      width: 24px;
-      height: 24px;
-      background: var(--gradient-brand);
-      border-radius: 6px;
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, #059669 0%, #0284c7 100%);
+      border-radius: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 900;
     }
 
-    .slide-category {
+    .slide-tag {
       font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--accent-emerald);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #34d399;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
+      background: var(--emerald-soft);
+      border: 1px solid rgba(5, 150, 105, 0.25);
+      padding: 3px 10px;
+      border-radius: 4px;
     }
 
     .slide-body {
@@ -117,269 +136,250 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 1.5rem 0;
-      overflow: hidden;
+      position: relative;
+      z-index: 2;
+      padding: 18px 0;
     }
 
     .slide-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-top: 1px solid var(--bg-card-border);
-      padding-top: 0.75rem;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
       font-size: 0.75rem;
       color: var(--text-dim);
       font-family: var(--font-mono);
-      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
     }
 
-    h1.title-main {
+    h1.hero-title {
       font-family: var(--font-heading);
-      font-size: clamp(2rem, 4.5vw, 3.8rem);
+      font-size: 2.85rem;
       font-weight: 800;
-      line-height: 1.1;
+      color: #ffffff;
+      line-height: 1.15;
       letter-spacing: -0.03em;
-      margin-bottom: 1rem;
+      margin-bottom: 14px;
     }
 
-    .gradient-text {
-      background: var(--gradient-brand);
+    .emerald-gradient {
+      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .emerald-text {
-      background: var(--gradient-value);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    h2.slide-title {
+    h2.slide-heading {
       font-family: var(--font-heading);
-      font-size: clamp(1.6rem, 3vw, 2.5rem);
+      font-size: 2rem;
       font-weight: 700;
+      color: #ffffff;
       letter-spacing: -0.02em;
-      margin-bottom: 0.5rem;
-      color: #fff;
+      line-height: 1.2;
+      margin-bottom: 6px;
     }
 
-    p.slide-subtitle {
-      font-size: clamp(0.9rem, 1.4vw, 1.15rem);
-      color: var(--text-muted);
-      max-width: 900px;
+    p.slide-subhead {
+      font-size: 0.98rem;
+      color: var(--text-body);
+      max-width: 880px;
       line-height: 1.5;
-      margin-bottom: 1.5rem;
+      margin-bottom: 22px;
     }
 
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
+      gap: 20px;
       width: 100%;
     }
 
     .grid-3 {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      width: 100%;
-    }
-
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
+      gap: 18px;
       width: 100%;
     }
 
     .card {
-      background: var(--bg-card);
-      border: 1px solid var(--bg-card-border);
-      border-radius: 12px;
-      padding: clamp(1rem, 1.8vw, 1.5rem);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 22px;
       display: flex;
       flex-direction: column;
+      justify-content: flex-start;
       position: relative;
-      backdrop-filter: blur(8px);
     }
 
     .card.highlight-emerald {
-      border-color: rgba(16, 185, 129, 0.4);
-      box-shadow: 0 8px 32px rgba(16, 185, 129, 0.1);
+      background: var(--surface-elevated);
+      border-color: rgba(5, 150, 105, 0.4);
     }
-
-    .card.highlight-cyan {
-      border-color: rgba(14, 165, 233, 0.4);
-      box-shadow: 0 8px 32px rgba(14, 165, 233, 0.1);
-    }
-
-    .card-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 0.25rem 0.6rem;
-      border-radius: 999px;
-      margin-bottom: 0.75rem;
-      width: fit-content;
-    }
-
-    .badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-cyan { background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
-    .badge-indigo { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); }
-    .badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .badge-rose { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
 
     .card-title {
       font-family: var(--font-heading);
-      font-size: 1.15rem;
+      font-size: 1.12rem;
       font-weight: 700;
-      color: #fff;
-      margin-bottom: 0.5rem;
+      color: #ffffff;
+      margin-bottom: 8px;
     }
 
-    .card-price {
+    .card-desc {
+      font-size: 0.86rem;
+      color: var(--text-body);
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .price-tag {
       font-family: var(--font-heading);
-      font-size: 1.8rem;
+      font-size: 1.9rem;
       font-weight: 800;
-      color: #fff;
-      margin-bottom: 0.25rem;
+      color: #ffffff;
+      line-height: 1;
+      margin-bottom: 4px;
     }
 
-    .card-price-sub {
-      font-size: 0.75rem;
-      color: var(--text-dim);
+    .price-period {
       font-family: var(--font-mono);
-      margin-bottom: 1rem;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin-bottom: 14px;
     }
 
-    .feature-list {
+    .list-items {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
+      gap: 9px;
+      font-size: 0.86rem;
+      color: var(--text-body);
     }
 
-    .feature-list li {
+    .list-items li {
       display: flex;
       align-items: flex-start;
-      gap: 0.5rem;
-      line-height: 1.4;
+      gap: 8px;
+      line-height: 1.45;
     }
 
-    .check-icon {
-      color: var(--accent-emerald);
+    .check-bullet {
+      color: #34d399;
+      font-weight: 800;
       flex-shrink: 0;
-      font-weight: 900;
     }
 
-    .cross-icon {
-      color: var(--accent-rose);
+    .cross-bullet {
+      color: #fb7185;
+      font-weight: 800;
       flex-shrink: 0;
-      font-weight: 900;
     }
 
-    .compare-table {
+    .matrix-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.82rem;
-      background: var(--bg-card);
-      border-radius: 10px;
+      font-size: 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       overflow: hidden;
-      border: 1px solid var(--bg-card-border);
     }
 
-    .compare-table th {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 0.75rem 1rem;
+    .matrix-table th {
+      background: #0d131f;
+      padding: 12px 16px;
       text-align: left;
       font-family: var(--font-heading);
       font-weight: 700;
-      color: #fff;
-      border-bottom: 1px solid var(--bg-card-border);
+      color: #ffffff;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
     }
 
-    .compare-table td {
-      padding: 0.65rem 1rem;
+    .matrix-table td {
+      padding: 11px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-muted);
+      color: var(--text-body);
     }
 
-    .highlight-col {
-      background: rgba(16, 185, 129, 0.05);
-      border-left: 1px solid rgba(16, 185, 129, 0.2);
-      border-right: 1px solid rgba(16, 185, 129, 0.2);
+    .matrix-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .matrix-table td strong {
+      color: #ffffff;
+    }
+
+    .focus-column {
+      background: rgba(5, 150, 105, 0.05);
+      border-left: 1px solid rgba(5, 150, 105, 0.25);
+      border-right: 1px solid rgba(5, 150, 105, 0.25);
     }
 
     .deck-toolbar {
       position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
+      bottom: 20px;
+      right: 24px;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid var(--bg-card-border);
-      padding: 0.5rem 0.75rem;
-      border-radius: 999px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      gap: 8px;
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
       z-index: 9999;
-      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
 
-    .btn-tool {
+    .btn-action {
       background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #fff;
-      padding: 0.4rem 0.8rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.74rem;
       font-family: var(--font-heading);
       font-weight: 600;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      transition: all 0.2s;
     }
 
-    .btn-tool:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.25);
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.16);
     }
 
-    .btn-print {
-      background: var(--gradient-brand);
-      border: none;
-      color: #fff;
+    .btn-primary {
+      background: #059669;
+      border: 1px solid #059669;
     }
 
-    .slide-indicator {
+    .btn-primary:hover {
+      background: #047857;
+    }
+
+    .slide-counter {
       font-family: var(--font-mono);
       font-size: 0.75rem;
-      color: var(--text-muted);
-      padding: 0 0.5rem;
+      color: var(--text-dim);
+      padding: 0 4px;
     }
 
-    .progress-bar-container {
+    .top-progress {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 3px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.06);
       z-index: 9999;
     }
 
-    .progress-bar {
+    .top-progress-fill {
       height: 100%;
       width: 10%;
-      background: var(--gradient-brand);
-      transition: width 0.25s ease;
+      background: #059669;
+      transition: width 0.2s ease;
     }
 
     @media print {
@@ -392,7 +392,7 @@
         width: 100% !important;
         height: auto !important;
         overflow: visible !important;
-        background: #090d16 !important;
+        background: #090e17 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -411,12 +411,11 @@
         break-after: page !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
-        padding: 2.2rem 3rem !important;
-        background: #090d16 !important;
+        padding: 30px 48px !important;
         border: none !important;
       }
 
-      .deck-toolbar, .progress-bar-container {
+      .deck-toolbar, .top-progress {
         display: none !important;
       }
     }
@@ -424,102 +423,100 @@
 </head>
 <body>
 
-  <div class="progress-bar-container">
-    <div class="progress-bar" id="progressBar"></div>
+  <div class="top-progress">
+    <div class="top-progress-fill" id="pFill"></div>
   </div>
 
   <div class="deck-toolbar">
-    <button class="btn-tool" onclick="prevSlide()">‹ Prev</button>
-    <span class="slide-indicator" id="slideIndicator">1 / 10</span>
-    <button class="btn-tool" onclick="nextSlide()">Next ›</button>
-    <button class="btn-tool btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
-    <button class="btn-tool" onclick="toggleFullScreen()">⛶ Fullscreen</button>
+    <button class="btn-action" onclick="prevSlide()">‹ Prev</button>
+    <span class="slide-counter" id="sCount">1 / 10</span>
+    <button class="btn-action" onclick="nextSlide()">Next ›</button>
+    <button class="btn-action btn-primary" onclick="window.print()">🖨️ Print to PDF</button>
   </div>
 
-  <div class="deck-container" id="deckContainer">
+  <div class="deck-container" id="deckWrap">
 
-    <!-- ==========================================
-         SLIDE 1: TITLE & HERO
-         ========================================== -->
+    <!-- SLIDE 1 -->
     <section class="slide" id="slide-1">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Business & Team Series · Nov 2026</div>
+        <div class="slide-tag">Essential Value Edition</div>
       </div>
       <div class="slide-body">
-        <span class="card-badge badge-emerald" style="font-size: 0.85rem;">ESSENTIAL VALUE EDITION · SMBs, TEAMS & ACADEMIA</span>
-        <h1 class="title-main">
+        <h1 class="hero-title">
           Enterprise-Grade Intelligence at<br>
-          <span class="emerald-text">1/10th the Cost of Big Tech</span>
+          <span class="emerald-gradient">1/10th the Cost of Big Tech</span>
         </h1>
-        <p class="slide-subtitle">
+        <p class="slide-subhead">
           Frontier AI models, executive document synthesis, and curriculum-grounded Socratic tutoring — billed in Indian Rupees with instant NPCI UPI and zero foreign currency markup.
         </p>
 
-        <div class="grid-3" style="max-width: 950px; margin-top: 1rem;">
-          <div class="card" style="padding: 1rem;">
-            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-emerald); font-size: 0.95rem;">Starting at ₹9.90 / Day</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Standard Professional tier costs less than an office cup of chai.</div>
+        <div class="grid-3" style="margin-top: 8px;">
+          <div class="card">
+            <div class="card-title" style="color: #34d399;">Starting at ₹9.90 / Day</div>
+            <div class="card-desc" style="margin-bottom: 0;">
+              Standard Professional tier costs less than an office cup of chai, delivering executive drafting, report synthesis, and document intelligence.
+            </div>
           </div>
-          <div class="card" style="padding: 1rem;">
-            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">4-Seat Pooled Accounts</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Family & Team plan at just ₹249 / user / mo with shared token budgets.</div>
+          <div class="card">
+            <div class="card-title" style="color: #38bdf8;">4-Seat Shared Accounts</div>
+            <div class="card-desc" style="margin-bottom: 0;">
+              Family & Team plan at just ₹249 / user / mo with pooled usage, empowering households and boutique teams under a single consolidated plan.
+            </div>
           </div>
-          <div class="card" style="padding: 1rem;">
-            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-indigo); font-size: 0.95rem;">Socratic Study Mode</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Safe pedagogical guidance for students with POCSO Act (2012) compliance.</div>
+          <div class="card">
+            <div class="card-title" style="color: #818cf8;">Socratic Study Mode</div>
+            <div class="card-desc" style="margin-bottom: 0;">
+              Safe pedagogical tutoring that guides students step-by-step with verified textbook citations and active POCSO child safety guardrails.
+            </div>
           </div>
         </div>
       </div>
       <div class="slide-footer">
-        <span>Prepared by Satchida Commercial Operations</span>
-        <span>Valid for SMB & Household Deployments · ai.satchida.com</span>
+        <span>Satchida Commercial Operations</span>
+        <span>SMB & Team Proposal · ai.satchida.com</span>
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 2: THE BIG TECH TOLL
-         ========================================== -->
+    <!-- SLIDE 2 -->
     <section class="slide" id="slide-2">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Cost Audit</div>
+        <div class="slide-tag">Cost Analysis</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Why Pay Big Tech ₹2,500/User Every Month?</h2>
-        <p class="slide-subtitle">Commercial AI subscriptions are inflated with foreign exchange penalties, withholding taxes, and hidden rate-limits.</p>
-        
+        <h2 class="slide-heading">Why Pay Big Tech ₹2,500/User Every Month?</h2>
+        <p class="slide-subhead">Commercial AI subscriptions are inflated with foreign exchange penalties, withholding taxes, and hidden rate-limits.</p>
+
         <div class="grid-2">
-          <div class="card" style="border-top: 3px solid var(--accent-rose);">
-            <span class="card-badge badge-rose">BIG TECH EXPENSE TRAP</span>
-            <div class="card-title" style="color: #fca5a5;">Microsoft 365 Copilot & ChatGPT Plus</div>
-            <ul class="feature-list" style="margin-top: 0.75rem;">
-              <li><span class="cross-icon">✗</span> <strong>₹2,500 / user / mo ($30):</strong> Copilot requires mandatory annual commitments.</li>
-              <li><span class="cross-icon">✗</span> <strong>₹1,700 / user / mo ($20):</strong> ChatGPT Plus incurs 3.5% USD credit card forex markups + GST.</li>
-              <li><span class="cross-icon">✗</span> <strong>Zero Household Pooling:</strong> Every family member or staff member must buy a separate account.</li>
-              <li><span class="cross-icon">✗</span> <strong>No Child Safety Guardrails:</strong> Unrestricted AI that can solve homework directly without teaching.</li>
+          <div class="card" style="border-top: 3px solid var(--rose);">
+            <div class="card-title" style="color: #fb7185;">Big Tech Subscriptions</div>
+            <ul class="list-items" style="margin-top: 10px;">
+              <li><span class="cross-bullet">✗</span> <strong>₹2,500 / user / mo ($30):</strong> Copilot requires mandatory annual commitments.</li>
+              <li><span class="cross-bullet">✗</span> <strong>₹1,700 / user / mo ($20):</strong> ChatGPT Plus incurs 3.5% USD credit card forex markups + GST.</li>
+              <li><span class="cross-bullet">✗</span> <strong>Zero Household Pooling:</strong> Every family member or staff member must buy a separate account.</li>
+              <li><span class="cross-bullet">✗</span> <strong>No Child Safety Guardrails:</strong> Unrestricted AI that can solve homework directly without teaching.</li>
             </ul>
-            <div style="background: rgba(244, 63, 94, 0.08); padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; color: #fca5a5; margin-top: 1rem;">
+            <div style="background: rgba(225, 29, 72, 0.08); padding: 10px 14px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-top: 14px;">
               Annual outlay for 4 users: <strong>₹81,600 to ₹1,20,000 every single year.</strong>
             </div>
           </div>
 
           <div class="card highlight-emerald">
-            <span class="card-badge badge-emerald">THE SATCHIDA BREAKTHROUGH</span>
-            <div class="card-title" style="color: #34d399;">Sovereign Infrastructure Advantage</div>
-            <ul class="feature-list" style="margin-top: 0.75rem;">
-              <li><span class="check-icon">✓</span> <strong>Same Frontier AI Models:</strong> Claude 3.5 Sonnet, GPT-4o, and DeepSeek.</li>
-              <li><span class="check-icon">✓</span> <strong>Billed in Indian Rupees:</strong> 0% forex markup, instant NPCI UPI payment via QR code.</li>
-              <li><span class="check-icon">✓</span> <strong>4-Seat Pooled Accounts:</strong> Just ₹999/mo for an entire household or department.</li>
-              <li><span class="check-icon">✓</span> <strong>Socratic Study Mode:</strong> Guides students step-by-step with POCSO safety compliance.</li>
+            <div class="card-title" style="color: #34d399;">Satchida Sovereign Infrastructure</div>
+            <ul class="list-items" style="margin-top: 10px;">
+              <li><span class="check-bullet">✓</span> <strong>Same Frontier AI Models:</strong> Claude 3.5 Sonnet, GPT-4o, and leading reasoning models.</li>
+              <li><span class="check-bullet">✓</span> <strong>Billed in Indian Rupees:</strong> 0% forex markup, instant NPCI UPI payment via QR code.</li>
+              <li><span class="check-bullet">✓</span> <strong>4-Seat Pooled Accounts:</strong> Just ₹999/mo for an entire household or department.</li>
+              <li><span class="check-bullet">✓</span> <strong>Socratic Study Mode:</strong> Guides students step-by-step with POCSO safety compliance.</li>
             </ul>
-            <div style="background: rgba(16, 185, 129, 0.08); padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; color: #34d399; margin-top: 1rem;">
+            <div style="background: rgba(5, 150, 105, 0.1); padding: 10px 14px; border-radius: 4px; font-size: 0.82rem; color: #34d399; margin-top: 14px;">
               Annual outlay for 4 users: <strong>Just ₹9,990 / year (Over 90% Cost Savings).</strong>
             </div>
           </div>
@@ -531,109 +528,102 @@
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 3: TIERS OVERVIEW
-         ========================================== -->
+    <!-- SLIDE 3 -->
     <section class="slide" id="slide-3">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Commercial Plans</div>
+        <div class="slide-tag">Volume Tiers</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Choose the Right Volume for Your Team</h2>
-        <p class="slide-subtitle">Simple, transparent pricing tailored to solo professionals, working households, and technical power users.</p>
-        
+        <h2 class="slide-heading">Choose the Right Volume for Your Team</h2>
+        <p class="slide-subhead">Simple, transparent pricing tailored to solo professionals, working households, and technical power users.</p>
+
         <div class="grid-3">
-          <!-- STANDARD -->
           <div class="card">
-            <span class="card-badge badge-cyan">SOLO PROFESSIONAL</span>
+            <div class="slide-tag" style="background: var(--cyan-soft); color: #38bdf8; border-color: rgba(2, 132, 199, 0.25); margin-bottom: 8px;">SOLO PROFESSIONAL</div>
             <div class="card-title">Standard Tier</div>
-            <div class="card-price">₹299<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="card-price-sub">₹9.90 / day (₹2,990 / year)</div>
-            <ul class="feature-list" style="font-size: 0.8rem;">
-              <li><span class="check-icon">✓</span> 1 Dedicated Seat</li>
-              <li><span class="check-icon">✓</span> 2,000,000 Tokens / Month</li>
-              <li><span class="check-icon">✓</span> Chat + Work Modes</li>
-              <li><span class="check-icon">✓</span> Executive Summaries & Reports</li>
-              <li><span class="check-icon">✓</span> Knowledge Vault Document RAG</li>
+            <div class="price-tag">₹299<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
+            <div class="price-period">₹9.90 / day (₹2,990 / year)</div>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> 1 Dedicated Seat</li>
+              <li><span class="check-bullet">✓</span> Chat + Work Modes</li>
+              <li><span class="check-bullet">✓</span> Executive Summaries & Reports</li>
+              <li><span class="check-bullet">✓</span> Private Document Vault RAG</li>
+              <li><span class="check-bullet">✓</span> Identity Hidden from Providers</li>
             </ul>
           </div>
 
-          <!-- FAMILY -->
           <div class="card highlight-emerald">
-            <span class="card-badge badge-emerald">#1 BEST SELLER · 4 SEATS</span>
+            <div class="slide-tag" style="margin-bottom: 8px;">#1 BEST SELLER · 4 SEATS</div>
             <div class="card-title">Family & Team</div>
-            <div class="card-price">₹999<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="card-price-sub">Just ₹249 / user / mo (₹9,990 / yr)</div>
-            <ul class="feature-list" style="font-size: 0.8rem;">
-              <li><span class="check-icon">✓</span> <strong>4 Included Pooled Accounts</strong></li>
-              <li><span class="check-icon">✓</span> <strong>6,000,000 Tokens Shared Pool</strong></li>
-              <li><span class="check-icon">✓</span> Chat + Study + Work Modes</li>
-              <li><span class="check-icon">✓</span> POCSO Child Safety Tutoring</li>
-              <li><span class="check-icon">✓</span> Clean Audio Read Aloud</li>
+            <div class="price-tag">₹999<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
+            <div class="price-period">Just ₹249 / user / mo (₹9,990 / yr)</div>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> <strong>4 Included Pooled Accounts</strong></li>
+              <li><span class="check-bullet">✓</span> Chat + Study + Work Modes</li>
+              <li><span class="check-bullet">✓</span> POCSO Child Safety Tutoring</li>
+              <li><span class="check-bullet">✓</span> Clean Voice Read Aloud</li>
+              <li><span class="check-bullet">✓</span> Shared Household Budget</li>
             </ul>
           </div>
 
-          <!-- PRO -->
           <div class="card">
-            <span class="card-badge badge-indigo">DEVELOPER POWERHOUSE</span>
+            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; border-color: rgba(79, 70, 229, 0.25); margin-bottom: 8px;">DEVELOPER POWERHOUSE</div>
             <div class="card-title">Pro Developer</div>
-            <div class="card-price">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="card-price-sub">Full Technical Suite (₹14,990 / yr)</div>
-            <ul class="feature-list" style="font-size: 0.8rem;">
-              <li><span class="check-icon">✓</span> 1 Dedicated Seat</li>
-              <li><span class="check-icon">✓</span> <strong>15,000,000 Tokens / Month</strong></li>
-              <li><span class="check-icon">✓</span> Full VS Code Server Web IDE</li>
-              <li><span class="check-icon">✓</span> Dual-Screen Flow + Undocked Artifacts</li>
-              <li><span class="check-icon">✓</span> Sandboxed Code Execution & MCP</li>
+            <div class="price-tag">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
+            <div class="price-period">Full Technical Suite (₹14,990 / yr)</div>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> 1 Dedicated Seat</li>
+              <li><span class="check-bullet">✓</span> Full Browser Web IDE</li>
+              <li><span class="check-bullet">✓</span> Dual-Screen Flow + Pop-out Portal</li>
+              <li><span class="check-bullet">✓</span> Sandboxed Code Execution</li>
+              <li><span class="check-bullet">✓</span> Autonomous Toolchains</li>
             </ul>
           </div>
         </div>
       </div>
       <div class="slide-footer">
-        <span>Tier Taxonomy</span>
+        <span>Commercial Hierarchy</span>
         <span>Slide 3 / 10</span>
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 4: TIER 1 - STANDARD PROFESSIONAL
-         ========================================== -->
+    <!-- SLIDE 4 -->
     <section class="slide" id="slide-4">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Individual Workhorse</div>
+        <div class="slide-tag">Individual Professional</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Tier 1: Standard Professional (₹9.90/Day)</h2>
-        <p class="slide-subtitle">For solo knowledge workers, accountants, executive assistants, lawyers, and office administrators.</p>
-        
+        <h2 class="slide-heading">Tier 1: Standard Professional (₹9.90/Day)</h2>
+        <p class="slide-subhead">Designed for solo knowledge workers, accountants, executive assistants, lawyers, and office administrators.</p>
+
         <div class="grid-2">
           <div class="card">
-            <div class="card-title">High-Throughput Executive Tools</div>
-            <ul class="feature-list" style="margin-top: 0.75rem;">
-              <li><span class="check-icon">✓</span> <strong>Work Mode Drafting:</strong> Compose executive emails, legal notices, client memos, and project scopes in seconds.</li>
-              <li><span class="check-icon">✓</span> <strong>Document Analysis:</strong> Ingest multi-page PDFs, scans, and spreadsheets for instant structured extraction.</li>
-              <li><span class="check-icon">✓</span> <strong>2,000,000 Tokens Monthly:</strong> Enough capacity to draft over 1,500 multi-page emails or analyze 400 deep reports.</li>
-              <li><span class="check-icon">✓</span> <strong>Instant UPI Settlement:</strong> Scan Google Pay, PhonePe, or Paytm QR code with automatic receipt generation.</li>
+            <div class="card-title">High-Efficiency Daily Work Tools</div>
+            <ul class="list-items" style="margin-top: 10px;">
+              <li><span class="check-bullet">✓</span> <strong>Work Mode Drafting:</strong> Compose executive emails, legal notices, client memos, and project scopes in seconds.</li>
+              <li><span class="check-bullet">✓</span> <strong>Document Analysis:</strong> Ingest multi-page PDFs, scans, and spreadsheets for instant structured extraction.</li>
+              <li><span class="check-bullet">✓</span> <strong>Anonymous Query Protection:</strong> Your identity is hidden from upstream AI providers. Your work remains private.</li>
+              <li><span class="check-bullet">✓</span> <strong>Instant UPI Settlement:</strong> Scan Google Pay, PhonePe, or Paytm QR code with automatic receipt generation.</li>
             </ul>
           </div>
 
-          <div class="card highlight-cyan">
-            <div class="card-title" style="color: #38bdf8;">ROI for Solo Professionals</div>
-            <div style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 800; color: #fff; margin: 0.5rem 0;">
+          <div class="card highlight-emerald">
+            <div class="card-title" style="color: #34d399;">Productivity ROI for Solo Workers</div>
+            <div style="font-family: var(--font-heading); font-size: 2.1rem; font-weight: 800; color: #ffffff; margin: 8px 0;">
               Save 8+ Hours Every Week
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-              Eliminate mundane clerical drafting. Reclaim your focus for high-value client advisory, revenue generation, and strategic decision making.
+            <p class="card-desc">
+              Eliminate repetitive clerical drafting and tedious document summarization. Reclaim your time for high-value client advisory, revenue generation, and strategic decision making.
             </p>
-            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(14, 165, 233, 0.08); border-radius: 6px; font-size: 0.8rem; color: #bae6fd;">
+            <div style="margin-top: 10px; padding: 10px 14px; background: rgba(5, 150, 105, 0.1); border-radius: 6px; font-size: 0.82rem; color: #34d399;">
               Daily Cost: <strong>₹9.90</strong> · Monthly Investment: <strong>₹299</strong> · Annual Total: <strong>₹2,990</strong>
             </div>
           </div>
@@ -645,46 +635,43 @@
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 5: TIER 2 - FAMILY & COLLABORATIVE TEAM
-         ========================================== -->
+    <!-- SLIDE 5 -->
     <section class="slide" id="slide-5">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Household & Team Flagship</div>
+        <div class="slide-tag">Household & Team Best Seller</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Tier 2: Family & Team (Our #1 Best Seller)</h2>
-        <p class="slide-subtitle">Four included accounts with pooled quota management. The perfect hybrid solution for offices and modern families.</p>
-        
+        <h2 class="slide-heading">Tier 2: Family & Team (Our #1 Best Seller)</h2>
+        <p class="slide-subhead">Four included accounts with pooled usage management. The perfect hybrid solution for offices and modern families.</p>
+
         <div class="grid-2">
           <div class="card highlight-emerald">
-            <span class="card-badge badge-emerald">DUAL-PURPOSE ARCHITECTURE</span>
-            <div class="card-title" style="font-size: 1.3rem;">For Work & Family in One Budget</div>
-            <ul class="feature-list" style="margin-top: 0.75rem;">
-              <li><span class="check-icon">✓</span> <strong>Work Mode for Adults:</strong> Client proposals, business plans, emails, and financial analysis.</li>
-              <li><span class="check-icon">✓</span> <strong>Study Mode for Students:</strong> Intelligent, safe academic tutor trained on CBSE, ICSE, and NCERT syllabi.</li>
-              <li><span class="check-icon">✓</span> <strong>Pooled Token Flexibility:</strong> If one user travels, unused tokens automatically roll to other family members.</li>
-              <li><span class="check-icon">✓</span> <strong>Single Consolidated Bill:</strong> One simple payment covers all 4 members without managing multiple subscriptions.</li>
+            <div class="card-title" style="font-size: 1.25rem; color: #34d399;">For Work & Family in One Budget</div>
+            <ul class="list-items" style="margin-top: 10px;">
+              <li><span class="check-bullet">✓</span> <strong>Work Mode for Adults:</strong> Client proposals, business plans, emails, and financial analysis.</li>
+              <li><span class="check-bullet">✓</span> <strong>Study Mode for Students:</strong> Intelligent, safe academic tutor trained on CBSE, ICSE, and NCERT syllabi.</li>
+              <li><span class="check-bullet">✓</span> <strong>Flexible Pooled Allowance:</strong> If one user travels, remaining capacity automatically supports other family members.</li>
+              <li><span class="check-bullet">✓</span> <strong>Single Consolidated Bill:</strong> One simple payment covers all 4 members without managing multiple subscriptions.</li>
             </ul>
           </div>
 
           <div class="card">
             <div class="card-title">Commercial Summary</div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin: 0.5rem 0;">
-              <div class="card-price" style="font-size: 2.2rem;">₹999 / mo</div>
-              <span class="card-badge badge-emerald">₹249 / user / mo</span>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0;">
+              <div class="price-tag" style="font-size: 2.1rem;">₹999 / mo</div>
+              <span class="slide-tag">₹249 / user / mo</span>
             </div>
-            <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+            <p class="card-desc" style="margin-bottom: 12px;">
               Annual billing option: <strong>₹9,990 / year</strong> (Saves 2 full months).
-            </div>
-            <div style="background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+            </p>
+            <div style="background: rgba(255, 255, 255, 0.04); border-radius: 6px; padding: 12px 14px; font-size: 0.82rem; color: var(--text-body);">
               <div><strong>Seats Included:</strong> 4 Pooled Accounts</div>
-              <div style="margin-top: 0.25rem;"><strong>Monthly Budget:</strong> 6,000,000 Tokens / Month</div>
-              <div style="margin-top: 0.25rem;"><strong>Child Safety:</strong> 100% POCSO Act (2012) Compliant</div>
+              <div style="margin-top: 4px;"><strong>Modes Unlocked:</strong> Chat + Study + Work</div>
+              <div style="margin-top: 4px;"><strong>Child Safety:</strong> 100% POCSO Act (2012) Compliant</div>
             </div>
           </div>
         </div>
@@ -695,43 +682,41 @@
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 6: SOCRATIC STUDY MODE
-         ========================================== -->
+    <!-- SLIDE 6 -->
     <section class="slide" id="slide-6">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Academic Safety</div>
+        <div class="slide-tag">Academic Excellence</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Responsible Academic Tutoring: Study Mode</h2>
-        <p class="slide-subtitle">Parents and educators trust Study Mode because it builds authentic comprehension instead of encouraging homework shortcuts.</p>
-        
+        <h2 class="slide-heading">Responsible Tutoring: Study Mode & Child Safety</h2>
+        <p class="slide-subhead">Parents and educators trust Study Mode because it builds authentic comprehension instead of encouraging homework shortcuts.</p>
+
         <div class="grid-3">
           <div class="card">
-            <span class="card-badge badge-indigo">SOCRATIC PEDAGOGY</span>
+            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; margin-bottom: 8px;">SOCRATIC PEDAGOGY</div>
             <div class="card-title">Guides Step-by-Step</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-              Unlike generic ChatGPT which solves math problems or writes essays instantly, Study Mode asks leading questions, points out arithmetic flaws, and teaches the methodology.
+            <p class="card-desc">
+              Unlike generic public AI which solves math problems or writes essays instantly, Study Mode asks leading questions, points out arithmetic flaws, and teaches the methodology.
             </p>
           </div>
 
           <div class="card">
-            <span class="card-badge badge-rose">POCSO ACT COMPLIANCE</span>
+            <div class="slide-tag" style="background: rgba(225, 29, 72, 0.12); color: #fb7185; margin-bottom: 8px;">POCSO ACT COMPLIANCE</div>
             <div class="card-title">Child Protection Filters</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+            <p class="card-desc">
               Strict multi-layered guardrails intercept adult content, self-harm, cyberbullying, or predatory interactions, ensuring total peace of mind for parents and school administrators.
             </p>
           </div>
 
           <div class="card">
-            <span class="card-badge badge-cyan">TEXTBOOK GROUNDING</span>
+            <div class="slide-tag" style="margin-bottom: 8px;">TEXTBOOK GROUNDING</div>
             <div class="card-title">Verified Page Citations</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-              Ingests NCERT, CBSE, and ICSE textbooks through our Knowledge Vault. Every answer references the exact chapter name and page number for verified study.
+            <p class="card-desc">
+              Indexes educational syllabi (NCERT, CBSE, ICSE) through our Knowledge Vault. Every answer references the exact chapter name and page number for verified study.
             </p>
           </div>
         </div>
@@ -742,91 +727,86 @@
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 7: KNOWLEDGE VAULT (ANYTHINGLLM)
-         ========================================== -->
+    <!-- SLIDE 7 -->
     <section class="slide" id="slide-7">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Document Intelligence</div>
+        <div class="slide-tag">Private Documents</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Satchida Knowledge Vault for SMBs</h2>
-        <p class="slide-subtitle">Instant search across vendor contracts, employee policies, and price lists with automated document creation.</p>
-        
+        <h2 class="slide-heading">Satchida Knowledge Vault: Private Office Repository</h2>
+        <p class="slide-subhead">Instant semantic search across vendor contracts, employee policies, and price lists with automated document creation.</p>
+
         <div class="grid-2">
           <div class="card">
-            <div class="card-title">On-Premise LanceDB Document Search</div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
-              Powered by AnythingLLM running natively on your infrastructure. Your confidential corporate files are never indexed in public clouds.
+            <div class="card-title">On-Premise Private Document Search</div>
+            <p class="card-desc">
+              Your confidential corporate files, tax memos, and client records are never uploaded to public cloud vector stores.
             </p>
-            <ul class="feature-list" style="font-size: 0.82rem;">
-              <li><span class="check-icon">✓</span> <strong>Exact Citations:</strong> Answers cite specific document page and paragraph numbers.</li>
-              <li><span class="check-icon">✓</span> <strong>Workspace Isolation:</strong> Each department or employee has their own private vault.</li>
-              <li><span class="check-icon">✓</span> <strong>Multi-Format Ingestion:</strong> Reads PDFs, Word DOCX, Excel XLSX, and text.</li>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> <strong>Exact Citations:</strong> Answers cite specific document page and paragraph numbers.</li>
+              <li><span class="check-bullet">✓</span> <strong>Workspace Isolation:</strong> Each department or employee has their own private vault.</li>
+              <li><span class="check-bullet">✓</span> <strong>Multi-Format Ingestion:</strong> Reads PDFs, Word DOCX, Excel spreadsheets, and text.</li>
             </ul>
           </div>
 
           <div class="card highlight-emerald">
-            <span class="card-badge badge-emerald">AUTOMATED FILE CREATION</span>
-            <div class="card-title">Instant Branded Exports</div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+            <div class="card-title" style="color: #34d399;">Automated Business Deliverables</div>
+            <p class="card-desc">
               The AI drafts and formats professional business files directly onto your download tray:
             </p>
-            <ul class="feature-list" style="font-size: 0.82rem;">
-              <li><span class="check-icon">✓</span> <strong>PowerPoint (PPTX):</strong> Formatted presentation decks with charts.</li>
-              <li><span class="check-icon">✓</span> <strong>Spreadsheets (XLSX):</strong> Financial sheets with live calculation formulas.</li>
-              <li><span class="check-icon">✓</span> <strong>PDF & DOCX:</strong> Formal agreements, client proposals, and executive briefs.</li>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> <strong>PowerPoint Presentations:</strong> Slide decks with styled typography and charts.</li>
+              <li><span class="check-bullet">✓</span> <strong>Spreadsheets:</strong> Financial tables with working calculation formulas.</li>
+              <li><span class="check-bullet">✓</span> <strong>PDF & Word Documents:</strong> Formal agreements, client proposals, and briefs.</li>
             </ul>
           </div>
         </div>
       </div>
       <div class="slide-footer">
-        <span>Knowledge Vault Integration</span>
+        <span>Private Repository</span>
         <span>Slide 7 / 10</span>
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 8: PRO TIER & DUAL-SCREEN
-         ========================================== -->
+    <!-- SLIDE 8 -->
     <section class="slide" id="slide-8">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Developer Suite</div>
+        <div class="slide-tag">Engineering Tooling</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">When Technical Staff Need Power Tools: Pro Tier</h2>
-        <p class="slide-subtitle">Empower your software developers and data analysts with browser-based IDEs and autonomous agent toolchains.</p>
-        
+        <h2 class="slide-heading">When Technical Staff Need Power Tools: Pro Tier</h2>
+        <p class="slide-subhead">Empower your software developers and data analysts with browser-based IDEs and autonomous agent toolchains.</p>
+
         <div class="grid-2">
           <div class="card">
-            <span class="card-badge badge-indigo">DEVELOPER ENVIRONMENT</span>
-            <div class="card-title">VS Code Server Web Built-In</div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
-              Full Monaco editor, integrated terminal, and Git version control running right inside the browser.
+            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; margin-bottom: 8px;">DEVELOPER WORKSPACE</div>
+            <div class="card-title">Web IDE & Dual-Screen Productivity</div>
+            <p class="card-desc">
+              Full browser code editor, integrated terminal, and Git version control running seamlessly across two displays.
             </p>
-            <ul class="feature-list" style="font-size: 0.82rem;">
-              <li><span class="check-icon">✓</span> <strong>Dual-Screen Flow:</strong> Screen 1 prompts agents; Screen 2 edits code.</li>
-              <li><span class="check-icon">✓</span> <strong>Undocked Artifacts:</strong> Pop out live React Sandpack previews to 2nd screen.</li>
-              <li><span class="check-icon">✓</span> <strong>Autonomous Agents:</strong> Multi-step refactoring via Model Context Protocol.</li>
+            <ul class="list-items" style="font-size: 0.82rem;">
+              <li><span class="check-bullet">✓</span> <strong>Dual-Screen Flow:</strong> Screen 1 prompts agents; Screen 2 edits code.</li>
+              <li><span class="check-bullet">✓</span> <strong>Pop-Out Portal:</strong> Undock live React and diagram previews to a second screen.</li>
+              <li><span class="check-bullet">✓</span> <strong>Autonomous Agents:</strong> Multi-step refactoring, file edits, and script execution.</li>
             </ul>
           </div>
 
-          <div class="card highlight-cyan">
+          <div class="card highlight-emerald">
             <div class="card-title">Commercial Terms</div>
-            <div class="card-price">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="card-price-sub">₹14,990 / year (Saves ₹2,998)</div>
-            <ul class="feature-list" style="font-size: 0.82rem; margin-top: 0.5rem;">
-              <li><span class="check-icon">✓</span> 15,000,000 High-Priority Tokens/mo</li>
-              <li><span class="check-icon">✓</span> Sandboxed Code Execution (Python, JS, Shell)</li>
-              <li><span class="check-icon">✓</span> Access to Claude 3.5 Sonnet & GPT-4o</li>
+            <div class="price-tag">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
+            <div class="price-period">₹14,990 / year (Saves ₹2,998)</div>
+            <ul class="list-items" style="font-size: 0.82rem; margin-top: 8px;">
+              <li><span class="check-bullet">✓</span> Complete Web IDE and code sandbox included</li>
+              <li><span class="check-bullet">✓</span> Sandboxed Code Execution (Python, JavaScript, Shell)</li>
+              <li><span class="check-bullet">✓</span> Anonymous query protection on frontier reasoning models</li>
             </ul>
           </div>
         </div>
@@ -837,29 +817,27 @@
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 9: VALUE COMPARISON & ROI
-         ========================================== -->
+    <!-- SLIDE 9 -->
     <section class="slide" id="slide-9">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">ROI Benchmark</div>
+        <div class="slide-tag">ROI Analysis</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Head-to-Head Value Comparison & 4-Person ROI</h2>
-        <p class="slide-subtitle">See why small businesses and families are migrating to Satchida AI in droves.</p>
-        
-        <table class="compare-table" style="margin-bottom: 1rem;">
+        <h2 class="slide-heading">Direct Value Comparison & 4-Person Team ROI</h2>
+        <p class="slide-subhead">See why growing businesses and collaborative teams choose Satchida AI over big tech tolls.</p>
+
+        <table class="matrix-table" style="margin-bottom: 16px;">
           <thead>
             <tr>
               <th>Solution (4 Users)</th>
               <th>Monthly Outlay</th>
               <th>Annual Cost</th>
               <th>Socratic Safety</th>
-              <th>Knowledge Vault</th>
+              <th>Document Vault</th>
               <th>Effective Savings</th>
             </tr>
           </thead>
@@ -868,7 +846,7 @@
               <td><strong>Microsoft 365 Copilot</strong></td>
               <td>~₹10,000 + GST</td>
               <td>₹1,20,000 / yr</td>
-              <td><span class="cross-icon">✗</span> No</td>
+              <td><span class="cross-bullet">✗</span> No</td>
               <td>Vendor Cloud</td>
               <td>Baseline</td>
             </tr>
@@ -876,87 +854,85 @@
               <td><strong>ChatGPT Plus (4 Accounts)</strong></td>
               <td>~₹6,800 + Forex</td>
               <td>₹81,600 / yr</td>
-              <td><span class="cross-icon">✗</span> No</td>
+              <td><span class="cross-bullet">✗</span> No</td>
               <td>Vendor Cloud</td>
               <td>Baseline</td>
             </tr>
-            <tr class="highlight-col">
+            <tr class="focus-column">
               <td><strong>Satchida Family / Team (4 Seats)</strong></td>
               <td><strong>₹999 (Flat)</strong></td>
               <td><strong>₹9,990 / yr</strong></td>
               <td><strong>✓ POCSO Safe</strong></td>
-              <td><strong>✓ LanceDB Local</strong></td>
-              <td><strong style="color: var(--accent-emerald);">92% Savings</strong></td>
+              <td><strong>✓ Private Local Vault</strong></td>
+              <td><strong style="color: #34d399;">92% Savings</strong></td>
             </tr>
           </tbody>
         </table>
 
-        <div class="card highlight-emerald" style="padding: 0.9rem 1.25rem;">
-          <div style="font-size: 0.85rem; color: #34d399; font-weight: 600;">
-            ROI Summary: You save over ₹71,000 every single year while gaining a safe educational tutor and local document intelligence!
+        <div class="card highlight-emerald" style="padding: 12px 18px;">
+          <div style="font-size: 0.88rem; color: #34d399; font-weight: 600;">
+            ROI Summary: Your organisation saves over ₹71,000 every single year while gaining a dedicated academic tutor and private document intelligence.
           </div>
         </div>
       </div>
       <div class="slide-footer">
-        <span>Return on Investment</span>
+        <span>Value Benchmark</span>
         <span>Slide 9 / 10</span>
       </div>
     </section>
 
-    <!-- ==========================================
-         SLIDE 10: IMMEDIATE ONBOARDING
-         ========================================== -->
+    <!-- SLIDE 10 -->
     <section class="slide" id="slide-10">
       <div class="slide-header">
         <div class="brand-mark">
           <div class="brand-logo-icon">S</div>
           <span>SATCHIDA PRODUCTIVITY AI</span>
         </div>
-        <div class="slide-category">Immediate Activation</div>
+        <div class="slide-tag">Immediate Onboarding</div>
       </div>
       <div class="slide-body">
-        <h2 class="slide-title">Activate Your Team in Under 5 Minutes</h2>
-        <p class="slide-subtitle">No international credit card required. Instant activation via standard NPCI UPI.</p>
-        
-        <div class="grid-3" style="margin-bottom: 1.5rem;">
+        <h2 class="slide-heading">Activate Your Team in Under 5 Minutes</h2>
+        <p class="slide-subhead">No international corporate credit card required. Instant activation via standard NPCI UPI.</p>
+
+        <div class="grid-3" style="margin-bottom: 20px;">
           <div class="card">
-            <div class="card-title">1. Choose Your Tier</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-              Select Standard (₹299), Family/Team (₹999), or Pro (₹1,499) based on your user volume.
+            <div class="card-title">1. Select Your Tier</div>
+            <p class="card-desc" style="margin-bottom: 0;">
+              Choose Standard (₹299), Family/Team (₹999), or Pro (₹1,499) based on your user volume.
             </p>
           </div>
 
           <div class="card">
             <div class="card-title">2. Scan UPI QR Code</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-              Pay via Google Pay, PhonePe, or Paytm with automatic 12-digit UTR verification.
+            <p class="card-desc" style="margin-bottom: 0;">
+              Pay via Google Pay, PhonePe, or Paytm with automatic 12-digit transaction verification.
             </p>
           </div>
 
           <div class="card">
             <div class="card-title">3. Instant Workspace Access</div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-              Credentials generated immediately with full access to frontier models and Knowledge Vault.
+            <p class="card-desc" style="margin-bottom: 0;">
+              Credentials generated immediately with full access to frontier models and your private document vault.
             </p>
           </div>
         </div>
 
-        <div class="card highlight-emerald" style="text-align: center; padding: 2rem;">
-          <h3 style="font-family: var(--font-heading); font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem;">
+        <div class="card highlight-emerald" style="text-align: center; padding: 24px;">
+          <h3 style="font-family: var(--font-heading); font-size: 1.45rem; color: #ffffff; margin-bottom: 6px;">
             Ready to Cut Your AI Expenses by 90%?
           </h3>
-          <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          <p style="font-size: 0.92rem; color: var(--text-body); margin-bottom: 14px;">
             Experience Satchida AI today with our instant trial or setup assistance.
           </p>
-          <div style="display: flex; justify-content: center; gap: 2rem; font-family: var(--font-mono); font-size: 0.9rem;">
-            <div>Email: <strong style="color: var(--accent-emerald);">sales@satchida.com</strong></div>
-            <div>Web: <strong style="color: var(--accent-emerald);">ai.satchida.com</strong></div>
-            <div>Instant UPI: <strong style="color: var(--accent-emerald);">Scan & Activate</strong></div>
+          <div style="display: flex; justify-content: center; gap: 28px; font-family: var(--font-mono); font-size: 0.88rem;">
+            <div>Email: <strong style="color: #34d399;">sales@satchida.com</strong></div>
+            <div>Web: <strong style="color: #34d399;">ai.satchida.com</strong></div>
+            <div>Instant UPI: <strong style="color: #34d399;">Scan & Activate</strong></div>
           </div>
         </div>
       </div>
       <div class="slide-footer">
-        <span>Confidential Commercial Proposal · Satchida AI</span>
+        <span>Commercial Proposal · Satchida AI</span>
         <span>Slide 10 / 10</span>
       </div>
     </section>
@@ -964,14 +940,14 @@
   </div>
 
   <script>
-    const container = document.getElementById('deckContainer');
+    const container = document.getElementById('deckWrap');
     const totalSlides = 10;
     let currentSlide = 1;
 
     function updateProgress(index) {
       currentSlide = index;
-      document.getElementById('slideIndicator').textContent = `${currentSlide} / ${totalSlides}`;
-      document.getElementById('progressBar').style.width = `${(currentSlide / totalSlides) * 100}%`;
+      document.getElementById('sCount').textContent = `${currentSlide} / ${totalSlides}`;
+      document.getElementById('pFill').style.width = `${(currentSlide / totalSlides) * 100}%`;
     }
 
     function scrollToSlide(index) {
@@ -984,15 +960,11 @@
     }
 
     function nextSlide() {
-      if (currentSlide < totalSlides) {
-        scrollToSlide(currentSlide + 1);
-      }
+      if (currentSlide < totalSlides) scrollToSlide(currentSlide + 1);
     }
 
     function prevSlide() {
-      if (currentSlide > 1) {
-        scrollToSlide(currentSlide - 1);
-      }
+      if (currentSlide > 1) scrollToSlide(currentSlide - 1);
     }
 
     window.addEventListener('keydown', (e) => {
@@ -1008,26 +980,13 @@
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          const id = entry.target.id;
-          const num = parseInt(id.replace('slide-', ''));
-          if (!isNaN(num)) {
-            updateProgress(num);
-          }
+          const num = parseInt(entry.target.id.replace('slide-', ''));
+          if (!isNaN(num)) updateProgress(num);
         }
       });
     }, { threshold: 0.6 });
 
-    document.querySelectorAll('.slide').forEach(slide => observer.observe(slide));
-
-    function toggleFullScreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
-      }
-    }
+    document.querySelectorAll('.slide').forEach(s => observer.observe(s));
   </script>
 </body>
 </html>

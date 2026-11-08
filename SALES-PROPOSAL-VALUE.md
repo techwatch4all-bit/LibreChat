@@ -57,7 +57,7 @@ Most teams want to empower their employees and families with modern AI, but stan
 - **Allowed Product Modes**: `Chat` + `Work`
 - **Key Capabilities**:
   - **Work Mode**: Fast executive drafting, contract scanning, document summarization, and tabular data extraction.
-  - **Document Analysis**: Upload PDFs, Word documents, spreadsheets, and scanned memos for instant synthesis.
+  - **Satchida Knowledge Vault (AnythingLLM MCP)**: Upload PDFs, Word documents, spreadsheets, and scanned memos for instant synthesis, verified page citations, and automated document generation (DOCX, PDF, XLSX).
   - **Zero Card Hassle**: Pay directly via NPCI UPI QR code (Google Pay, PhonePe, Paytm) with instant receipt generation.
 
 ### Tier 2: Family & Collaborative Small Team (Our #1 Best Seller)
@@ -69,7 +69,12 @@ Most teams want to empower their employees and families with modern AI, but stan
 - **Allowed Product Modes**: `Chat` + `Study` + `Work`
 - **Dual-Purpose Household & Office Value**:
   - **For the Workplace**: Staff use `Work` mode for client proposals, project planning, and communication.
-  - **For the Family & Students**: Children use `Study` mode—an intelligent tutor trained to explain mathematics, science, and history step-by-step with strict POCSO Act (2012) compliant child safety guardrails.
+  - **For the Family & Students (`Study` Mode)**:
+    - **Socratic Pedagogy**: Guides children with conceptual hints and step-by-step scaffolding rather than simply writing their homework.
+    - **POCSO Act (2012) Child Safety Compliance**: Multi-layer safety filtering protects children from harmful or adult interactions.
+    - **Clean Audio Read Aloud**: Built-in TTS strips model deliberation tags (`<think>`) so students hear crystal-clear explanations.
+    - **Knowledge Vault Textbook Grounding**: Direct RAG against NCERT, CBSE, and ICSE textbooks with verified page and chapter citations.
+  - **Household Document Hub**: Satchida Knowledge Vault (AnythingLLM MCP) securely generates and stores school projects, study notes, and budgeting spreadsheets.
   - **Pooled Usage Economy**: If one user is traveling or light on usage, their remaining tokens are automatically available for other family or team members.
 
 ### Tier 3: Pro Developer (When You Need the Power Tools)
@@ -78,7 +83,9 @@ Most teams want to empower their employees and families with modern AI, but stan
 - **Monthly Token Allowance**: **15,000,000 tokens / month**
 - **Allowed Product Modes**: `Chat` + `Study` + `Work`
 - **Exclusive Technical Capabilities**:
-  - **Browser-Based VS Code Server**: Full desktop-class web IDE accessible from any browser.
+  - **Dual-Screen Productivity**: Pair LibreChat on Screen 1 (prompting & autonomous subagents) with our embedded **VS Code Server Web IDE** (:8085) on Screen 2 (Monaco editor, Git, terminal, and localhost preview).
+  - **Undocked Artifacts Portal**: Pop out interactive React Sandpack apps, diagrams, and HTML previews into an independent second monitor with live streaming sync.
+  - **Satchida Knowledge Vault (AnythingLLM MCP)**: LanceDB on-premise vector search and multi-format document generation (PPTX slide decks, PDFs, DOCX briefs, XLSX models).
   - **Sandboxed Code Execution**: Run and test Python and JavaScript code safely in real-time.
   - **Model Context Protocol (MCP)**: Connect your AI workspace directly to external company databases, GitHub repositories, and Jira boards.
 
@@ -93,9 +100,12 @@ Most teams want to empower their employees and families with modern AI, but stan
 | **Cost Per User / Month** | ₹2,500 | ₹1,700 | **₹299** | **₹249.75** | **₹1,499** |
 | **Annual Outlay (4 Users)** | **₹1,20,000 / yr** | **₹81,600 / yr** | **₹14,352 / yr** | **₹9,990 / yr** | — |
 | **Your Annual Savings** | — | — | **88% Savings** | **92% Savings** | — |
-| **Academic Study Guardrails** | ❌ No | ❌ No | ❌ No | **✅ Included (POCSO Safe)** | ✅ Included |
+| **Academic Study Guardrails** | ❌ No | ❌ No | ❌ No | **✅ POCSO + NCERT RAG** | ✅ Included |
+| **Knowledge Vault (AnythingLLM)**| ❌ Cloud RAG | ❌ Cloud RAG | **✅ LanceDB Vault** | **✅ LanceDB Vault** | **✅ Full Vault Suite** |
+| **Dual-Screen Flow (Web IDE)** | ❌ No | ❌ No | ❌ No | ❌ No | **✅ Full VS Code Web** |
+| **Undocked Artifacts Portal** | ❌ Single tab | ❌ Single tab | ❌ No | ❌ No | **✅ Pop-Out Sync** |
 | **Document & Work Mode** | ✅ Yes | ✅ Yes | **✅ Included** | **✅ Included** | **✅ Included** |
-| **Developer IDE & Sandbox** | ❌ No | Limited | ❌ No | ❌ No | **✅ Full VS Code Web** |
+| **Developer Sandbox** | ❌ No | Limited | ❌ No | ❌ No | **✅ Full Sandbox** |
 | **Billing Method** | USD Wire / Credit Card | USD Credit Card Only | **Instant UPI / IMPS** | **Instant UPI / IMPS** | **Instant UPI / IMPS** |
 
 ---

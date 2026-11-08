@@ -44,7 +44,7 @@ We deploy across two purpose-built architectures depending on your existing infr
    • Low-latency cloud inference via Bifrost                       • 100% on-premise local inference
    • Full VS Code Server Web IDE built-in                          • Zero-Knowledge cloud egress guarantee
    • MCP Agents & Sandboxed Code Execution                         • Unlimited token volume with zero COGS
-   • ₹1,499 / single seat | ₹2,499 / 4-seat pool                   • ₹3,499 / 3-seat workstation license
+   • ₹1,499 / single seat | ₹2,499 / 4-seat pool                   • ₹3,499 / dedicated workstation seat
 ```
 
 ---
@@ -59,9 +59,11 @@ Designed for fast-moving engineering teams, technical founders, and knowledge ho
 - **Monthly Token Allowance**: **15,000,000 tokens / month** (High-priority routing via Satchida Bifrost gateway)
 - **Allowed Product Modes**: `Chat` + `Study` + `Work`
 - **Native Developer Toolchain**:
-  - **Embedded VS Code Server Web**: Full browser-based IDE connected directly to isolated workspace storage. Run terminal commands, edit repositories, and debug code from any tablet, laptop, or desktop.
+  - **Dual-Screen Engineering Flow**: Pair LibreChat on Screen 1 (prompting, orchestrating subagents) with our embedded **VS Code Server Web IDE** (:8085) on Screen 2 (Monaco editor, Git, terminal, and localhost app preview).
+  - **Undocked Artifacts Portal**: Pop out interactive React Sandpack apps, SVG/Mermaid diagrams, and live HTML previews into an independent second browser window with real-time streaming sync.
+  - **Satchida Knowledge Vault (AnythingLLM MCP)**: On-demand LanceDB semantic search with verified page citations, plus automated document generation (executive PPTX slide decks, styled PDFs, Word DOCX, and formatted XLSX spreadsheets).
   - **Sandboxed Code Execution**: Execute Python, JavaScript, and shell scripts in an isolated, secure sandbox with zero host exposure.
-  - **Model Context Protocol (MCP)**: Native integration with database connectors, GitHub, Jira, and file search tools.
+  - **Model Context Protocol (MCP)**: Native integration with enterprise tools, GitHub, Jira, and external databases.
   - **Multi-Agent Orchestrator**: Delegate long-running research, code refactoring, and multi-file analysis to parallel autonomous subagents.
 
 ### Tier 2: Pro Family / Tech Studio (4 Pooled Seats)
@@ -71,8 +73,13 @@ Designed for fast-moving engineering teams, technical founders, and knowledge ho
 - **Monthly Token Allowance**: **25,000,000 tokens / month** (Pooled household budget)
 - **Seat Architecture**: **4 Pooled Accounts** (e.g. 2 developers + 2 students, or 4 team members)
 - **Complete Feature Matrix**:
-  - **All Pro Developer Tools**: Every seat receives full access to VS Code Server Web, MCP agent pipelines, and code execution.
-  - **Educational Tutoring (`Study` Mode)**: Curated student reasoning models with strict POCSO Act (2012) compliant guardrails for children and students.
+  - **All Pro Developer Tools & Dual-Screen**: Every seat receives full access to VS Code Server Web IDE, Undocked Artifacts Portal, MCP agent pipelines, and code execution.
+  - **Educational Tutoring (`Study` Mode)**:
+    - **Socratic Pedagogy**: Guides students step-by-step with leading questions rather than solving homework directly.
+    - **POCSO Act (2012) Child Safety Compliance**: Multi-layered real-time filtering intercepts inappropriate content or adult themes.
+    - **Clean Audio Read Aloud**: Built-in TTS strips reasoning tokens (`<think>`) so students hear pure, natural explanations.
+    - **Knowledge Vault Textbook Grounding**: Cites exact NCERT, CBSE, and ICSE textbook chapters and page numbers.
+  - **Satchida Knowledge Vault**: Household document hub for school projects, family budgeting spreadsheets, and resumes.
   - **Unified Household Billing**: A single pooled quota managed with parental/administrative usage oversight.
 
 ---
@@ -99,14 +106,17 @@ Designed for law firms, medical centers, accounting firms, defense contractors, 
 
 | Feature / Capability | Commercial Cloud AI (Copilot / ChatGPT Plus) | Satchida Pro (Track A) | Satchida Pro Family (Track A) | Satchida Sovereign Privacy (Track B) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Retail Monthly Investment** | ₹1,700 – ₹2,500 / seat | **₹1,499 / seat** | **₹2,499 / 4 seats** (₹624/seat) | **₹3,499 / 3 seats** (₹1,166/seat) |
+| **Retail Monthly Investment** | ₹1,700 – ₹2,500 / seat | **₹1,499 / seat** | **₹2,499 / 4 seats** (₹624/seat) | **₹3,499 / seat** (Dedicated) |
 | **Data Leaves Physical Premises** | Always (Retained in US/EU) | Stripped (Zero PII metadata) | Stripped (Zero PII metadata) | **Never in Privacy Mode / Stripped for Cloud** |
 | **Target Hardware** | None (Vendor Cloud) | None (Any Laptop/Phone) | None (Any Laptop/Phone) | **Client Server (≥24GB GPU)** |
 | **Monthly Token Allocation** | Rate limited per 3 hours | **15M Tokens** | **25M Tokens (Shared)** | **15M Cloud + Uncapped Local** |
 | **Native VS Code Web IDE** | ❌ No | **✅ Included** | **✅ Included** | **✅ Included** |
 | **Sandboxed Code Execution** | Limited (Python only) | **✅ Full Sandbox** | **✅ Full Sandbox** | **✅ Full Local Sandbox** |
+| **Dual-Screen Productivity** | ❌ Single window | **✅ Web IDE + Artifacts** | **✅ Web IDE + Artifacts** | **✅ Web IDE + Artifacts** |
+| **Knowledge Vault (AnythingLLM)**| ❌ No (3rd party RAG) | **✅ LanceDB + Doc Gen** | **✅ LanceDB + Doc Gen** | **✅ 100% Local LanceDB** |
 | **MCP Tool & Agent Protocols** | ❌ No | **✅ Native Support** | **✅ Native Support** | **✅ Native Local Support** |
-| **Student Study & Child Safety** | ❌ No | Optional | **✅ POCSO Guardrails** | **✅ Air-Gapped Study** |
+| **Socratic Study & Child Safety** | ❌ No | Optional | **✅ POCSO + NCERT RAG**| **✅ Air-Gapped Study** |
+| **Ephemeral Zero-Trace Mode** | ❌ Vendor logs 30d | Optional | Optional | **✅ Forced Ephemeral** |
 | **Payment Mechanism** | International Credit Card (USD) | **Instant NPCI UPI / IMPS** | **Instant NPCI UPI / IMPS** | **Instant NPCI UPI / GST Invoice** |
 
 ---

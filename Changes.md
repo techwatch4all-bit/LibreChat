@@ -8,6 +8,32 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-08 — AnythingLLM Knowledge Vault, Dual-Screen Web Productivity & Sales Decks Update
+
+### 1. Architectural & Product Documentation Updates
+1. **AnythingLLM MCP Integration (Satchida Knowledge Vault — Section 25 in `ARCHITECTURE.md`)**:
+   - Documented the bare-metal runtime at `D:\LAN-AI-Infra\AnythingLLM` exposing port 3012 REST API.
+   - Documented stdio MCP bridge `skill/anythingllm_mcp_server.py` registered in `librechat.yaml` under `satchida-knowledge-vault`.
+   - Documented deterministic multi-tenant isolation (`_resolve_user_workspace_slug`) dynamically mapping users to isolated workspaces (`vault-<user_id>`).
+   - Documented programmatic document creation (PPTX via `python-pptx`, PDF via `ReportLab`, DOCX via `docx`, XLSX via `openpyxl`).
+   - Documented on-premise LanceDB semantic vector search with verified page and paragraph citations.
+2. **Dual-Screen Web Productivity Architecture (Section 26 in `ARCHITECTURE.md`)**:
+   - Explicitly clarified the architectural boundary: LibreChat is an conversational AI agent interaction platform, not a standalone IDE or code editor.
+   - Documented **Mechanism A (Pop-Out Undocked Artifacts Portal)**: Upstream feature allowing users to pop out the live Artifacts pane via `window.open` React Portals to a second monitor with streaming state sync.
+   - Documented **Mechanism B (Satchida Native Web IDE)**: Dedicated browser window on Monitor 2 running VS Code Server Web (`http://127.0.0.1:8085` / `:5173`) with Monaco editor, terminal, Git, and localhost app preview, while Monitor 1 runs LibreChat in `Work` or `Chat` mode orchestrating file operations via MCP tools.
+3. **Privacy Mode & Study Mode Architectural Deep-Dive (Section 27 in `ARCHITECTURE.md`)**:
+   - Sovereign Privacy Mode: Dual-Engine architecture (100% on-premises local GPU at ₹0 cloud COGS + 15M frontier cloud tokens for non-sensitive work), forced ephemeral memory retention (zero disk/database prompt logging), on-premise LanceDB RAG, and DPDP Act (2023) compliance.
+   - Study Mode: Socratic pedagogy (leading hints rather than solving homework directly), POCSO Act (2012) child safety filters, speech synthesis reasoning token stripping, and curriculum-grounded textbook RAG with exact page references.
+4. **Flagship Sales Proposal (`SALES-PROPOSAL-FLAGSHIP.md`)**:
+   - Showcased AnythingLLM Knowledge Vault, Dual-Screen Engineering flow (VS Code Web + Undocked Artifacts), and Sovereign Privacy Tier.
+   - Updated comparative capability matrix and aligned pricing to ₹3,499 / dedicated workstation seat / mo.
+5. **Value Sales Proposal (`SALES-PROPOSAL-VALUE.md`)**:
+   - Incorporated Knowledge Vault document intelligence into `Standard` (₹299/mo) and `Family` (₹999/mo) tiers.
+   - Emphasized Socratic Study Mode, POCSO compliance, and clean audio read-aloud.
+   - Highlighted Dual-Screen Web IDE workflow for `Pro Developer` (₹1,499/mo).
+
+---
+
 ## 2026-11-08 — Zero-Conflict Selective Upstream Feature Sync & Stream Hardening
 
 ### 1. Functional Scope & Upstream Enhancements Ported

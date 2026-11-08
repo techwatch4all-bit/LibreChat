@@ -2669,11 +2669,11 @@ The platform implements a unified 7-tier commercial taxonomy mirrored between Li
 
 ### 24.6 Sovereign Privacy Tier: Hybrid Dual-Engine & COGS Realism
 - **Hybrid Routing Mechanics**:
-  - When in **Privacy mode**, inference executes 100% locally on the client's on-premises GPU (≥24GB VRAM) via llama.cpp or LLM. Upstream cloud provider charges for these queries are **₹0.00**.
+  - When in **Privacy mode**, inference executes 100% locally on the client's on-premises GPU (≥24GB VRAM) via llama.cpp or vLLM. Upstream cloud provider charges for these queries are **₹0.00**.
   - When in **Chat**, **Study**, **Work**, or **Vibe Coding** (VS Code Server Web, MCP, Code Execution sandbox), requests route through the Satchida Zero-Knowledge Relay to frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek).
 - **COGS (Cost of Goods Sold) & Gross Margin**:
   - COGS represents the direct variable upstream API costs and data transfer charges incurred to fulfill queries.
-  - Because Privacy account holders utilize cloud frontier models for vibe coding and heavy work, the account incurs actual cloud COGS (~.50–.00 / ₹445–₹495 landed per month) against the ₹3,499 monthly fee.
+  - Because Privacy account holders utilize cloud frontier models for vibe coding and heavy work, the account incurs actual cloud COGS (~$4.50–$5.00 / ₹445–₹495 landed per month) against the ₹3,499 monthly fee.
   - The blended gross margin is therefore **~86% to 88%** (₹3,499 fee – ₹495 COGS = ₹3,004 gross profit), rather than a fictional 99.9%.
 
 ### 24.5 Tenant Metrics Auto-Backup & Archive Management Lifecycle
@@ -2685,4 +2685,128 @@ The platform implements a unified 7-tier commercial taxonomy mirrored between Li
   - `GET /api/analytics/tenant/:id/archives`: Lists all historical snapshots.
   - `GET /api/analytics/tenant/:id/archive/:archive_id/download`: Downloads the offline JSON backup.
   - `DELETE /api/analytics/tenant/:id/archive/:archive_id`: Permanently purges the archive record and unlinks the disk snapshot with a strict operator audit log.
+
+---
+
+## 25. AnythingLLM MCP Integration — Satchida Knowledge Vault
+
+### 25.1 Architecture & Runtime Plumbing
+- **Bare-Metal Engine**: The Knowledge Vault is powered by AnythingLLM running natively on Windows 11 at `D:\LAN-AI-Infra\AnythingLLM`, exposing its REST API on port `3012` (`http://127.0.0.1:3012/api/v1`).
+- **MCP Bridge (`anythingllm_mcp_server.py`)**: Registered in `librechat.yaml` under `satchida-knowledge-vault` via stdio:
+  ```yaml
+  satchida-knowledge-vault:
+    type: stdio
+    command: python
+    args:
+    - D:\LAN-AI-Infra\LibreChat\skill\anythingllm_mcp_server.py
+    env:
+      ANYTHINGLLM_URL: http://127.0.0.1:3012/api/v1
+      ANYTHINGLLM_API_KEY: 1C4Q14C-8BVMC35-KRZJSSV-ESDMPHH
+      SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated
+    title: Satchida Knowledge Vault
+    description: Multi-tenant document creation PDF DOCX XLSX PPTX LanceDB vector search enterprise RAG and verified citations
+    chatMenu: true
+    startup: true
+  ```
+- **Deterministic Multi-Tenant Isolation**:
+  - The MCP server implements `_resolve_user_workspace_slug(user_identifier)` to map each LibreChat user/seat to a dedicated AnythingLLM workspace slug (e.g. `vault-user-alice`).
+  - Workspaces are provisioned dynamically on-the-fly via AnythingLLM's `/workspace/new` API if not yet present.
+  - Cross-tenant document commingling is structurally impossible: LanceDB vector partitions and document storage trees remain isolated per workspace.
+
+### 25.2 Multi-Format Document Generation Pipeline
+The Satchida Knowledge Vault includes high-fidelity programmatic document generation tools callable by agents in `Work` and `Study` modes:
+1. **Presentations (PPTX)**: Powered by `python-pptx`, generating professional slide decks with executive typography, company color palettes, bullet layouts, metric callouts, and native PowerPoint charts.
+2. **Executive Reports (PDF)**: Powered by `ReportLab`, building publication-ready PDF documents with flowing tables, headers, footers, page numbering, and clean typography.
+3. **Word Documents (DOCX)**: Powered by `python-docx`, assembling formatted briefs, contracts, and memos with stylized headings, XML-styled tables, and indented callout boxes.
+4. **Spreadsheets (XLSX)**: Powered by `openpyxl`, generating financial models, KPI trackers, and data tables with dynamic formula cells, zebra striping, currency formatting, and auto-adjusted column widths.
+5. **Output Delivery**: Documents are written directly to `SATCHIDA_EXPORTS_DIR` and returned to LibreChat with instant direct download links.
+
+### 25.3 On-Premise Semantic RAG & Verified Citations
+- **LanceDB Vector Database**: Embeddings and document chunks are indexed in an embedded, serverless LanceDB instance within AnythingLLM's local runtime. Zero vector data or chunk text is transmitted to external cloud vector databases (e.g., Pinecone, Weaviate, or Qdrant).
+- **Exact Page-Level Citations**: Ingested PDF and DOCX files preserve structural pagination. When an agent queries the vault, AnythingLLM returns matched text chunks alongside precise metadata: `document_title`, `page_number`, `paragraph_index`, and `similarity_score`.
+- **Cross-Mode Integration**:
+  - **`Study` Mode**: Ingests textbook syllabi (NCERT, CBSE, ICSE, Cambridge). Provides Socratic tutoring grounded strictly in approved textbook chapters, preventing hallucinations with exact page citations.
+  - **`Privacy` Mode**: 100% on-premise LanceDB vector search. Embeddings and document text never leave the physical edge machine.
+  - **`Work` Mode**: Ingests corporate handbooks, standard operating procedures, legal contracts, vendor statements, and financial spreadsheets for instant querying and automated report drafting.
+
+---
+
+## 26. Dual-Screen Productivity & Web IDE Architecture
+
+### 26.1 Addressing the "Vibe Coding in LibreChat" Misconception
+- **Crucial Architectural Reality**: LibreChat is an enterprise conversational AI platform and multi-agent orchestration surface; **it does not natively include a full IDE, code editor, or vibe coding canvas in the chat viewport.**
+- Attempting to code complex multi-file projects inside a single chat window leads to severe context fragmentation, lost scroll positions, and constant context-switching between prompt editing and code inspection.
+- **How Satchida Achieves Dual-Screen Productivity**: Satchida decouples the **Conversational Control Plane** (LibreChat) from the **Execution & Preview Plane** across two distinct, complementary mechanisms in standard web browsers.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       SATCHIDA DUAL-SCREEN BROWSER ARCHITECTURE                                │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+   SCREEN 1: CONVERSATIONAL CONTROL PLANE                       SCREEN 2: EXECUTION & PREVIEW PLANE
+   (LibreChat on Port 3080)                                     (Choose Mechanism A or B)
+  ┌───────────────────────────────────────────────┐            ┌───────────────────────────────────────────────┐
+  │ LibreChat Chat / Work Mode                    │            │ MECHANISM A: UNDOCKED ARTIFACTS PORTAL        │
+  │ • Agent Prompting & Reasoning                 │            │ • Independent window (window.open portal)     │
+  │ • Model Selection (Claude 3.5, GPT-4o, Local) │            │ • React Sandpack live component preview       │
+  │ • Mode Switching (Chat, Work, Study, Privacy) │   SYNC     │ • Interactive SVG / Mermaid architecture      │
+  │ • Multi-Agent Orchestrator                    │ ─────────► │ • Rendered HTML / Markdown documentation      │
+  │ • MCP Tool Execution & Log Streaming          │            │ • Real-time streaming without remounting      │
+  │                                               │            ├───────────────────────────────────────────────┤
+  │                                               │            │ MECHANISM B: SATCHIDA WEB IDE (VS CODE WEB)   │
+  │                                               │            │ (Port 8085 / 5173 - PM2 Process)              │
+  │                                               │   AGENT    │ • Full Monaco multi-file code editor          │
+  │                                               │ ─────────► │ • Integrated Bash/PowerShell terminal        │
+  │                                               │   EDITS    │ • Git version control & diff inspector        │
+  │                                               │            │ • Localhost dev server preview                │
+  └───────────────────────────────────────────────┘            └───────────────────────────────────────────────┘
+```
+
+### 26.2 Mechanism A: Pop-Out Undocked Artifacts Portal (Native Upstream Feature)
+- **Zero Extension Requirement**: Built directly into LibreChat's React frontend.
+- **Workflow**:
+  1. The user prompts the agent on Screen 1 to generate an interactive component, dashboard, flowchart, or report.
+  2. LibreChat's Artifacts panel renders the code, Sandpack interactive React sandbox, or SVG/Mermaid diagram.
+  3. The user clicks the **Undock / Pop-Out** button in the Artifacts header.
+  4. LibreChat invokes a `window.open` browser portal that moves the live Artifacts pane into an independent browser window positioned on the second monitor.
+  5. As the assistant streams subsequent updates on Screen 1, the undocked portal on Screen 2 re-renders live in real time using React Portals, without unmounting the component tree or losing scroll state.
+
+### 26.3 Mechanism B: Native Satchida Web IDE (VS Code Server Web at `:8085` / `:5173`)
+- **For Heavy Engineering Workflows (Pro, Pro Family, Privacy, Enterprise tiers)**:
+- **Screen 1 (Command & Orchestration)**: The engineer directs LibreChat in `Work` or `Chat` mode. The agent utilizes filesystem MCP tools, `code_execution`, and workspace tools to read repositories, create files, install dependencies, and run test suites.
+- **Screen 2 (Full-Scale Web IDE)**: A dedicated browser window running VS Code Server Web (`http://127.0.0.1:8085` or `:5173`).
+  - Provides a desktop-class Monaco editor, file navigation tree, syntax highlighting, Git staging, and an integrated terminal.
+  - When the agent modifies source files from Screen 1, VS Code Server's file watcher immediately updates the open buffers on Screen 2.
+  - The engineer can inspect diffs, trigger builds in the terminal, or view the running web application on `localhost` side-by-side without leaving their browser.
+
+---
+
+## 27. Privacy Mode & Study Mode Architectural Deep-Dive
+
+### 27.1 Sovereign Privacy Mode: 100% On-Premise Air-Gap
+- **Dual-Engine Mechanics**:
+  - In **Privacy Mode**, queries are routed strictly to the client's on-premises GPU (NVIDIA RTX 3090/4090/A5000 or Apple Silicon Mac Studio) running local llama.cpp or Ollama.
+  - External network connectivity is bypassed entirely; upstream cloud provider COGS is **₹0.00**.
+  - In **Chat**, **Work**, and **Study** modes, users retain access to frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek) with a generous 15M monthly token quota for non-confidential heavy reasoning.
+- **Forced Ephemeral Memory Retention (Zero-Disk Footprint)**:
+  - Enabled automatically in Privacy Mode: conversation history and prompt tokens are kept in volatile RAM during the active session only.
+  - No prompt text, completion text, or user query telemetry is written to MongoDB or disk logs.
+  - When the session ends or browser tab closes, the conversational context is immediately purged.
+- **Local Knowledge Vault RAG**: AnythingLLM MCP executes LanceDB vector retrieval strictly from on-premise disk storage. Document embeddings never leave the edge machine.
+- **Regulatory Immunity**: Guarantees compliance with India's Digital Personal Data Protection (DPDP) Act 2023, HIPAA, and Bar Council confidentiality rules for medical and legal practices.
+
+### 27.2 Study Mode: Pedagogical Socratic Tutoring & Child Safety
+- **Socratic Pedagogy (No "Homework Cheating")**:
+  - Unlike generic LLMs that solve math equations or draft essays outright, Study Mode enforces a pedagogical prompt hierarchy.
+  - The model guides students through problem-solving step-by-step: asking leading conceptual questions, providing targeted hints, identifying intermediate arithmetic errors, and encouraging critical thinking.
+- **POCSO Act (2012) Child Safety Compliance**:
+  - Implements multi-stage safety moderation on all incoming prompts and generated completions.
+  - Automatically intercepts and blocks inappropriate content, adult themes, self-harm queries, or predatory interactions, ensuring a secure environment for minors in households and schools.
+- **Audio Read Aloud with Speech Reasoning Exclusion**:
+  - Integrates upstream speech synthesis pipeline improvements (`TTSService.js`, `parsers.ts`).
+  - Reasoning tokens and chain-of-thought blocks (`<think>...</think>`) are automatically stripped before audio synthesis.
+  - Students hear clean, natural pedagogical explanations read aloud without confusing internal model deliberation text.
+- **Curriculum-Grounded Textbook RAG**:
+  - Connects directly to the Satchida Knowledge Vault (AnythingLLM MCP) pre-indexed with approved NCERT, CBSE, ICSE, and Cambridge syllabi.
+  - Every academic explanation includes verified citations referencing the exact textbook, chapter title, and page number.
 

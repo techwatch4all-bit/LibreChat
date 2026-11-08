@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satchida Sovereign AI — Flagship Executive Pitch Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       SATCHIDA SOVEREIGN AI — FLAGSHIP SLIDE DECK (PRINT-READY)
+       ============================================================ */
+    :root {
+      --bg: #07090e;
+      --bg-card: rgba(16, 22, 36, 0.75);
+      --bg-card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-indigo: #6366f1;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --gradient-brand: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%);
+      --gradient-privacy: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Screen Slide Container */
+    .deck-container {
+      width: 100vw;
+      height: 100vh;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(1.5rem, 3.5vw, 3rem) clamp(2rem, 5vw, 4.5rem);
+      position: relative;
+      background: radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
+                  radial-gradient(circle at 10% 90%, rgba(99, 102, 241, 0.04) 0%, transparent 50%),
+                  var(--bg);
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* Header Bar */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--bg-card-border);
+      padding-bottom: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-heading);
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-logo-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--gradient-brand);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .slide-category {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Content Area */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 1.5rem 0;
+      overflow: hidden;
+    }
+
+    /* Footer Bar */
+    .slide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--bg-card-border);
+      padding-top: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    /* Typography */
+    h1.title-main {
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 4.5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+
+    .gradient-text {
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .privacy-text {
+      background: var(--gradient-privacy);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2.slide-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.6rem, 3vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+
+    p.slide-subtitle {
+      font-size: clamp(0.9rem, 1.4vw, 1.15rem);
+      color: var(--text-muted);
+      max-width: 900px;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      width: 100%;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      width: 100%;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 12px;
+      padding: clamp(1rem, 1.8vw, 1.5rem);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      backdrop-filter: blur(8px);
+    }
+
+    .card.highlight-cyan {
+      border-color: rgba(6, 182, 212, 0.4);
+      box-shadow: 0 8px 32px rgba(6, 182, 212, 0.1);
+    }
+
+    .card.highlight-emerald {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 8px 32px rgba(16, 185, 129, 0.1);
+    }
+
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      margin-bottom: 0.75rem;
+      width: fit-content;
+    }
+
+    .badge-cyan { background: rgba(6, 182, 212, 0.15); color: #38bdf8; border: 1px solid rgba(6, 182, 212, 0.3); }
+    .badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-rose { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .badge-indigo { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); }
+
+    .card-title {
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-price {
+      font-family: var(--font-heading);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.25rem;
+    }
+
+    .card-price-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      margin-bottom: 1rem;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      line-height: 1.4;
+    }
+
+    .feature-list li strong {
+      color: #fff;
+    }
+
+    .check-icon {
+      color: var(--accent-emerald);
+      flex-shrink: 0;
+      font-weight: 900;
+    }
+
+    .cross-icon {
+      color: var(--accent-rose);
+      flex-shrink: 0;
+      font-weight: 900;
+    }
+
+    /* Comparison Table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      background: var(--bg-card);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--bg-card-border);
+    }
+
+    .compare-table th {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: #fff;
+      border-bottom: 1px solid var(--bg-card-border);
+    }
+
+    .compare-table td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+    }
+
+    .compare-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .compare-table td strong {
+      color: #fff;
+    }
+
+    .highlight-col {
+      background: rgba(6, 182, 212, 0.05);
+      border-left: 1px solid rgba(6, 182, 212, 0.2);
+      border-right: 1px solid rgba(6, 182, 212, 0.2);
+    }
+
+    /* Diagram Blocks */
+    .diagram-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      width: 100%;
+      padding: 1rem 0;
+    }
+
+    .diagram-box {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: left;
+    }
+
+    .diagram-arrow {
+      color: var(--accent-cyan);
+      font-size: 1.5rem;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* Interactive Deck Floating Toolbar (Hidden in Print) */
+    .deck-toolbar {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--bg-card-border);
+      padding: 0.5rem 0.75rem;
+      border-radius: 999px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 9999;
+      backdrop-filter: blur(12px);
+    }
+
+    .btn-tool {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-family: var(--font-heading);
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s;
+    }
+
+    .btn-tool:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-print {
+      background: var(--gradient-brand);
+      border: none;
+      color: #fff;
+    }
+
+    .btn-print:hover {
+      opacity: 0.95;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+
+    .slide-indicator {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 0 0.5rem;
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      z-index: 9999;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 10%;
+      background: var(--gradient-brand);
+      transition: width 0.25s ease;
+    }
+
+    /* ============================================================
+       PRINT MEDIA OPTIMIZATION (CTRL+P / SAVE TO PDF)
+       ============================================================ */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+
+      html, body {
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: #07090e !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .deck-container {
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        scroll-snap-type: none !important;
+      }
+
+      .slide {
+        width: 100vw !important;
+        height: 100vh !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        padding: 2.2rem 3rem !important;
+        background: #07090e !important;
+        border: none !important;
+      }
+
+      .deck-toolbar, .progress-bar-container {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Progress Bar -->
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <!-- Floating Presentation Controls -->
+  <div class="deck-toolbar">
+    <button class="btn-tool" onclick="prevSlide()">‹ Prev</button>
+    <span class="slide-indicator" id="slideIndicator">1 / 10</span>
+    <button class="btn-tool" onclick="nextSlide()">Next ›</button>
+    <button class="btn-tool btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+    <button class="btn-tool" onclick="toggleFullScreen()">⛶ Fullscreen</button>
+  </div>
+
+  <div class="deck-container" id="deckContainer">
+
+    <!-- ==========================================
+         SLIDE 1: COVER & HERO
+         ========================================== -->
+    <section class="slide" id="slide-1">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Executive Series · Flagship Edition</div>
+      </div>
+      <div class="slide-body">
+        <span class="card-badge badge-cyan" style="font-size: 0.85rem;">ENTERPRISE & ENGINEERING SUITE · NOV 2026</span>
+        <h1 class="title-main">
+          Air-Gapped Privacy &<br>
+          <span class="gradient-text">High-Throughput Engineering Intelligence</span>
+        </h1>
+        <p class="slide-subtitle">
+          The sovereign AI infrastructure designed for technology leaders, legal practices, engineering teams, and enterprises demanding 100% data sovereignty without sacrificing frontier reasoning.
+        </p>
+        <div class="grid-3" style="max-width: 950px; margin-top: 1rem;">
+          <div class="card" style="padding: 1rem;">
+            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">Zero Cloud Relays</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Outbound Cloudflare Tunnels bypass CGNAT without expensive VPNs or VPS relays.</div>
+          </div>
+          <div class="card" style="padding: 1rem;">
+            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-emerald); font-size: 0.95rem;">100% Air-Gapped Option</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Local GPU inference with ₹0 cloud COGS and ephemeral zero-disk data retention.</div>
+          </div>
+          <div class="card" style="padding: 1rem;">
+            <div style="font-family: var(--font-heading); font-weight: 700; color: var(--accent-indigo); font-size: 0.95rem;">Dual-Screen Dev Suite</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Integrated VS Code Server Web IDE + autonomous multi-agent MCP toolchains.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Prepared by Satchida AI Architecture Group</span>
+        <span>Valid for Sovereign Deployments · ai.satchida.com</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 2: THE ENTERPRISE AI DILEMMA
+         ========================================== -->
+    <section class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Market Challenge</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">The Three Fatal Flaws of Big Tech AI</h2>
+        <p class="slide-subtitle">Modern engineering and executive teams are caught between data exposure and prohibitive per-seat licensing tolls.</p>
+        
+        <div class="grid-3">
+          <div class="card" style="border-top: 3px solid var(--accent-rose);">
+            <span class="card-badge badge-rose">CRISIS 1: DATA EXPOSURE</span>
+            <div class="card-title">Confidentiality Bleed</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+              Cloud providers retain prompts, log intellectual property, and transmit sensitive telemetry overseas. This creates severe regulatory non-compliance under India's DPDP Act (2023) and Bar Council/medical rules.
+            </p>
+            <div style="background: rgba(244, 63, 94, 0.08); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #fca5a5; font-family: var(--font-mono);">
+              Risk: Intellectual Property leakage & multi-crore privacy penalties.
+            </div>
+          </div>
+
+          <div class="card" style="border-top: 3px solid var(--accent-amber);">
+            <span class="card-badge badge-rose" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3);">CRISIS 2: RECURRING SAAS TOLL</span>
+            <div class="card-title">Astronomical Seat Taxes</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+              US dollar subscriptions ($30/mo for Copilot, $20–$60/mo for ChatGPT Enterprise) incur 3.5% forex markups, withholding taxes, and rate-limits that force teams to ration access.
+            </p>
+            <div style="background: rgba(245, 158, 11, 0.08); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #fde68a; font-family: var(--font-mono);">
+              Cost: A 10-person engineering team wastes over ₹3,00,000/year.
+            </div>
+          </div>
+
+          <div class="card" style="border-top: 3px solid var(--accent-cyan);">
+            <span class="card-badge badge-cyan">CRISIS 3: DISCONNECTED TOOLS</span>
+            <div class="card-title">Context Fragmentation</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+              Developers juggle separate windows: chat tabs, code editors, command terminals, and doc searches. Context is lost every time code is copy-pasted between chat and IDE.
+            </p>
+            <div style="background: rgba(6, 182, 212, 0.08); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #bae6fd; font-family: var(--font-mono);">
+              Friction: ~2.5 hours lost daily in manual copy-pasting & context loss.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Strategic Analysis</span>
+        <span>Slide 2 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 3: TWO REVENUE TRACKS
+         ========================================== -->
+    <section class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Architecture Tracks</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Which Architecture Fits Your Organisation?</h2>
+        <p class="slide-subtitle">Satchida adapts directly to your existing hardware infrastructure with two distinct deployment paths.</p>
+        
+        <div class="grid-2">
+          <!-- TRACK A -->
+          <div class="card highlight-cyan">
+            <span class="card-badge badge-cyan">TRACK A: CLOUD-ASSISTED ENGINEERING</span>
+            <div class="card-title" style="font-size: 1.4rem;">"We Don't Own GPU Hardware"</div>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">
+              Ideal for software startups, agile engineering teams, and tech households who want frontier reasoning models with zero upfront capital expenditure.
+            </p>
+            <ul class="feature-list" style="margin-bottom: 1.5rem;">
+              <li><span class="check-icon">✓</span> <span><strong>High-Throughput Frontier Models:</strong> Claude 3.5 Sonnet, GPT-4o, DeepSeek.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Dual-Screen Dev Suite:</strong> Embedded VS Code Web IDE + Undocked Artifacts.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Multi-Agent Toolchains:</strong> MCP tools, sandboxed execution, repository search.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Generous Monthly Quotas:</strong> 15,000,000 to 25,000,000 tokens included.</span></li>
+            </ul>
+            <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--bg-card-border); display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;">Flagship Tiers</span>
+                <div style="font-weight: 700; color: #fff;">Pro (₹1,499) · Pro Family (₹2,499)</div>
+              </div>
+              <span class="card-badge badge-cyan">Instant Activation</span>
+            </div>
+          </div>
+
+          <!-- TRACK B -->
+          <div class="card highlight-emerald">
+            <span class="card-badge badge-emerald">TRACK B: ON-PREMISE SOVEREIGN AIR-GAP</span>
+            <div class="card-title" style="font-size: 1.4rem;">"We Own ≥24GB GPU Hardware"</div>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">
+              Purpose-built for law firms, hospitals, defense agencies, and high-IP enterprises requiring complete data air-gapping on confidential workloads.
+            </p>
+            <ul class="feature-list" style="margin-bottom: 1.5rem;">
+              <li><span class="check-icon">✓</span> <span><strong>100% On-Premise GPU Inference:</strong> ₹0 cloud COGS via local llama.cpp / vLLM.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Ephemeral Memory Mode:</strong> Zero prompts saved to disk; volatile RAM only.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Local Knowledge Vault:</strong> 100% on-device LanceDB vector intelligence.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Hybrid Cloud Freedom:</strong> 15M cloud tokens included for non-sensitive heavy tasks.</span></li>
+            </ul>
+            <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--bg-card-border); display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;">Flagship Tier</span>
+                <div style="font-weight: 700; color: #fff;">Sovereign Privacy (₹3,499/seat)</div>
+              </div>
+              <span class="card-badge badge-emerald">24-48h Setup</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Deployment Topologies</span>
+        <span>Slide 3 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 4: PRO & PRO FAMILY TIERS
+         ========================================== -->
+    <section class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Track A Commercials</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Track A: Engineering & Collaborative Suites</h2>
+        <p class="slide-subtitle">Maximum developer productivity and collaborative family capability with zero infrastructure overhead.</p>
+        
+        <div class="grid-2">
+          <!-- PRO DEVELOPER -->
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="card-badge badge-indigo">SOLO DEVELOPER SUITE</span>
+                <div class="card-title">Pro Developer</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-price">₹1,499</div>
+                <div class="card-price-sub">per seat / month (excl. GST)</div>
+              </div>
+            </div>
+            <ul class="feature-list" style="margin-top: 1rem;">
+              <li><span class="check-icon">✓</span> <span><strong>15,000,000 High-Priority Tokens/mo:</strong> Generous quota for coding & reasoning.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Embedded VS Code Server Web:</strong> Full Monaco IDE with terminal, Git, and file tree.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Dual-Screen Flow:</strong> Screen 1 LibreChat chat + Screen 2 standalone Web IDE.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Sandboxed Code Execution:</strong> Run Python, JS, and shell scripts safely in-memory.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Knowledge Vault (AnythingLLM MCP):</strong> LanceDB search & automated doc exports.</span></li>
+            </ul>
+          </div>
+
+          <!-- PRO FAMILY -->
+          <div class="card highlight-cyan">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="card-badge badge-cyan">4-SEAT POOLED HOUSEHOLD / STUDIO</span>
+                <div class="card-title">Pro Family / Tech Studio</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-price">₹2,499</div>
+                <div class="card-price-sub">Just ₹624 / seat / mo (4 Seats)</div>
+              </div>
+            </div>
+            <ul class="feature-list" style="margin-top: 1rem;">
+              <li><span class="check-icon">✓</span> <span><strong>25,000,000 Pooled Tokens/mo:</strong> Shared family or boutique studio budget.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>All Pro Developer Tools Included:</strong> Every seat gets VS Code Web & MCP agents.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Socratic Study Mode:</strong> Guides students with hints rather than cheating homework.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>POCSO Act (2012) Child Safety:</strong> Multi-layer safety filtering for children.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Clean Audio Read Aloud:</strong> Upstream TTS strips reasoning tags for pure listening.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Cloud-Assisted Tiers</span>
+        <span>Slide 4 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 5: DUAL-SCREEN BROWSER WORKFLOW
+         ========================================== -->
+    <section class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Developer Productivity</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Dual-Screen Web Browser Productivity</h2>
+        <p class="slide-subtitle">LibreChat directs agents while the Web IDE executes code. Two browser windows, zero context-switching.</p>
+        
+        <div class="diagram-container">
+          <div class="diagram-box" style="border-color: rgba(6, 182, 212, 0.4);">
+            <div class="card-badge badge-cyan">SCREEN 1: CONVERSATIONAL CONTROL PLANE</div>
+            <div style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">LibreChat Web (Port 3080)</div>
+            <ul class="feature-list" style="font-size: 0.8rem;">
+              <li>• Chat, Work, Study, or Privacy mode prompt flow</li>
+              <li>• Orchestrates autonomous subagents & tools</li>
+              <li>• MCP server tool execution with live streaming logs</li>
+              <li>• Directs file updates to local workspace repository</li>
+            </ul>
+          </div>
+
+          <div class="diagram-arrow">➔<br><span style="font-size: 0.7rem; font-family: var(--font-mono); color: var(--text-dim);">LIVE SYNC</span></div>
+
+          <div class="diagram-box" style="border-color: rgba(99, 102, 241, 0.4);">
+            <div class="card-badge badge-indigo">SCREEN 2: EXECUTION & PREVIEW PLANE</div>
+            <div style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">VS Code Server Web IDE (:8085)</div>
+            <ul class="feature-list" style="font-size: 0.8rem;">
+              <li>• Full-screen Monaco multi-file code editor</li>
+              <li>• Integrated PowerShell & Bash terminal running dev servers</li>
+              <li>• Git version control, diff inspector, and file watcher</li>
+              <li>• Pop-out undocked Artifacts portal for live React preview</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem; padding: 0.9rem 1.25rem; background: rgba(6, 182, 212, 0.05); border-color: rgba(6, 182, 212, 0.2);">
+          <div style="font-size: 0.82rem; color: #bae6fd; line-height: 1.5;">
+            <strong>How to run it:</strong> Click the <strong>IDE</strong> icon on LibreChat's left sidebar and hit the <strong>"Pop Out"</strong> button in the top action bar. Drag the new window to Screen 2. Screen 1 stays on Chat; Screen 2 becomes your full-screen browser IDE.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Dual-Screen Workflow</span>
+        <span>Slide 5 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 6: KNOWLEDGE VAULT (ANYTHINGLLM MCP)
+         ========================================== -->
+    <section class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Enterprise Knowledge</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Satchida Knowledge Vault — AnythingLLM MCP</h2>
+        <p class="slide-subtitle">Turn corporate contracts, SOPs, and textbooks into an on-premise LanceDB vector store with verified citations.</p>
+        
+        <div class="grid-3">
+          <div class="card">
+            <span class="card-badge badge-cyan">ON-PREMISE VECTOR RAG</span>
+            <div class="card-title">Embedded LanceDB</div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+              Embeddings and document chunks remain strictly inside your server. Zero data escapes to external cloud vector SaaS (Pinecone, Weaviate).
+            </p>
+            <ul class="feature-list" style="font-size: 0.78rem;">
+              <li><span class="check-icon">✓</span> Multi-tenant workspace isolation</li>
+              <li><span class="check-icon">✓</span> Sub-50ms local semantic retrieval</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <span class="card-badge badge-emerald">VERIFIED CITATIONS</span>
+            <div class="card-title">Page-Level Proof</div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+              Eliminate hallucinations. Answers cite exact document titles, page numbers, and paragraph offsets for absolute legal and audit compliance.
+            </p>
+            <ul class="feature-list" style="font-size: 0.78rem;">
+              <li><span class="check-icon">✓</span> Exact PDF/DOCX page references</li>
+              <li><span class="check-icon">✓</span> Direct snippet provenance check</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <span class="card-badge badge-indigo">DOCUMENT GENERATOR</span>
+            <div class="card-title">Multi-Format Creation</div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+              The AI generates styled, presentation-ready files on-the-fly and drops them into your download tray immediately:
+            </p>
+            <ul class="feature-list" style="font-size: 0.78rem;">
+              <li><span class="check-icon">✓</span> <strong>PPTX:</strong> Executive slide decks with charts</li>
+              <li><span class="check-icon">✓</span> <strong>PDF:</strong> Publication-grade styled reports</li>
+              <li><span class="check-icon">✓</span> <strong>XLSX:</strong> Spreadsheets with live formulas</li>
+              <li><span class="check-icon">✓</span> <strong>DOCX:</strong> Formatted briefs & agreements</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Knowledge Infrastructure</span>
+        <span>Slide 6 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 7: TRACK B - SOVEREIGN PRIVACY TIER
+         ========================================== -->
+    <section class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Track B Sovereign</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Track B: Sovereign Privacy Edition</h2>
+        <p class="slide-subtitle">For law firms, healthcare, and high-security enterprises with ≥24GB GPU hardware. 100% on-premise air-gap.</p>
+        
+        <div class="grid-2">
+          <div class="card highlight-emerald">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <span class="card-badge badge-emerald">AIR-GAPPED HARDWARE EDITION</span>
+                <div class="card-title" style="font-size: 1.4rem;">Sovereign Privacy Tier</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-price">₹3,499</div>
+                <div class="card-price-sub">per dedicated seat / month (excl. GST)</div>
+              </div>
+            </div>
+
+            <ul class="feature-list" style="margin-top: 1rem;">
+              <li><span class="check-icon">✓</span> <span><strong>Dual-Engine Architecture:</strong> Toggle between 100% local GPU and frontier cloud.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Uncapped Local GPU Generation:</strong> Zero cloud COGS for all Privacy mode queries.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Forced Ephemeral Memory:</strong> Zero prompts or chats written to disk; RAM-only.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>15,000,000 Frontier Cloud Tokens:</strong> Included for heavy coding and research.</span></li>
+              <li><span class="check-icon">✓</span> <span><strong>Full Pro Toolchain:</strong> VS Code Server Web, MCP agents, and local sandbox.</span></li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="color: var(--accent-emerald);">Hardware Qualification Checklist</div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Verified by Satchida deployment engineers before activation:
+            </p>
+            <table class="compare-table" style="font-size: 0.78rem;">
+              <tr>
+                <td><strong>GPU Hardware</strong></td>
+                <td>NVIDIA RTX 3090/4090 (24GB) or Mac Studio (≥36GB)</td>
+              </tr>
+              <tr>
+                <td><strong>System RAM</strong></td>
+                <td>32 GB DDR5 / DDR4 (64GB recommended)</td>
+              </tr>
+              <tr>
+                <td><strong>Storage Engine</strong></td>
+                <td>1 TB NVMe PCIe 4.0 SSD (≥5,000 MB/s read)</td>
+              </tr>
+              <tr>
+                <td><strong>Operating System</strong></td>
+                <td>Windows 11 Pro/Enterprise or Ubuntu 22.04 LTS</td>
+              </tr>
+              <tr>
+                <td><strong>Regulatory Posture</strong></td>
+                <td>100% DPDP Act (2023) & HIPAA Immunity</td>
+              </tr>
+            </table>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.75rem; font-style: italic;">
+              *Turnkey pre-configured workstations available directly from Satchida if hardware is needed.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Sovereign Privacy Architecture</span>
+        <span>Slide 7 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 8: STUDY MODE & SAFETY
+         ========================================== -->
+    <section class="slide" id="slide-8">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Education & Safety</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Responsible AI: Study Mode & Child Safety</h2>
+        <p class="slide-subtitle">Built for schools, colleges, and families. Encourages real comprehension while preventing plagiarism and harm.</p>
+        
+        <div class="grid-4">
+          <div class="card">
+            <span class="card-badge badge-indigo">PEDAGOGY</span>
+            <div class="card-title" style="font-size: 1rem;">Socratic Tutoring</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+              Refuses to simply solve homework. Asks leading conceptual questions and breaks problems down step-by-step.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="card-badge badge-rose">LEGAL SAFETY</span>
+            <div class="card-title" style="font-size: 1rem;">POCSO Act (2012)</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+              Multi-layer content guardrails instantly intercept explicit, harmful, or inappropriate student interactions.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="card-badge badge-cyan">AUDIO PIPELINE</span>
+            <div class="card-title" style="font-size: 1rem;">Clean Read Aloud</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+              TTS pipeline automatically strips model reasoning tags (<think>) so students hear clear, natural explanations.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="card-badge badge-emerald">CURRICULUM</span>
+            <div class="card-title" style="font-size: 1rem;">Textbook Grounding</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+              Grounds explanations in approved NCERT, CBSE, and ICSE textbooks with verified chapter and page citations.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Academic Guardrails</span>
+        <span>Slide 8 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 9: COMPARATIVE CAPABILITY MATRIX
+         ========================================== -->
+    <section class="slide" id="slide-9">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Competitive Analysis</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Head-to-Head Architectural Comparison</h2>
+        <p class="slide-subtitle">How Satchida Sovereign AI outperforms generic big tech subscriptions across privacy, tools, and pricing.</p>
+        
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Capability / Feature</th>
+              <th>Big Tech AI (Copilot / ChatGPT Plus)</th>
+              <th class="highlight-col">Satchida Pro (Track A)</th>
+              <th>Satchida Pro Family</th>
+              <th style="background: rgba(16, 185, 129, 0.08); color: #34d399;">Satchida Sovereign Privacy (Track B)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Monthly Investment</strong></td>
+              <td>₹1,700 – ₹2,500 / seat (USD)</td>
+              <td class="highlight-col"><strong>₹1,499 / seat</strong></td>
+              <td><strong>₹2,499 / 4 seats</strong> (₹624/seat)</td>
+              <td><strong>₹3,499 / seat</strong> (Dedicated)</td>
+            </tr>
+            <tr>
+              <td><strong>Data Sovereignty & Egress</strong></td>
+              <td><span class="cross-icon">✗</span> Logged overseas</td>
+              <td class="highlight-col"><strong>Stripped PII (Zero-Knowledge)</strong></td>
+              <td>Stripped PII</td>
+              <td><strong>100% Air-Gapped (Zero Egress)</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Monthly Token Budget</strong></td>
+              <td>Rate limited per 3 hours</td>
+              <td class="highlight-col"><strong>15,000,000 tokens</strong></td>
+              <td><strong>25,000,000 tokens</strong> (Pooled)</td>
+              <td><strong>Uncapped Local + 15M Cloud</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Dual-Screen Dev Suite</strong></td>
+              <td><span class="cross-icon">✗</span> No IDE integration</td>
+              <td class="highlight-col"><strong>✓ Full VS Code Server Web</strong></td>
+              <td><strong>✓ Full VS Code Server Web</strong></td>
+              <td><strong>✓ Full VS Code Server Web</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Knowledge Vault (AnythingLLM)</strong></td>
+              <td><span class="cross-icon">✗</span> Vendor Cloud RAG</td>
+              <td class="highlight-col"><strong>✓ LanceDB + Citations</strong></td>
+              <td><strong>✓ LanceDB + Citations</strong></td>
+              <td><strong>✓ 100% On-Premise LanceDB</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Child Safety & Socratic Study</strong></td>
+              <td><span class="cross-icon">✗</span> Unrestricted AI</td>
+              <td class="highlight-col">Optional</td>
+              <td><strong>✓ POCSO + NCERT RAG</strong></td>
+              <td><strong>✓ Air-Gapped Study</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Payment Method</strong></td>
+              <td>International Credit Card</td>
+              <td class="highlight-col"><strong>Instant NPCI UPI / IMPS</strong></td>
+              <td><strong>Instant NPCI UPI / IMPS</strong></td>
+              <td><strong>Instant NPCI UPI / GST Invoice</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="slide-footer">
+        <span>Evaluation Matrix</span>
+        <span>Slide 9 / 10</span>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         SLIDE 10: ONBOARDING & CALL TO ACTION
+         ========================================== -->
+    <section class="slide" id="slide-10">
+      <div class="slide-header">
+        <div class="brand-mark">
+          <div class="brand-logo-icon">S</div>
+          <span>SATCHIDA SOVEREIGN AI</span>
+        </div>
+        <div class="slide-category">Deployment & Terms</div>
+      </div>
+      <div class="slide-body">
+        <h2 class="slide-title">Deployment SLA & Immediate Onboarding</h2>
+        <p class="slide-subtitle">Activate sovereign AI intelligence for your team with zero friction and guaranteed support.</p>
+        
+        <div class="grid-3" style="margin-bottom: 1.5rem;">
+          <div class="card">
+            <div class="card-title">15-Minute Cloud SLA</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              Track A (Pro & Pro Family) credentials and isolated workspaces activate instantly upon UPI settlement.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">24-48h On-Premise Setup</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              Track B (Sovereign Privacy) GPU validation, model weights calibration, and tunnel lockdown handled turnkey.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Official GST Invoicing</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              Corporate GST invoices, input tax credit eligibility, and zero international transaction charges.
+            </p>
+          </div>
+        </div>
+
+        <div class="card highlight-cyan" style="text-align: center; padding: 2rem;">
+          <h3 style="font-family: var(--font-heading); font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem;">
+            Ready to Take Command of Your Enterprise AI?
+          </h3>
+          <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            Contact our engineering deployment team or activate instantly via our sovereign portal.
+          </p>
+          <div style="display: flex; justify-content: center; gap: 2rem; font-family: var(--font-mono); font-size: 0.9rem;">
+            <div>Email: <strong style="color: var(--accent-cyan);">sales@satchida.com</strong></div>
+            <div>Web: <strong style="color: var(--accent-cyan);">ai.satchida.com</strong></div>
+            <div>HQ: <strong style="color: var(--accent-cyan);">Bengaluru, Karnataka</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Confidential Proposal · Satchida AI Platform</span>
+        <span>Slide 10 / 10</span>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // Slide Navigation Logic
+    const container = document.getElementById('deckContainer');
+    const totalSlides = 10;
+    let currentSlide = 1;
+
+    function updateProgress(index) {
+      currentSlide = index;
+      document.getElementById('slideIndicator').textContent = `${currentSlide} / ${totalSlides}`;
+      document.getElementById('progressBar').style.width = `${(currentSlide / totalSlides) * 100}%`;
+    }
+
+    function scrollToSlide(index) {
+      if (index < 1 || index > totalSlides) return;
+      const target = document.getElementById(`slide-${index}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth' });
+        updateProgress(index);
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        scrollToSlide(currentSlide + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        scrollToSlide(currentSlide - 1);
+      }
+    }
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevSlide();
+      }
+    });
+
+    // Observer to track slide scrolling
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          const num = parseInt(id.replace('slide-', ''));
+          if (!isNaN(num)) {
+            updateProgress(num);
+          }
+        }
+      });
+    }, { threshold: 0.6 });
+
+    document.querySelectorAll('.slide').forEach(slide => observer.observe(slide));
+
+    // Fullscreen Toggle
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+  </script>
+</body>
+</html>

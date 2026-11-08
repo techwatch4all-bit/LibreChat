@@ -80,6 +80,27 @@ router.use((req, res, next) => {
 
 // Enforce JWT Auth on all IDE proxy calls
 router.use(requireJwtAuth);
+
+// Enforce vscode_server capability gate: only pro, pro_family, privacy, enterprise seats may use the IDE.
+// All other tiers (basic, standard, family) are denied with 403 and shown an upgrade prompt.
+const IDE_ENTITLED_ACCOUNT_TYPES = new Set(['pro', 'pro_family', 'privacy', 'enterprise']);
+
+router.use((req, res, next) => {
+  const user = req.user;
+  const accountType = user && user.accountType;
+  const capabilities = (user && user.allowedCapabilities) || [];
+  const hasCapability =
+    capabilities.includes('vscode_server') || IDE_ENTITLED_ACCOUNT_TYPES.has(accountType);
+  if (!hasCapability) {
+    return res.status(403).json({
+      error: 'IDE access requires a Pro, Pro Family, Privacy, or Enterprise plan.',
+      code: 'IDE_ENTITLEMENT_REQUIRED',
+      currentPlan: accountType || 'unknown',
+    });
+  }
+  return next();
+});
+
 router.use('/', vscoderProxy);
 
 module.exports = {

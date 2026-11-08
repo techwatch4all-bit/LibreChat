@@ -195,6 +195,8 @@ There is no per-seat metering, no token billing, and no surprise invoices at mon
 
 ### 7.4 End-user subscriptions
 
+Detailed tier specifications and user plans are detailed in SALES-PROPOSAL-FLAGSHIP.md (flagship Pro, Pro Family, and Privacy tiers) and SALES-PROPOSAL-VALUE.md (Standard and Family value plans).
+
 Your users may subscribe to additional Satchida services directly. **This is arranged entirely
 between Satchida and the individual user.** Your organisation is not a reseller, is not involved
 in those transactions, and receives no commission.

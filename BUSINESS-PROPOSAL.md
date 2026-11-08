@@ -186,8 +186,14 @@ we never receive it. That is the position to defend.
 | ≤500 users | ₹25,000 | **₹2,50,000** |
 | ≤1,000 users | ₹50,000 | **₹5,00,000** |
 
-Plus end-user subscriptions sold direct: Demo free · Standard ₹499 · Pro ₹1,499 · Family ₹2,499 ·
-Privacy add-on ₹990.
+Plus end-user subscriptions sold direct (see PRICING.md and SALES-PROPOSAL-FLAGSHIP.md):
+- **Basic (Free Trial)**: ₹0 (500k tokens, Chat mode only)
+- **Standard**: ₹299/mo (2M tokens, Chat + Work modes, solopreneurs)
+- **Family (4 Pooled Seats)**: ₹999/mo (6M tokens pooled = ₹250/seat, Chat + Study + Work, POCSO child safety guardrails)
+- **Pro Developer**: ₹1,499/mo (15M tokens, Chat + Study + Work, VSCode Server Web IDE, MCP, Agents)
+- **Pro Family (4 Pooled Seats)**: ₹2,499/mo (25M tokens pooled, full Pro developer tools on adult seats)
+- **Privacy Sovereign Edge (3 Seats)**: ₹3,499/mo (100% on-premises inference on client\'s >=24GB GPU, Zero-Knowledge relay)
+- **Enterprise**: from ₹15,000/mo (custom seats & token pools, dedicated node, SAML SSO, SLA)
 
 ### Model B — AMC including accounts
 

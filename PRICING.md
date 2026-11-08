@@ -56,88 +56,30 @@ statement that invites comparison with cheaper API credits.
 
 ---
 
-## 3. Tier table
+## 3. Commercial Tier Hierarchy & Feature Matrix
 
-Context ceiling is **8K on every paid tier** — the differentiator is compaction quality and
-what fits inside it, not a bigger number. ChatGPT Plus is already 128K, so competing on
-context size loses; competing on *useful density within a small window* can win.
+The Satchida AI platform features 7 standardized, harmonized commercial tiers synchronized across LibreChat, One-API (license_tiers), and Bifrost (satchida-master analytics & margin engine):
 
-| | **Demo** | **Standard** | **Pro** | **Family** | **Enterprise** |
-|---|---|---|---|---|---|
-| **Price / month** | ₹0 | **₹499** | **₹1,499** | **₹2,499** | from ₹24,999 |
-| **Price / year** | — | **₹4,790** | **₹14,390** | **₹23,990** | from ₹2,39,990 |
-| Annual saving | — | 20% | 20% | 20% | ~20% |
-| Context | 4K | 8K | 8K | 8K | 8K, negotiated |
-| Concurrent streams | 1 | 2 | 4 | 6 shared | negotiated |
-| Monthly local allowance | ~50K tok | ~2M tok | ~8M tok | ~25M pooled | uncapped |
-| Local model | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Files, artifacts, web search | — | ✓ | ✓ | ✓ | ✓ |
-| Agents, memories, MCP | — | — | ✓ | ✓ | ✓ |
-| Code interpreter | — | — | ✓ | ✓ | ✓ |
-| RAG / file search | — | — | ✓ | ✓ | ✓ |
-| **BYOK entitlement** | — | — | ✓ | ✓ | ✓ |
-| Seats | 1 | 1 | 1 | **5** | negotiated |
-| Deployment | shared | shared | shared | shared | **dedicated instance** |
-| Admin console / audit log | — | — | — | — | ✓ |
-| SSO | — | — | — | — | ✓ |
-| QuickBooks MCP | — | — | — | — | ✓ |
+| Tier Code | Plan Name | Target Audience | Seats | Monthly Fee | Annual Fee (2 Mo Free) | Token Quota / mo | Active Modes | Key Capabilities & Developer Tools | Upstream COGS | Gross Margin |
+|---|---|---|---|---|---|---|---|---|---|---|
+| asic | **Basic (Free Trial)** | First-time evaluators | 1 seat | **₹0** | ₹0 | 500,000 | Chat | Web search, basic artifacts | ~.10 | N/A (Acquisition) |
+| standard | **Standard** | Solopreneurs, writers, consultants | 1 seat | **₹299** | ₹2,990 | 2,000,000 | Chat, Work | Deep document analysis, file uploads, web search | ~.40 (₹39.60) | **86.8%** |
+| amily | **Family** | Households (2 Adults + 2 Kids) | **4 seats** (pooled) | **₹999** | ₹9,990 | 6,000,000 (pooled) | Chat, Study, Work | POCSO-compliant safe browsing, homework assistant, shared household quota | ~.50 (₹148.50) | **85.1%** |
+| pro | **Pro Developer** | Engineers, quantitative analysts, power users | 1 seat | **₹1,499** | ₹14,990 | 15,000,000 | Chat, Study, Work | Full VSCode Server Web IDE, MCP tool servers, sandboxed code execution, agents, BYOK | ~.50 (₹445.50) | **70.3%** |
+| pro_family | **Pro Family** | Tech-forward households | **4 seats** (pooled) | **₹2,499** | ₹24,990 | 25,000,000 (pooled) | Chat, Study, Work | 4 pooled accounts with full Pro toolchain on adult seats + child-safe study mode | ~.50 (₹742.50) | **70.3%** |
+| privacy | **Privacy (Sovereign Hybrid)** | Clinics, CA/Law firms, SMEs with local GPU | **1 seat** (licensed per seat) | **₹3,499 / seat** | ₹34,990 / seat | **15M Cloud / seat + Uncapped Local** | Chat, Study, Work, Privacy | Dual Engine: Uncapped local GPU in Privacy mode + Full Pro cloud developer suite for Chat/Work/Vibe coding | ~.50 (₹445.50) / seat | **87.3%** |
+| enterprise | **Enterprise** | Schools, colleges, distributed enterprises | Custom (10–100+) | **from ₹15,000** | Custom SLA | Custom pooled | Chat, Study, Work, Privacy | Dedicated tenant gateway, custom fine-tuned local models, SAML/SSO, audit log compliance | Negotiated | **75%–85%** |
 
-### The Privacy tier — ₹990/month, a different axis
+### Strategic Proposals & Sales Decks
 
-**Privacy is not a rung on the capability ladder.** Chat/Work/Pro describe capability; Private
-describes *where the computation happens*. So it is priced and sold separately rather than as a
-sixth column.
+The sales strategy is bifurcated into two distinct, executive-ready sales decks:
 
-| | **Privacy (Local)** | **Privacy (Cloud)** |
-|---|---|---|
-| Price | **₹990/month** | ₹990/month |
-| Inference | Our vLLM only | Contracted non-retention provider |
-| Content leaves our hardware | **Never** | Yes, but not retained |
-| COGS | ~₹0 | Metered |
-| Real limit | **GPU concurrency (~8 streams)**, not tokens | Plan quota |
-| Available at launch | **Yes** | Blocked on ZDR approval |
-
-**Why it is the highest-margin tier:** a Privacy (Local) user costs essentially nothing to
-serve, so ₹990 is conservative against their COGS of ~₹0.
-
-**Why it must be capacity-limited, not token-limited:** the scarce resource is GPU slots, not
-tokens. If 200 subscribers take Privacy (Local) they will saturate the card and starve the Chat
-mode's local fallback, degrading the cheapest tier. Cap it at **1–2 concurrent streams** or a
-monthly *request* allowance — never a token ceiling.
-
-**Sell it two ways:** standalone at ₹990 for a privacy-focused customer, or as a **₹500
-add-on** to any existing tier (Pro + Privacy = ₹1,999) which is the higher-revenue path and
-converts your existing base. The add-on should be available from Pro upward only.
-
-**Privacy (Cloud) cannot launch with a non-retention claim.** OpenAI ZDR is approval-gated, not
-self-serve, and default abuse-monitoring logs run 30 days. Ship Privacy (Local) first; add
-Privacy (Cloud) once a contract is in place. See `INFERENCE.md` §2.1.
-
-| | ChatGPT Go | **Satchida Standard** | ChatGPT Plus | **Satchida Pro** |
-|---|---|---|---|---|
-| Monthly | ~₹399 | **₹499** | ~₹1,999 | **₹1,499** |
-
-Standard sits just above Go; Pro undercuts Plus by 25% while adding a privacy and
-on-premises story they cannot match. That is a defensible position — do not compete on
-model quality against a frontier lab.
-
-### Annual strategy
-
-You want annual to pull cash forward. Three levers, in order of effectiveness:
-
-1. **20% off, shown as a monthly-equivalent.** "₹4,790/year — ₹399/month" reads cheaper than
-   "₹499/month billed monthly", which is worth more than the discount itself.
-2. **Two months free for Pro specifically.** Pro has the highest churn risk (the one tier
-   where a user can most easily justify leaving), so annual Pro gets 2 months rather than 1.
-   Keep Standard at 20%.
-3. **Annual-first checkout default.** Pre-select the annual toggle. Monthly remains visible
-   and available.
-
-A 20% annual blend across 1,000 subscribers yields roughly ₹1.4 crore of cash up front
-versus ~₹1.0 crore spread over the year — the difference funds the hardware upgrade you named
-as the goal.
-
----
+1. **Flagship Sales Proposal (SALES-PROPOSAL-FLAGSHIP.md)**:
+   - Primary high-revenue focus: **Pro** (₹1,499/mo), **Pro Family** (₹2,499/mo), and **Privacy Sovereign Edge** (₹3,499/mo).
+   - Targeted at tech professionals, high-income families, and regulated organizations requiring local GPU isolation.
+2. **Negotiation & Downsell Sales Proposal (SALES-PROPOSAL-VALUE.md)**:
+   - Value & volume focus: **Standard** (₹299/mo), **Family** (₹999/mo for 4 seats = ₹250/seat), and **Pro** (₹1,499/mo).
+   - Deployed during hard procurement negotiations to close deals without discounting the flagship price points.
 
 ## 4. Credits — what they actually mean
 

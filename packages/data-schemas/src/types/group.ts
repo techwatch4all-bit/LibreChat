@@ -74,6 +74,7 @@ export interface IGroup extends Document {
    * tenant's own view and is applied as a further narrowing, never a widening.
    */
   allowedModes?: string[];
+  assignedKnowledgeVaults?: string[];
 }
 
 export interface CreateGroupRequest {

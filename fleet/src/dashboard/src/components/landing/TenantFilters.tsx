@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import type { Filters } from '../../lib/filters';
 import type { PlanFilter, StatusFilter, ExpiryFilter } from '../../lib/filters';
 
@@ -59,8 +60,11 @@ export function TenantFilters({ filters, onChange, resultCount, totalCount }: Pr
         >
           <option value="ALL">All plans</option>
           <option value="basic">Basic</option>
-          <option value="pro">Pro</option>
+          <option value="standard">Standard</option>
           <option value="family">Family</option>
+          <option value="pro">Pro</option>
+          <option value="pro_family">Pro Family</option>
+          <option value="privacy">Privacy</option>
           <option value="enterprise">Enterprise</option>
         </select>
       </div>
@@ -83,7 +87,9 @@ export function TenantFilters({ filters, onChange, resultCount, totalCount }: Pr
       </div>
 
       <p className="filters__count" aria-live="polite">
-        {resultCount === totalCount ? `${totalCount} nodes` : `${resultCount} of ${totalCount} nodes`}
+        {resultCount === totalCount
+          ? `${totalCount} nodes`
+          : `${resultCount} of ${totalCount} nodes`}
       </p>
     </div>
   );

@@ -490,6 +490,7 @@ export async function initializeCustom(
   } else {
     const finalClientOptions = {
       modelOptions,
+      user,
       ...clientOptions,
     };
     options = getOpenAIConfig(apiKey, finalClientOptions, endpoint);

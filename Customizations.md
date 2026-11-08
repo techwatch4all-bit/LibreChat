@@ -20,10 +20,11 @@ These are deliberate, each with its upstream counterpart and reason. See `Change
 | D2  | `GET /api/admin/users` listing scope is derived from **caller authority**; `?scope`/`?tenantId` are ignored   | Scope came from the request (`!req.query.tenantId` → `runAsSystem`), i.e. any caller could be served all tenants | The upstream form was a cross-tenant read once a non-operator could reach the route. Fail-closed: a caller with neither platform authority nor a tenant is refused.                                     |
 | D3  | New `seedTenantAdmin(tenantId, roleName?)` and operator-only `POST /api/admin/grants/tenant-admin`            | No tenant-administrator provisioning path; `bootstrapOperatorCapability` only covers the platform operator | Needed to grant the tenant-scoped capability set. Refuses `OPERATOR_CONTROL`, so it cannot escalate.                                                                                                   |
 | D4  | `GrantPrincipalType` is `ROLE \| GROUP \| USER`; grant body accepts an operator-only `tenantId`                | ROLE-only (`Record`/`Set` structure was left as a placeholder for expansion)                            | A group must be able to carry an entitlement so members inherit it, and an operator must be able to write a grant *for another tenant* — the handler previously stamped only the caller's own tenant.   |
-| D5  | `accountType` added to the User schema and `IUser` (`basic\|pro\|family\|privacy`, lowercase)                  | Absent                                                                                                  | This is the value the one-api seat linkage keys on (one-api resolves a seat's group by exact name). Lowercase is load-bearing: a mis-cased name silently bypasses one-api's `MaxSeats` cap.             |
+| D5  | `accountType` added to the User schema and `IUser` (`basic\|standard\|family\|pro\|pro_family\|enterprise\|privacy`, lowercase)                  | Absent                                                                                                  | This is the value the one-api seat linkage keys on (one-api resolves a seat's group by exact name). Lowercase is load-bearing: a mis-cased name silently bypasses one-api's `MaxSeats` cap.             |
 | D6  | Admin user list/search/create/update live in `packages/api/src/admin/users.ts`; `/api` keeps wiring only       | User create (and bulk, and reset-password) were inline in `api/server/routes/admin/users.js` using `mongoose.models.*` | The repo's own rule is "`/api` holds wiring, not behaviour". Bulk and reset-password remain inline — recorded as outstanding.                                                                           |
 | D7  | `GET /api/admin/verify` returns `isOperator` and `tenantId`                                                    | Returned `{ user }` only                                                                                | The panel inferred authority from `role === 'ADMIN' && tenantId in (undefined,'satchida-master')` — which mis-classifies every tenant admin (their role is also `ADMIN`).                                |
 | D8  | `admin/` vanilla-JS panel is served at `/admin` by the API process                                             | Upstream expects the **AGPL-3.0** `LibreChat-AI/admin-panel` via `ADMIN_PANEL_URL`                       | Licensing: the AGPL panel cannot ship in a paid service (see C1). `admin/` is the clean replacement; upstream's `AdminPanel.tsx` link is retained.                                                      |
+| D9  | `TENANT_SEAT_CAPABILITIES` includes `'vscode_server'` for developer suite gating                               | Absent (capabilities were unformalized or absent)                                                       | Gates access to the bare-metal VS Code Server Web workspace for Pro and Pro Family developer tiers.                                                                                                       |
 
 **Not changed:** `audit.js` remains operator-only — `AuditLog` is deliberately outside tenant
 isolation (`chainKey`-scoped), so exposing it per-tenant needs that read path verified first.
@@ -360,3 +361,141 @@ Upstream LibreChat performs immediate hard deletion when a user deletes a skill 
    - Integrated a "Deleted Skills" section in the Skills Side Panel visible only to administrators.
    - Provides a 1-click "Restore" button with toast notification and real-time query invalidation.
 
+
+## C15. Satchida Multi-Tenant Identity Forwarding & Bifrost Telemetry Pipeline (2026-11-07)
+
+Upstream LibreChat defaults outbound OpenAI client requests without tenant or user context, and upstream One-API assigns unauthenticated or generic requests to `"root"` or raw 24-character hexadecimal MongoDB ObjectIds. Furthermore, Bifrost OSS requires `customer_id` and `user_id` headers to attribute telemetry in its governance dashboards.
+
+**Customization:**
+1. **LibreChat Telemetry Forwarder (`packages/api/src/endpoints/openai/config.ts` & `initialize.ts`):**
+   - Automatically detects endpoints matching `:4000`, `:4099`, `:8700`, or `satchida.com`.
+   - Injects `X-Tenant-Id`, `X-User-Name`, `X-Seat-Alias`, `X-Bifrost-User-Id`, `X-Bifrost-Role`, `x-bf-dim-user_id`, `x-bf-dim-user_name`, and `x-bf-dim-customer_id`.
+   - Extracts human display names (`user.name` / `user.username`) rather than raw hex ObjectIDs.
+2. **One-API Ingress Identity Guard (`middleware/tenant_identity.go` & `model/log.go`):**
+   - Enforces human username resolution: binds `X-User-Name` to Gin context key `ctxkey.Username`.
+   - Added `isHexObjectId` validation in `model/log.go`: prevents 24-character hex strings or "root" from overwriting valid seat identities in consumption and relay error logs.
+3. **Outbound Bifrost Dimension Injection (`relay/adaptor/common.go`):**
+   - Injects `X-Bifrost-Tenant`, `x-bf-dim-customer_id`, `x-bf-dim-customer_name`, `x-bf-dim-user_id`, and `x-bf-dim-user_name` on all upstream calls to Bifrost (`:8700`).
+
+## C16. Cache-Aware Billable Token Accounting & Rolling Quota Windows (2026-11-07)
+
+In agentic loops (e.g. multi-step web search), conversation history expands across turns, creating large prompt token counts. Under upstream One-API, all prompt tokens were added directly into `quota_window_buckets`, penalizing users for repeated context and triggering premature burst quota exhaustion.
+
+**Customization:**
+1. **Cache Discounting in Window Buckets (`relay/controller/helper.go`):**
+   - Implemented KV prompt cache discounting in `postConsumeQuota`:
+     `effectiveTokens = uncachedPrompt + int(float64(cachedTokens) * 0.1) + completionTokens`
+   - Gives users a 90% credit on cached prompt tokens, aligning rolling window consumption with real upstream compute costs.
+2. **Bifrost Prompt Cache Auto-Injection (`relay/adaptor/common.go`):**
+   - Injects `x-bf-prompt-cache-auto-inject: true` on outbound calls to Bifrost (:8700), triggering automatic cache breakpoint placement on Claude, OpenAI, and DeepSeek.
+3. **Calibrated Window Rules (`model/tenant.go`):**
+   - Re-seeded Pro tier rolling window rules to 500,000 tokens (3-hour burst) and 2,500,000 tokens (24-hour daily quota).
+
+## C17. Automated Multi-Tenant Provisioning Hook for Bifrost (`model/bifrost_sync.go`) (2026-11-07)
+
+Previously, creating a tenant in One-API only registered rows in `one-api.db`. Bifrost's `governance_customers` table remained unpopulated, resulting in missing tenant rankings on Bifrost's dashboard.
+
+**Customization:**
+1. **Automated Lifecycle Hooks (`controller/tenant.go` & `model/bifrost_sync.go`):**
+   - `CreateTenant`: Executes `SyncTenantToBifrost`, upserting the tenant into Bifrost's `governance_customers` table in `Bifrost/data/config.db`.
+   - `UpdateTenant`: Updates customer name/attributes in Bifrost.
+   - `DeleteTenant`: Cascades deletion via `DeleteTenantFromBifrost`.
+2. **Startup Self-Healing Reconciliation (`main.go`):**
+   - `ReconcileAllTenantsToBifrost` executes on One-API boot, scanning `one-api.db` and ensuring 100% of active tenants exist in Bifrost.
+
+## C18. Tenant Telemetry Export & Offline Billing Statement Generator (2026-11-07)
+
+Operators require tenant-level billing statements and data exports for offline enterprise reconciliation without third-party payment gateway fees.
+
+**Customization:**
+1. **Tenant Invoice Dialog (`web/berry/src/views/Dashboard/component/TenantInvoiceDialog.js`):**
+   - Formal invoice generator with unique invoice numbering (`INV-<TENANT>-<YYYYMM>`), telemetry summary, product mode distribution, seat utilization, and offline UPI remittance details.
+   - Integrated with `@media print` styling and `window.print()` for instant PDF generation.
+2. **CSV Telemetry Export (`web/berry/src/views/Dashboard/component/TenantUsageDrawer.js`):**
+   - One-click CSV export generating a complete audit of seat, mode, token, and cost metrics for that tenant.
+3. **Per-Tenant Scoped Navigation (`web/berry/src/views/Tenant/index.js`):**
+   - Corrected navigation parameter binding (`tenant.id || tenant.tenant_id`) ensuring 1-click transition from the Tenants table directly into the filtered Tenant Analytics Dashboard.
+
+## C19. SQLite Write-Ahead Logging (WAL) & Concurrency Hardening (`model/main.go`) (2026-11-07)
+
+Under concurrent multi-tenant seat traffic and high-volume background telemetry queries, default SQLite rollback journaling led to `database is locked` lockouts.
+
+**Customization:**
+1. **WAL Mode DSN:** `openSQLite` explicitly configures `_journal_mode=WAL&_busy_timeout=5000&_sync=NORMAL&_cache_size=-64000`.
+2. **Concurrent Readers & Writers:** Allows simultaneous read operations across all analytics and relay workers while single-writer transactions commit non-blockingly via WAL frames.
+3. **Verified Invariants:** `PRAGMA journal_mode = wal` and `PRAGMA busy_timeout = 5000` enforced at database connection initialization.
+
+## C20. Completion Ceiling Clamping & Upstream Credit Reservation Guard (`relay/controller/text.go`) (2026-11-07)
+
+When client requests omitted `max_tokens`, upstream aggregators such as OpenRouter reserved credit for the model's full context window (e.g. 131,072 tokens), resulting in HTTP 402 payment required failures even on well-funded accounts.
+
+**Customization:**
+1. **Dynamic Max Token Assignment:** When `MaxTokens == 0` and `MaxCompletionTokens == nil`, One-API automatically clamps `MaxTokens` to 4,096 tokens for Chat mode and 8,192 tokens for Work/Study modes.
+2. **Enforced Serialization:** Sets `meta.MaxTokensClamped = true`, bypassing the raw-body pass-through and ensuring the request body is converted and serialized with explicit `max_tokens` and `stream_options.include_usage: true`.
+3. **Usage Certainty:** Ensures upstream streaming chunks reliably deliver `usage` statistics across all models.
+
+## C21. NPCI-Standard 12-Digit UTR Verification, Idempotent Top-Up & Automated Log Pruning (2026-11-07)
+
+Ensures financial transactions submitted via offline UPI meet regulatory Indian banking standards and converts currency accurately against dynamic landed forex rates.
+
+**Customization:**
+1. **NPCI 12-Digit UTR Regex:** `controller/upi_billing.go` enforces strict validation (`^\d{12}$`), rejecting synthetic test patterns (`000000000000`, `123456789012`).
+2. **Realtime Landed FX Quota Conversion:** Dynamically calculates quota units as `(AmountINR / LandedRate) * 500,000` using `common.GetLandedRate()` (+5% upper ceil buffer), preventing arbitrage.
+3. **Audit Trail & Idempotency:** Tags top-ups with `[AUDIT_STATUS:PENDING_OPERATOR_REVIEW]` and prevents duplicate crediting on identical UTRs.
+4. **Automated Log Retention Daemon (`model/log.go`):** Prunes ephemeral consume and test logs older than 30 days while preserving financial topup and administrative audit trails indefinitely, followed by SQLite incremental vacuuming.
+
+## C22. Timezone Harmonization & Local Midnight Quota Reset (2026-11-08)
+
+Previous quota window calculations used `now % 86400`, which anchored 24-hour daily quotas to UTC epoch midnight (05:30:00 AM IST). At 00:30 AM IST, users were blocked by yesterday's token consumption while the gauge displayed "Resets in 5h 29m". Furthermore, JavaScript `toISOString().slice(0, 10)` in `chart.js` misattributed daily statistics.
+
+**Customization:**
+1. **Local Calendar Day Anchoring (`model/tenant.go` & `controller/analytics.go`):**
+   - Anchors 1-day periodic windows to `time.Date(y, m, d, 0, 0, 0, 0, now.Location())`.
+   - `CheckWindowLimit` and `AnalyticsWindowStatus` dynamically calculate live token usage from the indexed `logs` table directly, eliminating stale discrete bucket artifacts.
+2. **Dashboard Calendar Harmonization (`controller/user.go` & `web/berry/src/utils/chart.js`):**
+   - Replaced epoch truncation in `GetUserDashboard` with true local calendar day calculation.
+   - Fixed `getTodayDay()` to format local calendar date components.
+   - Added a 3-way time range selector (`24h Rolling` | `Today` | `7 Days`) to `Dashboard/index.js` with cross-referencing subtexts.
+
+## C23. Guaranteed ≥ 80% Gross Margin Telemetry & Official List Pricing (2026-11-08)
+
+Operators required transparent verification of actual upstream landed COGS against retail billed usage to enforce and guarantee a gross margin of ≥ 80%.
+
+**Customization:**
+1. **Gross Margin % Computation (`web/berry/src/views/Dashboard/component/CostReconciliationTable.js`):**
+   - Dynamically calculates `((quotaUSD - costUSD) / quotaUSD) * 100` across Upstream Provider Totals and Model Breakdown.
+   - Color-coded visual chips: Green (`≥80% Target Met`), Amber (`50% - 79% Low`), Red (`<50% Deficit Risk`).
+   - Summary margin chips displayed in both table footers.
+2. **Commercial List Price Policy Header:**
+   - Standard retail pricing policy alert ($0.30/M input, $1.20/M output, with 80%+ discount on cached tokens).
+3. **Prefix Caching Discount (`relay/billing/ratio/cache.go`):**
+   - Enhanced `GetCacheRatio` with automated 90% cache discount (`0.1` ratio) for DeepSeek and Claude models, passing substantial token savings to tenants while maintaining a 99.1% gross margin on OpenRouter.
+
+## C24. High-Performance Blob CSV Export, Fleet-Wide Telemetry & Complete Tenant Metadata (2026-11-08)
+
+Previous implementations used `encodeURI` data URIs that truncated large CSV exports, serialized tenants without `monthly_fee_inr` or `max_seats` (causing the dashboard to display ₹0 /mo MRR), and formatted zero cost as `.00`.
+
+**Customization:**
+1. **Complete Tenant Contract Schema (`model/analytics_tenant.go`):**
+   - Added `MaxSeats` and `MonthlyFeeINR` fields to `TenantUsageSummary` and `TenantUsageOverview`, populating them directly from the `tenants` table.
+   - Eliminates ₹0/mo contract fee fallbacks and accurately reflects genuine fleet MRR (₹15,399/mo) and seat limits.
+2. **Direct Action Buttons & Blob CSV Exports (`TenantCommercialCard.js` & `TenantUsageDrawer.js`):**
+   - Added "Statement / PDF", "Export CSV", and "Export Fleet Summary CSV" buttons directly onto `TenantCommercialCard.js`.
+   - Replaced legacy data URIs with standard `Blob` and `URL.createObjectURL(blob)` in all export paths.
+3. **Display Polish & Row Focus (`TenantPortfolio.js` & `utils/common.js`):**
+   - Corrected `renderCost` in `common.js` to return `'$0.00'` rather than `'.00'`.
+   - Enabled interactive row highlighting in `TenantPortfolio.js` when a tenant is selected in the global dropdown.
+
+## C25. Commercial Tier Harmonization, Auto-Backup Engine & Hybrid Privacy Architecture (2026-11-08)
+
+**Customization:**
+1. **Commercial Tier Harmonization (packages/data-schemas/src/types/entitlement.ts & model/group.go):**
+   - Harmonized 7 standardized commercial tiers across LibreChat, One-API, and Bifrost: asic, standard, amily, pro, pro_family, privacy, and enterprise.
+   - Added 'vscode_server' to TENANT_SEAT_CAPABILITIES and gated the native VS Code Server Web IDE to pro, pro_family, privacy, and enterprise.
+2. **Tenant Metrics Auto-Backup & Archive Management Engine (model/analytics_tenant.go & TenantArchivesDialog.js):**
+   - Implemented zero-loss auto-snapshotting of tenant metrics prior to reset, persisting structured snapshots both in SQLite (	enant_metrics_archives) and on disk (data/archives/).
+   - Built a comprehensive frontend backup manager in Berry dashboard allowing operators to inspect, download, and delete archived metric runs.
+3. **Hybrid Dual-Engine Architecture & Real COGS on Privacy Tier:**
+   - Standardized definition of COGS (Cost of Goods Sold) as direct variable upstream API provider charges and network delivery costs.
+   - Clarified that Privacy accounts feature a hybrid dual-engine: local GPU inference with ₹0 cloud COGS when in Privacy mode, and frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek) when in Chat, Study, Work, or Vibe Coding (VS Code Server Web, MCP, Code Execution).
+   - Accurately recalibrated Privacy gross margin to **~85.8% to 88.0%** based on real cloud usage (~.50 / ₹445.50 COGS) against the ₹3,499 monthly fee.

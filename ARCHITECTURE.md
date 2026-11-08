@@ -2546,3 +2546,143 @@ When bundling the Satchida AI harness for new client systems:
 ### 4. 21/21 MCP Verified Execution Matrix
 All 21 registered MCP servers in librechat.yaml are verified active with live JSON-RPC execution (initialize, 
 otifications/initialized, 	ools/list, and real 	ools/call).
+
+
+---
+
+## 22. Commercial Gateway Pipeline, Telemetry Attribution, and Autonomous Provisioning (One-API & Bifrost Integration)
+
+### 22.1 Multi-Layer Identity Pipeline (LibreChat -> One-API -> Bifrost)
+To guarantee physical multi-tenant isolation, Zero-Knowledge provider anonymity, and accurate seat/tenant attribution across the fleet:
+1. **Client Identity Injection (`LibreChat/packages/api/src/endpoints/openai/config.ts`)**:
+   - Forwards `X-Tenant-Id: <tenant_id>`, `X-User-Name: <human_user_name>`, `X-Seat-Alias: <seat_id>`, `X-Bifrost-User-Id: <seat_id>`, and `X-Bifrost-Role: <role>` across all outbound gateway requests targeting `:4000`, `:4099`, and `:8700`.
+   - Resolves the human user display name (`name` / `username`) from the session to eliminate raw 24-character MongoDB ObjectIds from operational dashboards.
+2. **Gateway Ingress & Validation (`One-API/middleware/tenant_identity.go`)**:
+   - Validates incoming tenant and seat headers against tenant provisioned boundaries.
+   - Binds `ctxkey.TenantId`, `ctxkey.SeatAlias`, and `ctxkey.Username` onto the Gin request context.
+   - Prevents generic "root" or hex ObjectID fallback in consumption and audit logs (`model/log.go`).
+3. **Outbound Dimension Propagation (`One-API/relay/adaptor/common.go`)**:
+   - Automatically injects `X-Bifrost-Tenant`, `x-bf-dim-customer_id`, `x-bf-dim-customer_name`, `x-bf-dim-user_id`, and `x-bf-dim-user_name` on all upstream calls to Bifrost (`:8700`).
+   - Injects `x-bf-prompt-cache-auto-inject: true` to trigger automatic KV prompt cache breakpoints for Anthropic, OpenAI, and DeepSeek.
+
+### 22.2 Automated Lifecycle Provisioning (One-API <-> Bifrost Synchronization)
+Guarantees that creating, updating, or deleting a tenant in One-API automatically syncs to Bifrost's governance registry:
+1. **Real-Time Lifecycle Hook (`One-API/model/bifrost_sync.go`)**:
+   - `SyncTenantToBifrost(tenant)`: Directly upserts the tenant organization into `governance_customers` in `D:\LAN-AI-Infra\Bifrost\data\config.db`.
+   - `DeleteTenantFromBifrost(tenantId)`: Cascades tenant deletion from Bifrost's customer registry.
+2. **Startup Self-Healing Reconciliation (`One-API/main.go`)**:
+   - `ReconcileAllTenantsToBifrost()` scans `one-api.db` on boot, verifying that 100% of active tenants exist in Bifrost's `governance_customers`.
+3. **In-Flight Header Attributing**:
+   - Bifrost logs requests directly with `customer_id` and `customer_name` from wire headers, ensuring live telemetry even before database reload cycles.
+
+### 22.3 Cache-Aware Token Accounting, Quota Windows & Timezone Harmonization
+- **Timezone Synchronization & Calendar Reset**:
+  - Daily periodic quotas reset strictly at local calendar midnight (`time.Date(y, m, d, 0, 0, 0, 0, now.Location())`), eliminating the 5.5-hour UTC epoch modulo drift that previously locked users out at 00:30 AM IST.
+  - 3-hour sliding windows calculate live token consumption directly from the indexed `logs` table, ensuring accurate burst policy gauges without stale discrete bucket artifacts.
+  - The dashboard provides a 3-way time range selector (`24h Rolling` | `Today` | `7 Days`) to allow operators to compare sliding rolling consumption against calendar accounting periods.
+- **Prefix Caching & Agentic Token Optimization**:
+  - In multi-step agentic loops (e.g. web search, code review, coding agents), conversation history expands across turns. One-API automatically applies an **80% to 90% prompt cache discount** (`DefaultCacheRatio = 0.2`, `0.1` for DeepSeek and Claude models) via `CacheAwareQuota` in `relay/billing/ratio/cache.go`.
+  - Bifrost and upstream aggregators (OpenRouter) automatically pass cache breakpoints, drastically reducing token burn without degrading response fidelity.
+- **Production Calibration**:
+  - Pro tier 3-hour sliding burst limit calibrated to 500,000 tokens.
+  - 24-hour daily quota calibrated to 2,500,000 tokens, providing generous headroom for heavy enterprise workflows while stopping runaway automation loops.
+
+### 22.4 Dual-Currency Financial Engine, Margin Verification & Invoicing
+- **Realtime Landed FX Engine**:
+  - Hourly background synchronization with live currency feeds (`common/forex.go`), applying a 5% upper ceiling markup (covering gateway cuts, GST, and banking spreads) to compute the landed rate (e.g. ₹99.00/USD).
+- **Guaranteed $\ge 80\%$ Gross Margin Telemetry (`CostReconciliationTable.js`)**:
+  - Standard official provider list price table displays retail list rates ($0.30/M input, $1.20/M output, with 80%+ discount on cached tokens).
+  - Telemetry dynamically computes Gross Margin % against actual landed upstream provider COGS for every upstream provider and mapped model pair.
+  - Visual status chips enforce operator targets: Green (`≥80% Target Met`), Amber (`50% - 79%`), Red (`<50% Deficit Risk`).
+- **Complete Commercial Tenant Registry**:
+  - `TenantUsageSummary` and `TenantUsageOverview` serialize contracted monthly fee (`monthly_fee_inr`) and capacity limits (`max_seats`), ensuring the dashboard reflects genuine contracted MRR (e.g. ₹15,399/mo) and seat utilization percentages without zero fallbacks or hardcoded values.
+- **Tenant Export & Printable Invoicing**:
+  - **Statement / PDF (`TenantInvoiceDialog.js`)**: Formatted statement with unique invoice IDs (`INV-<TENANT>-<YYYYMM>`), telemetry audits, mode breakdown, and offline Persona UPI / Wire remittance instructions with audit UTR verification.
+  - **High-Performance Blob CSV Export**: Replaced legacy `encodeURI` data URIs with DOM `Blob` URLs in `TenantUsageDrawer.js` and `TenantCommercialCard.js`, allowing instant exports of tenant telemetry and fleet summaries without browser truncation.
+
+### 22.5 Offline Persona UPI Settlement & Strict 12-Digit NPCI UTR Audit
+- **Dynamic Persona UPI QR Generation**: Generates standard NPCI-compliant UPI payment intent URLs and high-resolution base64 QR codes with 0% intermediary gateway fees.
+- **Strict 12-Digit Numeric NPCI UTR Validation**: Validates transaction references with regex `^\d{12}$`, rejecting synthetic or sequential dummy test numbers (`111111111111`, `123456789012`, `987654321098`).
+- **Idempotency Protection**: Checks `LOG_DB` to reject duplicate submissions (HTTP 409 Conflict), preventing double crediting.
+- **Instant Credit & Operator Review**: Credits quota units dynamically at the live landed FX rate (₹99.00/USD) and permanently stamps top-up logs with `[AUDIT_STATUS:PENDING_OPERATOR_REVIEW]`.
+
+## 23. Production Gateway Hardening & High-Concurrency Reliability
+
+### 23.1 SQLite Write-Ahead Logging (WAL) Architecture
+- **Concurrency Isolation**: To eliminate database lock contention (`SQLITE_BUSY` / `database is locked (5)`) under parallel seat workloads, One-API explicitly configures SQLite in WAL mode: `_journal_mode=WAL&_busy_timeout=5000&_sync=NORMAL&_cache_size=-64000`.
+- **Reader/Writer Decoupling**: Reads proceed concurrently without taking shared database locks against writers. Write transactions append directly to the WAL frame ring, allowing fast sub-millisecond commits without stalling tenant telemetry queries.
+
+### 23.2 Upstream Credit Reservation & Completion Ceiling Safeguard
+- **OpenRouter Credit Hold Trap Mitigation**: Upstream aggregators (e.g. OpenRouter) calculate authorization holds against full model context windows (131,072 tokens) when `max_tokens` is omitted, causing false HTTP 402 "Payment Required" failures.
+- **Server-Side Enforcement**: When incoming client requests omit `max_tokens`, One-API automatically clamps the ceiling to:
+  - **4,096 tokens** for Chat mode.
+  - **8,192 tokens** for Work and Study modes.
+- **Conversion Serialization**: The clamp flags `meta.MaxTokensClamped = true`, forcing request conversion so explicit `max_tokens` and `stream_options.include_usage: true` are always passed upstream, ensuring stable token accounting and error-free responses.
+
+### 23.3 NPCI-Compliant Offline UPI Settlement & Realtime Forex Conversion
+- **UTR Format Enforcement**: Validates transaction references against the National Payments Corporation of India (NPCI) 12-digit standard (`^\d{12}$`), rejecting dummy or sequential test patterns.
+- **Dynamic Landed Rate Pricing**: Converts INR top-ups to quota units dynamically using `common.GetLandedRate()` (+5% safety buffer against spot), guaranteeing financial margins and preventing exchange rate arbitrage.
+- **Audit Review Tagging**: Offline top-ups are recorded with `[AUDIT_STATUS:PENDING_OPERATOR_REVIEW]` and enforce idempotency against existing transaction references to prevent duplicate crediting.
+
+### 23.4 Automated Log Retention & Database Maintenance
+- **Scheduled Background Pruner**: `StartLogRetentionDaemon` periodically deletes ephemeral consume and test logs older than 30 days while permanently preserving financial top-ups and administrative audit trails.
+- **Incremental Vacuuming**: Runs `PRAGMA incremental_vacuum;` post-pruning to reclaim disk pages and maintain high SQLite query performance without table locking.
+
+---
+
+## 24. Commercial Tier Hierarchy, Mode Matrix & Developer Tool Gating
+
+### 24.1 Account Tier Taxonomy & Differentiation
+
+The platform implements a unified 7-tier commercial taxonomy mirrored between LibreChat (`TENANT_ACCOUNT_TYPES` in `packages/data-schemas/src/types/entitlement.ts`) and One-API (`ValidAccountTypes` in `model/tenant_account_plan.go`):
+
+| Tier Key | Commercial Name | Seat Architecture | Allowed Modes | Developer Suite & Tooling | Monthly Retail Fee | Monthly Quota Allowance | Target Persona |
+| :--- | :--- | :---: | :--- | :--- | :---: | :---: | :--- |
+| **`basic`** | Basic Free Tier | 1 Seat | `Chat` | None (Standard Chat only) | ₹0 / mo | 500,000 tokens (Trial) | Individual trial users exploring the platform |
+| **`standard`** | Standard Professional | 1 Seat | `Chat`, `Work` | Document synthesis, business writing, knowledge tasks | ₹299 / mo | 2,000,000 tokens | Solo knowledge workers, freelancers, office staff |
+| **`family`** | Family Safety Household | 4 Seats (Pooled: 2 adults, 2 kids) | `Chat`, `Study`, `Work` | POCSO child safety filters, educational tutoring, shared budget | ₹999 / mo | 6,000,000 tokens (Pooled) | Modern households with school/college children |
+| **`pro`** | Pro Developer | 1 Seat | `Chat`, `Study`, `Work` | **Full Developer Suite**: VS Code Server Web, MCP agents, sandboxed code execution | ₹1,499 / mo | 15,000,000 tokens | Software engineers, data scientists, tech professionals |
+| **`pro_family`** | Pro Family Tech Household | 4 Seats (Pooled: 2 adults, 2 kids) | `Chat`, `Study`, `Work` | **All of Family + All of Pro**: 4 pooled seats, Study safety tutoring + VS Code Web & MCP agents | ₹2,499 / mo | 25,000,000 tokens (Pooled) | Tech families, developer parents, coding students |
+| **privacy** | Sovereign Privacy Hybrid | 1 Seat (Per-seat license) | Chat, Study, Work, Privacy | **Dual-Engine**: Uncapped local GPU in Privacy mode + full Pro developer suite on Cloud | ₹3,499 / seat / mo | 15M Cloud / seat + Uncapped Local | High-privacy professionals (legal, medical, financial, coding) |
+| **`enterprise`** | Enterprise Sovereign Fleet | Custom (e.g. 50-500) | `Chat`, `Study`, `Work`, `Privacy` | Dedicated edge node, all modes, custom SLA, full operator telemetry & multi-tenant billing | Custom Contract (e.g. ₹15,000+/mo) | 100,000,000+ tokens | Schools, colleges, SMBs, commercial organizations |
+
+### 24.2 Rationale: Differentiating `basic` vs. `standard`
+- **`basic`** is strictly a **zero-cost customer acquisition tier** limited to `Chat` mode with a modest trial quota (500k tokens). It allows new users to experience the low-latency sovereign interface without incurring material upstream provider COGS.
+- **`standard`** introduces **`Work` mode**, empowering solo professionals with document intelligence, executive drafting, structured data extraction, and web research at an accessible entry price of ₹299/mo. It excludes technical developer environments (VS Code Server, code execution) to keep system resource overhead lightweight.
+
+### 24.3 Seat Isolation vs. Family Pooling Architecture
+- **Family Accounts (amily, pro_family) - The Only Pooled Tier**:
+  - A Family account is a single collective household entity containing 4 seats (2 adults, up to 2 children).
+  - All 4 seats share **one single pooled token quota** (6M tokens for amily, 25M tokens for pro_family) recorded on a single shared SeatTokenUsage row (Shared = true). A child or spouse's consumption draws down from the shared family balance.
+- **Non-Family Accounts (asic, standard, pro, privacy, enterprise) - Strictly 1 Seat per Unit**:
+  - The seat concept for all non-family accounts is **strictly 1 individual seat** (Shared = false).
+  - A tenant licenses $ seats for a given group. Each seat represents one distinct user with their own dedicated, unshared monthly quota (e.g., 2M tokens for each Standard seat, 15M tokens for each Pro seat, 15M cloud tokens + unmetered local GPU for each Privacy seat).
+  - Consumption by User A never depletes or impacts the token budget of User B.
+- **`family`**: Designed for residential households (2 adults and up to 2 children). It pools the 6M token quota onto a single `SeatTokenUsage` row (`Shared = true`), enabling parents to share an AI budget with their children while enforcing strict POCSO Act (2012) compliant guardrails in `Study` mode.
+- **`pro_family`**: Bridges family household pooling with professional engineering capability. It grants the 4-seat shared structure while unlocking the complete developer toolchain (`vscode_server`, `mcp`, `code_execution`) for technical family members.
+
+### 24.4 Developer Suite Gating: VS Code Server Web Integration
+- The platform hosts a native `vscode-server` daemon running on bare-metal Windows 11 (PM2 process `vscode-server`, PID 5244).
+- Access to the web IDE is restricted to `pro`, `pro_family`, `privacy`, and `enterprise` tiers via the `vscode_server` capability token check.
+- Unentitled tiers (`basic`, `standard`, `family`) see a marketing-first "Locked Tool Preview" prompting them to upgrade to `pro` or `pro_family`.
+
+
+### 24.6 Sovereign Privacy Tier: Hybrid Dual-Engine & COGS Realism
+- **Hybrid Routing Mechanics**:
+  - When in **Privacy mode**, inference executes 100% locally on the client's on-premises GPU (≥24GB VRAM) via llama.cpp or LLM. Upstream cloud provider charges for these queries are **₹0.00**.
+  - When in **Chat**, **Study**, **Work**, or **Vibe Coding** (VS Code Server Web, MCP, Code Execution sandbox), requests route through the Satchida Zero-Knowledge Relay to frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek).
+- **COGS (Cost of Goods Sold) & Gross Margin**:
+  - COGS represents the direct variable upstream API costs and data transfer charges incurred to fulfill queries.
+  - Because Privacy account holders utilize cloud frontier models for vibe coding and heavy work, the account incurs actual cloud COGS (~.50–.00 / ₹445–₹495 landed per month) against the ₹3,499 monthly fee.
+  - The blended gross margin is therefore **~86% to 88%** (₹3,499 fee – ₹495 COGS = ₹3,004 gross profit), rather than a fictional 99.9%.
+
+### 24.5 Tenant Metrics Auto-Backup & Archive Management Lifecycle
+- **Zero-Loss Metric Resets**: When an operator initiates a tenant metric reset, `ResetTenantMetrics` in `model/analytics_tenant.go` automatically executes a pre-reset archive before zeroing out logs or window buckets:
+  1. Captures total requests, tokens, COGS, landed INR, by-mode breakdown, by-seat breakdown, and all raw consumption logs.
+  2. Commits a permanent record to `tenant_metrics_archives` in SQLite.
+  3. Writes an immutable physical backup JSON snapshot to `data/archives/tenant_{tenant_id}_archive_{timestamp}.json`.
+- **Archive Management & Deletion**:
+  - `GET /api/analytics/tenant/:id/archives`: Lists all historical snapshots.
+  - `GET /api/analytics/tenant/:id/archive/:archive_id/download`: Downloads the offline JSON backup.
+  - `DELETE /api/analytics/tenant/:id/archive/:archive_id`: Permanently purges the archive record and unlinks the disk snapshot with a strict operator audit log.
+

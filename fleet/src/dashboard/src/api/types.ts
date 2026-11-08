@@ -2,7 +2,14 @@
 
 export type TenantStatus = 'ACTIVE' | 'EXPIRED' | 'BLOCKED' | 'SUSPENDED';
 
-export type PlanTier = 'basic' | 'pro' | 'family' | 'enterprise';
+export type PlanTier =
+  | 'basic'
+  | 'standard'
+  | 'family'
+  | 'pro'
+  | 'pro_family'
+  | 'privacy'
+  | 'enterprise';
 
 export interface TenantSummary {
   id: string;
@@ -40,8 +47,11 @@ export interface FleetOverview {
 
 export const PLAN_LABEL: Record<PlanTier, string> = {
   basic: 'Basic',
-  pro: 'Pro',
+  standard: 'Standard',
   family: 'Family',
+  pro: 'Pro',
+  pro_family: 'Pro Family',
+  privacy: 'Privacy',
   enterprise: 'Enterprise',
 };
 

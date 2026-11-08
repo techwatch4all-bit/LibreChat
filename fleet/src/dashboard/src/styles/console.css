@@ -521,6 +521,30 @@
   color: rgb(var(--s-rose));
 }
 
+.plan[data-plan='pro'] {
+  border-color: rgb(var(--s-blue) / 0.5);
+  background: rgb(var(--s-blue) / 0.12);
+  color: rgb(var(--s-sky));
+}
+
+.plan[data-plan='pro_family'] {
+  border-color: rgb(var(--s-purple) / 0.5);
+  background: rgb(var(--s-purple) / 0.14);
+  color: rgb(var(--s-violet-soft));
+}
+
+.plan[data-plan='privacy'] {
+  border-color: rgb(var(--s-cyan) / 0.5);
+  background: rgb(var(--s-cyan) / 0.12);
+  color: rgb(var(--s-cyan-soft));
+}
+
+.plan[data-plan='standard'] {
+  border-color: rgb(var(--s-sky) / 0.4);
+  background: rgb(var(--s-sky) / 0.08);
+  color: rgb(var(--s-snow));
+}
+
 .row-actions {
   display: flex;
   gap: 0.35rem;

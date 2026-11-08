@@ -17,7 +17,13 @@ export const TENANT_ACCOUNT_TYPES = [
 ] as const;
 export const SEMANTIC_MODES = ['Chat', 'Study', 'Work', 'Privacy'] as const;
 export const TENANT_ENTITLEMENT_STATUSES = ['active', 'suspended', 'expired', 'revoked'] as const;
-export const TENANT_SEAT_CAPABILITIES = ['work_tools', 'mcp', 'agents', 'code_execution'] as const;
+export const TENANT_SEAT_CAPABILITIES = [
+  'work_tools',
+  'mcp',
+  'agents',
+  'code_execution',
+  'vscode_server',
+] as const;
 
 export type TenantPlanType = (typeof TENANT_PLAN_TYPES)[number];
 export type TenantAccountType = (typeof TENANT_ACCOUNT_TYPES)[number];
@@ -28,7 +34,7 @@ export type TenantSeatCapability = (typeof TENANT_SEAT_CAPABILITIES)[number];
 export type EntitlementAccountType = {
   seatLimit: number;
   allowedModes: SemanticMode[];
-  allowedCapabilities?: Array<'work_tools' | 'mcp' | 'agents' | 'code_execution'>;
+  allowedCapabilities?: Array<'work_tools' | 'mcp' | 'agents' | 'code_execution' | 'vscode_server'>;
   localPrivacyEnabled?: boolean;
   monthlyTokenCredits?: number;
   requestsPerMinute?: number;

@@ -244,21 +244,34 @@ export function getOpenAIConfig(
     configOptions.defaultHeaders = headers;
   }
 
-  // Inject telemetry headers when routing upstream to the Satchida Gateway (Bifrost OSS at :8700 / control.satchida.com).
-  // Header names use the Bifrost convention because the gateway reads them by that name.
+  // Inject telemetry headers when routing upstream to the Satchida Gateway (:4000 One-API, :4099 Privacy, :8700 Bifrost, or control.satchida.com).
   if (
     baseURL &&
-    (baseURL.includes(':8700') || baseURL.includes('satchida') || baseURL.includes('satchida.com'))
+    (baseURL.includes(':8700') ||
+      baseURL.includes('satchida') ||
+      baseURL.includes('satchida.com') ||
+      baseURL.includes(':4000') ||
+      baseURL.includes(':4099'))
   ) {
-    const tenantId = getTenantId() || 'satchida-master';
-    const userId = getUserId() || '';
-    const userRole =
-      (options as t.OpenAIConfigOptions & { user?: { role?: string } }).user?.role ?? 'USER';
+    const rawUser = (options as t.OpenAIConfigOptions & { user?: Record<string, unknown> }).user;
+    const tenantId = rawUser?.tenantId || getTenantId() || 'satchida-master';
+    const userId = rawUser?.id || getUserId() || '';
+    const userRole = rawUser?.role ?? 'USER';
+    const userName = rawUser?.name || rawUser?.username || rawUser?.email || 'Satchida User';
     configOptions.defaultHeaders = {
       ...configOptions.defaultHeaders,
       'X-Tenant-Id': tenantId,
+      'X-User-Id': userId,
+      'X-User-Name': userName,
+      'X-Seat-Alias': userId,
       'X-Bifrost-User-Id': userId,
       'X-Bifrost-Role': userRole,
+      'x-bf-dim-user_id': userId,
+      'x-bf-dim-user_name': userName,
+      'x-bf-dim-customer_id': tenantId,
+      'x-bf-dim-customer_name': tenantId,
+      'x-bf-dim-team_id': tenantId,
+      'x-bf-dim-team_name': tenantId,
     };
   }
 

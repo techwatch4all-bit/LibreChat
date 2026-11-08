@@ -1,9 +1,10 @@
-﻿import type {
+import type {
   TUserFavorite,
   RefillIntervalUnit,
   StatefulCodeEnvironment,
 } from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
+import type { TenantSeatCapability, TenantAccountType } from './entitlement';
 import { CursorPaginationParams } from '~/common';
 
 export type FamilyRole = 'owner' | 'adult' | 'minor' | null;
@@ -15,7 +16,7 @@ export type FamilyRole = 'owner' | 'adult' | 'minor' | null;
  * bypasses that side's `MaxSeats` cap.
  */
 export const ACCOUNT_TYPES = ['basic', 'pro', 'family', 'privacy'] as const;
-export type AccountType = (typeof ACCOUNT_TYPES)[number];
+export type AccountType = TenantAccountType;
 
 export interface FamilyLimits {
   imageGenEnabled: boolean;
@@ -104,7 +105,7 @@ export interface IUser extends Document {
   privacyAssertion?: string;
   /** True only when the current local seat policy grants the Privacy add-on. */
   privacyEntitled?: boolean;
-  tenantSeatCapabilities?: Array<'work_tools' | 'mcp' | 'agents' | 'code_execution'>;
+  tenantSeatCapabilities?: TenantSeatCapability[] | string[];
   /** Account type / one-api seat group this user is entitled under. */
   accountType?: AccountType | null;
   familyLimits?: FamilyLimits | null;

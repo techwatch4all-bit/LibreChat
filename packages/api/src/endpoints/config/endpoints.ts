@@ -6,7 +6,12 @@ import {
   orderEndpointsConfig,
   defaultAgentCapabilities,
 } from 'librechat-data-provider';
-import type { AgentCapabilities, TEndpointsConfig, TConfig } from 'librechat-data-provider';
+import type {
+  AgentCapabilities,
+  TEndpointsConfig,
+  TConfig,
+  TAzureGroupMap,
+} from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
 import type { ServerRequest, TCustomEndpointsConfig } from '~/types';
 import type { GetAppConfigOptions } from '~/app/service';
@@ -22,6 +27,20 @@ export interface EndpointsConfigDeps {
   getAppConfig: (params: GetAppConfigOptions) => Promise<AppConfig>;
   loadDefaultEndpointsConfig: (appConfig: AppConfig) => Promise<DefaultEndpointsResult>;
   loadCustomEndpointsConfig?: (custom: unknown) => TCustomEndpointsConfig | undefined;
+}
+
+/** Only the model names and efforts reach the client; deployment details stay server-side. */
+function getAzureModelReasoningEfforts(
+  groupMap: TAzureGroupMap = {},
+): Pick<TConfig, 'modelReasoningEfforts'> {
+  const declared = Object.values(groupMap).flatMap((group) =>
+    Object.entries(group?.models ?? {}).flatMap(([model, config]) =>
+      typeof config === 'object' && config.reasoningEfforts != null
+        ? [[model, config.reasoningEfforts] as const]
+        : [],
+    ),
+  );
+  return declared.length > 0 ? { modelReasoningEfforts: Object.fromEntries(declared) } : {};
 }
 
 export function createEndpointsConfigService(deps: EndpointsConfigDeps): {
@@ -45,7 +64,10 @@ export function createEndpointsConfigService(deps: EndpointsConfigDeps): {
     };
 
     if (appConfig.endpoints?.[EModelEndpoint.azureOpenAI]) {
-      mergedConfig[EModelEndpoint.azureOpenAI] = { userProvide: false };
+      mergedConfig[EModelEndpoint.azureOpenAI] = {
+        userProvide: false,
+        ...getAzureModelReasoningEfforts(appConfig.endpoints[EModelEndpoint.azureOpenAI].groupMap),
+      };
     }
 
     for (const endpoint of [EModelEndpoint.openAI, EModelEndpoint.azureOpenAI] as const) {

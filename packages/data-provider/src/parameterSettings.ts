@@ -1417,3 +1417,34 @@ export function applyModelAwareDefaults(
     (setting) => setting.key !== 'promptCache' && setting.key !== 'promptCacheTtl',
   );
 }
+
+/**
+ * The definitions esolveReasoningSettingForTarget\ should see for one model: the endpoint's own,
+ * plus the efforts the model's Azure deployment declares. \model\ comes from the request, so the
+ * lookup only trusts an array, never a property inherited by a model named \constructor\.
+ */
+export function getReasoningParamDefinitions(
+  endpointConfig:
+    | {
+        customParams?: { paramDefinitions?: Partial<SettingDefinition>[] | null } | null;
+        modelReasoningEfforts?: Record<string, string[]>;
+      }
+    | null
+    | undefined
+    | false,
+  model?: string | null,
+): Partial<SettingDefinition>[] | null | undefined {
+  if (!endpointConfig) {
+    return undefined;
+  }
+  const paramDefinitions = endpointConfig.customParams?.paramDefinitions;
+  const efforts = model == null ? undefined : endpointConfig.modelReasoningEfforts?.[model];
+  if (!Array.isArray(efforts)) {
+    return paramDefinitions;
+  }
+  const options = [
+    ReasoningEffort.unset,
+    ...efforts.filter((effort) => effort !== ReasoningEffort.unset),
+  ];
+  return [...(paramDefinitions ?? []), { key: 'reasoning_effort', options }];
+}

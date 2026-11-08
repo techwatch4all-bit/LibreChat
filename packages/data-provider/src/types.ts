@@ -21,8 +21,8 @@ import type {
   CodeEnvironmentUserSettings,
   TAgentsEndpoint,
 } from './config';
+import type { TenantAccountType, TenantSeatCapability } from './tenant-entitlement';
 import type { StatefulCodeEnvironment } from './stateful-code';
-import type { TenantAccountType } from './tenant-entitlement';
 import type { CodeApprovalMode } from './code/approval';
 import type { EToolResources } from './types/tools';
 import type { RefillIntervalUnit } from './balance';
@@ -337,7 +337,7 @@ export type TUser = {
    */
   accountType?: TenantAccountType;
   /** Privileged capabilities the operator granted to this seat. */
-  tenantSeatCapabilities?: string[];
+  tenantSeatCapabilities?: TenantSeatCapability[];
   /** Whether the seat is entitled to the local Privacy mode. */
   privacyEntitled?: boolean;
   plugins?: string[];
@@ -665,6 +665,8 @@ export type ResponsesApiRouting = Record<string, ResponsesApiRoute>;
 
 export type TConfig = {
   responsesApiRouting?: ResponsesApiRouting;
+  /** Azure model name -> the reasoning_effort values its deployment declares. */
+  modelReasoningEfforts?: Record<string, string[]>;
   order: number;
   type?: EModelEndpoint;
   azure?: boolean;

@@ -254,10 +254,12 @@ export function getOpenAIConfig(
       baseURL.includes(':4099'))
   ) {
     const rawUser = (options as t.OpenAIConfigOptions & { user?: Record<string, unknown> }).user;
-    const tenantId = rawUser?.tenantId || getTenantId() || 'satchida-master';
-    const userId = rawUser?.id || getUserId() || '';
-    const userRole = rawUser?.role ?? 'USER';
-    const userName = rawUser?.name || rawUser?.username || rawUser?.email || 'Satchida User';
+    const tenantId = String(rawUser?.tenantId || getTenantId() || 'satchida-master');
+    const userId = String(rawUser?.id || getUserId() || '');
+    const userRole = String(rawUser?.role ?? 'USER');
+    const userName = String(
+      rawUser?.name || rawUser?.username || rawUser?.email || 'Satchida User',
+    );
     configOptions.defaultHeaders = {
       ...configOptions.defaultHeaders,
       'X-Tenant-Id': tenantId,

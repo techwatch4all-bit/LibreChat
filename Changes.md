@@ -8,6 +8,45 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-08 — Zero-Conflict Selective Upstream Feature Sync & Stream Hardening
+
+### 1. Functional Scope & Upstream Enhancements Ported
+1. **Model Reasoning Effort Parameter Settings & Deployment Knobs**:
+   - Ported `getReasoningParamDefinitions` in `packages/data-provider/src/parameterSettings.ts` to resolve model-specific reasoning effort parameters, default reset logic, and deployment declarations.
+   - Added `reasoningEfforts` to `modelConfigSchema` in `packages/data-provider/src/config.ts` and `modelReasoningEfforts` to `TConfig` in `packages/data-provider/src/types.ts`.
+   - Integrated `getAzureModelReasoningEfforts` in `packages/api/src/endpoints/config/endpoints.ts` to surface Azure model reasoning capabilities directly to the client composer.
+2. **Decoupled MCP Host Tool Execution & Code Workspace Discovery**:
+   - Ported `requiresCodeWorkspaceCapabilities` from upstream commit `99fb03cb9` to decouple host tool loads from active container/code workspace checks when executing pure host tools.
+   - Wired selective workspace check into `api/server/services/ToolService.js` (`loadToolsForExecution`).
+3. **Stream Pipeline Guards & Client Disconnect Protection (Upstream Commits `698ee25fe` & `ded1e734e`)**:
+   - Implemented `pipeToResponse` in `packages/api/src/utils/streams.ts` using `node:stream.pipeline` to prevent unhandled stream errors on client disconnect during file downloads.
+   - Implemented `pipeSegment` to tear down both upstream and response buffers when TTS streaming clients disconnect, preventing hanging socket loops.
+   - Implemented `ClientDisconnectedError` and `abortOnClose` signal helper to quietly abort upstream requests without generating false-alarm error logs.
+   - Wrapped `/code/download/:session_id/:fileId` and `TTSService.js` in stream guards.
+4. **Text-To-Speech Safety Cap & Reasoning Exclusion in Read Aloud**:
+   - Added `maxInputChars` to `ttsSchema` in `packages/data-provider/src/config.ts` (default 20,000 characters) bounding unbounded paid TTS API fanout.
+   - Ported `createSpeechChunkProcessor` and `capSpeechInput` in `packages/api/src/files/speech.ts`.
+   - Added `getSpeechText` and `parseThinkingContent` in `packages/data-provider/src/parsers.ts` ensuring model reasoning (`think` parts and `:::thinking` blocks) is excluded from spoken audio.
+5. **Type Hierarchy Harmonization**:
+   - Synchronized `TenantSeatCapability` in `librechat-data-provider` to include `'vscode_server'`, perfectly aligning with `data-schemas` and `api/src/admin/groups.ts`.
+   - Resolved `Partial<IUser>` and `TUser.tenantSeatCapabilities` type compatibility across `mcp.spec.ts`.
+
+### 2. Verification & Live Evidence
+- Built and validated all packages:
+  - `packages/data-provider`: `npm run build` completed with code 0 (`tsdown` + `tsc` clean).
+  - `packages/data-schemas`: `npm run build` completed with code 0.
+  - `packages/api`: `npm run build` and `npx tsc --noEmit` completed with code 0.
+- Executed targeted unit test suites:
+  - `server/services/__tests__/ToolService.spec.js`: 143 passed, 143 total (100% pass).
+  - `server/services/Files/Audio/TTSService.spec.js`: 9 passed, 9 total (100% pass).
+  - `packages/api/src/files/speech.spec.ts` & `packages/api/src/utils/streams.spec.ts`: 33 passed, 33 total (100% pass).
+- Live service verification on Windows host:
+  - LibreChat backend restarted cleanly on port 3080 (PID 74012, HTTP 200 OK via `/api/config`).
+  - Satchida Gateway verified online on port 4000 (PID 75432, HTTP 200 OK via `/api/status`).
+  - Zero conflicts achieved: Mandala canvas, Vibe Coding Studio IDE (`/api/ide`), and Satchida 7-tier entitlement bridges preserved intact.
+
+---
+
 ## 2026-11-08 — Commercial Tier Hierarchy Harmonization & Metrics Auto-Backup Engine
 
 ### 1. Functional Scope & Business Architecture

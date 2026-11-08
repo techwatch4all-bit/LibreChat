@@ -43,9 +43,20 @@ export type TenantPlanType = (typeof TENANT_PLAN_TYPES)[number];
 export type TenantAccountType = (typeof TENANT_ACCOUNT_TYPES)[number];
 export type SemanticMode = (typeof SEMANTIC_MODES)[number];
 export type TenantEntitlementStatus = (typeof TENANT_ENTITLEMENT_STATUSES)[number];
-export type TenantSeatCapability = 'work_tools' | 'mcp' | 'agents' | 'code_execution';
+export type TenantSeatCapability =
+  | 'work_tools'
+  | 'mcp'
+  | 'agents'
+  | 'code_execution'
+  | 'vscode_server';
 
-export const TENANT_SEAT_CAPABILITIES = ['work_tools', 'mcp', 'agents', 'code_execution'] as const;
+export const TENANT_SEAT_CAPABILITIES = [
+  'work_tools',
+  'mcp',
+  'agents',
+  'code_execution',
+  'vscode_server',
+] as const;
 
 /** Reports whether a value is a recognised commercial account type. */
 export function isTenantAccountType(value: unknown): value is TenantAccountType {

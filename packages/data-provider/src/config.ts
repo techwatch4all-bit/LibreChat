@@ -14,6 +14,7 @@ import {
   EModelEndpoint,
   eModelEndpointSchema,
   isAgentsEndpoint,
+  eReasoningEffortSchema,
   eReasoningParameterFormatSchema,
   eReasoningResponseKeySchema,
 } from './schemas';
@@ -557,6 +558,11 @@ export const modelConfigSchema = z
     deploymentName: z.string().optional(),
     version: z.string().optional(),
     assistants: z.boolean().optional(),
+    /**
+     * The `reasoning_effort` values this deployment accepts. A deployment name does not identify
+     * its model, so the composer offers an effort control only for a deployment declaring these.
+     */
+    reasoningEfforts: z.array(eReasoningEffortSchema).min(1).optional(),
   })
   .or(z.boolean());
 
@@ -1953,6 +1959,8 @@ const ttsLocalaiSchema = z.object({
 
 const ttsSchema = z.object({
   allowedAddresses: allowedAddressesSchema,
+  /** Longest text one request may synthesize; each 1,000 characters is a separate paid call. */
+  maxInputChars: z.number().int().positive().optional(),
   openai: ttsOpenaiSchema.optional(),
   azureOpenAI: ttsAzureOpenAISchema.optional(),
   elevenlabs: ttsElevenLabsSchema.optional(),

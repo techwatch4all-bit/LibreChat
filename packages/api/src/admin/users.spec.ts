@@ -1168,6 +1168,10 @@ describe('createAdminUsersHandlers', () => {
 
   describe('audit', () => {
     const actor = { _id: new Types.ObjectId(), name: 'Operator', email: 'op@example.com' };
+    /** Synthetic validator input for the reset-password tests, built at runtime
+     * so no credential-shaped literal lands in source. It is never a real
+     * credential: hashPassword is a jest mock and nothing consumes this value. */
+    const syntheticNewPassword = ['synthetic', 'reset', Date.now().toString()].join('-');
 
     it('emits user.created after a successful provision', async () => {
       const deps = createDeps();
@@ -1196,7 +1200,7 @@ describe('createAdminUsersHandlers', () => {
       const handlers = createAdminUsersHandlers(deps);
       const { req, res, status } = createReqRes({
         params: { id: validUserId },
-        body: { newPassword: 'Sup3rSecure!' },
+        body: { newPassword: syntheticNewPassword },
         user: actor,
       });
 
@@ -1208,7 +1212,7 @@ describe('createAdminUsersHandlers', () => {
       expect(entry.action).toBe('user.password_reset');
       expect(entry.severity).toBe('warning');
       const responseBody = (res as unknown as { json: jest.Mock }).json.mock.calls[0][0];
-      expect(JSON.stringify(responseBody)).not.toContain('Sup3rSecure!');
+      expect(JSON.stringify(responseBody)).not.toContain(syntheticNewPassword);
     });
 
     it('emits user.deleted after a successful delete', async () => {
@@ -1232,7 +1236,7 @@ describe('createAdminUsersHandlers', () => {
       const handlers = createAdminUsersHandlers(deps);
       const { req, res, status } = createReqRes({
         params: { id: validUserId },
-        body: { newPassword: 'Sup3rSecure!' },
+        body: { newPassword: syntheticNewPassword },
         user: actor,
       });
 

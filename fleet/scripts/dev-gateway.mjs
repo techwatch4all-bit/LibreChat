@@ -66,17 +66,26 @@ if (existsSync(privPath) && existsSync(pubPath)) {
 
 const privateKey = createPrivateKey(privateKeyPem);
 
-const token = issueLicence({
-  clientId: 'hq-local',
-  seats: 500,
-  plan: 'enterprise',
-  expiresAt: Math.floor(Date.now() / 1000) + 30 * 86400,
-  privateKey,
-  features: { modes: ['chat', 'work', 'privacy'], imageGen: false },
-}).token;
+// A rotated operator credential must survive this boot. When the file holds a
+// gateway-issued relay key (no body.signature separator, so not an Ed25519
+// licence) it was minted by the issuer's own rotation tool and re-minting here
+// would clobber it; only a missing or Ed25519-shaped token is refreshed.
+const existingLicence = existsSync(licPath) ? readFileSync(licPath, 'utf8').trim() : '';
+if (existingLicence && !existingLicence.includes('.')) {
+  console.log('licence: keeping the operator-rotated relay key at', licPath, '(not printed)');
+} else {
+  const token = issueLicence({
+    clientId: 'hq-local',
+    seats: 500,
+    plan: 'enterprise',
+    expiresAt: Math.floor(Date.now() / 1000) + 30 * 86400,
+    privateKey,
+    features: { modes: ['chat', 'work', 'privacy'], imageGen: false },
+  }).token;
 
-writeFileSync(licPath, token, { mode: 0o600 });
-console.log('licence written to', licPath, '(not printed)');
+  writeFileSync(licPath, token, { mode: 0o600 });
+  console.log('licence written to', licPath, '(not printed)');
+}
 
 // The Privacy router.
 //

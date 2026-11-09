@@ -1009,7 +1009,8 @@ describe('createAdminRolesHandlers', () => {
       await handlers.deleteRole(req, res);
 
       expect(status).toHaveBeenCalledWith(200);
-      expect(recordAuditEntry).toHaveBeenCalledTimes(2);
+      /** Two grant.removed entries plus the role.deleted entry itself. */
+      expect(recordAuditEntry).toHaveBeenCalledTimes(3);
       expect(recordAuditEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'grant.removed',
@@ -1065,7 +1066,10 @@ describe('createAdminRolesHandlers', () => {
       await handlers.deleteRole(req, res);
 
       expect(status).toHaveBeenCalledWith(200);
-      expect(recordAuditEntry).not.toHaveBeenCalled();
+      /** The role.deleted entry fires regardless; the cascade-specific
+       * grant.removed entries must not. */
+      const actions = recordAuditEntry.mock.calls.map(([entry]) => entry.action);
+      expect(actions).toEqual(['role.deleted']);
     });
 
     it('succeeds even when all cascade operations fail', async () => {

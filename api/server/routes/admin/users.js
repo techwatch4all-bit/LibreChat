@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { createAdminUsersHandlers, revokeUserCodeEnvironmentWorkers } = require('@librechat/api');
-const { logger, SystemCapabilities } = require('@librechat/data-schemas');
+const { SystemCapabilities } = require('@librechat/data-schemas');
 const { hasCapability, requireCapability } = require('~/server/middleware/roles/capabilities');
 const { requireJwtAuth } = require('~/server/middleware');
 const {
@@ -107,6 +107,8 @@ const handlers = createAdminUsersHandlers({
   invalidateCodeEnvironmentConfigCache,
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,
+  deleteAllUserSessions: (params) => db.deleteAllUserSessions(params),
+  recordAuditEntry: db.recordAuditEntry,
 });
 
 router.use(requireJwtAuth, requireAdminSurface);
@@ -123,41 +125,12 @@ router.delete('/:id', requireManageUsers, handlers.deleteUser);
  * `requireManageUsers`, which the operator JWT satisfies via OPERATOR_CONTROL
  * (and `MANAGE_USERS` is implied). The new password is bcrypt-hashed and the
  * user's active sessions/JWTs are invalidated so the next login uses the new
- * credential.
+ * credential. Audited as `user.password_reset` by the handler.
  *
  * POST /api/admin/users/:id/reset-password
  * Body: { newPassword: string }
  */
-router.post('/:id/reset-password', requireManageUsers, async (req, res) => {
-  try {
-    const { newPassword } = req.body ?? {};
-    if (typeof newPassword !== 'string' || newPassword.length < 8) {
-      return res.status(400).json({
-        error: 'New password must be at least 8 characters',
-        error_code: 'WEAK_PASSWORD',
-      });
-    }
-
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(newPassword, salt);
-    const user = await db.updateUser(req.params.id, { password: hash });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found', error_code: 'USER_NOT_FOUND' });
-    }
-
-    await db.deleteAllUserSessions({ userId: req.params.id });
-    logger.info(
-      `[admin/users/reset-password] Password reset performed for user [Id: ${req.params.id}] [IP: ${req.ip}]`,
-    );
-    return res.status(200).json({
-      ok: true,
-      message: 'Password has been reset. The user must sign in again with the new password.',
-    });
-  } catch (err) {
-    logger.error('[admin/users/reset-password] Error:', err);
-    return res.status(500).json({ error: 'Internal server error', error_code: 'INTERNAL_ERROR' });
-  }
-});
+router.post('/:id/reset-password', requireManageUsers, handlers.resetPassword);
 
 function generateSecureTempPassword(length = 12) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';

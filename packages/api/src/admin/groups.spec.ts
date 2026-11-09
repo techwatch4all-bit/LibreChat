@@ -47,12 +47,14 @@ describe('createAdminGroupsHandlers', () => {
       params?: Record<string, string>;
       query?: Record<string, string>;
       body?: Record<string, unknown>;
+      user?: { _id?: Types.ObjectId; name?: string; username?: string; email?: string };
     } = {},
   ) {
     const req = {
       params: overrides.params ?? {},
       query: overrides.query ?? {},
       body: overrides.body ?? {},
+      ...(overrides.user !== undefined ? { user: overrides.user } : {}),
     } as unknown as ServerRequest;
 
     const json = jest.fn();
@@ -76,6 +78,7 @@ describe('createAdminGroupsHandlers', () => {
       findUsers: jest.fn().mockResolvedValue([]),
       deleteConfig: jest.fn().mockResolvedValue(null),
       deleteAclEntries: jest.fn().mockResolvedValue({ deletedCount: 0 }),
+      recordAuditEntry: jest.fn().mockResolvedValue(undefined),
       ...overrides,
     };
   }
@@ -1340,6 +1343,83 @@ describe('createAdminGroupsHandlers', () => {
 
       expect(status).toHaveBeenCalledWith(200);
       expect(json).toHaveBeenCalledWith({ success: true });
+    });
+  });
+
+  describe('audit', () => {
+    const actor = { _id: new Types.ObjectId(), name: 'Operator', email: 'op@example.com' };
+
+    it('emits group.created after a successful create', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ recordAuditEntry });
+      const handlers = createAdminGroupsHandlers(deps);
+      const { req, res, status } = createReqRes({
+        body: { name: 'New Group' },
+        user: actor,
+      });
+
+      await handlers.createGroup(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(recordAuditEntry).toHaveBeenCalledTimes(1);
+      const entry = recordAuditEntry.mock.calls[0][0];
+      expect(entry.action).toBe('group.created');
+      expect(entry.outcome).toBe('success');
+      expect(entry.actor.id).toBe(actor._id.toString());
+      expect(entry.target.name).toBe('Test Group');
+    });
+
+    it('emits group.deleted with warning severity', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ recordAuditEntry });
+      const handlers = createAdminGroupsHandlers(deps);
+      const { req, res } = createReqRes({ params: { id: validId }, user: actor });
+
+      await handlers.deleteGroup(req, res);
+
+      const entry = recordAuditEntry.mock.calls[0][0];
+      expect(entry.action).toBe('group.deleted');
+      expect(entry.severity).toBe('warning');
+    });
+
+    it('emits group.member_added with the member in metadata', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ recordAuditEntry });
+      const handlers = createAdminGroupsHandlers(deps);
+      const { req, res } = createReqRes({
+        params: { id: validId },
+        body: { userId: validUserId },
+        user: actor,
+      });
+
+      await handlers.addGroupMember(req, res);
+
+      const entry = recordAuditEntry.mock.calls[0][0];
+      expect(entry.action).toBe('group.member_added');
+      expect(entry.metadata.memberUserId).toBe(validUserId);
+    });
+
+    it('stays fail-open when the recorder rejects: the mutation still answers', async () => {
+      const recordAuditEntry = jest.fn().mockRejectedValue(new Error('audit store down'));
+      const deps = createDeps({ recordAuditEntry });
+      const handlers = createAdminGroupsHandlers(deps);
+      const { req, res, status, json } = createReqRes({ params: { id: validId }, user: actor });
+
+      await handlers.deleteGroup(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith({ success: true, id: validId });
+    });
+
+    it('emits nothing when the request carries no authenticated user', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ recordAuditEntry });
+      const handlers = createAdminGroupsHandlers(deps);
+      const { req, res } = createReqRes({ params: { id: validId } });
+
+      await handlers.deleteGroup(req, res);
+
+      expect(recordAuditEntry).not.toHaveBeenCalled();
     });
   });
 });

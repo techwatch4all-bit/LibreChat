@@ -85,6 +85,8 @@ function createDeps(overrides: Partial<AdminUsersDeps> = {}): AdminUsersDeps {
     invalidateCodeEnvironmentConfigCache: jest.fn().mockResolvedValue(undefined),
     deleteConfig: jest.fn().mockResolvedValue(null),
     deleteAclEntries: jest.fn().mockResolvedValue(undefined),
+    deleteAllUserSessions: jest.fn().mockResolvedValue(undefined),
+    recordAuditEntry: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -1161,6 +1163,82 @@ describe('createAdminUsersHandlers', () => {
       await handlers.bulkCreateUsers(req, res);
 
       expect(status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  describe('audit', () => {
+    const actor = { _id: new Types.ObjectId(), name: 'Operator', email: 'op@example.com' };
+
+    it('emits user.created after a successful provision', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        body: { email: 'new@example.com', name: 'New User' },
+        user: actor,
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      const calls = (deps.recordAuditEntry as jest.Mock).mock.calls;
+      expect(calls).toHaveLength(1);
+      const entry = calls[0][0];
+      expect(entry.action).toBe('user.created');
+      expect(entry.actor.id).toBe(actor._id.toString());
+      expect(entry.target.type).toBe(PrincipalType.USER);
+      expect(entry.metadata.accountType).toBeNull();
+    });
+
+    it('emits user.password_reset with warning severity and kills sessions', async () => {
+      const deps = createDeps({
+        updateUserRecord: jest.fn().mockResolvedValue(mockUser()),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        params: { id: validUserId },
+        body: { newPassword: 'Sup3rSecure!' },
+        user: actor,
+      });
+
+      await handlers.resetPassword(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(deps.deleteAllUserSessions).toHaveBeenCalledWith({ userId: validUserId });
+      const entry = (deps.recordAuditEntry as jest.Mock).mock.calls[0][0];
+      expect(entry.action).toBe('user.password_reset');
+      expect(entry.severity).toBe('warning');
+      const responseBody = (res as unknown as { json: jest.Mock }).json.mock.calls[0][0];
+      expect(JSON.stringify(responseBody)).not.toContain('Sup3rSecure!');
+    });
+
+    it('emits user.deleted after a successful delete', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res } = createReqRes({ params: { id: validUserId }, user: actor });
+
+      await handlers.deleteUser(req, res);
+
+      const calls = (deps.recordAuditEntry as jest.Mock).mock.calls;
+      const deleted = calls.find(([entry]) => entry.action === 'user.deleted');
+      expect(deleted).toBeTruthy();
+      expect(deleted[0].target.id).toBe(validUserId);
+    });
+
+    it('stays fail-open when the recorder rejects: the mutation still answers', async () => {
+      const deps = createDeps({
+        updateUserRecord: jest.fn().mockResolvedValue(mockUser()),
+        recordAuditEntry: jest.fn().mockRejectedValue(new Error('audit store down')),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        params: { id: validUserId },
+        body: { newPassword: 'Sup3rSecure!' },
+        user: actor,
+      });
+
+      await handlers.resetPassword(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
     });
   });
 });

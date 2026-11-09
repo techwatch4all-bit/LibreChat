@@ -291,9 +291,7 @@ const startServer = async () => {
       return null;
     }
     const clientUrl = new URL(process.env.DOMAIN_CLIENT);
-    const base = clientUrl.pathname.endsWith('/')
-      ? clientUrl.pathname
-      : `${clientUrl.pathname}/`;
+    const base = clientUrl.pathname.endsWith('/') ? clientUrl.pathname : `${clientUrl.pathname}/`;
     if (base === '/') {
       return null;
     }
@@ -451,6 +449,7 @@ const startServer = async () => {
   app.use('/api/admin/users', routes.adminUsers);
   app.use('/api/admin/audit-log', routes.adminAuditLog);
   app.use('/api/admin/reconciliation', routes.adminReconciliation);
+  app.use('/api/admin/entitlements', routes.adminEntitlements);
   app.use('/api/admin/vaults', routes.adminVaults);
   app.use('/api/actions', routes.actions);
   app.use('/api/keys', routes.keys);
@@ -475,13 +474,18 @@ const startServer = async () => {
   app.use('/api/files', await routes.files.initialize());
 
   // Direct download route for AnythingLLM generated documents & presentations
-  const generatedDocsPath = path.resolve('D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated');
+  const generatedDocsPath = path.resolve(
+    'D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated',
+  );
   if (fs.existsSync(generatedDocsPath)) {
-    app.use('/generated', express.static(generatedDocsPath, {
-      setHeaders: (res, filePath) => {
-        res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
-      }
-    }));
+    app.use(
+      '/generated',
+      express.static(generatedDocsPath, {
+        setHeaders: (res, filePath) => {
+          res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+        },
+      }),
+    );
   }
   app.use(
     '/images/',

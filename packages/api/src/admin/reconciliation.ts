@@ -1,18 +1,25 @@
-import type { Response } from 'express';
-import type { ServerRequest } from '~/types/http';
 import { logger } from '@librechat/data-schemas';
 import type {
+  AuditAction,
   BillingMethods,
   ReconciliationFilterParams,
   PaymentStatus,
   PlanTier,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
 } from '@librechat/data-schemas';
+import type { Response } from 'express';
 import type { BillingService } from '../billing/service';
+import type { ServerRequest } from '~/types/http';
+import { buildAuditContext } from './context';
 
 export interface AdminReconciliationDeps {
   billingMethods: BillingMethods;
   billingService: BillingService;
-  recordAuditEntry?: (entry: Record<string, unknown>) => Promise<unknown>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 }
 
 export interface AdminReconciliationHandlers {
@@ -25,7 +32,62 @@ export interface AdminReconciliationHandlers {
 export function createAdminReconciliationHandlers(
   deps: AdminReconciliationDeps,
 ): AdminReconciliationHandlers {
-  const { billingMethods, billingService } = deps;
+  const { billingMethods, billingService, recordAuditEntry } = deps;
+
+  /** Emits the hash-chained audit entry for an approval or rejection. Fail-open
+   * with a loud error: the payment decision has already been applied when the
+   * audit runs and cannot be compensated here, so a failed audit must not
+   * misreport the decision to the caller. */
+  const emitPaymentAudit = async (
+    req: ServerRequest,
+    action: Extract<AuditAction, 'payment.approved' | 'payment.rejected'>,
+    payment: {
+      id?: string;
+      _id?: unknown;
+      user?: unknown;
+      tenantId?: string;
+      plan?: string;
+      amount?: number;
+      currency?: string;
+    },
+    metadata: Record<string, unknown> = {},
+  ): Promise<void> => {
+    if (!recordAuditEntry) return;
+    const operator = req.user;
+    const operatorId = operator?._id?.toString() ?? operator?.id;
+    if (!operator || !operatorId) return;
+    try {
+      await recordAuditEntry({
+        action,
+        outcome: 'success',
+        severity: 'warning',
+        actor: {
+          type: 'user',
+          id: operatorId,
+          name: operator.name || operator.username || operator.email || operatorId,
+        },
+        target: {
+          type: 'payment',
+          id: payment._id?.toString?.() ?? payment.id ?? '',
+          name: payment.plan,
+        },
+        metadata: {
+          plan: payment.plan ?? null,
+          amount: payment.amount ?? null,
+          currency: payment.currency ?? null,
+          paymentUserId: payment.user?.toString?.() ?? null,
+          ...metadata,
+        },
+        context: buildAuditContext(req),
+        tenantId: payment.tenantId,
+      });
+    } catch (err) {
+      logger.error(
+        `[AdminReconciliation] ${action} audit failed after the decision was applied`,
+        err,
+      );
+    }
+  };
 
   /**
    * GET /api/admin/reconciliation
@@ -33,19 +95,19 @@ export function createAdminReconciliationHandlers(
    */
   const listLedger = async (req: ServerRequest, res: Response): Promise<Response> => {
     try {
-       const page = Math.max(1, parseInt((req.query.page as string) || '1', 10));
-       const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || '25', 10)));
-       const status = req.query.status as PaymentStatus | undefined;
-       const plan = req.query.plan as PlanTier | undefined;
-       const search = req.query.search as string | undefined;
+      const page = Math.max(1, parseInt((req.query.page as string) || '1', 10));
+      const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || '25', 10)));
+      const status = req.query.status as PaymentStatus | undefined;
+      const plan = req.query.plan as PlanTier | undefined;
+      const search = req.query.search as string | undefined;
 
-       const params: ReconciliationFilterParams = {
-         offset: (page - 1) * limit,
-         limit,
-         status,
-         plan,
-         search,
-       };
+      const params: ReconciliationFilterParams = {
+        offset: (page - 1) * limit,
+        limit,
+        status,
+        plan,
+        search,
+      };
 
       const result = await billingMethods.listReconciliationLedger(params);
       return res.status(200).json(result);
@@ -67,13 +129,18 @@ export function createAdminReconciliationHandlers(
       const operatorId = req.user?.id || 'system';
 
       if (!id) {
-        return res.status(400).json({ error: { code: 'missing_id', message: 'Payment ID is required' } });
+        return res
+          .status(400)
+          .json({ error: { code: 'missing_id', message: 'Payment ID is required' } });
       }
 
       const approval = await billingMethods.approvePayment(id, operatorId);
       if (!approval.ok || !approval.payment) {
         return res.status(400).json({
-          error: { code: approval.error || 'approval_failed', message: 'Could not approve payment' },
+          error: {
+            code: approval.error || 'approval_failed',
+            message: 'Could not approve payment',
+          },
         });
       }
 
@@ -84,13 +151,20 @@ export function createAdminReconciliationHandlers(
       );
 
       if (!applyResult.ok) {
-        logger.error('[AdminReconciliation] Subscription application failed after approval:', applyResult.error);
+        logger.error(
+          '[AdminReconciliation] Subscription application failed after approval:',
+          applyResult.error,
+        );
         return res.status(500).json({
           error: { code: applyResult.error.code, message: applyResult.error.message },
         });
       }
 
       logger.info(`[AdminReconciliation] Payment ${id} approved by operator ${operatorId}`);
+
+      await emitPaymentAudit(req, 'payment.approved', approval.payment, {
+        subscriptionApplied: applyResult.ok,
+      });
 
       return res.status(200).json({
         ok: true,
@@ -116,7 +190,9 @@ export function createAdminReconciliationHandlers(
       const operatorId = req.user?.id || 'system';
 
       if (!id) {
-        return res.status(400).json({ error: { code: 'missing_id', message: 'Payment ID is required' } });
+        return res
+          .status(400)
+          .json({ error: { code: 'missing_id', message: 'Payment ID is required' } });
       }
 
       if (!reason || typeof reason !== 'string') {
@@ -128,11 +204,18 @@ export function createAdminReconciliationHandlers(
       const rejection = await billingMethods.rejectPayment(id, operatorId, reason);
       if (!rejection.ok || !rejection.payment) {
         return res.status(400).json({
-          error: { code: rejection.error || 'rejection_failed', message: 'Could not reject payment' },
+          error: {
+            code: rejection.error || 'rejection_failed',
+            message: 'Could not reject payment',
+          },
         });
       }
 
-      logger.info(`[AdminReconciliation] Payment ${id} rejected by operator ${operatorId}: ${reason}`);
+      logger.info(
+        `[AdminReconciliation] Payment ${id} rejected by operator ${operatorId}: ${reason}`,
+      );
+
+      await emitPaymentAudit(req, 'payment.rejected', rejection.payment, { reason });
 
       return res.status(200).json({
         ok: true,
@@ -196,7 +279,10 @@ export function createAdminReconciliationHandlers(
       }
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="reconciliation-ledger-${Date.now()}.csv"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="reconciliation-ledger-${Date.now()}.csv"`,
+      );
       return res.status(200).send('\ufeff' + csvRows.join('\r\n'));
     } catch (err: unknown) {
       logger.error('[AdminReconciliation] Failed to export CSV:', err);

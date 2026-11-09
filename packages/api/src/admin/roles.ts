@@ -1,6 +1,8 @@
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import { logger, isValidObjectIdString, RoleConflictError } from '@librechat/data-schemas';
 import type {
+  AuditAction,
+  AuditMetadata,
   IRole,
   IUser,
   IConfig,
@@ -210,6 +212,40 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
     }
   }
 
+  /** Emits one hash-chained audit entry for a role mutation. Fail-open with a
+   * loud error, for the same reason as the deletion cascade: the mutation has
+   * already taken effect when the audit runs, and create/update/permissions
+   * have no compensation this handler can perform. Sequential to keep the
+   * per-tenant hash chain ordered. */
+  async function emitRoleAudit(
+    req: ServerRequest,
+    action: AuditAction,
+    roleName: string,
+    metadata: AuditMetadata = {},
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?._id?.toString() ?? user?.id;
+    if (!user || !userId) return;
+    try {
+      await recordAuditEntry({
+        action,
+        outcome: 'success',
+        severity: action === 'role.deleted' ? 'warning' : 'info',
+        actor: {
+          type: 'user',
+          id: userId,
+          name: user.name || user.username || user.email || userId,
+        },
+        target: { type: PrincipalType.ROLE, id: roleName, name: roleName },
+        metadata,
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error(`[adminRoles] ${action} audit failed after the mutation took effect`, err);
+    }
+  }
+
   async function listRolesHandler(req: ServerRequest, res: Response) {
     try {
       const { limit, offset } = parsePagination(req.query);
@@ -268,6 +304,7 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
         roleData.description = description;
       }
       const role = await createRoleByName(roleData);
+      await emitRoleAudit(req, 'role.created', role.name ?? (name as string).trim());
       return res.status(201).json({ role });
     } catch (error) {
       logger.error('[adminRoles] createRole error:', error);
@@ -382,6 +419,9 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
         if (!role) {
           return res.status(404).json({ error: 'Role not found' });
         }
+        await emitRoleAudit(req, 'role.updated', role.name ?? trimmedName, {
+          renamedFrom: name,
+        });
         return res.status(200).json({ role });
       }
 
@@ -389,6 +429,9 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
       if (!role) {
         return res.status(404).json({ error: 'Role not found' });
       }
+      await emitRoleAudit(req, 'role.updated', name, {
+        fields: Object.keys(updates).join(','),
+      });
       return res.status(200).json({ role });
     } catch (error) {
       if (error instanceof RoleConflictError) {
@@ -430,6 +473,9 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
       if (!updated) {
         return res.status(404).json({ error: 'Role not found' });
       }
+      await emitRoleAudit(req, 'role.permissions_updated', name, {
+        permissions: Object.keys(permissions ?? {}).join(','),
+      });
       return res.status(200).json({ role: updated });
     } catch (error) {
       logger.error('[adminRoles] updateRolePermissions error:', error);
@@ -471,6 +517,12 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps): {
       if (grantsResult.status === 'fulfilled') {
         await emitGrantRemovals(req, name, grantsResult.value);
       }
+
+      await emitRoleAudit(req, 'role.deleted', name, {
+        rejectedCleanup: [configResult, aclResult, grantsResult].filter(
+          (r) => r.status === 'rejected',
+        ).length,
+      });
 
       return res.status(200).json({ success: true });
     } catch (error) {

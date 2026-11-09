@@ -8,18 +8,23 @@ import {
   isTenantAccountType,
 } from 'librechat-data-provider';
 import type {
+  AuditAction,
+  AuditMetadata,
   IGroup,
   IUser,
   IConfig,
   CreateGroupRequest,
   UpdateGroupRequest,
   GroupFilterOptions,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
 } from '@librechat/data-schemas';
 import type { FilterQuery, ClientSession, DeleteResult } from 'mongoose';
 import type { Response } from 'express';
 import type { ValidationError } from '~/types/error';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
+import { buildAuditContext } from './context';
 
 type GroupListFilter = Pick<GroupFilterOptions, 'source' | 'search' | 'accountType'>;
 
@@ -141,6 +146,10 @@ export interface AdminGroupsDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<DeleteResult>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 }
 
 export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
@@ -166,7 +175,47 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
     findUsers,
     deleteConfig,
     deleteAclEntries,
+    recordAuditEntry,
   } = deps;
+
+  /** Emits one hash-chained audit entry for a group mutation. Fail-open with a
+   * loud error, matching the role-deletion cascade: a create, update or delete
+   * has already taken effect when the audit runs, and none of them can be
+   * compensated by this handler, so a failed audit must not misreport the
+   * mutation as failed to the caller. Sequential to keep the per-tenant hash
+   * chain ordered. */
+  async function emitGroupAudit(
+    req: ServerRequest,
+    action: AuditAction,
+    group: Pick<IGroup, '_id' | 'name'>,
+    metadata: AuditMetadata = {},
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?._id?.toString() ?? user?.id;
+    if (!user || !userId) return;
+    try {
+      await recordAuditEntry({
+        action,
+        outcome: 'success',
+        severity: action === 'group.deleted' ? 'warning' : 'info',
+        actor: {
+          type: 'user',
+          id: userId,
+          name: user.name || user.username || user.email || userId,
+        },
+        target: {
+          type: PrincipalType.GROUP,
+          id: group._id?.toString(),
+          name: group.name,
+        },
+        metadata,
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error(`[adminGroups] ${action} audit failed after the mutation took effect`, err);
+    }
+  }
 
   async function listGroupsHandler(req: ServerRequest, res: Response) {
     try {
@@ -305,6 +354,11 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
         ...(body.allowedCapabilities ? { allowedCapabilities: body.allowedCapabilities } : {}),
         ...(body.allowedModes ? { allowedModes: body.allowedModes } : {}),
       });
+      await emitGroupAudit(req, 'group.created', group, {
+        source: group.source ?? null,
+        accountType: group.accountType ?? null,
+        memberCount: memberIds.length,
+      });
       return res.status(201).json({ group });
     } catch (error) {
       if ((error as ValidationError).name === 'ValidationError') {
@@ -405,6 +459,9 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (!group) {
         return res.status(404).json({ error: 'Group not found' });
       }
+      await emitGroupAudit(req, 'group.updated', group, {
+        fields: Object.keys(updateData).join(','),
+      });
       return res.status(200).json({ group });
     } catch (error) {
       if ((error as ValidationError).name === 'ValidationError') {
@@ -442,6 +499,9 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
           logger.error('[adminGroups] cascade cleanup step failed for group:', id, result.reason);
         }
       }
+      await emitGroupAudit(req, 'group.deleted', deleted, {
+        rejectedCleanup: cleanupResults.filter((r) => r.status === 'rejected').length,
+      });
       return res.status(200).json({ success: true, id });
     } catch (error) {
       logger.error('[adminGroups] deleteGroup error:', error);
@@ -536,6 +596,7 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (!group) {
         return res.status(404).json({ error: 'Group not found' });
       }
+      await emitGroupAudit(req, 'group.member_added', group, { memberUserId: userId });
       return res.status(200).json({ group });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -580,6 +641,7 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (!group) {
         return res.status(404).json({ error: 'Group not found' });
       }
+      await emitGroupAudit(req, 'group.member_removed', group, { memberUserId: userId });
       return res.status(200).json({ success: true });
     } catch (error) {
       logger.error('[adminGroups] removeGroupMember error:', error);

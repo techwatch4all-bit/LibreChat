@@ -56,6 +56,9 @@ export const AUDIT_CATEGORIES = [
   'permission',
   'auth',
   'approval',
+  'group',
+  'user',
+  'entitlement',
 ] as const;
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
@@ -70,6 +73,23 @@ export const AUDIT_ACTIONS = [
   'grant.removed',
   'permission.insights_assigned',
   'permission.insights_removed',
+  'role.created',
+  'role.updated',
+  'role.deleted',
+  'role.permissions_updated',
+  'group.created',
+  'group.updated',
+  'group.deleted',
+  'group.member_added',
+  'group.member_removed',
+  'user.created',
+  'user.updated',
+  'user.deleted',
+  'user.bulk_created',
+  'user.password_reset',
+  'payment.approved',
+  'payment.rejected',
+  'entitlement.set',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -79,6 +99,23 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'grant.removed': 'grant',
   'permission.insights_assigned': 'permission',
   'permission.insights_removed': 'permission',
+  'role.created': 'permission',
+  'role.updated': 'permission',
+  'role.deleted': 'permission',
+  'role.permissions_updated': 'permission',
+  'group.created': 'group',
+  'group.updated': 'group',
+  'group.deleted': 'group',
+  'group.member_added': 'group',
+  'group.member_removed': 'group',
+  'user.created': 'user',
+  'user.updated': 'user',
+  'user.deleted': 'user',
+  'user.bulk_created': 'user',
+  'user.password_reset': 'auth',
+  'payment.approved': 'approval',
+  'payment.rejected': 'approval',
+  'entitlement.set': 'entitlement',
 };
 
 /** Result of the audited operation. Kept first-class instead of being encoded

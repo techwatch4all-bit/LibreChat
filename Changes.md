@@ -8,6 +8,50 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-10 — Operator audit coverage + TenantEntitlement operator API (backlog item started)
+
+The entitlement engine in `packages/data-schemas` (seat limits, per-account-type
+allocations, atomic `reserveTenantSeat`) was complete but had zero API surface — dead
+code. Two of the three gaps closed; seat reservation wiring (step 3) and the operator UI
+remain.
+
+1. **Audit taxonomy extended** (`packages/data-schemas/src/types/admin.ts`): new categories
+   `group`, `user`, `entitlement`; new actions `role.created/updated/deleted/
+   permissions_updated`, `group.created/updated/deleted/member_added/member_removed`,
+   `user.created/updated/deleted/bulk_created/password_reset`, `payment.approved/rejected`,
+   `entitlement.set`.
+2. **Unaudited operator mutations now audited** — `admin/groups.ts` (all five mutations),
+   `admin/users.ts` (create/update/delete/bulk + the reset-password route, which moved from
+   inline CJS logic into a `resetPassword` factory handler per the module-boundary rule),
+   `admin/roles.ts` (CRUD + permissions), `admin/reconciliation.ts` (approve/reject, the
+   previously declared-but-never-wired `recordAuditEntry` dep). Fail-open after the
+   mutation with a loud error, matching the role-deletion cascade convention — these
+   mutations cannot be compensated by the handler. Routers pass `db.recordAuditEntry`.
+3. **`/api/admin/entitlements`** — new operator-only surface
+   (`packages/api/src/admin/entitlements.ts` + `api/server/routes/admin/entitlements.js`,
+   mounted in `api/server/index.js` behind `requireCapability(OPERATOR_CONTROL,
+   {platformOnly:true})`): GET `/` (list), GET `/:tenantId`, PUT `/:tenantId` (set). The
+   handler constructs a clean update object — never the raw body — because the data layer
+   spreads the update into `$set`; data-layer validation failures map to 400 by known
+   message, the optimistic-concurrency race to 409, anything unrecognized to 500. Audited
+   `entitlement.set` with `warning` severity, tenant-scoped.
+4. **Verification** — `packages/api` tsc clean; admin suites **830/830** (incl. 21 new
+   audit/API tests: emit shape, actor, tenant scoping, fail-open, 400/409/500 mapping,
+   raw-body exclusion); data-schemas suite run against the extended taxonomy (see entry
+   below); `fleet/test/chat.mjs` restructured to a gateway smoke corpus with the shield
+   corpus behind `--shield` (the identity shield and date injection are user-path
+   behaviors; :4000 is one-api and intentionally has none).
+5. **Gateway SQLite fix (source, not deployed)** — `one-api/model/main.go` DSN now carries
+   `_txlock=immediate`: WAL-mode read-modify-write transactions (the budget reservation)
+   return SQLITE_BUSY immediately on the deferred→writer upgrade, which the busy timeout
+   never covers. `go vet`/`go build` clean. **Deployment held**: the one-api tree carries
+   ~425 lines of the operator's in-flight WIP (19 files; two middleware tests failing
+   inside their WIP files), so building and restarting would activate unvalidated changes.
+   The operator should rebuild and `pm2 restart satchida-gateway` when their WIP lands;
+   the corpus's 503 `budget_reservation_unavailable` failures clear with it.
+6. **Known remaining audit surface** (operator-only, lower risk): config, code-environment,
+   skills-sync and langfuse admin mutations.
+
 ## 2026-11-10 — A26 & A27: Landing zero-height overlap eliminated, mandala hero restored, Bifrost customer attribution
 
 1. **A26 (Landing Page Overlap & Mandala Hero):**
@@ -1498,3 +1542,33 @@ Rebuilt both customer-facing sales decks from scratch after review found them fe
    - **Deployment honesty**: all "15 minutes / 24–48 hours" claims removed everywhere (A4s and both 16:9 decks); the deployment plan now shows P1 Planning (days 1–2) → P2 Installation of dependencies + LibreChat & platform services (days 3–5) → P3 Testing (days 6–7) → P4 Go-live (days 8–10), i.e. **1–2 weeks from acceptance**.
    - **Commercial structure**: both A4 commercial tables add "All options · One-time setup" and "All options · Managed service" line items with fill-in blank amounts (₹ ______) — amounts intentionally not invented; operator fills per client.
    - **No unverifiable curriculum claims**: every NCERT / CBSE / ICSE textbook-grounding claim removed from both A4s and both decks; tutoring is described only as Socratic (hints/step-checks) with POCSO-aligned filtering, and citations are tied to study material actually loaded into the tenant's vault ("where study material is loaded… answers cite it page by page"). Page-1 CTA band removed from the flagship proposal (Acceptance §9 is the action point); zero residual claim strings verified by grep and live HTTP grep.
+
+## 2026-11-10 — Chat persona context-full + failed summarization remediated; bullion live-USD-spot mandate added
+
+Operator reported two failures on the default Chat persona (Satchida-Gateway lane): (1) the conversation hit a full context window (30K/31.1K, 96%) and the auto-summarization round failed ("Summarization failed"), leaving the conversation stuck; (2) bullion answers never include live international spot USD prices for Gold/Silver and do not visually highlight rates.
+
+Root causes:
+- The `Chat` agent preset capped `maxContextTokens: 32768` while its gateway lane (`Satchida-Gateway` → `Chat` model tokenConfig) declares 65536 — half the lane's real budget. With 10 attached MCP servers (~13.8K tool-definition tokens), a ~4K promptPrefix and a 4096-token completion reserve, only ~11K tokens remained for actual conversation.
+- `@librechat/agents` derives its default per-tool-result truncation from the context window (~30% of window in chars, 400K hard ceiling), so a burst of web-search tool results can overshoot the window mid-turn, past the auto-compaction trigger; the summarize round itself (full history as input) then exceeds the remaining budget and fails.
+- The bullion output contract (`FINANCIAL_OUTPUT_FORMAT`) required INR retail tables but never mandated fetching international USD spot ($/oz, $/g), and no rule required bold/highlighted price figures; the `general_assistant` persona carried only `MANDATORY_CITATION_RULES` with no financial output format at all.
+
+Changes:
+1. **`librechat.yaml` agent context budgets aligned with lane capability**: `Chat` 32768 → 65536; `Work` and `Study` 65536 → 131072 (their lanes declare 131072). `Study-Local`/`Privacy` (local `Satchida` endpoint) intentionally unchanged.
+2. **Tool-result flood clamp**: added `maxToolResultChars: 12000` (~3K tokens per tool result) to the `Satchida-Gateway` custom endpoint — applies to all gateway lanes; a 10-search turn now peaks ~30K tool tokens instead of overshooting the window.
+3. **Bullion live-spot mandate + price visibility** inserted into all 7 agent `promptPrefix` contracts (Vibecoding, Pro, Chat, Work, Study, Study-Local, Privacy — identical blocks): new `1a. BULLION LIVE-SPOT MANDATE` (first section must be a Live International Spot (USD) block for Gold and Silver in $/oz and $/g — $/g = $/oz ÷ 31.1035 — fetched via a dedicated spot-price web search, with timestamp and clickable source; INR-only answers forbidden), new `4. PRICE VISIBILITY` rule (every price figure bold in tables and key lines), and two new bolded summary-table rows `Gold Spot (Intl)` / `Silver Spot (Intl)` ($/oz and $/g).
+4. **Persona library sync (`satchida/personas/personas.ts`)**: the same mandate, visibility rule and spot rows added to the shared `FINANCIAL_OUTPUT_FORMAT`; `general_assistant` persona now appends `${FINANCIAL_OUTPUT_FORMAT}` so its gold/silver starter gets the structured spot-first contract.
+
+Validation: `librechat.yaml` parses (js-yaml); parsed-preset probe confirms all 7 agents carry the mandate, the visibility rule, and Gold/Silver spot rows as real table lines; parsed `maxContextTokens` = 65536 (Chat) / 131072 (Work, Study); parsed gateway `maxToolResultChars` = 12000; `npx tsc --noEmit --strict` clean on `satchida/personas/personas.ts`.
+
+Deployment note: `librechat.yaml` changes take effect on the next server restart (PM2). After restart, the stuck conversation recovers via the "Compact context" button — the summarize round now fits (30K history against a 65K window).
+
+## 2026-11-10 — Platform-wide live-data, source-authority & engagement contract; deterministic auto-compaction
+
+Operator directive for ALL personas: generate live data where applicable, retrieve efficiently, use authorized/reputed sources, present summaries in gold-standard structure, and end substantive answers with follow-up questions to keep users engaged; chats that run long must auto-compact.
+
+Changes:
+1. **Deterministic auto-compaction (`librechat.yaml` top-level `summarization:` block)**: `enabled: true`, `trigger: {type: token_ratio, value: 0.55}` — compaction now fires deterministically at 55% window usage instead of whenever the internal heuristic decided, guaranteeing the summarize round always fits (this is the structural guarantee against the "Summarization failed" incident earlier today); `reserveRatio: 0.08` (slightly more response headroom than the 0.05 default), `retainRecent: {turns: 2}` (last two user-led turns kept verbatim — SDK default, made explicit), `maxSummaryTokens: 2048` (bounds summary cost). Verified end-to-end wiring: root `configSchema` accepts the block (zod PASS); `shapeSummarizationConfig` carries `trigger`/`reserveRatio`/`retainRecent`/`maxSummaryTokens` into `summarization.config` → `agentInput.summarizationConfig` (packages/api/src/agents/run.ts).
+2. **LIVE DATA, SOURCE AUTHORITY & ENGAGEMENT CONTRACT appended to all 7 agent promptPrefix blocks** (Vibecoding, Pro, Chat, Work, Study, Study-Local, Privacy): (1) LIVE-DATA MANDATE — volatile facts must come from live web/tool data pulled in the current turn, never training memory; (2) EFFICIENT RETRIEVAL — plan queries, batch independent ones, 2–4 focused searches, no re-searching answered facts, stop once verified; (3) SOURCE AUTHORITY — primary/official (gov.in portals, RBI, SEBI, IMD, PPAC, IOCL/BPCL/HPCL, NSE/BSE, USGS, WHO, FDA + equivalents) > exchanges/benchmarks (IBJA, MCX, LBMA, COMEX/NYMEX) > established outlets (Reuters, Bloomberg, ET, BS, Mint, The Hindu, PTI/ANI); primary over aggregator, no unknown blogs/scrapers; (4) GOLD-STANDARD SUMMARY STRUCTURE — one-glance emoji headline block with bolded key figures → Markdown tables (figures bold) → brief analysis → Sources & References table; (5) FOLLOW-UP ENGAGEMENT — every substantive answer ends with `### 🔄 Suggested Next Questions`: exactly 3–4 concrete, topic-tailored follow-ups after the Sources section (skipped for short conversational replies).
+3. **Persona library sync (`satchida/personas/personas.ts`)**: new exported const `LIVE_DATA_ENGAGEMENT_RULES` carrying the identical contract; appended programmatically to all 34 persona systemPrompts (`${LIVE_DATA_ENGAGEMENT_RULES}` inside each template literal — an initial scripted append that landed the interpolation outside the closing backtick was caught by tsc and repaired 34/34).
+
+Validation: js-yaml parse OK; parsed `summarization` block matches the written values; all 7 agents verified carrying bullion mandate + all five engagement-contract sections; root `configSchema.safeParse` PASS; `npx tsc --noEmit --strict` clean on personas.ts. Deployment: takes effect on next PM2 restart.

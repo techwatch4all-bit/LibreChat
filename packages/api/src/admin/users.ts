@@ -2,6 +2,8 @@ import { Types } from 'mongoose';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import { ACCOUNT_TYPES, logger, isValidObjectIdString, runAsSystem } from '@librechat/data-schemas';
 import type {
+  AuditAction,
+  AuditMetadata,
   IUser,
   IConfig,
   AdminUserListItem,
@@ -10,11 +12,14 @@ import type {
   AccountType,
   AdminUserGroup,
   CreateUserRequest,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
 } from '@librechat/data-schemas';
 import type { FilterQuery } from 'mongoose';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
+import { buildAuditContext } from './context';
 
 const MAX_SEARCH_LENGTH = 200;
 const MAX_NAME_LENGTH = 200;
@@ -290,6 +295,13 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
+  /** Kills every active session/JWT for the user, so a reset password takes
+   * effect on the next login rather than at token expiry. */
+  deleteAllUserSessions: (params: { userId: string }) => Promise<unknown>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 }
 
 export function createAdminUsersHandlers(deps: AdminUsersDeps): {
@@ -300,6 +312,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
   updateUser: (req: ServerRequest, res: Response) => Promise<Response>;
   getUserGroups: (req: ServerRequest, res: Response) => Promise<Response>;
   deleteUser: (req: ServerRequest, res: Response) => Promise<Response>;
+  resetPassword: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
   const {
     findUsers,
@@ -329,7 +342,44 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     invalidateCodeEnvironmentConfigCache,
     deleteConfig,
     deleteAclEntries,
+    deleteAllUserSessions,
+    recordAuditEntry,
   } = deps;
+
+  /** Emits one hash-chained audit entry for a user mutation. Fail-open with a
+   * loud error, matching the role-deletion cascade: provisioning and deletion
+   * have already taken effect when the audit runs, so a failed audit must not
+   * misreport the mutation as failed to the caller. Sequential to keep the
+   * per-tenant hash chain ordered. */
+  async function emitUserAudit(
+    req: ServerRequest,
+    action: AuditAction,
+    target: { id: string; name?: string; email?: string },
+    metadata: AuditMetadata = {},
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?._id?.toString() ?? user?.id;
+    if (!user || !userId) return;
+    try {
+      await recordAuditEntry({
+        action,
+        outcome: 'success',
+        severity:
+          action === 'user.deleted' || action === 'user.password_reset' ? 'warning' : 'info',
+        actor: {
+          type: 'user',
+          id: userId,
+          name: user.name || user.username || user.email || userId,
+        },
+        target: { type: PrincipalType.USER, id: target.id, name: target.name ?? target.email },
+        metadata,
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error(`[adminUsers] ${action} audit failed after the mutation took effect`, err);
+    }
+  }
 
   /** Builds the capability-check identity from the authenticated request. */
   function callerIdentity(req: ServerRequest): AdminCapabilityUser {
@@ -552,6 +602,13 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         logger.error('[adminUsers] code environment cache invalidation failed:', id, error);
       });
 
+      await emitUserAudit(
+        req,
+        'user.deleted',
+        { id: id, name: targetUser?.name, email: targetUser?.email },
+        { rejectedCleanup: cleanupResults.filter((r) => r.status === 'rejected').length },
+      );
+
       return res.status(200).json({ message: result.message || 'User deleted successfully' });
     } catch (error) {
       if (targetUserId != null && triggerDeletionFence != null && !userDeleted) {
@@ -678,6 +735,13 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
 
       logger.info(
         `[adminUsers] provisioned user [Id: ${userId}] [Email: ${email}] [Role: ${role}]`,
+      );
+
+      await emitUserAudit(
+        req,
+        'user.created',
+        { id: userId, name, email },
+        { role, accountType: accountType.value },
       );
 
       return res.status(201).json({
@@ -885,6 +949,19 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           `in ${Date.now() - startedAt}ms [By: ${caller.id}]`,
       );
 
+      for (const slip of slips) {
+        await emitUserAudit(
+          req,
+          'user.bulk_created',
+          { id: slip.id ?? '', name: slip.name, email: slip.email },
+          {
+            role: slip.role,
+            accountType: slip.accountType,
+            group: slip.group,
+          },
+        );
+      }
+
       return res.status(200).json({
         ok: true,
         createdCount: slips.length,
@@ -956,7 +1033,10 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         update.suspended = body.suspended;
       }
       if (body.dailyMessageLimit !== undefined) {
-        if (body.dailyMessageLimit !== null && (typeof body.dailyMessageLimit !== 'number' || body.dailyMessageLimit < 0)) {
+        if (
+          body.dailyMessageLimit !== null &&
+          (typeof body.dailyMessageLimit !== 'number' || body.dailyMessageLimit < 0)
+        ) {
           return res.status(400).json({ error: 'Invalid dailyMessageLimit' });
         }
         update.dailyMessageLimit = body.dailyMessageLimit;
@@ -965,7 +1045,9 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         if (!Array.isArray(body.assignedKnowledgeVaults)) {
           return res.status(400).json({ error: 'Invalid assignedKnowledgeVaults' });
         }
-        update.assignedKnowledgeVaults = body.assignedKnowledgeVaults.filter(v => typeof v === 'string');
+        update.assignedKnowledgeVaults = body.assignedKnowledgeVaults.filter(
+          (v) => typeof v === 'string',
+        );
       }
       if (body.accountType !== undefined) {
         const parsed = parseAccountType(body.accountType);
@@ -991,6 +1073,17 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      await emitUserAudit(
+        req,
+        'user.updated',
+        {
+          id: updated._id?.toString() ?? id,
+          name: updated.name,
+          email: updated.email,
+        },
+        { fields: Object.keys(update).join(',') },
+      );
+
       return res.status(200).json({ user: toListItem(updated) });
     } catch (error) {
       logger.error('[adminUsers] updateUser error:', error);
@@ -1013,6 +1106,47 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     }
   }
 
+  /**
+   * Operator-driven password reset. Sets the new credential and invalidates the
+   * user's active sessions/JWTs so the next login uses it. Audited with
+   * `warning` severity — a credential change by an operator is exactly what an
+   * auditor looks for — and the response never echoes the new password.
+   */
+  async function resetPasswordHandler(req: ServerRequest, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+      const { newPassword } = (req.body ?? {}) as { newPassword?: string };
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
+        return res.status(400).json({
+          error: 'New password must be at least 8 characters',
+          error_code: 'WEAK_PASSWORD',
+        });
+      }
+
+      const hash = await hashPassword(newPassword);
+      const user = await updateUserRecord(id, { password: hash });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found', error_code: 'USER_NOT_FOUND' });
+      }
+
+      await deleteAllUserSessions({ userId: id });
+      await emitUserAudit(
+        req,
+        'user.password_reset',
+        { id, name: user.name, email: user.email },
+        {},
+      );
+      logger.info(`[adminUsers] Password reset performed for user [Id: ${id}] [IP: ${req.ip}]`);
+      return res.status(200).json({
+        ok: true,
+        message: 'Password has been reset. The user must sign in again with the new password.',
+      });
+    } catch (error) {
+      logger.error('[adminUsers] resetPassword error:', error);
+      return res.status(500).json({ error: 'Internal server error', error_code: 'INTERNAL_ERROR' });
+    }
+  }
+
   return {
     listUsers: listUsersHandler,
     searchUsers: searchUsersHandler,
@@ -1021,5 +1155,6 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     updateUser: updateUserHandler,
     getUserGroups: getUserGroupsHandler,
     deleteUser: deleteUserHandler,
+    resetPassword: resetPasswordHandler,
   };
 }

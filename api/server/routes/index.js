@@ -13,6 +13,7 @@ const adminSkills = require('./admin/skills');
 const adminUsers = require('./admin/users');
 const adminAuditLog = require('./admin/audit');
 const adminReconciliation = require('./admin/reconciliation');
+const adminEntitlements = require('./admin/entitlements');
 const adminVaults = require('./admin/vaults');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
@@ -65,6 +66,7 @@ module.exports = {
   adminUsers,
   adminAuditLog,
   adminReconciliation,
+  adminEntitlements,
   adminVaults,
   keys,
   apiKeys,

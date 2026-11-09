@@ -1,14 +1,13 @@
-import type { Response } from 'express';
-import type { ServerRequest } from '~/types/http';
-import type { BillingMethods } from '@librechat/data-schemas';
-import type { BillingService } from '../billing/service';
 import type {
   IPaymentRecord,
   ISubscriptionRecord,
   ReconciliationItem,
   ReconciliationResponse,
 } from '@librechat/data-schemas';
-
+import type { BillingMethods } from '@librechat/data-schemas';
+import type { Response } from 'express';
+import type { BillingService } from '../billing/service';
+import type { ServerRequest } from '~/types/http';
 import { createAdminReconciliationHandlers } from './reconciliation';
 
 interface MockResponse extends Response {
@@ -121,7 +120,14 @@ function makeDeps(): Deps {
     applySubscription,
     sweepExpiredSubscriptions,
   } as unknown as BillingService;
-  return { billingMethods, billingService, listLedger, approvePayment, rejectPayment, applySubscription };
+  return {
+    billingMethods,
+    billingService,
+    listLedger,
+    approvePayment,
+    rejectPayment,
+    applySubscription,
+  };
 }
 
 describe('createAdminReconciliationHandlers', () => {
@@ -142,7 +148,10 @@ describe('createAdminReconciliationHandlers', () => {
       });
 
       const res = mockResponse();
-      await handlers.listLedger(baseRequest({ query: { page: '2', limit: '25', status: 'approved' } }), res);
+      await handlers.listLedger(
+        baseRequest({ query: { page: '2', limit: '25', status: 'approved' } }),
+        res,
+      );
 
       expect(res.statusCode).toBe(200);
       expect(deps.listLedger).toHaveBeenCalledWith(
@@ -168,7 +177,9 @@ describe('createAdminReconciliationHandlers', () => {
       const res = mockResponse();
       await handlers.listLedger(baseRequest({ query: { page: '0', limit: '500' } }), res);
 
-      expect(deps.listLedger).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 100 }));
+      expect(deps.listLedger).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0, limit: 100 }),
+      );
       expect(res.statusCode).toBe(200);
     });
 
@@ -202,7 +213,9 @@ describe('createAdminReconciliationHandlers', () => {
       await handlers.approvePayment(baseRequest({ params: {} }), res);
 
       expect(res.statusCode).toBe(400);
-      expect(res.body).toEqual({ error: { code: 'missing_id', message: 'Payment ID is required' } });
+      expect(res.body).toEqual({
+        error: { code: 'missing_id', message: 'Payment ID is required' },
+      });
       expect(deps.approvePayment).not.toHaveBeenCalled();
     });
 
@@ -285,7 +298,9 @@ describe('createAdminReconciliationHandlers', () => {
       await handlers.rejectPayment(baseRequest({ params: {}, body: { reason: 'fraud' } }), res);
 
       expect(res.statusCode).toBe(400);
-      expect(res.body).toEqual({ error: { code: 'missing_id', message: 'Payment ID is required' } });
+      expect(res.body).toEqual({
+        error: { code: 'missing_id', message: 'Payment ID is required' },
+      });
     });
 
     it('returns 400 when the reason is missing or non-string', async () => {
@@ -367,10 +382,84 @@ describe('createAdminReconciliationHandlers', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.headers['Content-Type']).toBe('text/csv; charset=utf-8');
-      expect(res.headers['Content-Disposition']).toMatch(/attachment; filename="reconciliation-ledger-/);
+      expect(res.headers['Content-Disposition']).toMatch(
+        /attachment; filename="reconciliation-ledger-/,
+      );
       expect(res.sent).toMatch(/^\uFEFFPayment ID,/);
       expect(res.sent).toContain('"ledger@example.com"');
       expect(res.sent).toContain('"operator-1"');
+    });
+  });
+
+  describe('audit', () => {
+    it('emits payment.approved after a successful approval', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = makeDeps();
+      deps.approvePayment.mockResolvedValue({ ok: true, payment: paymentRecord() });
+      deps.applySubscription.mockResolvedValue({
+        ok: true,
+        value: { subscription: { id: 'sub-1' } as never, user: 'user-1' },
+      });
+      const handlers = createAdminReconciliationHandlers({
+        billingMethods: deps.billingMethods,
+        billingService: deps.billingService,
+        recordAuditEntry,
+      });
+
+      const res = mockResponse();
+      await handlers.approvePayment(baseRequest({ params: { id: 'pay-1' } }), res);
+
+      expect(res.statusCode).toBe(200);
+      expect(recordAuditEntry).toHaveBeenCalledTimes(1);
+      const entry = recordAuditEntry.mock.calls[0][0];
+      expect(entry.action).toBe('payment.approved');
+      expect(entry.target.id).toBe('pay-1');
+      expect(entry.metadata.plan).toBe('pro');
+      expect(entry.metadata.amount).toBe(499);
+      expect(entry.actor.id).toBe('operator-1');
+      expect(entry.tenantId).toBe('satchida-master');
+    });
+
+    it('emits payment.rejected with the operator reason', async () => {
+      const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+      const deps = makeDeps();
+      deps.rejectPayment.mockResolvedValue({ ok: true, payment: paymentRecord() });
+      const handlers = createAdminReconciliationHandlers({
+        billingMethods: deps.billingMethods,
+        billingService: deps.billingService,
+        recordAuditEntry,
+      });
+
+      const res = mockResponse();
+      await handlers.rejectPayment(
+        baseRequest({ params: { id: 'pay-1' }, body: { reason: 'mismatched reference' } }),
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const entry = recordAuditEntry.mock.calls[0][0];
+      expect(entry.action).toBe('payment.rejected');
+      expect(entry.metadata.reason).toBe('mismatched reference');
+    });
+
+    it('stays fail-open when the recorder rejects: the decision still answers', async () => {
+      const recordAuditEntry = jest.fn().mockRejectedValue(new Error('audit store down'));
+      const deps = makeDeps();
+      deps.rejectPayment.mockResolvedValue({ ok: true, payment: paymentRecord() });
+      const handlers = createAdminReconciliationHandlers({
+        billingMethods: deps.billingMethods,
+        billingService: deps.billingService,
+        recordAuditEntry,
+      });
+
+      const res = mockResponse();
+      await handlers.rejectPayment(
+        baseRequest({ params: { id: 'pay-1' }, body: { reason: 'late' } }),
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect((res.body as { ok: boolean }).ok).toBe(true);
     });
   });
 });

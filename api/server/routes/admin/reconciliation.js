@@ -21,6 +21,7 @@ const billingService = new BillingService({
 const handlers = createAdminReconciliationHandlers({
   billingMethods: db,
   billingService,
+  recordAuditEntry: db.recordAuditEntry,
 });
 
 router.use(requireJwtAuth, requireAdminAccess);

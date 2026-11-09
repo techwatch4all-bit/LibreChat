@@ -8,6 +8,28 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-10 — Transcript prefetch hoisted off the shell render wave; lane overrides baked into the harness
+
+1. **Prefetch** — the fork's client fired `/api/messages/<convoId>` only when ChatView
+   mounted, a full render wave after the shell data landed (measured start ~2940 ms,
+   complete ~4061 ms under the lane's serial-read latency) even though the fetch needs
+   only the route param. `client/src/routes/ChatRoute.tsx` now prefetches the messages
+   query off the URL id as soon as auth resolves; ChatView's `useGetMessagesByConvoId`
+   shares the key, consumes the warm cache, and reconciles with its existing
+   `refetchOnMount` pass. Measured after: messages start ~1180 ms, complete ~2692 ms —
+   the transcript lands ~1.4 s earlier. LCP median 3119 → 2943 ms (the watermark still
+   carries the metric; the in-conversation watermark remains).
+2. **Harness defaults** — the lane's two manual env overrides are baked in:
+   `e2e/setup/env.ts` defaults the harness base URL to `http://localhost:3098` (off the
+   live pm2 port), and `e2e/setup/start-server.js` forces
+   `SATCHIDA_OPERATOR_USER_ID=''` unless the caller set it (an empty value, not a delete —
+   the server's own `dotenv.config()` runs later in the same process and would otherwise
+   re-load the production `.env` value; the first attempt with `delete` failed the lane
+   with "Configured Satchida operator user does not exist"). Plain `npm run lighthouse`
+   now runs the lane. Verified: **1 passed (3.0 m), exit 0** — LCP 2942.9 ≤ 4500,
+   CLS 0.0133 ≤ 0.1, TBT 266.8 ≤ 500; route specs 35/35; client tsc at the 37-error
+   `Admin/*` baseline. Customizations.md C27 updated.
+
 ## 2026-11-09 — P0→P2 persona accuracy, privacy honesty, MCP portability & staging UX (verified end-to-end)
 
 Operator objective (verbatim): "start P0 until P2 and do a full verification of accuracy and

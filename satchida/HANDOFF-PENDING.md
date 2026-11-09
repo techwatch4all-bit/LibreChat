@@ -1,5 +1,14 @@
 # Satchida Pending Tasks — Session Handoff (2026-11-09)
 
+**STATUS UPDATE 2026-11-10:** tasks 1, 2, 3, 4 and 5 below are DONE and verified in the
+2026-11-10 session — see Changes.md's 2026-11-10 entries and Bugs.md B22 for evidence.
+Task 1: Option A executed (rotated via `one-api/scripts/admin-token -api-key`); chat.mjs
+has zero 401s but its shield corpus targets the retired fleet gateway — operator decision
+recorded in Changes.md. Task 2: split committed (91a41f619…738a79c1b) plus the operator's
+own 95cf9376d. Task 3: B22 root-caused and fixed live (useKeyboardShortcuts.ts). Tasks
+4+5: messages prefetch in ChatRoute.tsx, lane overrides baked into e2e (plain
+`npm run lighthouse` works), lane PASS. Remaining: the backlog pointers below.
+
 Resume context for a new AI session. Read this file first, then pick up at the
 pending tasks below in priority order. This supersedes
 `satchida/HANDOFF-P0-P2-QA.md` — **all five of its steps are DONE and verified;

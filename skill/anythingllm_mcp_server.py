@@ -64,7 +64,7 @@ except ImportError:
 
 # Configuration
 ANYTHINGLLM_BASE_URL = os.environ.get("ANYTHINGLLM_URL", "http://127.0.0.1:3012/api/v1")
-ANYTHINGLLM_API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "1C4Q14C-8BVMC35-KRZJSSV-ESDMPHH")
+ANYTHINGLLM_API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
 EXPORT_OUTPUT_DIR = os.environ.get("SATCHIDA_EXPORTS_DIR", "D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated")
 
 os.makedirs(EXPORT_OUTPUT_DIR, exist_ok=True)

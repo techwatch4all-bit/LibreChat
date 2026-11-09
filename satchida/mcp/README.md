@@ -29,9 +29,9 @@ servers spawn at boot; `false` spawn on first use.
 | `satchida-ai-engineer` | `skill/ai-engineer-server.py` | true | GPU Compute, AI Architecture sizing |
 | `satchida-knowledge-vault` | `skill/anythingllm_mcp_server.py` | true | Vault RAG, Document Gen, E-Book — includes `deep_research_web_search`, `search_web_images`, `create_formatted_document` (needs AnythingLLM sidecar) |
 | `deeptutor-integration` | `skill/deeptutor-mcp/dist/index.js` | true | DeepTutor — **`dist/` is not git-tracked; build required on every target** (`cd skill/deeptutor-mcp && npm ci && npm run build`); needs DeepTutor service on `:8001` |
-| `legal-research` | `skill/legal-research-server.py` | false | Legal & Governance — **scope note: serves US eCFR/case law; Indian statutes (RBI/SC/Gazette) are covered by `satchida-web-search` — verify pairing in P1 matrix pass** |
+| `legal-research` | `skill/legal-research-server.py` | false | Legal & Governance — **scope note: serves US eCFR/case law; Indian statutes (RBI/SC/Gazette) are covered by `satchida-web-search`, which legal starters also bind (P1 matrix pass complete)** |
 | `academic-search` | `skill/academic-search-server.py` | false | Deep Research, Scholar — OpenAlex/CrossRef/PubMed |
-| `accessibility-tools` | `skill/accessibility-server.py` | false | WCAG 2.2 starter — **description says WCAG 2.1 contrast; confirm version coverage in P1 pass** |
+| `accessibility-tools` | `skill/accessibility-server.py` | false | WCAG 2.2 starter — contrast SCs unchanged since 2.1; yaml description updated to WCAG 2.2 (P1 pass) |
 | `devops-security` | `skill/devops-security-server.py` | false | CVE, Code Security, GRC, Cyber Warfare — hashing/ports/.env leak audit |
 | `clinical-research` | `skill/clinical-research-server.py` | false | PubMed/ClinicalTrials/FDA boxed warnings — **currently unbound by any of the 44 starters; candidate binding for Clinical DDx / Drug Safety (P1)** |
 
@@ -48,29 +48,47 @@ Notes:
 |---|---|---|---|---|
 | `time-server` | `uvx` | `mcp-server-time` (Asia/Kolkata) | true | `uv`/`uvx` on PATH + network (or pre-warmed cache) |
 | `web-fetch` | `uvx` | `mcp-server-fetch` | false | " |
-| `git-librechat` | `uvx` | `mcp-server-git --repository D:/LAN-AI-Infra/LibreChat` | false | " + path rewrite |
+| `git-librechat` | `uvx` | `mcp-server-git --repository .` | false | " |
 | `arxiv-search` | `uvx` | `arxiv-mcp-server` | false | " |
 | `openfda-drugs` | `uvx` | `openfda-mcp` | false | " |
 | `filesystem-shared` | `npx.cmd` | `@modelcontextprotocol/server-filesystem D:/LAN-AI-Infra/SharedDocs` | false | Node + path rewrite |
-| `knowledge-graph-memory` | `npx.cmd` | `@modelcontextprotocol/server-memory` (`MEMORY_FILE_PATH=D:/LAN-AI-Infra/LibreChat/data/memory.json`) | false | Node + path rewrite |
+| `knowledge-graph-memory` | `npx.cmd` | `@modelcontextprotocol/server-memory` (`MEMORY_FILE_PATH=data/memory.json`) | false | Node |
 
 First-run fetches hit PyPI/npm. For offline/CGNAT client nodes, pre-warm during
 provisioning: `uvx mcp-server-time --help` and
 `npx -y @modelcontextprotocol/server-memory --help` on the target machine.
 
-## Per-client path rewrites (P2 todo: make portable)
+## Portable paths (P2 done 2026-11-09)
 
-`librechat.yaml` currently hardcodes this development machine's layout. Rewrite
-every row during client provisioning — exact strings to search:
+All in-repo `args` and env paths are now **relative to the repo root**. Spawn
+cwd evidence: pm2 exec cwd = repo root, and `connection.ts` passes no `cwd`,
+so the stdio child inherits it — confirmed by boot-log check during QA.
+
+| `librechat.yaml` key | Value now |
+|---|---|
+| 14 in-repo `args` (13× `skill/*.py`, deeptutor `skill/deeptutor-mcp/dist/index.js`) | relative — works from repo root on Windows and POSIX |
+| `git-librechat.args` | `.` (repository = cwd) |
+| `knowledge-graph-memory.env.MEMORY_FILE_PATH` | `data/memory.json` (resolves against spawn cwd) |
+
+Two values intentionally stay absolute — they point **outside** the repo and
+are rewritten at provisioning:
 
 | `librechat.yaml` key | Current value | Client value |
 |---|---|---|
-| 10× python `args` | `D:\LAN-AI-Infra\LibreChat\skill\*.py` / `D:/LAN-AI-Infra/LibreChat/skill/*.py` | `<client-repo>/skill/*.py` |
-| `git-librechat.args` | `D:/LAN-AI-Infra/LibreChat` | client repo path |
-| `filesystem-shared.args` | `D:/LAN-AI-Infra/SharedDocs` | tenant shared-documents dir (outside repo) |
-| `knowledge-graph-memory.env.MEMORY_FILE_PATH` | `D:/LAN-AI-Infra/LibreChat/data/memory.json` | `<client-repo>/data/memory.json` |
+| `filesystem-shared.args` | `D:/LAN-AI-Infra/SharedDocs` | tenant shared-documents dir |
 | `satchida-knowledge-vault.env.SATCHIDA_EXPORTS_DIR` | `D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated` | tenant AnythingLLM exports dir |
-| `satchida-knowledge-vault.env.ANYTHINGLLM_API_KEY` | **hardcoded literal** | replace with `${ANYTHINGLLM_API_KEY}` and **rotate the exposed key** (P1 todo) |
+
+## Credentials (P1 done 2026-11-09)
+
+`satchida-knowledge-vault.env.ANYTHINGLLM_API_KEY` is the template
+`${ANYTHINGLLM_API_KEY}`, resolved from process.env at spawn
+(`extractEnvVariable` wired into `packages/api/src/mcp/connection.ts`); the
+value lives only in `.env`. The old hardcoded literal was scrubbed from
+`librechat.yaml`, `skill/anythingllm_mcp_server.py`,
+`api/server/routes/admin/vaults.js` and `backup/` copies — repo-wide scan
+reports zero credential-shaped literals. **Rotate the AnythingLLM account key**
+(it appeared in an earlier session transcript; rotation happens on the
+AnythingLLM host, then update `.env`).
 
 ## External sidecars (not in this repo)
 
@@ -90,5 +108,6 @@ every row during client provisioning — exact strings to search:
 4. Sidecars above reachable (`curl -sf http://127.0.0.1:3012`, `:8001`).
 5. Per-persona smoke test: click one starter per category, confirm the bound
    servers are selected and actually invoked (ties into the P2 QA-matrix todo).
-6. No `D:/LAN-AI-Infra` string remains in the shipped `librechat.yaml`
-   (grep after rewrite).
+6. Exactly two `LAN-AI-Infra` strings remain in `librechat.yaml` (SharedDocs
+   and AnythingLLM exports dir); every other path is relative and
+   `ANYTHINGLLM_API_KEY` is a `${...}` template.

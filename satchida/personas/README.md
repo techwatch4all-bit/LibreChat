@@ -19,17 +19,23 @@ imports this directory yet (tracked as a P2 todo: single-source refactor):
 
 1. **Mode system prompt** — `librechat.yaml` → `modelSpecs.list[].preset.promptPrefix`
    (one per mode: Chat / Work / Pro / Study / Study-Local / Vibecoding / Privacy).
-2. **Starter prompt strings** — `client/src/components/Chat/Input/ConversationStarters.tsx`
-   (`ALL_CATEGORIES`, 44 starters across 11 categories) and the per-mode
-   `conversation_starters` arrays in `librechat.yaml` (the ✨ Suggested tab).
+2. **Starter prompt strings** — `client/src/common/starters.ts` (`ALL_CATEGORIES`,
+   extracted from `ConversationStarters.tsx` in P2; 11 categories, labels and
+   badges keyed for `useLocalize`) and the per-mode `conversation_starters`
+   arrays in `librechat.yaml` (the ✨ Suggested tab).
 3. **Tool bindings** — each starter's `mcpServers` (component) + each mode's
    `mcpServers` allowlist (yaml). Servers are unioned at request time
    (`packages/api/src/agents/added.ts`).
 
-**Known gap (P0 todo):** the four accuracy rule blocks below exist only in this
-library and in the unified-suite runtime — they are *not yet* in any
-`promptPrefix`, so the running chat does not enforce them. Porting them is the
-first P0 action.
+**Wired (P0, 2026-11-09):** the four accuracy rule blocks below are appended to
+every mode `promptPrefix` in `librechat.yaml` — 7/7 modes verified by marker
+scan (SATCHIDA ACCURACY / No live intelligence context / BANNED ESCAPE
+HATCHES / FINANCIAL + NEWS format blocks). Three adaptations were made for the
+LibreChat fleet and are recorded as deltas vs origin below: identity
+**Satchida AI → Satchida SI** (3 occurrences; fleet identity asserted by
+`fleet/test/chat.mjs`), refusal wording **"click Force Pull Fresh Data" →
+"enable Web Search (or the web-search tool) and resend"** (LibreChat has no
+Force Pull control), and the BCD/GST zero-old-data rewording.
 
 ## The four accuracy rule blocks (zero-hallucination design)
 
@@ -44,18 +50,20 @@ first P0 action.
 
 1. Three previously private consts are exported (`MANDATORY_CITATION_RULES`,
    `FINANCIAL_OUTPUT_FORMAT`, `NEWS_OUTPUT_FORMAT`) so the module is importable.
-2. Provenance header added at the top.
-3. Line endings: origin is CRLF on disk, this file is LF (repo working-tree
-   convention). Content is byte-identical otherwise — verified with
-   `diff --strip-trailing-cr`.
+2. Provenance header added at the top (now also documenting delta 3).
+3. Zero-old-data pass (2026-11-09): hardcoded SCSS/PPF/SSY rates, model-era
+   names in `frontier_ai_hardware`, and both 6% BCD / 3% GST figures replaced
+   with verify-then-state instructions (6 content edits; mirrored into all 7
+   yaml promptPrefixes for the BCD/GST line).
+4. Line endings: this copy preserves the origin's CRLF.
 
 Verify at any time:
 
 ```bash
-diff --strip-trailing-cr \
+diff \
   "D:/LAN-AI-Infra/satchida-ai-unified-suite/src/lib/constants/personas.constants.ts" \
   satchida/personas/personas.ts
-# expect only: header block (0a1,11) + three `export const` lines
+# expect: header block + three `export const` lines + the delta-3 zero-old-data edits
 ```
 
 ## Stale-data audit (zero-old-data — must clear before client ship, P1)
@@ -65,12 +73,12 @@ tag + live verification, or removal:
 
 | Location | Stale item | Fix |
 |---|---|---|
-| `personas.ts` → `civic_banking_consumer_rights` starter | SCSS 8.2% / PPF 7.1% / SSY 8.2% | Remove numbers; require current rates from PIB/EPFO circular via search |
-| `personas.ts` → `frontier_ai_hardware` system + starter | Model-era names (Claude 3.7, o3/GPT-4.5, Gemini 2.0, Qwen 2.5/3, Llama 3.3, Gemma 2) | Genericize to "current frontier releases (verify via search)" |
-| `personas.ts` → `MANDATORY_CITATION_RULES` + `sovereign_market_intelligence` | 6% BCD + 3% GST gold duty | Tag "verify current Finance Act rate" or source from search |
+| `personas.ts` → `civic_banking_consumer_rights` starter | SCSS 8.2% / PPF 7.1% / SSY 8.2% | ✅ done 2026-11-09: numbers removed; requires current MoF quarterly notification + effective date |
+| `personas.ts` → `frontier_ai_hardware` system + starter | Model-era names (Claude 3.7, o3/GPT-4.5, Gemini 2.0, Qwen 2.5/3, Llama 3.3, Gemma 2) | ✅ done 2026-11-09: genericized to current-release phrasing with verify-instructions |
+| `personas.ts` → `MANDATORY_CITATION_RULES` + bullion systemPrompt | 6% BCD + 3% GST gold duty | ✅ done 2026-11-09: verify-against-Finance-Act/CBIC wording in both spots **and mirrored into all 7 yaml promptPrefixes (7 occurrences)** |
 | `personas.ts` → `satchida_model_manager` | "EXAMPLE entries from May 2026" inventory | Self-labeled + verify-on-use instruction — acceptable; re-date quarterly |
 | `mcp/recommended-mcp.ts` | "gemini-1.5-flash" free-tier quota note | Re-verify tier notes before ship |
-| LibreChat runtime starters (`ConversationStarters.tsx`, `librechat.yaml`) | No hardcoded rates today — keep it that way; enforce via the rule blocks | P0/P1 prompt rewrites |
+| LibreChat runtime starters (`client/src/common/starters.ts`, `librechat.yaml`) | No hardcoded rates today — keep it that way; enforce via the rule blocks | ✅ P0/P1 rewrites done; labels/badges localized (P2) |
 
 ## Sync rule
 
@@ -81,8 +89,12 @@ refactor, this copy becomes the import source for the client build.
 
 ## Shipping checklist
 
-- [ ] Stale-data audit above cleared (P1)
-- [ ] Rule blocks wired into mode `promptPrefix` (P0)
-- [ ] `diff --strip-trailing-cr` clean against origin (or divergence recorded)
+- [x] Stale-data audit above cleared (P1) — remaining: `recommended-mcp.ts`
+  gemini tier note re-verified at ship time
+- [x] Rule blocks wired into mode `promptPrefix` (P0) — 7/7 modes marker-verified
+- [x] `ALL_CATEGORIES` extracted to `client/src/common/starters.ts` and
+  localized via `useLocalize` (P2); personas cross-import deferred (outside
+  client tsconfig root) — keep prompt copy aligned manually
+- [x] `diff` against origin accounts for header + exports + delta-3 edits only
 - [ ] Specification's staging-protocol behavior verified on the target build
 - [ ] Companion manifest reviewed: `satchida/mcp/README.md` (tool bindings exist client-side)

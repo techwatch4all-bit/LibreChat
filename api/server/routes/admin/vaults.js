@@ -10,7 +10,7 @@ const requireAdminSurface = requireCapability(SystemCapabilities.ACCESS_ADMIN);
 const requireReadUsers = requireCapability(SystemCapabilities.READ_USERS);
 
 const ANYTHINGLLM_URL = process.env.ANYTHINGLLM_URL || 'http://127.0.0.1:3012/api/v1';
-const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY || '1C4Q14C-8BVMC35-KRZJSSV-ESDMPHH';
+const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY || '';
 
 router.use(requireJwtAuth, requireAdminSurface);
 

@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import { EventEmitter } from 'events';
 import { logger } from '@librechat/data-schemas';
+import { extractEnvVariable } from 'librechat-data-provider';
 import { fetch as undiciFetch, Agent, ProxyAgent } from 'undici';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -1499,7 +1500,16 @@ export class MCPConnection extends EventEmitter {
             args: options.args,
             // workaround bug of mcp sdk that can't pass env:
             // https://github.com/modelcontextprotocol/typescript-sdk/issues/216
-            env: { ...getDefaultEnvironment(), ...(options.env ?? {}) },
+            env: {
+              ...getDefaultEnvironment(),
+              // resolve `${VAR}` templates in yaml env values from process.env
+              ...Object.fromEntries(
+                Object.entries(options.env ?? {}).map(([key, value]) => [
+                  key,
+                  extractEnvVariable(value),
+                ]),
+              ),
+            },
             ...(options.cwd !== undefined && { cwd: options.cwd }),
           });
 

@@ -37,6 +37,21 @@ export function lcpElement(report: Result): string {
   return JSON.stringify(details);
 }
 
+/**
+ * Windows teardown race: chrome-launcher runs `taskkill /T /F` and then
+ * immediately rmSyncs its temp profile; a file lock that outlives the retries
+ * makes destroyTmp throw EPERM even though the audit finished and saved its
+ * report. Only that exact signature is tolerated — and only against a clean
+ * saved report — so missing, corrupt, or runtime-error reports still retry.
+ */
+function isTeardownEperm(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const text = `${error.message}\n${(error as { stderr?: string | Buffer }).stderr ?? ''}`;
+  return text.includes('EPERM') && text.includes('destroyTmp');
+}
+
 function medianOf(results: Result[], audit: string): number {
   const values = results
     .map((report) => report.audits[audit]?.numericValue)
@@ -95,6 +110,20 @@ export async function auditPage({
           }
           break;
         } catch (error) {
+          const reportPath = `${output}.report.json`;
+          if (isTeardownEperm(error) && fs.existsSync(reportPath)) {
+            try {
+              const saved = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as Result;
+              if (!saved.runtimeError) {
+                console.log(
+                  `Lighthouse run ${run}/${runs} hit the Windows teardown EPERM after a clean save; keeping ${reportPath}`,
+                );
+                break;
+              }
+            } catch {
+              /* Corrupt or partial report — fall through to the retry path. */
+            }
+          }
           if (attempt >= RUN_ATTEMPTS) {
             throw error;
           }

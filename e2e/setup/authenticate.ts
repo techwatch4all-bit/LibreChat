@@ -9,7 +9,12 @@ const timeout = Number(process.env.E2E_AUTH_TIMEOUT ?? 15000);
 const chromiumChannel = process.env.E2E_CHROMIUM_CHANNEL || undefined;
 
 async function register(page: Page, user: User) {
-  await page.getByRole('link', { name: 'Sign up' }).click();
+  /**
+   * The Satchida auth shell renders the marketing landing until `?signin=1`
+   * (AuthLayout), so the form panel — and the "Sign up" link inside it — are
+   * not on the initial page. Open the registration form directly instead.
+   */
+  await page.goto(new URL('register?signin=1', page.url()).toString());
   await page.getByLabel('Full name').click();
   await page.getByLabel('Full name').fill(user.name);
   await page.getByLabel('Email').click();
@@ -87,7 +92,8 @@ async function authenticate(config: FullConfig, user: User) {
     }
     console.log('🤖: ✔️  user successfully registered');
 
-    await page.goto(loginURL, { timeout });
+    /** `?signin=1` opens the login form past the marketing landing (AuthLayout). */
+    await page.goto(loginURL + '?signin=1', { timeout });
     await login(page, user);
     await page.waitForURL(conversationURL, { timeout });
     console.log('🤖: ✔️  user successfully authenticated');

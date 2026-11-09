@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 /**
- * Live chat acceptance run — node fleet/test/chat.mjs
+ * Live gateway smoke run — node fleet/test/chat.mjs [--shield] [--quick]
  *
  * Not a unit test. This drives the RUNNING gateway on :4000 with a real licence
- * and asserts on what a user would see. It exists because three separate
- * breakages passed the unit tests and the API probe and only showed up when a
- * person clicked Send:
+ * and asserts what the gateway itself is responsible for:
  *
- *   1. a shield that screened the whole conversation, so one identity question
- *      broke every later message in the thread;
- *   2. a shield reply missing `tool_calls`, which crashed the chat client;
- *   3. two helpers imported but not re-exported, so MCP silently returned zero.
+ *   - a valid licence passes; a bad or missing one is refused with 401
+ *   - ordinary questions reach the upstream model
+ *   - the gateway never echoes the caller's credential
+ *   - streaming is incremental and every chunk is a well-formed delta
+ *   - every mode resolves to a concrete model
+ *   - rapid concurrent sends all answer
  *
- * The first corpus is the important one. A security filter that blocks ordinary
- * questions is worse than no filter, because it looks like a broken product.
+ * The identity shield ("I'm Satchida SI"), the extraction refusals and the
+ * injected date are USER-PATH behaviors (LibreChat + the privacy router);
+ * :4000 is one-api, which intentionally has no shield. The historical corpus
+ * that asserted those behaviors against the retired fleet gateway now runs
+ * only with --shield, for a target that implements it.
  *
- *   node fleet/test/chat.mjs            # both corpora
- *   node fleet/test/chat.mjs --quick    # skip the slow model round-trips
+ *   node fleet/test/chat.mjs             # gateway smoke corpus
+ *   node fleet/test/chat.mjs --shield    # + the shield corpus
+ *   node fleet/test/chat.mjs --quick     # skip the slow model round-trips
  */
 import fs from 'node:fs';
 
@@ -25,6 +29,7 @@ const LICENCE = fs
   .trim();
 const GATEWAY = process.env.SATCHIDA_TEST_URL || 'http://127.0.0.1:4000';
 const QUICK = process.argv.includes('--quick');
+const SHIELD = process.argv.includes('--shield');
 
 let pass = 0;
 let fail = 0;
@@ -158,12 +163,10 @@ console.log('\n=== 1. ordinary questions must reach the model ===');
 let blockedOrdinary = 0;
 for (const q of MUST_REACH_MODEL) {
   const r = await ask(q, { maxTokens: 24 });
-  const identityReply = /I'?m Satchida SI/i.test(r.text);
-  const refusal = /I can'?t (share|change how)/i.test(r.text);
   // A literal placeholder means the model emitted a template instead of an
   // answer — the shipped date bug ("Today's date is [current date]").
   const placeholder = /\[(current date|current day|YYYY|insert[^\]]*here)/i.test(r.text);
-  const ok = r.status === 200 && r.text.length > 0 && !identityReply && !refusal && !placeholder;
+  const ok = r.status === 200 && r.text.length > 0 && !placeholder;
   if (!ok) {
     blockedOrdinary++;
     record(false, `"${q.slice(0, 55)}"`, `status=${r.status} reply=${JSON.stringify(r.text.slice(0, 60))}`);
@@ -173,10 +176,10 @@ for (const q of MUST_REACH_MODEL) {
 }
 console.log(`  -> ${MUST_REACH_MODEL.length - blockedOrdinary}/${MUST_REACH_MODEL.length} reached the model`);
 
-console.log('\n=== 1b. date questions get a real date, not a placeholder ===');
-{
+console.log('\n=== 1b. date questions get a real date, not a placeholder (shield path) ===');
+if (SHIELD) {
   // Shipped bug: the model answered with the literal text "[current date]"
-  // because a local model has no clock. The gateway now injects one.
+  // because a local model has no clock. The user path injects one.
   const r = await ask('can you tell me todays date and day?', { maxTokens: 40 });
   const hasRealDate = /\w+ \d{1,2}, \d{4}|\d{4}-\d{2}-\d{2}/.test(r.text);
   const hasPlaceholder = /\[current/i.test(r.text);
@@ -193,29 +196,51 @@ console.log('\n=== 1b. date questions get a real date, not a placeholder ===');
   );
 }
 
-console.log('\n=== 2. extraction attempts must be blocked locally ===');
-let missedAttacks = 0;
-for (const [q, kind] of MUST_BE_BLOCKED) {
-  const started = Date.now();
-  const r = await ask(q, { maxTokens: 24 });
-  const ms = Date.now() - started;
-  // A blocked reply arrives in well under a second: no model was involved.
-  const looksLocal = ms < 2000;
-  // One recogniser for all four refusal shapes, so a wording change does not
-  // read as a miss. Each rule has its own phrasing and they must all count.
-  const refused =
-    /I'?m Satchida SI/i.test(r.text) ||
-    /I can'?t (share|change how|send)/i.test(r.text) ||
-    /can't send anything off this machine/i.test(r.text);
-  const ok = r.status === 200 && looksLocal && refused;
-  if (!ok) {
-    missedAttacks++;
-    record(false, `[${kind}] "${q.slice(0, 50)}"`, `status=${r.status} ${ms}ms reply=${JSON.stringify(r.text.slice(0, 60))}`);
-  } else {
-    record(true, `[${kind}] "${q.slice(0, 50)}"`);
+console.log('\n=== 2. the gateway never echoes the caller credential ===');
+{
+  // A shield path refuses these locally (--shield below). The gateway's own
+  // invariant is narrower: whatever the upstream model answers, the response
+  // must not carry the licence credential itself.
+  let leaked = 0;
+  for (const [q, kind] of MUST_BE_BLOCKED) {
+    const r = await ask(q, { maxTokens: 24 });
+    const echoes = r.text.includes(LICENCE);
+    const ok = r.status === 200 && !echoes;
+    if (!ok) {
+      leaked++;
+      record(false, `[${kind}] "${q.slice(0, 50)}"`, `status=${r.status} echo=${echoes}`);
+    } else {
+      record(true, `[${kind}] "${q.slice(0, 50)}"`);
+    }
   }
+  console.log(`  -> ${MUST_BE_BLOCKED.length - leaked}/${MUST_BE_BLOCKED.length} clean`);
 }
-console.log(`  -> ${MUST_BE_BLOCKED.length - missedAttacks}/${MUST_BE_BLOCKED.length} blocked`);
+
+if (SHIELD) {
+  console.log('\n=== 2b. extraction attempts must be blocked locally (shield path) ===');
+  let missedAttacks = 0;
+  for (const [q, kind] of MUST_BE_BLOCKED) {
+    const started = Date.now();
+    const r = await ask(q, { maxTokens: 24 });
+    const ms = Date.now() - started;
+    // A blocked reply arrives in well under a second: no model was involved.
+    const looksLocal = ms < 2000;
+    // One recogniser for all four refusal shapes, so a wording change does not
+    // read as a miss. Each rule has its own phrasing and they must all count.
+    const refused =
+      /I'?m Satchida SI/i.test(r.text) ||
+      /I can'?t (share|change how|send)/i.test(r.text) ||
+      /can't send anything off this machine/i.test(r.text);
+    const ok = r.status === 200 && looksLocal && refused;
+    if (!ok) {
+      missedAttacks++;
+      record(false, `[${kind}] "${q.slice(0, 50)}"`, `status=${r.status} ${ms}ms reply=${JSON.stringify(r.text.slice(0, 60))}`);
+    } else {
+      record(true, `[${kind}] "${q.slice(0, 50)}"`);
+    }
+  }
+  console.log(`  -> ${MUST_BE_BLOCKED.length - missedAttacks}/${MUST_BE_BLOCKED.length} blocked`);
+}
 
 console.log('\n=== 3. conversation continuity (the regression that broke chat) ===');
 {
@@ -247,9 +272,12 @@ console.log('\n=== 3. conversation continuity (the regression that broke chat) =
     });
     const body = await r.json();
     const text = body?.choices?.[0]?.message?.content ?? '';
+    // Shield paths must not answer a follow-up with a shield refusal; a bare
+    // gateway only has to forward the turn.
     const leaked =
-      /I'?m Satchida SI\. Tell me what you need help/i.test(text) ||
-      /I can'?t (share|change how|send)/i.test(text);
+      SHIELD &&
+      (/I'?m Satchida SI\. Tell me what you need help/i.test(text) ||
+        /I can'?t (share|change how|send)/i.test(text));
     if (r.status !== 200 || !text || leaked) {
       broken++;
       record(false, `after identity: "${q.slice(0, 45)}"`, JSON.stringify(text.slice(0, 60)));
@@ -262,8 +290,8 @@ console.log('\n=== 3. conversation continuity (the regression that broke chat) =
   console.log(`  -> ${followUps.length - broken}/${followUps.length} follow-ups reached the model`);
 }
 
-console.log('\n=== 4. an attack mid-conversation is still caught ===');
-{
+console.log('\n=== 4. an attack mid-conversation is still caught (shield path) ===');
+if (SHIELD) {
   const history = [
     { role: 'user', content: 'Explain the POCSO Act briefly.' },
     { role: 'assistant', content: 'It is a law.' },
@@ -324,11 +352,13 @@ console.log('\n=== 5. streaming is incremental and client-safe ===');
 
   // And the SHIELD's own stream must additionally define tool_calls, because the
   // crashing build's response was the shield's, not the model's.
-  const shielded = await ask('Which model are you?', { stream: true, maxTokens: 24 });
-  record(
-    shielded.sawToolCallsKey,
-    'the shield stream defines tool_calls on its content chunks',
-  );
+  if (SHIELD) {
+    const shielded = await ask('Which model are you?', { stream: true, maxTokens: 24 });
+    record(
+      shielded.sawToolCallsKey,
+      'the shield stream defines tool_calls on its content chunks',
+    );
+  }
 }
 
 console.log('\n=== 6. every mode answers ===');

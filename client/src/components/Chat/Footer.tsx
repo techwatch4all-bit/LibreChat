@@ -131,7 +131,7 @@ function Footer({ className, startupConfig, configuredOnly = false }: FooterProp
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative z-20 w-full shrink-0">
       <div
         className={
           className ??
@@ -144,7 +144,7 @@ function Footer({ className, startupConfig, configuredOnly = false }: FooterProp
              rather than the brighter `text-secondary`: the underline carries the
              affordance, and a link that outshines its own sentence puts the
              emphasis back where this change takes it from. */
-          'absolute bottom-0 left-0 right-0 hidden items-center justify-center gap-2 px-2 py-2 text-center text-xs text-text-muted sm:flex md:px-[60px]'
+          'flex items-center justify-center gap-2 px-2 py-2 text-center text-xs text-text-muted md:px-[60px]'
         }
       >
         {footerElements.map((contentRender, index) => {

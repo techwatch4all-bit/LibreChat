@@ -136,9 +136,16 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
 
   return (
     <div
-      className={`flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200 ${centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'} ${getDynamicMargin}`}
+      className={`flex h-full transform-gpu flex-col items-center justify-end pb-2 transition-all duration-200 ${centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'} ${getDynamicMargin}`}
     >
-      <div ref={contentRef} className="flex flex-col items-center gap-0 p-2">
+      <div className="mb-2 flex shrink-0 items-center justify-center">
+        <img
+          src="/assets/satchida/satchida-splash-mandala-dark.png?v=clean6"
+          alt="Satchida AI Mandala"
+          className="pointer-events-none h-auto max-h-[160px] w-auto max-w-[210px] select-none object-contain drop-shadow-md"
+        />
+      </div>
+      <div ref={contentRef} className="flex flex-col items-center gap-0 p-1">
         <div
           className={`flex ${textHasMultipleLines ? 'flex-col' : 'flex-col md:flex-row'} items-center justify-center gap-2`}
         >

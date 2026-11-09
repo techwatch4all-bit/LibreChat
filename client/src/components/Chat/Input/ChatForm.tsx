@@ -43,11 +43,14 @@ import PendingManualSkillsChips from './PendingManualSkillsChips';
 import usePastedTextEdit from '~/hooks/Files/usePastedTextEdit';
 import useAskAnswerMode from '~/hooks/Input/useAskAnswerMode';
 import AskUserQuestionPopover from './AskUserQuestionPopover';
+import useSatchiExtraBody from '~/hooks/useSatchiExtraBody';
 import InterruptSteerButton from './InterruptSteerButton';
 import PastedTextDialog from './Files/PastedTextDialog';
 import DuringRunSendButton from './DuringRunSendButton';
+import SatchiStyleSelector from './SatchiStyleSelector';
 import ProjectLandingChip from '../ProjectLandingChip';
 import { useGetStartupConfig } from '~/data-provider';
+import SatchiModeSelector from './SatchiModeSelector';
 import { mainTextareaId, BadgeItem } from '~/common';
 import PendingSteerChips from './PendingSteerChips';
 import PendingQuoteChips from './PendingQuoteChips';
@@ -63,6 +66,7 @@ import { submitFromComposer } from './submit';
 import SkillsCommand from './SkillsCommand';
 import AudioRecorder from './AudioRecorder';
 import AutoPlayAudio from './AutoPlayAudio';
+import SatchiToolbar from './SatchiToolbar';
 import CollapseChat from './CollapseChat';
 import QuoteButton from './QuoteButton';
 import TokenUsage from './TokenUsage';
@@ -70,10 +74,6 @@ import StopButton from './StopButton';
 import SendButton from './SendButton';
 import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
-import SatchiStyleSelector from './SatchiStyleSelector';
-import SatchiToolbar from './SatchiToolbar';
-import SatchiModeSelector from './SatchiModeSelector';
-import useSatchiExtraBody from '~/hooks/useSatchiExtraBody';
 import Mention from './Mention';
 import store from '~/store';
 
@@ -614,14 +614,14 @@ const ChatForm = memo(function ChatForm({
      surface's own shadow. Below `sm` the composer runs to the viewport floor in
      every state. */
   const landingClearance =
-    centerFormOnLanding && !isSubmitting ? 'transition-all duration-200 sm:mb-28' : 'sm:mb-10';
-  let bottomClearance = 'sm:mb-4';
+    centerFormOnLanding && !isSubmitting ? 'transition-all duration-200 sm:mb-2' : 'sm:mb-2';
+  let bottomClearance = 'sm:mb-2';
   if (isLandingPage) {
     bottomClearance = landingClearance;
   } else if (footerBelow) {
     /* A conversation that carries a configured footer keeps the band that bar
        needs, exactly as the welcome screen does. */
-    bottomClearance = 'sm:mb-10';
+    bottomClearance = 'sm:mb-6';
   }
 
   const { stylePromptPrefix } = useSatchiExtraBody();
@@ -892,7 +892,9 @@ const ChatForm = memo(function ChatForm({
                   getText={() => methods.getValues('text')}
                   setText={(text) => {
                     methods.setValue('text', text);
-                    const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
+                    const textarea = document.getElementById(
+                      mainTextareaId,
+                    ) as HTMLTextAreaElement | null;
                     textarea?.focus();
                   }}
                   disabled={disableInputs || isSubmitting}

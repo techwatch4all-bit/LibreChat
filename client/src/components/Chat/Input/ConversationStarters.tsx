@@ -190,11 +190,11 @@ const ConversationStarters = () => {
       return modeCategories.flatMap((c) => c.starters.slice(0, 2));
     }
     const cat = modeCategories.find((c) => c.id === selectedCategory);
-    return cat ? cat.starters : [];
+    return cat ? cat.starters.slice(0, 10) : [];
   }, [selectedCategory, customStarters, modeCategories]);
 
   return (
-    <div className="mx-auto mb-2 mt-0 flex w-full max-w-4xl flex-col items-center gap-1.5 px-3">
+    <div className="mb-2 mt-0 flex w-full flex-col items-center gap-1.5 px-0">
       {/* Category Tabs */}
       <div className="mb-0.5 flex flex-wrap items-center justify-center gap-1.5">
         <button
@@ -334,7 +334,7 @@ const ConversationStarters = () => {
               aria-label={item.prompt}
               onClick={() => handleStarterClick(item)}
               style={{ animationDelay: `${index * 25}ms`, animationFillMode: 'backwards' }}
-              className="group flex cursor-pointer flex-col items-start justify-between rounded-lg border border-border-light bg-surface-secondary/80 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
+              className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
             >
               <div className="flex w-full items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1.5 overflow-hidden">

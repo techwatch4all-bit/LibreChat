@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useState, useRef } from 'react';
 import { useRecoilValue } from 'recoil';
 import { HatGlasses } from 'lucide-react';
 import { easings } from '@react-spring/web';
@@ -37,7 +37,11 @@ function getTextSizeClass(text: string | undefined | null) {
   return 'text-lg sm:text-base';
 }
 
-export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: boolean }) {
+export default function Landing({
+  centerFormOnLanding: _centerFormOnLanding,
+}: {
+  centerFormOnLanding: boolean;
+}) {
   const { conversation } = useChatContext();
   const agentsMap = useAgentsMapContext();
   const assistantMap = useAssistantsMapContext();
@@ -48,8 +52,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
   const isTemporary = useRecoilValue(temporaryStore.isTemporary);
 
   const [textHasMultipleLines, setTextHasMultipleLines] = useState(false);
-  const [lineCount, setLineCount] = useState(1);
-  const [contentHeight, setContentHeight] = useState(0);
+  const [_lineCount, setLineCount] = useState(1);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const endpointType = useMemo(() => {
@@ -99,32 +102,6 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     setLineCount(count);
   }, []);
 
-  useEffect(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.offsetHeight);
-    }
-  }, [lineCount, description, selectedAgent]);
-
-  const getDynamicMargin = useMemo(() => {
-    let margin = 'mb-0';
-
-    if (lineCount > 2 || (description && description.length > 100)) {
-      margin = 'mb-10';
-    } else if (lineCount > 1 || (description && description.length > 0)) {
-      margin = 'mb-6';
-    } else if (textHasMultipleLines) {
-      margin = 'mb-4';
-    }
-
-    if (contentHeight > 200) {
-      margin = 'mb-16';
-    } else if (contentHeight > 150) {
-      margin = 'mb-12';
-    }
-
-    return margin;
-  }, [lineCount, description, textHasMultipleLines, contentHeight]);
-
   const resolvedWelcome =
     customWelcome != null && user?.name
       ? customWelcome.replace(/{{user.name}}/g, user.name)
@@ -135,21 +112,24 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     : (resolvedWelcome ?? scheduledGreeting);
 
   return (
-    <div
-      className={`flex h-full transform-gpu flex-col items-center justify-end pb-2 transition-all duration-200 ${centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'} ${getDynamicMargin}`}
-    >
+    <div className="mb-2 flex w-full shrink-0 flex-col items-center justify-center text-center transition-all duration-200">
       <div className="mb-2 flex shrink-0 items-center justify-center">
         <img
           src="/assets/satchida/satchida-splash-mandala-dark.png?v=clean6"
           alt="Satchida AI Mandala"
-          className="pointer-events-none h-auto max-h-[160px] w-auto max-w-[210px] select-none object-contain drop-shadow-md"
+          className="pointer-events-none h-auto max-h-[270px] w-auto max-w-[340px] select-none object-contain drop-shadow-md sm:max-h-[290px] sm:max-w-[360px]"
         />
       </div>
-      <div ref={contentRef} className="flex flex-col items-center gap-0 p-1">
+      <div
+        ref={contentRef}
+        className="flex w-full max-w-2xl flex-col items-center justify-center gap-0 px-2 py-0.5 text-center"
+      >
         <div
           className={`flex ${textHasMultipleLines ? 'flex-col' : 'flex-col md:flex-row'} items-center justify-center gap-2`}
         >
-          <div className={`relative size-10 justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}>
+          <div
+            className={`relative size-10 shrink-0 justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}
+          >
             {isTemporary ? (
               <div className={containerClassName}>
                 <HatGlasses className="h-2/3 w-2/3 text-text-primary" aria-hidden="true" />
@@ -177,11 +157,11 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
             )}
           </div>
           {((isAgent || isAssistant) && name) || name ? (
-            <div className="flex flex-col items-center gap-0 p-2">
+            <div className="flex flex-col items-center gap-0 p-1">
               <SplitText
                 key={`split-text-${name}`}
                 text={name}
-                className={`${getTextSizeClass(name)} font-medium text-text-primary`}
+                className={`${getTextSizeClass(name)} font-semibold tracking-tight text-text-primary`}
                 delay={50}
                 textAlign="center"
                 animationFrom={greetingAnimationFrom}
@@ -193,19 +173,21 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
               />
             </div>
           ) : (
-            <SplitText
-              key={`split-text-${greetingText}${user?.name ? '-user' : ''}`}
-              text={greetingText}
-              className={`${getTextSizeClass(greetingText)} font-medium text-text-primary`}
-              delay={50}
-              textAlign="center"
-              animationFrom={greetingAnimationFrom}
-              animationTo={greetingAnimationTo}
-              easing={easings.easeOutCubic}
-              threshold={0}
-              rootMargin="0px"
-              onLineCountChange={handleLineCountChange}
-            />
+            <div className="flex flex-col items-center gap-0 p-1">
+              <SplitText
+                key={`split-text-${greetingText}${user?.name ? '-user' : ''}`}
+                text={greetingText}
+                className={`${getTextSizeClass(greetingText)} font-semibold tracking-tight text-text-primary`}
+                delay={50}
+                textAlign="center"
+                animationFrom={greetingAnimationFrom}
+                animationTo={greetingAnimationTo}
+                easing={easings.easeOutCubic}
+                threshold={0}
+                rootMargin="0px"
+                onLineCountChange={handleLineCountChange}
+              />
+            </div>
           )}
         </div>
         <Description
@@ -213,8 +195,8 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           description={description}
           className={
             descriptionIsHTML
-              ? 'animate-fadeIn mt-4 flex max-w-md items-center justify-center gap-2 text-center text-sm font-normal text-text-primary [&_img]:inline-block [&_img]:h-4 [&_img]:w-4'
-              : `animate-fadeIn mt-4 max-w-md text-center text-sm font-normal ${isTemporary ? 'text-text-secondary' : 'text-text-primary'}`
+              ? 'animate-fadeIn mt-2 flex max-w-md items-center justify-center gap-2 text-center text-sm font-normal text-text-primary [&_img]:inline-block [&_img]:h-4 [&_img]:w-4'
+              : `animate-fadeIn mt-2 max-w-md text-center text-sm font-normal ${isTemporary ? 'text-text-secondary' : 'text-text-primary'}`
           }
         />
         {selectedAgent && !isTemporary && (

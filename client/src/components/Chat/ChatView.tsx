@@ -183,7 +183,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                                together, so it holds the same band back here. Without
                                it the composer lands 4px right of where a conversation
                                puts it and slides sideways on the way in. */
-                              'scrollbar-gutter-spacer flex-1 items-center justify-end pb-1'
+                              'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 py-2 sm:py-4'
                             : 'h-full overflow-y-auto',
                         )}
                       >
@@ -199,7 +199,8 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                           className={cn(
                             'relative z-10 w-full bg-presentation [view-transition-name:chat-form]',
                             !isLandingPage && 'scrollbar-gutter-spacer',
-                            isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
+                            isLandingPage &&
+                              'mx-auto w-full max-w-2xl transition-all duration-200 sm:max-w-3xl',
                           )}
                         >
                           {isLandingPage && <ConversationStarters />}

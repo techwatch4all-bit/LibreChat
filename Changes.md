@@ -107,6 +107,21 @@ watermark paints at ~3.1 s and carries the metric.
 - Pre-existing baselines (not this work): 37 client tsc errors in `Admin/*`; unused
   `com_admin_*` i18n keys; 1000+ fork lint errors vs upstream/dev across the branch.
 
+## 2026-11-10 — B22 fixed: model-selector ghost popover and dead keyboard shortcuts
+
+Live-browser root cause in `client/src/hooks/useKeyboardShortcuts.ts` (full write-up in
+Bugs.md B22): the shortcut dispatcher's bare `el.click()` skipped the focus hand-off a
+trusted click performs, so a programmatic open while the composer held focus lost the
+focus fight with the composer's refocus keeper mid-enter-transition and left the Ariakit
+popover mounted fully visible while its store reported closed; the fork's `anyModalOpen()`
+guard only knew Radix's `data-state`, so the ghost dialog blocked every keyboard chord;
+and the composer's refocus keeper meant `openModelSelector` was blocked by the editing
+guard in normal use regardless. Fixes: `clickTarget` focuses before clicking,
+`anyModalOpen()` skips `data-open="false"` and box-less dialogs, `openModelSelector`
+joined `EDITING_ALLOWED_SHORTCUTS`. Verified live (chord opens/reopens with composer
+focus, clean close, click path intact, 15/15 shortcut specs, tsc at the 37-error
+`Admin/*` baseline).
+
 ## 2026-11-10 — Licence-401 remediated (Option A: rotated at the issuer; operator-approved)
 
 1. **Rotation executed** — `one-api/scripts/admin-token -api-key` (the repo's own issuer

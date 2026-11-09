@@ -728,7 +728,46 @@ SWITCHING in the UI is blocked.
 (Ariakit `MenuButton` with `showTimeout: 100`) — the controlled `open` state never
 flips. Needs a debugging session with console access.
 
-**Verification status:** reproducible; not fixed.
+**Resolution (2026-11-10, live-browser root cause — two stacked defects, neither in
+CustomMenu.tsx itself):**
+
+1. **Ghost popover.** The shortcut dispatcher clicks targets programmatically
+   (`clickTarget` → bare `el.click()`). Unlike a trusted user click, that does not focus
+   the target first. When the composer textarea holds focus, the programmatic click on the
+   model-selector button opens the Ariakit popover, whose `autoFocusOnShow` then loses a
+   focus fight with the composer's refocus keeper mid-enter-transition: the dialog stays
+   mounted **fully visible** (`data-open=true`, 400×588 at z-40, pointer-events auto,
+   verified by screenshot) while the menu store reports closed. Reproduced
+   deterministically on the live build (textarea focus + programmatic click). While the
+   ghost exists the selector appears dead (store closed, popover overlaying the page) and
+   every keyboard chord dies — which is the observed B22 face. Fresh-load, Escape-close,
+   item-select and rapid-toggle paths were all verified clean; only the unfocused
+   programmatic click ghosts.
+2. **`anyModalOpen()` blind to Ariakit.** The fork's chord guard
+   (`useKeyboardShortcuts.ts`) treats any `role="dialog"` without Radix's
+   `data-state="closed"` or `inert` as an open modal. Ariakit popovers carry `data-open`
+   instead and stay mounted through an interrupted exit, so a ghost (or a mid-exit
+   popover) blocked **all** shortcuts — `Ctrl+Shift+M`, and everything else.
+3. **Composer-focus block (the "stopped working" half).** Even without a ghost, the
+   composer's refocus keeper puts focus back into the textarea after every interaction,
+   and `openModelSelector` is not in `EDITING_ALLOWED_SHORTCUTS`, so the chord only ever
+   worked while the composer had never been focused.
+
+**Fixes (all in `client/src/hooks/useKeyboardShortcuts.ts`):** `clickTarget` now focuses
+the target before clicking (identical to the trusted-click hand-off, fixing every
+programmatic-click shortcut at once); `anyModalOpen()` additionally skips
+`data-open="false"` and box-less (exiting/unmounted) dialogs; `openModelSelector` joined
+`EDITING_ALLOWED_SHORTCUTS` (it types nothing into the composer).
+
+**Verification (live, `:3080`, rebuilt bundle):** chord with composer focus opens the
+selector and moves focus into its search box; Escape closes with zero dialogs at rest;
+the chord reopens repeatedly (the exact failing sequence); Work still selects by click
+(`?spec=Work`); 15/15 shortcut-related component specs; `tsc --noEmit` at the 37-error
+`Admin/*` baseline with none in the changed file. Evidence: `b22-ghost-menu-before-reload.png`,
+`b22-fixed-work-mode.png` (temp QA dir).
+
+**Verification status:** fixed on the live build; operator to confirm on their profile
+(after a hard reload so the service worker picks up the new precache).
 
 ---
 

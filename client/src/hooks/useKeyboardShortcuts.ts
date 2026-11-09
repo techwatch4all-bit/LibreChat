@@ -299,6 +299,12 @@ export const EDITING_ALLOWED_SHORTCUTS: ReadonlySet<ShortcutActionId> = new Set(
   'submitMessage',
   'escalateSteer',
   'uploadFile',
+  /** The model selector types nothing into the composer, and the composer's
+   *  refocus keeper puts focus back into the textarea after every menu closes,
+   *  so without this the chord only ever worked when the composer had never
+   *  been focused (Bugs.md B22). clickTarget hands focus to the trigger first,
+   *  which is the same hand-off a trusted click performs. */
+  'openModelSelector',
 ]);
 
 export type ShortcutAction = ShortcutDefinition & {
@@ -332,6 +338,15 @@ function anyModalOpen(): boolean {
     if (dialog.getAttribute('data-state') === 'closed') {
       continue;
     }
+    /** Ariakit popovers mark their state with data-open, not Radix's
+     *  data-state, and can stay mounted through an interrupted exit, so an
+     *  element that reports closed or paints no box must not block chords. */
+    if (dialog.getAttribute('data-open') === 'false') {
+      continue;
+    }
+    if (dialog.getClientRects().length === 0) {
+      continue;
+    }
     return true;
   }
   return false;
@@ -359,6 +374,12 @@ function clickTarget(el: HTMLElement | null | undefined): boolean {
   if (!el || isUnavailableElement(el)) {
     return false;
   }
+  /** A trusted user click focuses the target before the click event; a bare
+   *  el.click() does not. Without the focus step, a programmatic click that
+   *  opens a popover while the composer holds focus loses the focus fight to
+   *  the composer's refocus keeper mid-enter-transition, leaving the popover
+   *  mounted and visible while its store reports closed (Bugs.md B22). */
+  el.focus({ preventScroll: true });
   el.click();
   return true;
 }

@@ -13,7 +13,7 @@ import { SidePanelGroup } from '~/components/SidePanel';
 import AppChatSurface from '~/components/Chat/Surface';
 import { useSetFilesToDelete } from '~/hooks';
 import { failedFileIdsFrom } from '~/utils';
-import { cn } from '~/utils';
+
 import store from '~/store';
 
 const Artifacts = lazy(() => import('~/components/Artifacts/Artifacts'));
@@ -157,13 +157,12 @@ export default function Presentation({
         >
           <SidePanelGroup panel={panelElement}>
             <div className="relative flex h-full flex-1 flex-col overflow-hidden">
-              <div
-                className={cn(
-                  'satchida-chat-watermark pointer-events-none select-none',
-                  isLandingPage && 'satchida-chat-watermark--landing',
-                )}
-                aria-hidden="true"
-              />
+              {!isLandingPage && (
+                <div
+                  className="satchida-chat-watermark pointer-events-none select-none"
+                  aria-hidden="true"
+                />
+              )}
               <main className="relative z-[1] flex h-full flex-col overflow-y-auto" role="main">
                 {children}
               </main>

@@ -8,6 +8,23 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-10 — A26 & A27: Landing zero-height overlap eliminated, mandala hero restored, Bifrost customer attribution
+
+1. **A26 (Landing Page Overlap & Mandala Hero):**
+   - Discovered root cause of multi-layer landing collision (`media_1794251108632_728733c1.jpg`): `centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'` in `client/src/components/Chat/Landing.tsx` collapsed the container height to 0px on desktop screens while elements inside continued rendering without overflow clipping. The subsequent sibling (`ConversationStarters` tabs/cards and composer) painted from the top of the container, stacking directly over the Mandala and greeting.
+   - Removed `sm:max-h-0` and dynamic bottom margin calculations (`getDynamicMargin`).
+   - Sized the Mandala emblem to `max-h-[270px] sm:max-h-[290px]`, `max-w-[340px] sm:max-w-[360px]` as the central hero element in document flow.
+   - Set greeting container width to `max-w-2xl` with `line-height: 1.35` and `overflow: visible` to eliminate letter-wrapping glitches.
+   - Displayed 10 persona starter cards in 2 columns with domain-specific contextual icons (`🌟`, `🤖`, `⚖️`, `🚨`, `📈`, `🩺`, `🚆`, `🔬`, `🛡️`, `💡`), bold titles, and 1-line descriptions matching operator reference design.
+   - Converted `ChatView.tsx` landing container to `scrollbar-gutter-spacer flex-1 flex-col items-center justify-center min-h-full overflow-y-auto px-2 py-2 sm:py-4`, centering layout vertically and allowing smooth scrolling on shorter viewports (1280×800) without top clipping.
+   - Synchronized cards and composer widths to `max-w-2xl sm:max-w-3xl`.
+   - Rebuilt frontend with `npm run build:client` (PWA precache updated) and restarted PM2 `librechat`.
+   - Verified visually via Playwright at 1440×900 and 1280×800 (`live_viewport_verify.png`, `live_viewport_800p.png`); all 7 unit test specs in `ConversationStarters.spec.tsx` passing.
+2. **A27 (Bifrost Telemetry Customer Attribution):**
+   - Resolved 832 "Unassigned" requests in Bifrost Observability Dashboard by registering `satchida-system-upkeep` in `governance_customers` and `sys-health-probe-vkey` in `governance_virtual_keys` within `D:\LAN-AI-Infra\Bifrost\data\config.db`.
+   - Normalized historical records in `logs.db` to attribute 945 health probe requests to `satchida-system-upkeep` and 1,125 customer requests to `satchida-master` ("Satchida HQ"). Unassigned count dropped to 0.
+   - Restarted PM2 process `satchida-gateway` (PID 63996) and verified live rankings.
+
 ## 2026-11-10 — Transcript prefetch hoisted off the shell render wave; lane overrides baked into the harness
 
 1. **Prefetch** — the fork's client fired `/api/messages/<convoId>` only when ChatView

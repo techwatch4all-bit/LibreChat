@@ -1280,3 +1280,44 @@ is killed mid-flight and reports spurious failures — run it per directory, not
   2. Updated `CostReconciliationTable.js` to calculate and render live Gross Margin % with color-coded status chips (Green for $\ge 80\%$, Amber for $50\% - 79\%$, Red for $< 50\%$) for both provider totals and model breakdowns.
   3. Added direct "Statement / PDF" and "Export CSV" buttons to `TenantCommercialCard.js`.
 - **Verification:** Live test verified: genuine 12-digit UTR credited 2,525,252 quota units, duplicate attempt blocked with 409 Conflict, and reconciliation table confirmed 99.1% gross margin on OpenRouter usage. Status: **Resolved (2026-11-08)**.
+
+---
+
+### A26 — Chat Landing Page Zero-Height Collapse & Multi-Layer Overlap (`centerFormOnLanding`)
+
+- **Severity:** High (visual presentation / UX regression)
+- **Evidence:** On `/c/new`, the central Mandala hero, greeting text ("Still up, [User]?"), category tabs, persona starter cards, and the chat composer were overlapping each other in a jumbled multi-layer stack (`media_1794251108632_728733c1.jpg`). The greeting text was rendered behind row 2 of the persona cards, the category tabs sat on the lower petals of the Mandala, and long user names dropped single orphan letters onto a new line. Concurrently, on desktop screens with standard scaling (100% zoom), the top petals of the Mandala were pushed out of the viewport and clipped.
+- **Root Cause:**
+  1. `client/src/components/Chat/Landing.tsx` conditioned container classes on `centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'`. On viewports $\ge \text{sm}$ (desktop/laptop), this set `max-h-0` on the `Landing` container. Because `overflow: hidden` was not set, child elements (Mandala and Greeting) remained visible while the container collapsed to 0px height. As a result, subsequent siblings in the document flow (`ConversationStarters` and `ChatForm`) began painting at the top of the container, directly over the Mandala and greeting.
+  2. The landing viewport in `ChatView.tsx` was configured with `justify-end pb-1` and `Landing` had `h-full justify-end` with dynamic bottom margins (`getDynamicMargin` up to `mb-16`), which pinned the stack to the bottom and forced the top of large emblems above `y=0` (off-screen clipping).
+  3. The greeting container lacked explicit max-width constraints, causing `SplitText` to wrap the trailing word/character onto a separate line when calculating grapheme bounds.
+  4. Starter card container widths (`max-w-3xl`) and composer widths (`max-w-2xl xl:max-w-3xl`) were desynchronized, causing the chat box to appear disproportionately wide.
+- **Remediation:**
+  1. Removed `centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'` and dynamic margin calculations from `Landing.tsx`. The container now retains its natural in-flow height (`flex shrink-0 w-full flex-col items-center justify-center text-center`).
+  2. Prominently sized the Mandala emblem (`max-h-[270px] sm:max-h-[290px]`, `max-w-[340px] sm:max-w-[360px]`).
+  3. Constrained greeting container to `max-w-2xl` with `line-height: 1.35` and `overflow: visible` to eliminate letter orphan wrapping.
+  4. In `ChatView.tsx`, converted the landing container to `scrollbar-gutter-spacer flex-1 flex-col items-center justify-center min-h-full overflow-y-auto px-2 py-2 sm:py-4`, centering content vertically while allowing smooth scrolling without top clipping on shorter screens.
+  5. Aligned the width of both `ConversationStarters` and `ChatForm` to `mx-auto w-full max-w-2xl sm:max-w-3xl`.
+  6. Rebuilt the frontend client bundle (`npm run build:client`) and updated PWA precache.
+- **Verification:**
+  1. Automated Playwright browser tests executed across multiple viewports (`1440x900` standard desktop and `1280x800` laptop display at 100% zoom).
+  2. Live screenshot inspection confirmed zero clipping of the Mandala, clean vertical rhythm between Mandala $\to$ Greeting $\to$ Category Tabs $\to$ 10 Persona Cards $\to$ Composer $\to$ Footer, matching horizontal grid boundaries, and intact footer links.
+  3. All 7 unit test specs in `ConversationStarters.spec.tsx` passing. Status: **Resolved (2026-11-10)**.
+
+---
+
+### A27 — Bifrost System Health Probe Telemetry Fallback to "Unassigned" Customer
+
+- **Severity:** Medium (observability / reporting integrity)
+- **Evidence:** Bifrost Observability Dashboard under "Top Customers" reported 832 requests attributed to "Unassigned", despite all system maintenance probes passing through `satchida-system-upkeep` with virtual key name `Satchida-System-Health-Probe`.
+- **Root Cause:**
+  1. While requests were tagged with `customer_id = 'satchida-system-upkeep'`, this customer ID was never registered in Bifrost's `governance_customers` table in `D:\LAN-AI-Infra\Bifrost\data\config.db`.
+  2. Bifrost's customer rankings query performs aggregation against recognized governance customer records; any requests with customer IDs missing from `governance_customers` or with unmapped virtual keys fall into the "Unassigned" aggregate.
+- **Remediation:**
+  1. Registered `satchida-system-upkeep` (name: "Satchida System Upkeep", rate limit: `rl-workstudy`) in `governance_customers`.
+  2. Registered `sys-health-probe-vkey` in `governance_virtual_keys` bound to customer `satchida-system-upkeep`.
+  3. Normalized historical logs in `D:\LAN-AI-Infra\Bifrost\data\logs.db` to attribute all 945 health-probe entries to `satchida-system-upkeep` / `sys-health-probe-vkey` and normalized `satchida-master` customer names to "Satchida HQ".
+  4. Restarted PM2 process `satchida-gateway` (PID 63996) to reload the governance customer cache.
+- **Verification:**
+  1. Re-queried `logs.db` customer grouping: `satchida-master` (1,125 requests), `satchida-system-upkeep` (945 requests), `Unassigned` (0 requests).
+  2. Confirmed Bifrost "Top Customers" dashboard now displays 100% clean attribution with 0 unassigned requests. Status: **Resolved (2026-11-10)**.

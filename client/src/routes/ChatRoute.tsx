@@ -4,7 +4,13 @@ import { useRecoilCallback, useRecoilValue } from 'recoil';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Button, Spinner, useToastContext } from '@librechat/client';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
-import { Constants, EModelEndpoint, PermissionBits } from 'librechat-data-provider';
+import {
+  Constants,
+  EModelEndpoint,
+  PermissionBits,
+  QueryKeys,
+  dataService,
+} from 'librechat-data-provider';
 import type { TPreset, TAgentsMap } from 'librechat-data-provider';
 import {
   defaultSpecAwaitsAgents,
@@ -138,6 +144,25 @@ export default function ChatRoute() {
       conversationId !== Constants.NEW_CONVO &&
       (!hasSetConversation.current || routeState.pending),
   });
+  /** The transcript fetch needs only the route param, not the shell data whose
+   *  arrival mounts ChatView — without this it starts a full render wave later
+   *  (measured ~1.7 s into the cold load under the lighthouse serial-read lane,
+   *  see e2e/lighthouse/README.md). ChatView's useGetMessagesByConvoId shares
+   *  this key and consumes the warm cache, then reconciles with its own
+   *  refetchOnMount pass. */
+  useEffect(() => {
+    if (
+      !isAuthenticated ||
+      !conversationId ||
+      conversationId === Constants.NEW_CONVO ||
+      conversationId === Constants.SEARCH
+    ) {
+      return;
+    }
+    void queryClient.prefetchQuery([QueryKeys.messages, conversationId], () =>
+      dataService.getMessagesByConvoId(conversationId),
+    );
+  }, [isAuthenticated, conversationId, queryClient]);
   const endpointsQuery = useGetEndpointsQuery({ enabled: isAuthenticated });
   const assistantListMap = useAssistantListMap();
   /** The map comes from Root's shared context (one mapping pass app-wide); the

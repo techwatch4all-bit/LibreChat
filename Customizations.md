@@ -499,3 +499,61 @@ Previous implementations used `encodeURI` data URIs that truncated large CSV exp
    - Standardized definition of COGS (Cost of Goods Sold) as direct variable upstream API provider charges and network delivery costs.
    - Clarified that Privacy accounts feature a hybrid dual-engine: local GPU inference with ₹0 cloud COGS when in Privacy mode, and frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek) when in Chat, Study, Work, or Vibe Coding (VS Code Server Web, MCP, Code Execution).
    - Accurately recalibrated Privacy gross margin to **~85.8% to 88.0%** based on real cloud usage (~.50 / ₹445.50 COGS) against the ₹3,499 monthly fee.
+
+## C26. Persona & MCP shipping assets under `satchida/` (2026-11-09)
+
+Upstream LibreChat contains neither the persona master library nor an MCP shipping
+manifest; the fork adds two product-layer directories so a client edge node can be
+provisioned from this repo alone. No upstream file is modified.
+
+**Customization:**
+1. **`satchida/personas/`** — `personas.ts`: verbatim copy of the 34-persona master
+   library from `satchida-ai-unified-suite/src/lib/constants/personas.constants.ts`
+   (deltas only: provenance header + `export` on the three private rule blocks;
+   verified with `diff --strip-trailing-cr`). Plus `specification.md` (operator spec:
+   11 categories / 44 starters, staging protocol, ModelSpec overrides) and `README.md`
+   (wiring map, stale-data audit, origin-sync rule, shipping checklist).
+2. **`satchida/mcp/`** — `recommended-mcp.ts`: curated external MCP catalog copied
+   from the unified-suite constant (type inlined). Plus `README.md`: manifest of all
+   21 `librechat.yaml` servers (custom servers confirmed git-tracked under `skill/`),
+   packaged-server dependencies and pre-warm steps, external sidecar requirements
+   (AnythingLLM :3012, DeepTutor :8001), the per-client rewrite table for hardcoded
+   `D:/LAN-AI-Infra` paths, and audit findings (deeptutor `dist/` untracked, hardcoded
+   AnythingLLM API key, US-law `legal-research` pairing, unbound `clinical-research`,
+   unreferenced `stem-math-server.py`).
+3. **Runtime untouched** — `ConversationStarters.tsx`, `librechat.yaml`, and MCP
+   configs are unchanged; the P0–P2 persona improvement plan (rule-block wiring,
+   dangling-placeholder fixes, safety rewrites, matrix fixes) is tracked in the
+   session todo list and logged in `Changes.md` (2026-11-09 entry).
+
+## C27. P0–P2 persona accuracy contract, MCP credential/path portability & staging starters (2026-11-09)
+
+Supersedes C26's "Runtime untouched" note: the P0–P2 plan now lands runtime changes. Upstream
+LibreChat contains none of the following.
+
+**Customization:**
+1. **Accuracy contract in `librechat.yaml` ModelSpecs** — four anti-fabrication rule blocks
+   (citation obligation, no fabricated numerics, stale-data refusal, Satchida-SI identity)
+   appended to the `promptPrefix` of all 7 mode specs (Chat, Work, Pro, Vibecoding, Study,
+   Study-Local, Privacy), plus zero-old-data rewrites in `librechat.yaml` and
+   `satchida/personas/personas.ts` (8/8, 0 residuals).
+2. **Privacy honesty** — the Privacy spec carries `webSearch: false` and a local-only
+   no-live-context refusal line; `family_health` routes to Chat rather than Privacy. Diverges
+   from upstream's web-enabled defaults; jest mode-filter tests pin the routing.
+3. **MCP credentials via env template** — `${ANYTHINGLLM_API_KEY}` in `librechat.yaml`,
+   expanded per connection by `extractEnvVariable` in `packages/api/src/mcp/connection.ts`
+   (upstream does not resolve env templates in MCP command args); the secret lives only in
+   `.env`. Paired with portable MCP args: 14 relative `skill/...` paths and
+   `git --repository .` instead of `D:/LAN-AI-Infra` absolutes.
+4. **MCP mode×allowlist matrix** — per-spec `mcpServers` allowlists across all 7 modes
+   (upstream: one global set).
+5. **Client starters refactor** — `client/src/common/starters.ts` extracted from
+   `ConversationStarters.tsx` (deictic gate, label-bracket skip, Tab-cycle helpers), all copy
+   through `useLocalize()` with `starters_*` English keys; new colocated jest spec 7/7.
+6. **E2E harness adaptations** (divergence from upstream test infra, forced by this fork's own
+   UI/environment): `e2e/setup/authenticate.ts` opens the auth forms via the AuthLayout
+   `?signin=1` affordance; `e2e/lighthouse/audit.ts` tolerates chrome-launcher's Windows
+   teardown-EPERM against a clean saved report; `e2e/lighthouse/load.spec.ts` allows the
+   permanent `satchida-chat-watermark` as an LCP element (Chrome counts background-image divs
+   as LCP candidates; canvas/border-image variants are ineligible). Lane invocation on this
+   box: `SATCHIDA_OPERATOR_USER_ID= E2E_BASE_URL=http://localhost:3098 npm run lighthouse`.

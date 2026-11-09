@@ -17,7 +17,7 @@ export const TENANT_ACCOUNT_TYPES = [
   'enterprise',
   'privacy',
 ] as const;
-export const SEMANTIC_MODES = ['Chat', 'Study', 'Work', 'Privacy'] as const;
+export const SEMANTIC_MODES = ['Chat', 'Study', 'Work', 'Privacy', 'Vibecoding'] as const;
 export const TENANT_ENTITLEMENT_STATUSES = ['active', 'suspended', 'expired', 'revoked'] as const;
 
 /**

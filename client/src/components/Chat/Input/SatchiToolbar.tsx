@@ -45,7 +45,9 @@ import {
 } from '~/store/satchiStore';
 import { Tools } from 'librechat-data-provider';
 import { useLocalize, useAuthContext } from '~/hooks';
-import { useBadgeRowContext } from '~/Providers';
+import { useBadgeRowContext, useChatContext } from '~/Providers';
+import { mcpValuesAtomFamily } from '~/store/mcp';
+import { Constants } from 'librechat-data-provider';
 import SatchiUpgradeModal from './SatchiUpgradeModal';
 import { cn } from '~/utils';
 
@@ -82,18 +84,34 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
   const isThinkingActive = think !== 'off';
 
   const badgeContext = useBadgeRowContext();
+  const { conversation } = useChatContext();
+  const convoKey = conversation?.conversationId ?? Constants.NEW_CONVO;
+  const [, setMCPValues] = useAtom(mcpValuesAtomFamily(convoKey));
 
   const toggleWebSearch = useCallback(() => {
     if (disabled) return;
     setWebSearch((prev) => {
       const next = !prev;
       if (badgeContext?.webSearch?.debouncedChange) {
-        // The hook's change handler takes the tool value, not a bare boolean.
         badgeContext.webSearch.debouncedChange({ value: next });
+      }
+      // Also sync MCP server selection for web search & fetch so model doesn't invoke search when toggled off
+      if (!next) {
+        setMCPValues((current = []) => current.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'));
+        if (badgeContext?.mcpServerManager?.setMCPValues) {
+          const curr = badgeContext.mcpServerManager.mcpValues ?? [];
+          badgeContext.mcpServerManager.setMCPValues(curr.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'));
+        }
+      } else {
+        setMCPValues((current = []) => Array.from(new Set([...current, 'satchida-web-search'])));
+        if (badgeContext?.mcpServerManager?.setMCPValues) {
+          const curr = badgeContext.mcpServerManager.mcpValues ?? [];
+          badgeContext.mcpServerManager.setMCPValues(Array.from(new Set([...curr, 'satchida-web-search'])));
+        }
       }
       return next;
     });
-  }, [disabled, setWebSearch, badgeContext]);
+  }, [disabled, setWebSearch, badgeContext, setMCPValues]);
 
   const toggleThinking = useCallback(() => {
     if (disabled) return;

@@ -260,6 +260,7 @@ export function getOpenAIConfig(
     const userName = String(
       rawUser?.name || rawUser?.username || rawUser?.email || 'Satchida User',
     );
+    const modeName = String(options.modelOptions?.model || 'default');
     configOptions.defaultHeaders = {
       ...configOptions.defaultHeaders,
       'X-Tenant-Id': tenantId,
@@ -268,6 +269,10 @@ export function getOpenAIConfig(
       'X-Seat-Alias': userId,
       'X-Bifrost-User-Id': userId,
       'X-Bifrost-Role': userRole,
+      'X-Bf-App': 'LibreChat',
+      'x-bf-app': 'LibreChat',
+      'x-bf-dim-app': 'LibreChat',
+      'x-bf-dim-mode': modeName,
       'x-bf-dim-user_id': userId,
       'x-bf-dim-user_name': userName,
       'x-bf-dim-customer_id': tenantId,

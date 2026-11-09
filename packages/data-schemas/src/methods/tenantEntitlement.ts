@@ -79,7 +79,7 @@ function validateStoredEntitlement(value: ITenantEntitlement): void {
       (allocation.allowedCapabilities != null &&
         (!Array.isArray(allocation.allowedCapabilities) ||
           !allocation.allowedCapabilities.every((capability) =>
-            ['work_tools', 'mcp', 'agents', 'code_execution'].includes(capability),
+            ['work_tools', 'mcp', 'agents', 'code_execution', 'vscode_server'].includes(capability),
           ))) ||
       (allocation.localPrivacyEnabled != null &&
         typeof allocation.localPrivacyEnabled !== 'boolean')
@@ -182,7 +182,7 @@ export function createTenantEntitlementMethods(
         (allocation.allowedCapabilities != null &&
           (!Array.isArray(allocation.allowedCapabilities) ||
             !allocation.allowedCapabilities.every((capability) =>
-              ['work_tools', 'mcp', 'agents', 'code_execution'].includes(capability),
+              ['work_tools', 'mcp', 'agents', 'code_execution', 'vscode_server'].includes(capability),
             ))) ||
         (allocation.localPrivacyEnabled != null &&
           typeof allocation.localPrivacyEnabled !== 'boolean')

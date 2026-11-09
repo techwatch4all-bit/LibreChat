@@ -1,992 +1,514 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Satchida Productivity AI — Value & Team Sales Deck</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #090e17;
-      --surface: #111827;
-      --surface-elevated: #152033;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(5, 150, 105, 0.3);
-      --text-head: #ffffff;
-      --text-body: #94a3b8;
-      --text-dim: #64748b;
-      --emerald: #059669;
-      --emerald-soft: rgba(5, 150, 105, 0.12);
-      --cyan: #0284c7;
-      --cyan-soft: rgba(2, 132, 199, 0.12);
-      --indigo: #4f46e5;
-      --indigo-soft: rgba(79, 70, 229, 0.12);
-      --amber: #d97706;
-      --rose: #e11d48;
-      --font-heading: 'Plus Jakarta Sans', sans-serif;
-      --font-body: 'Inter', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satchida AI for Teams — Team &amp; Productivity Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+  :root {
+    --paper: #FAFAF7;
+    --card: #FFFFFF;
+    --ink: #16233A;
+    --ink-2: #3D4A5E;
+    --ink-3: #778092;
+    --line: #E5E2DA;
+    --line-2: #D3CFC4;
+    --navy: #122A47;
+    --navy-2: #0C1D33;
+    --cyan: #0E7490;
+    --indigo: #4338CA;
+    --emerald: #047857;
+    --amber: #B45309;
+    --rose: #B42318;
+    --cyan-soft: #EBF5F8;
+    --emerald-soft: #ECF7F1;
+    --rose-soft: #FBEFED;
+    --amber-soft: #FBF3E7;
+    --indigo-soft: #EEF0FB;
+    --serif: 'Source Serif 4', Georgia, serif;
+    --sans: 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html { font-size: clamp(10px, calc(100vw / 80), 26px); }
+  @media print { html { font-size: 16px; } }
+  body { font-family: var(--sans); color: var(--ink); background: var(--paper); font-variant-numeric: tabular-nums; }
+  .deck { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  @media print { .deck { height: auto; overflow: visible; scroll-snap-type: none; } }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+  .slide {
+    width: 100vw; height: 100dvh; scroll-snap-align: start;
+    display: flex; flex-direction: column;
+    padding: 1.55rem 3.1rem 1.15rem;
+    position: relative; overflow: hidden;
+    background: var(--paper);
+    break-after: page; page-break-after: always;
+  }
+  @media print { .slide { width: 13.333in; height: 7.5in; } }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      background: var(--bg);
-      color: var(--text-body);
-      font-family: var(--font-body);
-      font-size: 14px;
-      line-height: 1.5;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
+  .s-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: .62rem; border-bottom: 1px solid var(--line-2); }
+  .kicker { font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+  .kicker b { color: var(--cyan); font-weight: 600; }
+  .brandmark { font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .14em; color: var(--ink-3); }
+  .s-foot { margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; color: var(--ink-3); }
+  .s-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; padding: .85rem 0 .7rem; }
 
-    .deck-container {
-      width: 100vw;
-      height: 100vh;
-      overflow-y: scroll;
-      scroll-snap-type: y mandatory;
-      scroll-behavior: smooth;
-    }
+  .s-title { font-family: var(--serif); font-size: 1.92rem; font-weight: 600; letter-spacing: -.015em; line-height: 1.14; color: var(--navy); margin-bottom: .38rem; }
+  .s-sub { font-size: .84rem; line-height: 1.5; color: var(--ink-2); max-width: 58rem; }
 
-    .slide {
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      scroll-snap-align: start;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 32px 56px 28px 56px;
-      position: relative;
-      background: var(--bg);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      overflow: hidden;
-      page-break-after: always;
-      break-after: page;
-    }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: .55rem; padding: .95rem 1.05rem; }
+  .ct { font-size: .86rem; font-weight: 700; color: var(--navy); margin-bottom: .3rem; }
+  .cd { font-size: .76rem; line-height: 1.52; color: var(--ink-2); }
 
-    .slide::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: 
-        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-    }
+  .stat .n { font-family: var(--serif); font-size: 1.72rem; font-weight: 700; letter-spacing: -.02em; color: var(--navy); line-height: 1.05; }
+  .stat .l { font-size: .68rem; line-height: 1.4; color: var(--ink-3); margin-top: .22rem; }
 
-    .slide-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      z-index: 2;
-    }
+  ul.ticks { list-style: none; }
+  ul.ticks li { display: flex; gap: .5rem; font-size: .78rem; line-height: 1.5; color: var(--ink-2); padding: .22rem 0; }
+  ul.ticks li::before { content: "✓"; color: var(--emerald); font-weight: 700; flex: none; }
+  ul.ticks li b { color: var(--ink); font-weight: 600; }
 
-    .brand-mark {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--font-heading);
-      font-weight: 800;
-      font-size: 1.05rem;
-      color: #ffffff;
-      letter-spacing: -0.01em;
-    }
+  .chip { display: inline-flex; align-items: center; gap: .35rem; border-radius: 2rem; padding: .26rem .68rem; font-size: .68rem; font-weight: 600; letter-spacing: .01em; }
+  .chip.cyan { background: var(--cyan-soft); color: var(--cyan); border: 1px solid #C4E0EA; }
+  .chip.emerald { background: var(--emerald-soft); color: var(--emerald); border: 1px solid #BFE3D2; }
+  .chip.amber { background: var(--amber-soft); color: var(--amber); border: 1px solid #EAD4B4; }
+  .chip.rose { background: var(--rose-soft); color: var(--rose); border: 1px solid #EFCBC5; }
 
-    .brand-logo-icon {
-      width: 22px;
-      height: 22px;
-      background: linear-gradient(135deg, #059669 0%, #0284c7 100%);
-      border-radius: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 900;
-    }
+  .steps { display: grid; gap: .5rem; }
+  .step { display: flex; gap: .62rem; align-items: flex-start; }
+  .step .sn { flex: none; width: 1.22rem; height: 1.22rem; border-radius: 50%; background: var(--navy); color: #fff; font-size: .62rem; font-weight: 600; display: grid; place-items: center; margin-top: .12rem; }
+  .step p { font-size: .78rem; line-height: 1.48; color: var(--ink-2); }
+  .step p b { color: var(--ink); font-weight: 600; }
 
-    .slide-tag {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #34d399;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      background: var(--emerald-soft);
-      border: 1px solid rgba(5, 150, 105, 0.25);
-      padding: 3px 10px;
-      border-radius: 4px;
-    }
+  .uc-grid { display: grid; grid-template-columns: 1.02fr 1.28fr .92fr; gap: 1rem; align-items: stretch; }
+  .uc-out { display: grid; gap: .55rem; align-content: start; }
+  .oc { border: 1px solid #BFE3D2; background: var(--emerald-soft); border-radius: .55rem; padding: .6rem .75rem; }
+  .oc .t { font-family: var(--serif); font-size: .98rem; font-weight: 700; color: var(--emerald); line-height: 1.15; }
+  .oc .d { font-size: .68rem; line-height: 1.42; color: #33604E; margin-top: .18rem; }
+  .uc-note { font-size: .62rem; color: var(--ink-3); margin-top: .7rem; font-family: var(--mono); letter-spacing: .04em; }
 
-    .slide-body {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      position: relative;
-      z-index: 2;
-      padding: 18px 0;
-    }
+  table.matrix { width: 100%; border-collapse: collapse; font-size: .72rem; }
+  table.matrix th { font-family: var(--mono); font-size: .58rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: .4rem .55rem; border-bottom: 1.5px solid var(--navy); }
+  table.matrix th.hc { text-align: center; }
+  table.matrix td { padding: .34rem .55rem; border-bottom: 1px solid var(--line); color: var(--ink-2); line-height: 1.35; vertical-align: middle; }
+  table.matrix td:first-child { font-weight: 600; color: var(--ink); }
+  table.matrix td.hc { text-align: center; }
+  table.matrix tr:last-child td { border-bottom: none; }
+  .yes { color: var(--emerald); font-weight: 700; }
+  .no { color: #A8AEB8; }
+  .hl { background: var(--indigo-soft); }
 
-    .slide-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-      position: relative;
-      z-index: 2;
-    }
+  .flow { display: flex; align-items: stretch; gap: .6rem; }
+  .flow .node { flex: 1; border: 1px solid var(--line-2); border-radius: .55rem; background: var(--card); padding: .6rem .7rem; }
+  .flow .node .nt { font-family: var(--mono); font-size: .56rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--cyan); margin-bottom: .25rem; }
+  .flow .node .nd { font-size: .7rem; line-height: 1.4; color: var(--ink-2); }
+  .flow .arr { align-self: center; color: var(--ink-3); font-size: .95rem; flex: none; }
 
-    h1.hero-title {
-      font-family: var(--font-heading);
-      font-size: 2.85rem;
-      font-weight: 800;
-      color: #ffffff;
-      line-height: 1.15;
-      letter-spacing: -0.03em;
-      margin-bottom: 14px;
-    }
+  .tier { display: flex; flex-direction: column; }
+  .tier .price { display: flex; align-items: baseline; gap: .3rem; margin: .35rem 0 .1rem; }
+  .tier .price .p { font-family: var(--serif); font-size: 1.9rem; font-weight: 700; color: var(--navy); letter-spacing: -.02em; }
+  .tier .price .u { font-size: .66rem; color: var(--ink-3); }
+  .tier .best { font-size: .68rem; font-style: italic; color: var(--ink-3); margin-bottom: .45rem; }
+  .tier ul.ticks li { font-size: .72rem; padding: .18rem 0; }
+  .tier.flag { border: 1.5px solid var(--navy); }
 
-    .emerald-gradient {
-      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+  .cover { background: linear-gradient(160deg, var(--navy) 0%, var(--navy-2) 78%); color: #fff; }
+  .cover::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 46px 46px; }
+  .cover .s-head, .cover .s-foot { border-color: rgba(255,255,255,.16); }
+  .cover .kicker, .cover .brandmark, .cover .s-foot { color: rgba(255,255,255,.62); }
+  .cover .s-title { color: #fff; font-size: 2.7rem; line-height: 1.1; }
+  .cover .grad { color: #7DD3E8; }
+  .cover .s-sub { color: rgba(255,255,255,.78); font-size: .92rem; max-width: 52rem; }
+  .cover-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-top: 2rem; padding-top: 1.1rem; border-top: 1px solid rgba(255,255,255,.18); }
+  .cover-stats .stat .n { color: #fff; font-size: 1.55rem; }
+  .cover-stats .stat .l { color: rgba(255,255,255,.6); }
+  .logo-mark { width: 1.5rem; height: 1.5rem; border-radius: .3rem; background: linear-gradient(135deg, #0EA5E9, #6366F1); display: inline-grid; place-items: center; color: #fff; font-weight: 800; font-size: .78rem; vertical-align: -.35rem; margin-right: .45rem; }
 
-    h2.slide-heading {
-      font-family: var(--font-heading);
-      font-size: 2rem;
-      font-weight: 700;
-      color: #ffffff;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-      margin-bottom: 6px;
-    }
+  .cta { background: var(--navy); color: #fff; border-radius: .65rem; padding: 1rem 1.4rem; display: flex; justify-content: space-between; align-items: center; }
+  .cta .big { font-family: var(--serif); font-size: 1.18rem; font-weight: 600; }
+  .cta .link { font-family: var(--mono); font-size: .74rem; color: #7DD3E8; letter-spacing: .05em; }
 
-    p.slide-subhead {
-      font-size: 0.98rem;
-      color: var(--text-body);
-      max-width: 880px;
-      line-height: 1.5;
-      margin-bottom: 22px;
-    }
+  .modes { display: flex; gap: .55rem; margin: .8rem 0 1rem; }
+  .mode { flex: 1; border: 1px solid var(--line-2); background: var(--card); border-radius: .5rem; padding: .5rem .7rem; }
+  .mode .mt { font-family: var(--mono); font-size: .62rem; font-weight: 600; letter-spacing: .12em; color: var(--navy); }
+  .mode .md { font-size: .68rem; color: var(--ink-3); line-height: 1.35; margin-top: .12rem; }
 
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      width: 100%;
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      width: 100%;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 20px 22px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      position: relative;
-    }
-
-    .card.highlight-emerald {
-      background: var(--surface-elevated);
-      border-color: rgba(5, 150, 105, 0.4);
-    }
-
-    .card-title {
-      font-family: var(--font-heading);
-      font-size: 1.12rem;
-      font-weight: 700;
-      color: #ffffff;
-      margin-bottom: 8px;
-    }
-
-    .card-desc {
-      font-size: 0.86rem;
-      color: var(--text-body);
-      line-height: 1.5;
-      margin-bottom: 14px;
-    }
-
-    .price-tag {
-      font-family: var(--font-heading);
-      font-size: 1.9rem;
-      font-weight: 800;
-      color: #ffffff;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .price-period {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      margin-bottom: 14px;
-    }
-
-    .list-items {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      font-size: 0.86rem;
-      color: var(--text-body);
-    }
-
-    .list-items li {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      line-height: 1.45;
-    }
-
-    .check-bullet {
-      color: #34d399;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
-
-    .cross-bullet {
-      color: #fb7185;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
-
-    .matrix-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .matrix-table th {
-      background: #0d131f;
-      padding: 12px 16px;
-      text-align: left;
-      font-family: var(--font-heading);
-      font-weight: 700;
-      color: #ffffff;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.85rem;
-    }
-
-    .matrix-table td {
-      padding: 11px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-body);
-    }
-
-    .matrix-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .matrix-table td strong {
-      color: #ffffff;
-    }
-
-    .focus-column {
-      background: rgba(5, 150, 105, 0.05);
-      border-left: 1px solid rgba(5, 150, 105, 0.25);
-      border-right: 1px solid rgba(5, 150, 105, 0.25);
-    }
-
-    .deck-toolbar {
-      position: fixed;
-      bottom: 20px;
-      right: 24px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(17, 24, 39, 0.95);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 6px;
-      z-index: 9999;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    }
-
-    .btn-action {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #ffffff;
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 0.74rem;
-      font-family: var(--font-heading);
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-action:hover {
-      background: rgba(255, 255, 255, 0.16);
-    }
-
-    .btn-primary {
-      background: #059669;
-      border: 1px solid #059669;
-    }
-
-    .btn-primary:hover {
-      background: #047857;
-    }
-
-    .slide-counter {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      padding: 0 4px;
-    }
-
-    .top-progress {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 3px;
-      background: rgba(255, 255, 255, 0.06);
-      z-index: 9999;
-    }
-
-    .top-progress-fill {
-      height: 100%;
-      width: 10%;
-      background: #059669;
-      transition: width 0.2s ease;
-    }
-
-    @media print {
-      @page {
-        size: A4 landscape;
-        margin: 0;
-      }
-
-      html, body {
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        background: #090e17 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      .deck-container {
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        scroll-snap-type: none !important;
-      }
-
-      .slide {
-        width: 100vw !important;
-        height: 100vh !important;
-        page-break-after: always !important;
-        break-after: page !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        padding: 30px 48px !important;
-        border: none !important;
-      }
-
-      .deck-toolbar, .top-progress {
-        display: none !important;
-      }
-    }
-  </style>
+  .bar-row { display: grid; grid-template-columns: 13rem 1fr 6.4rem; align-items: center; gap: .8rem; padding: .34rem 0; }
+  .bar-row .bl { font-size: .74rem; font-weight: 600; color: var(--ink); }
+  .bar-row .btrack { height: .95rem; background: #EFEDE6; border-radius: .25rem; overflow: hidden; }
+  .bar-row .bfill { display: block; height: 100%; border-radius: .25rem; }
+  .bar-row .bv { font-family: var(--mono); font-size: .7rem; font-weight: 600; color: var(--ink-2); text-align: right; }
+</style>
 </head>
 <body>
+<div class="deck">
 
-  <div class="top-progress">
-    <div class="top-progress-fill" id="pFill"></div>
-  </div>
-
-  <div class="deck-toolbar">
-    <button class="btn-action" onclick="prevSlide()">‹ Prev</button>
-    <span class="slide-counter" id="sCount">1 / 10</span>
-    <button class="btn-action" onclick="nextSlide()">Next ›</button>
-    <button class="btn-action btn-primary" onclick="window.print()">🖨️ Print to PDF</button>
-  </div>
-
-  <div class="deck-container" id="deckWrap">
-
-    <!-- SLIDE 1 -->
-    <section class="slide" id="slide-1">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
-        </div>
-        <div class="slide-tag">Essential Value Edition</div>
+  <!-- ═══ 01 · COVER ═══ -->
+  <section class="slide cover" id="p1">
+    <div class="s-head" style="position:relative;z-index:2;">
+      <span class="brandmark"><span class="logo-mark">S</span>SATCHIDA AI FOR TEAMS</span>
+      <span class="kicker">TEAM &amp; PRODUCTIVITY BRIEFING · NOVEMBER 2026</span>
+    </div>
+    <div class="s-body" style="position:relative;z-index:2;">
+      <h1 class="s-title">Frontier AI for every desk —<br><span class="grad">at ₹249 a seat.</span></h1>
+      <p class="s-sub" style="margin-top:.7rem;">Satchida AI gives small businesses, professional practices and families the same frontier reasoning the big subscriptions sell — in one private workspace, with a cited document vault, school-safe tutoring for children, and billing in rupees over UPI. No foreign cards. No per-seat tax. No hardware.</p>
+      <div class="cover-stats">
+        <div class="stat"><div class="n">₹299 / month</div><div class="l">Entry tier — that is ₹9.90 a day for a full AI workspace</div></div>
+        <div class="stat"><div class="n">₹999 / month</div><div class="l">Four pooled seats for the whole office or family — ₹249.75 per seat</div></div>
+        <div class="stat"><div class="n">15 minutes</div><div class="l">From UPI payment to your team logging in — on any phone, tablet or PC</div></div>
       </div>
-      <div class="slide-body">
-        <h1 class="hero-title">
-          Enterprise-Grade Intelligence at<br>
-          <span class="emerald-gradient">1/10th the Cost of Big Tech</span>
-        </h1>
-        <p class="slide-subhead">
-          Frontier AI models, executive document synthesis, and curriculum-grounded Socratic tutoring — billed in Indian Rupees with instant NPCI UPI and zero foreign currency markup.
-        </p>
+    </div>
+    <div class="s-foot" style="position:relative;z-index:2;"><span>PRIVATE &amp; CONFIDENTIAL · PREPARED FOR CLIENT DISCUSSION</span><span>AI.SATCHIDA.COM · SUPPORT@SATCHIDA.COM</span></div>
+  </section>
 
-        <div class="grid-3" style="margin-top: 8px;">
-          <div class="card">
-            <div class="card-title" style="color: #34d399;">Starting at ₹9.90 / Day</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Standard Professional tier costs less than an office cup of chai, delivering executive drafting, report synthesis, and document intelligence.
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color: #38bdf8;">4-Seat Shared Accounts</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Family & Team plan at just ₹249 / user / mo with pooled usage, empowering households and boutique teams under a single consolidated plan.
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color: #818cf8;">Socratic Study Mode</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Safe pedagogical tutoring that guides students step-by-step with verified textbook citations and active POCSO child safety guardrails.
-            </div>
-          </div>
+  <!-- ═══ 02 · THE PROBLEM ═══ -->
+  <section class="slide" id="p2">
+    <div class="s-head"><span class="kicker"><b>02</b> · MARKET CONTEXT</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">The per-seat AI tax your office pays today</h2>
+      <p class="s-sub">Every member of staff who needs a serious AI assistant costs the business ₹1,700–₹2,500 every month on leading commercial plans — charged in dollars, with no pooling, no student guardrails and no document ownership.</p>
+      <div class="g3" style="margin-top:.85rem;">
+        <div class="card" style="border-top:3px solid var(--rose);">
+          <div class="ct" style="color:var(--rose);">1 · The math never adds up</div>
+          <p class="cd">A 4-person office on a leading subscription pays <b>₹6,800–₹10,000 every month</b> — <b>₹81,600–₹1,20,000 a year</b> — for assistants that throttle usage every few hours.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--rose-soft);border-radius:.4rem;font-size:.68rem;color:#8C2A20;line-height:1.4;"><b>Reality:</b> most offices use AI a few hours a day but pay full per-seat price around the clock.</div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--amber);">
+          <div class="ct" style="color:var(--amber);">2 · Payment friction, by design</div>
+          <p class="cd">International plans demand USD credit cards, add <b>3.5% forex markup plus GST</b>, and lock you into annual commitments. Small Indian businesses without corporate cards are simply locked out.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--amber-soft);border-radius:.4rem;font-size:.68rem;color:#7A4308;line-height:1.4;"><b>Friction:</b> no UPI, no cash-flow-friendly monthly option, no GST-ready simplicity.</div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--cyan);">
+          <div class="ct" style="color:var(--cyan);">3 · Your words, their servers</div>
+          <p class="cd">Client proposals, financial queries and staff conversations are processed on foreign cloud servers under your team's named accounts — with retention policies you don't control.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--cyan-soft);border-radius:.4rem;font-size:.68rem;color:#0B5A70;line-height:1.4;"><b>Exposure:</b> sensitive business and family conversations logged abroad, tied to real identities.</div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Satchida Commercial Operations</span>
-        <span>SMB & Team Proposal · ai.satchida.com</span>
-      </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>WHY TEAMS OVERPAY FOR AI</span><span>02 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 2 -->
-    <section class="slide" id="slide-2">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
+  <!-- ═══ 03 · PLATFORM OVERVIEW ═══ -->
+  <section class="slide" id="p3">
+    <div class="s-head"><span class="kicker"><b>03</b> · THE PLATFORM</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">One private workspace for the whole team</h2>
+      <div class="modes">
+        <div class="mode"><div class="mt">CHAT</div><div class="md">Frontier reasoning for research, drafting and everyday questions</div></div>
+        <div class="mode"><div class="mt">STUDY</div><div class="md">Socratic tutoring, textbook citations and child-safety guardrails</div></div>
+        <div class="mode"><div class="mt">WORK</div><div class="md">Proposals, reports, spreadsheets and letters with cited sources</div></div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="ct">Pooled seats, not per-seat gouging</div>
+          <p class="cd">A Family &amp; Team plan includes <b>4 member accounts on one shared usage budget</b>. A light user's unused allowance flexes automatically to whoever is shipping that week. One payment covers everyone.</p>
         </div>
-        <div class="slide-tag">Cost Analysis</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Why Pay Big Tech ₹2,500/User Every Month?</h2>
-        <p class="slide-subhead">Commercial AI subscriptions are inflated with foreign exchange penalties, withholding taxes, and hidden rate-limits.</p>
-
-        <div class="grid-2">
-          <div class="card" style="border-top: 3px solid var(--rose);">
-            <div class="card-title" style="color: #fb7185;">Big Tech Subscriptions</div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="cross-bullet">✗</span> <strong>₹2,500 / user / mo ($30):</strong> Copilot requires mandatory annual commitments.</li>
-              <li><span class="cross-bullet">✗</span> <strong>₹1,700 / user / mo ($20):</strong> ChatGPT Plus incurs 3.5% USD credit card forex markups + GST.</li>
-              <li><span class="cross-bullet">✗</span> <strong>Zero Household Pooling:</strong> Every family member or staff member must buy a separate account.</li>
-              <li><span class="cross-bullet">✗</span> <strong>No Child Safety Guardrails:</strong> Unrestricted AI that can solve homework directly without teaching.</li>
-            </ul>
-            <div style="background: rgba(225, 29, 72, 0.08); padding: 10px 14px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-top: 14px;">
-              Annual outlay for 4 users: <strong>₹81,600 to ₹1,20,000 every single year.</strong>
-            </div>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="card-title" style="color: #34d399;">Satchida Sovereign Infrastructure</div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <strong>Same Frontier AI Models:</strong> Claude 3.5 Sonnet, GPT-4o, and leading reasoning models.</li>
-              <li><span class="check-bullet">✓</span> <strong>Billed in Indian Rupees:</strong> 0% forex markup, instant NPCI UPI payment via QR code.</li>
-              <li><span class="check-bullet">✓</span> <strong>4-Seat Pooled Accounts:</strong> Just ₹999/mo for an entire household or department.</li>
-              <li><span class="check-bullet">✓</span> <strong>Socratic Study Mode:</strong> Guides students step-by-step with POCSO safety compliance.</li>
-            </ul>
-            <div style="background: rgba(5, 150, 105, 0.1); padding: 10px 14px; border-radius: 4px; font-size: 0.82rem; color: #34d399; margin-top: 14px;">
-              Annual outlay for 4 users: <strong>Just ₹9,990 / year (Over 90% Cost Savings).</strong>
-            </div>
-          </div>
+        <div class="card">
+          <div class="ct">Private workspace, Indian rails</div>
+          <p class="cd">Documents stay in your tenant's vault with <b>per-seat isolation</b>. Billing runs over <b>NPCI UPI / IMPS with instant receipts</b> and GST invoices for business accounts — no forex, no annual lock-in.</p>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Economics Analysis</span>
-        <span>Slide 2 / 10</span>
+      <div style="display:flex;gap:.55rem;margin-top:.9rem;flex-wrap:wrap;">
+        <span class="chip cyan">✓ Works on any phone, tablet or PC at ai.satchida.com</span>
+        <span class="chip emerald">✓ Knowledge Vault with page-level citations included</span>
+        <span class="chip amber">✓ Live in 15 minutes from UPI settlement</span>
       </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>PLATFORM OVERVIEW</span><span>03 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 3 -->
-    <section class="slide" id="slide-3">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
+  <!-- ═══ 04 · USE CASE 1 ═══ -->
+  <section class="slide" id="p4">
+    <div class="s-head"><span class="kicker"><b>04</b> · USE CASE 01 — CHARTERED ACCOUNTANCY</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">A CA office turns circulars into deliverables, with citations</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A two-partner accountancy serves 90 SME clients. Circular summaries, notice replies and computation sheets eat the first week of every month, and junior staff spend their evenings typing what a machine should draft.</p>
         </div>
-        <div class="slide-tag">Volume Tiers</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Choose the Right Volume for Your Team</h2>
-        <p class="slide-subhead">Simple, transparent pricing tailored to solo professionals, working households, and technical power users.</p>
-
-        <div class="grid-3">
-          <div class="card">
-            <div class="slide-tag" style="background: var(--cyan-soft); color: #38bdf8; border-color: rgba(2, 132, 199, 0.25); margin-bottom: 8px;">SOLO PROFESSIONAL</div>
-            <div class="card-title">Standard Tier</div>
-            <div class="price-tag">₹299<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="price-period">₹9.90 / day (₹2,990 / year)</div>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> 1 Dedicated Seat</li>
-              <li><span class="check-bullet">✓</span> Chat + Work Modes</li>
-              <li><span class="check-bullet">✓</span> Executive Summaries & Reports</li>
-              <li><span class="check-bullet">✓</span> Private Document Vault RAG</li>
-              <li><span class="check-bullet">✓</span> Identity Hidden from Providers</li>
-            </ul>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="slide-tag" style="margin-bottom: 8px;">#1 BEST SELLER · 4 SEATS</div>
-            <div class="card-title">Family & Team</div>
-            <div class="price-tag">₹999<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="price-period">Just ₹249 / user / mo (₹9,990 / yr)</div>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> <strong>4 Included Pooled Accounts</strong></li>
-              <li><span class="check-bullet">✓</span> Chat + Study + Work Modes</li>
-              <li><span class="check-bullet">✓</span> POCSO Child Safety Tutoring</li>
-              <li><span class="check-bullet">✓</span> Clean Voice Read Aloud</li>
-              <li><span class="check-bullet">✓</span> Shared Household Budget</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; border-color: rgba(79, 70, 229, 0.25); margin-bottom: 8px;">DEVELOPER POWERHOUSE</div>
-            <div class="card-title">Pro Developer</div>
-            <div class="price-tag">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="price-period">Full Technical Suite (₹14,990 / yr)</div>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> 1 Dedicated Seat</li>
-              <li><span class="check-bullet">✓</span> Full Browser Web IDE</li>
-              <li><span class="check-bullet">✓</span> Dual-Screen Flow + Pop-out Portal</li>
-              <li><span class="check-bullet">✓</span> Sandboxed Code Execution</li>
-              <li><span class="check-bullet">✓</span> Autonomous Toolchains</li>
-            </ul>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">HOW IT RUNS ON SATCHIDA</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>Statutory circulars, client books and prior-year working papers go into the office <b>Knowledge Vault</b> — each seat maps to its own isolated workspace.</p></div>
+            <div class="step"><span class="sn">2</span><p>In <b>Work mode</b>, notice replies are drafted <b>citing the exact circular page</b> — verifiable, not paraphrased.</p></div>
+            <div class="step"><span class="sn">3</span><p>Computation sheets arrive as <b>XLSX with live formulas</b>; client letters as DOCX; summaries as formatted PDFs — generated, not typed.</p></div>
+            <div class="step"><span class="sn">4</span><p>Partners review and sign. <b>One ₹999 plan covers both partners and both assistants</b>, billed over UPI with a GST invoice.</p></div>
           </div>
         </div>
-      </div>
-      <div class="slide-footer">
-        <span>Commercial Hierarchy</span>
-        <span>Slide 3 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 4 -->
-    <section class="slide" id="slide-4">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
-        </div>
-        <div class="slide-tag">Individual Professional</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Tier 1: Standard Professional (₹9.90/Day)</h2>
-        <p class="slide-subhead">Designed for solo knowledge workers, accountants, executive assistants, lawyers, and office administrators.</p>
-
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">High-Efficiency Daily Work Tools</div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <strong>Work Mode Drafting:</strong> Compose executive emails, legal notices, client memos, and project scopes in seconds.</li>
-              <li><span class="check-bullet">✓</span> <strong>Document Analysis:</strong> Ingest multi-page PDFs, scans, and spreadsheets for instant structured extraction.</li>
-              <li><span class="check-bullet">✓</span> <strong>Anonymous Query Protection:</strong> Your identity is hidden from upstream AI providers. Your work remains private.</li>
-              <li><span class="check-bullet">✓</span> <strong>Instant UPI Settlement:</strong> Scan Google Pay, PhonePe, or Paytm QR code with automatic receipt generation.</li>
-            </ul>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="card-title" style="color: #34d399;">Productivity ROI for Solo Workers</div>
-            <div style="font-family: var(--font-heading); font-size: 2.1rem; font-weight: 800; color: #ffffff; margin: 8px 0;">
-              Save 8+ Hours Every Week
-            </div>
-            <p class="card-desc">
-              Eliminate repetitive clerical drafting and tedious document summarization. Reclaim your time for high-value client advisory, revenue generation, and strategic decision making.
-            </p>
-            <div style="margin-top: 10px; padding: 10px 14px; background: rgba(5, 150, 105, 0.1); border-radius: 6px; font-size: 0.82rem; color: #34d399;">
-              Daily Cost: <strong>₹9.90</strong> · Monthly Investment: <strong>₹299</strong> · Annual Total: <strong>₹2,990</strong>
-            </div>
-          </div>
+        <div class="uc-out">
+          <div class="oc"><div class="t">Whole office on one plan</div><div class="d">4 pooled seats at ₹249.75 effective each — one invoice, one renewal</div></div>
+          <div class="oc"><div class="t">Drafts generated, not typed</div><div class="d">XLSX, DOCX and PDF produced by agents inside the vault</div></div>
+          <div class="oc"><div class="t">Every figure traceable</div><div class="d">Citations to the exact page an auditor would ask for</div></div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Standard Professional Tier</span>
-        <span>Slide 4 / 10</span>
-      </div>
-    </section>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · FAMILY &amp; TEAM ₹999/MO · PRO ₹1,499/MO ADDS THE FULL DEVELOPER SUITE</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 1 OF 3</span><span>04 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 5 -->
-    <section class="slide" id="slide-5">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
+  <!-- ═══ 05 · USE CASE 2 ═══ -->
+  <section class="slide" id="p5">
+    <div class="s-head"><span class="kicker"><b>05</b> · USE CASE 02 — COACHING &amp; SCHOOLS</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">A coaching institute offers safe, honest tutoring after hours</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A coaching institute runs doubt hours until 9 pm. Parents want real help for their children — not a chatbot that writes the homework for them, and not an open internet AI with no guardrails for minors.</p>
         </div>
-        <div class="slide-tag">Household & Team Best Seller</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Tier 2: Family & Team (Our #1 Best Seller)</h2>
-        <p class="slide-subhead">Four included accounts with pooled usage management. The perfect hybrid solution for offices and modern families.</p>
-
-        <div class="grid-2">
-          <div class="card highlight-emerald">
-            <div class="card-title" style="font-size: 1.25rem; color: #34d399;">For Work & Family in One Budget</div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <strong>Work Mode for Adults:</strong> Client proposals, business plans, emails, and financial analysis.</li>
-              <li><span class="check-bullet">✓</span> <strong>Study Mode for Students:</strong> Intelligent, safe academic tutor trained on CBSE, ICSE, and NCERT syllabi.</li>
-              <li><span class="check-bullet">✓</span> <strong>Flexible Pooled Allowance:</strong> If one user travels, remaining capacity automatically supports other family members.</li>
-              <li><span class="check-bullet">✓</span> <strong>Single Consolidated Bill:</strong> One simple payment covers all 4 members without managing multiple subscriptions.</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Commercial Summary</div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0;">
-              <div class="price-tag" style="font-size: 2.1rem;">₹999 / mo</div>
-              <span class="slide-tag">₹249 / user / mo</span>
-            </div>
-            <p class="card-desc" style="margin-bottom: 12px;">
-              Annual billing option: <strong>₹9,990 / year</strong> (Saves 2 full months).
-            </p>
-            <div style="background: rgba(255, 255, 255, 0.04); border-radius: 6px; padding: 12px 14px; font-size: 0.82rem; color: var(--text-body);">
-              <div><strong>Seats Included:</strong> 4 Pooled Accounts</div>
-              <div style="margin-top: 4px;"><strong>Modes Unlocked:</strong> Chat + Study + Work</div>
-              <div style="margin-top: 4px;"><strong>Child Safety:</strong> 100% POCSO Act (2012) Compliant</div>
-            </div>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--indigo);">HOW STUDY MODE WORKS</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>Students ask in <b>Study mode</b>: the tutor responds with questions, hints and step-checks — <b>Socratic by design</b>, it teaches instead of solving.</p></div>
+            <div class="step"><span class="sn">2</span><p>Every explanation cites the <b>NCERT / CBSE / ICSE chapter and page</b> it comes from — grounded in approved textbooks, not internet guesswork.</p></div>
+            <div class="step"><span class="sn">3</span><p><b>POCSO Act (2012)-aligned filtering</b> screens prompts and replies in real time, protecting minors from harmful or adult content.</p></div>
+            <div class="step"><span class="sn">4</span><p><b>Clean audio read-aloud</b> — internal reasoning tokens are stripped before speech, so students hear clear, natural explanations.</p></div>
           </div>
         </div>
-      </div>
-      <div class="slide-footer">
-        <span>Family & Team Tier</span>
-        <span>Slide 5 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 6 -->
-    <section class="slide" id="slide-6">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
-        </div>
-        <div class="slide-tag">Academic Excellence</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Responsible Tutoring: Study Mode & Child Safety</h2>
-        <p class="slide-subhead">Parents and educators trust Study Mode because it builds authentic comprehension instead of encouraging homework shortcuts.</p>
-
-        <div class="grid-3">
-          <div class="card">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; margin-bottom: 8px;">SOCRATIC PEDAGOGY</div>
-            <div class="card-title">Guides Step-by-Step</div>
-            <p class="card-desc">
-              Unlike generic public AI which solves math problems or writes essays instantly, Study Mode asks leading questions, points out arithmetic flaws, and teaches the methodology.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: rgba(225, 29, 72, 0.12); color: #fb7185; margin-bottom: 8px;">POCSO ACT COMPLIANCE</div>
-            <div class="card-title">Child Protection Filters</div>
-            <p class="card-desc">
-              Strict multi-layered guardrails intercept adult content, self-harm, cyberbullying, or predatory interactions, ensuring total peace of mind for parents and school administrators.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="margin-bottom: 8px;">TEXTBOOK GROUNDING</div>
-            <div class="card-title">Verified Page Citations</div>
-            <p class="card-desc">
-              Indexes educational syllabi (NCERT, CBSE, ICSE) through our Knowledge Vault. Every answer references the exact chapter name and page number for verified study.
-            </p>
-          </div>
+        <div class="uc-out">
+          <div class="oc"><div class="t">Doubts cleared after hours</div><div class="d">Guided practice at 9 pm without waiting for the next batch</div></div>
+          <div class="oc"><div class="t">Grounded in approved textbooks</div><div class="d">Chapter-and-page citations keep answers on syllabus</div></div>
+          <div class="oc"><div class="t">Child-safe by policy</div><div class="d">POCSO-aligned moderation on every prompt and reply</div></div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Educational Architecture</span>
-        <span>Slide 6 / 10</span>
-      </div>
-    </section>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · STUDY MODE INCLUDED ON FAMILY &amp; TEAM AND ALL HIGHER TIERS</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 2 OF 3</span><span>05 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 7 -->
-    <section class="slide" id="slide-7">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
+  <!-- ═══ 06 · USE CASE 3 ═══ -->
+  <section class="slide" id="p6">
+    <div class="s-head"><span class="kicker"><b>06</b> · USE CASE 03 — BOUTIQUE AGENCY</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">A four-person agency shares one AI budget, zero admin</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A four-person creative agency — founder, designer, content lead, accounts — wants AI for proposals, campaigns and trackers. Per-seat subscriptions meant four invoices, four cards and budgets that sat idle on light users.</p>
         </div>
-        <div class="slide-tag">Private Documents</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Satchida Knowledge Vault: Private Office Repository</h2>
-        <p class="slide-subhead">Instant semantic search across vendor contracts, employee policies, and price lists with automated document creation.</p>
-
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">On-Premise Private Document Search</div>
-            <p class="card-desc">
-              Your confidential corporate files, tax memos, and client records are never uploaded to public cloud vector stores.
-            </p>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> <strong>Exact Citations:</strong> Answers cite specific document page and paragraph numbers.</li>
-              <li><span class="check-bullet">✓</span> <strong>Workspace Isolation:</strong> Each department or employee has their own private vault.</li>
-              <li><span class="check-bullet">✓</span> <strong>Multi-Format Ingestion:</strong> Reads PDFs, Word DOCX, Excel spreadsheets, and text.</li>
-            </ul>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="card-title" style="color: #34d399;">Automated Business Deliverables</div>
-            <p class="card-desc">
-              The AI drafts and formats professional business files directly onto your download tray:
-            </p>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> <strong>PowerPoint Presentations:</strong> Slide decks with styled typography and charts.</li>
-              <li><span class="check-bullet">✓</span> <strong>Spreadsheets:</strong> Financial tables with working calculation formulas.</li>
-              <li><span class="check-bullet">✓</span> <strong>PDF & Word Documents:</strong> Formal agreements, client proposals, and briefs.</li>
-            </ul>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--emerald);">HOW IT RUNS ON SATCHIDA</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>The founder drafts client proposals in <b>Work mode</b>; the content lead runs campaign variants and social calendars alongside.</p></div>
+            <div class="step"><span class="sn">2</span><p>Project trackers and rate cards come out of the <b>Knowledge Vault</b> as formatted <b>XLSX with formulas</b>; pitch decks as PPTX.</p></div>
+            <div class="step"><span class="sn">3</span><p>The <b>pooled Pro Family budget</b> flexes — a designer's quiet week automatically funds the content lead's launch sprint.</p></div>
+            <div class="step"><span class="sn">4</span><p><b>One UPI payment, one GST invoice</b>, four seats live the same day. No corporate card, no forex line items.</p></div>
           </div>
         </div>
-      </div>
-      <div class="slide-footer">
-        <span>Private Repository</span>
-        <span>Slide 7 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 8 -->
-    <section class="slide" id="slide-8">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
-        </div>
-        <div class="slide-tag">Engineering Tooling</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">When Technical Staff Need Power Tools: Pro Tier</h2>
-        <p class="slide-subhead">Empower your software developers and data analysts with browser-based IDEs and autonomous agent toolchains.</p>
-
-        <div class="grid-2">
-          <div class="card">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; margin-bottom: 8px;">DEVELOPER WORKSPACE</div>
-            <div class="card-title">Web IDE & Dual-Screen Productivity</div>
-            <p class="card-desc">
-              Full browser code editor, integrated terminal, and Git version control running seamlessly across two displays.
-            </p>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li><span class="check-bullet">✓</span> <strong>Dual-Screen Flow:</strong> Screen 1 prompts agents; Screen 2 edits code.</li>
-              <li><span class="check-bullet">✓</span> <strong>Pop-Out Portal:</strong> Undock live React and diagram previews to a second screen.</li>
-              <li><span class="check-bullet">✓</span> <strong>Autonomous Agents:</strong> Multi-step refactoring, file edits, and script execution.</li>
-            </ul>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="card-title">Commercial Terms</div>
-            <div class="price-tag">₹1,499<span style="font-size: 1rem; color: var(--text-dim);"> / mo</span></div>
-            <div class="price-period">₹14,990 / year (Saves ₹2,998)</div>
-            <ul class="list-items" style="font-size: 0.82rem; margin-top: 8px;">
-              <li><span class="check-bullet">✓</span> Complete Web IDE and code sandbox included</li>
-              <li><span class="check-bullet">✓</span> Sandboxed Code Execution (Python, JavaScript, Shell)</li>
-              <li><span class="check-bullet">✓</span> Anonymous query protection on frontier reasoning models</li>
-            </ul>
-          </div>
+        <div class="uc-out">
+          <div class="oc"><div class="t">₹249.75 effective per seat</div><div class="d">Against ₹1,700–₹2,500 per seat on leading plans</div></div>
+          <div class="oc"><div class="t">One pooled budget, zero admin</div><div class="d">Unused tokens flex across the team automatically</div></div>
+          <div class="oc"><div class="t">Rupee-native billing</div><div class="d">UPI today, GST invoice for the accountant</div></div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Pro Developer Suite</span>
-        <span>Slide 8 / 10</span>
-      </div>
-    </section>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · FAMILY &amp; TEAM ₹999/MO · PRO FAMILY ₹2,499/MO WITH THE FULL DEV SUITE</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 3 OF 3</span><span>06 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 9 -->
-    <section class="slide" id="slide-9">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
+  <!-- ═══ 07 · TIERS ═══ -->
+  <section class="slide" id="p7">
+    <div class="s-head"><span class="kicker"><b>07</b> · COMMERCIALS</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Three tiers. Every desk covered.</h2>
+      <div class="g3" style="margin-top:.85rem;">
+        <div class="card tier">
+          <span class="chip cyan" style="align-self:flex-start;">SOLO PROFESSIONAL</span>
+          <div class="price"><span class="p">₹299</span><span class="u">/ month — ₹9.90 a day<br>₹2,990 / year</span></div>
+          <div class="best">For accountants, brokers, assistants and office staff</div>
+          <ul class="ticks">
+            <li><span><b>Chat + Work</b> — drafting, summaries, contract scanning, tabular extraction</span></li>
+            <li><span>Knowledge Vault: upload, query and generate documents with citations</span></li>
+          </ul>
         </div>
-        <div class="slide-tag">ROI Analysis</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Direct Value Comparison & 4-Person Team ROI</h2>
-        <p class="slide-subhead">See why growing businesses and collaborative teams choose Satchida AI over big tech tolls.</p>
-
-        <table class="matrix-table" style="margin-bottom: 16px;">
-          <thead>
-            <tr>
-              <th>Solution (4 Users)</th>
-              <th>Monthly Outlay</th>
-              <th>Annual Cost</th>
-              <th>Socratic Safety</th>
-              <th>Document Vault</th>
-              <th>Effective Savings</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Microsoft 365 Copilot</strong></td>
-              <td>~₹10,000 + GST</td>
-              <td>₹1,20,000 / yr</td>
-              <td><span class="cross-bullet">✗</span> No</td>
-              <td>Vendor Cloud</td>
-              <td>Baseline</td>
-            </tr>
-            <tr>
-              <td><strong>ChatGPT Plus (4 Accounts)</strong></td>
-              <td>~₹6,800 + Forex</td>
-              <td>₹81,600 / yr</td>
-              <td><span class="cross-bullet">✗</span> No</td>
-              <td>Vendor Cloud</td>
-              <td>Baseline</td>
-            </tr>
-            <tr class="focus-column">
-              <td><strong>Satchida Family / Team (4 Seats)</strong></td>
-              <td><strong>₹999 (Flat)</strong></td>
-              <td><strong>₹9,990 / yr</strong></td>
-              <td><strong>✓ POCSO Safe</strong></td>
-              <td><strong>✓ Private Local Vault</strong></td>
-              <td><strong style="color: #34d399;">92% Savings</strong></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="card highlight-emerald" style="padding: 12px 18px;">
-          <div style="font-size: 0.88rem; color: #34d399; font-weight: 600;">
-            ROI Summary: Your organisation saves over ₹71,000 every single year while gaining a dedicated academic tutor and private document intelligence.
-          </div>
+        <div class="card tier flag">
+          <span class="chip indigo" style="background:var(--indigo-soft);color:var(--indigo);border:1px solid #D4D8F3;align-self:flex-start;">FAMILY &amp; TEAM · BEST SELLER</span>
+          <div class="price"><span class="p">₹999</span><span class="u">/ month — 4 pooled seats<br>₹9,990 / year</span></div>
+          <div class="best">For small teams, home offices and families with students</div>
+          <ul class="ticks">
+            <li><span><b>One pooled budget</b> flexing across 4 member accounts</span></li>
+            <li><span><b>Chat + Study + Work</b> on every seat</span></li>
+            <li><span>Socratic tutoring with NCERT / CBSE / ICSE grounding</span></li>
+            <li><span>POCSO-aligned child-safety filtering &amp; clean read-aloud</span></li>
+          </ul>
+        </div>
+        <div class="card tier" style="border-top:3px solid var(--indigo);">
+          <span class="chip emerald" style="align-self:flex-start;">PRO DEVELOPER</span>
+          <div class="price"><span class="p">₹1,499</span><span class="u">/ month<br>₹14,990 / year</span></div>
+          <div class="best">For your lead developer, analyst or technical manager</div>
+          <ul class="ticks">
+            <li><span><b>Priority routing</b> on every cloud query</span></li>
+            <li><span><b>Dual-screen developer suite</b> — VS Code Web IDE, undocked artifacts, sandboxed execution</span></li>
+            <li><span>MCP tools and autonomous subagents</span></li>
+            <li><span>Document generation: PPTX, PDF, DOCX, XLSX</span></li>
+          </ul>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Value Benchmark</span>
-        <span>Slide 9 / 10</span>
+      <div style="margin-top:.8rem;padding:.5rem .8rem;background:#F7F6F2;border:1px solid var(--line);border-radius:.5rem;font-size:.7rem;color:var(--ink-2);">
+        <b>Annual plans save 2 months.</b> Growing past 4 seats or need a fleet? <b>Enterprise tiers start at ₹15,000/month</b> — talk to us for pooled departments, admin oversight and custom quotas.
       </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>ALL PRICES INR · EXCL. GST · BILLED VIA NPCI UPI / IMPS</span><span>07 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 10 -->
-    <section class="slide" id="slide-10">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA PRODUCTIVITY AI</span>
-        </div>
-        <div class="slide-tag">Immediate Onboarding</div>
+  <!-- ═══ 08 · KNOWLEDGE VAULT ═══ -->
+  <section class="slide" id="p8">
+    <div class="s-head"><span class="kicker"><b>08</b> · CAPABILITY — KNOWLEDGE VAULT</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">The office repository that writes back</h2>
+      <p class="s-sub">Upload the documents your team already works from. The Vault makes them queryable — and turns answers into finished, formatted deliverables.</p>
+      <div class="flow" style="margin-top:.85rem;">
+        <div class="node"><div class="nt">1 · INGEST</div><div class="nd">Circulars, contracts, invoices, school textbooks, project files — PDF, DOCX, XLSX and scans</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">2 · INDEX</div><div class="nd">Indexed into a <b>per-seat isolated workspace</b> — one member's documents are invisible to another's queries</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">3 · INTERROGATE</div><div class="nd">Ask in plain language; answers cite <b>document, page and paragraph</b> — verifiable, not paraphrase</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">4 · PRODUCE</div><div class="nd">Generate <b>PPTX decks, PDF reports, DOCX letters and XLSX models</b> with formulas and formatting</div></div>
       </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Activate Your Team in Under 5 Minutes</h2>
-        <p class="slide-subhead">No international corporate credit card required. Instant activation via standard NPCI UPI.</p>
+      <div class="g3" style="margin-top:.9rem;">
+        <div class="card"><div class="ct" style="color:var(--cyan);">For the office</div><p class="cd">Proposals, notices, SOPs and financial models drafted from your own repository — with the source page attached.</p></div>
+        <div class="card"><div class="ct" style="color:var(--indigo);">For the family</div><p class="cd">School projects, study notes and household budget trackers generated and stored safely per member.</p></div>
+        <div class="card"><div class="ct" style="color:var(--emerald);">For the record</div><p class="cd">Every generated figure carries a citation — the audit trail is built in, not bolted on.</p></div>
+      </div>
+    </div>
+    <div class="s-foot"><span>INCLUDED ON ALL TIERS</span><span>08 / 12</span></div>
+  </section>
 
-        <div class="grid-3" style="margin-bottom: 20px;">
-          <div class="card">
-            <div class="card-title">1. Select Your Tier</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Choose Standard (₹299), Family/Team (₹999), or Pro (₹1,499) based on your user volume.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="card-title">2. Scan UPI QR Code</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Pay via Google Pay, PhonePe, or Paytm with automatic 12-digit transaction verification.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="card-title">3. Instant Workspace Access</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Credentials generated immediately with full access to frontier models and your private document vault.
-            </p>
-          </div>
+  <!-- ═══ 09 · RESPONSIBLE TUTORING ═══ -->
+  <section class="slide" id="p9">
+    <div class="s-head"><span class="kicker"><b>09</b> · CAPABILITY — RESPONSIBLE TUTORING</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Study Mode: the tutor that won't do the homework</h2>
+      <p class="s-sub">Generic AI assistants answer the question. Satchida's Study mode is built to teach — with safety designed for minors and honesty anchored to the approved syllabus.</p>
+      <div class="g2" style="margin-top:.8rem;">
+        <div class="card">
+          <div class="ct" style="color:var(--indigo);">Socratic pedagogy, not answer vending</div>
+          <p class="cd">The tutor responds with <b>leading questions, targeted hints and intermediate step-checks</b>. It spots where a student's arithmetic went wrong and walks them to the next step — it does not hand over the finished essay or solved equation.</p>
+          <div class="ct" style="color:var(--emerald);margin-top:.55rem;">Textbook grounding</div>
+          <p class="cd">Connected to the Knowledge Vault pre-indexed with <b>NCERT, CBSE and ICSE</b> syllabi. Every explanation cites the <b>exact textbook, chapter and page</b> — so parents and teachers can verify.</p>
         </div>
-
-        <div class="card highlight-emerald" style="text-align: center; padding: 24px;">
-          <h3 style="font-family: var(--font-heading); font-size: 1.45rem; color: #ffffff; margin-bottom: 6px;">
-            Ready to Cut Your AI Expenses by 90%?
-          </h3>
-          <p style="font-size: 0.92rem; color: var(--text-body); margin-bottom: 14px;">
-            Experience Satchida AI today with our instant trial or setup assistance.
-          </p>
-          <div style="display: flex; justify-content: center; gap: 28px; font-family: var(--font-mono); font-size: 0.88rem;">
-            <div>Email: <strong style="color: #34d399;">sales@satchida.com</strong></div>
-            <div>Web: <strong style="color: #34d399;">ai.satchida.com</strong></div>
-            <div>Instant UPI: <strong style="color: #34d399;">Scan & Activate</strong></div>
-          </div>
+        <div class="card">
+          <div class="ct" style="color:var(--rose);">POCSO Act (2012)-aligned child safety</div>
+          <p class="cd">Multi-layer real-time moderation screens every prompt and every generated reply, intercepting adult themes, self-harm content and predatory interactions before they reach a child.</p>
+          <div class="ct" style="color:var(--cyan);margin-top:.55rem;">Clean audio read-aloud</div>
+          <p class="cd">Built-in text-to-speech <b>strips internal reasoning tokens</b> before synthesis. Students hear pure, natural explanations — no confusing machine deliberation read aloud.</p>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Commercial Proposal · Satchida AI</span>
-        <span>Slide 10 / 10</span>
+      <div style="display:flex;gap:.55rem;margin-top:.8rem;flex-wrap:wrap;">
+        <span class="chip emerald">✓ Teaches, never cheats</span>
+        <span class="chip amber">✓ Moderated for minors in real time</span>
+        <span class="chip cyan">✓ Pooled usage visible to parents &amp; admins</span>
       </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>INCLUDED ON FAMILY &amp; TEAM AND ALL HIGHER TIERS</span><span>09 / 12</span></div>
+  </section>
 
-  </div>
+  <!-- ═══ 10 · ROI ═══ -->
+  <section class="slide" id="p10">
+    <div class="s-head"><span class="kicker"><b>10</b> · RETURN ON INVESTMENT</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">The 4-person team ledger</h2>
+      <p class="s-sub">Same frontier intelligence, same everyday workload — one-fifth the spend, billed in the currency your business earns.</p>
+      <div class="g2" style="margin-top:.85rem;align-items:stretch;">
+        <div class="card" style="display:flex;flex-direction:column;justify-content:center;">
+          <div class="bar-row">
+            <span class="bl">Office AI suite, 4 users</span>
+            <span class="btrack"><span class="bfill" style="width:100%;background:#C0614F;"></span></span>
+            <span class="bv">₹1,20,000 / yr</span>
+          </div>
+          <div class="bar-row">
+            <span class="bl">Leading chatbot, 4 accounts</span>
+            <span class="btrack"><span class="bfill" style="width:68%;background:#C98A3D;"></span></span>
+            <span class="bv">₹81,600 / yr</span>
+          </div>
+          <div class="bar-row">
+            <span class="bl" style="color:var(--emerald);">Satchida Family &amp; Team, 4 seats</span>
+            <span class="btrack"><span class="bfill" style="width:8.3%;background:#059669;"></span></span>
+            <span class="bv" style="color:var(--emerald);">₹9,990 / yr</span>
+          </div>
+          <div style="margin-top:.7rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.78rem;color:var(--ink-2);">Net annual saving on the leading-chatbot route:</span>
+            <span class="chip emerald" style="font-size:.8rem;">₹71,610 saved · 88% less</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ct">What the ledger assumes</div>
+          <ul class="ticks" style="margin-top:.3rem;">
+            <li><span>Leading subscription at <b>~₹1,700/user/mo</b> and office suites at <b>~₹2,500/user/mo</b> — typical retail, before forex and GST on USD billing</span></li>
+            <li><span>Satchida Family &amp; Team at <b>₹999/mo</b> — 4 pooled seats, <b>₹249.75 per seat</b></span></li>
+            <li><span>Pooled tokens flex across members, so <b>light users fund heavy weeks</b> — no wasted seats</span></li>
+            <li><span>Study mode for the kids and vault document generation included at no extra cost</span></li>
+          </ul>
+          <div style="margin-top:.6rem;padding:.5rem .7rem;background:var(--emerald-soft);border:1px solid #BFE3D2;border-radius:.4rem;font-size:.72rem;color:#33604E;line-height:1.45;"><b>Solo professional?</b> Standard at ₹299/mo replaces a ₹1,700+ subscription for <b>₹16,808/yr less per seat</b> — that is 82% off, every year.</div>
+        </div>
+      </div>
+    </div>
+    <div class="s-foot"><span>RETAIL RATES OBSERVED NOVEMBER 2026 · YOUR EXACT SAVINGS DEPEND ON PLAN MIX</span><span>10 / 12</span></div>
+  </section>
 
-  <script>
-    const container = document.getElementById('deckWrap');
-    const totalSlides = 10;
-    let currentSlide = 1;
+  <!-- ═══ 11 · COMPARISON MATRIX ═══ -->
+  <section class="slide" id="p11">
+    <div class="s-head"><span class="kicker"><b>11</b> · SIDE BY SIDE</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Direct value comparison</h2>
+      <table class="matrix" style="margin-top:.7rem;">
+        <tr><th style="width:26%;">What you get</th><th class="hc">Leading commercial AI (per seat)</th><th class="hc">Standard — ₹299</th><th class="hc hl">Family &amp; Team — ₹999 / 4 seats</th><th class="hc">Pro — ₹1,499</th></tr>
+        <tr><td>Cost per user / month</td><td class="hc">₹1,700 – ₹2,500 + forex</td><td class="hc">₹299 flat</td><td class="hc hl"><b>₹249.75 effective</b></td><td class="hc">₹1,499 flat</td></tr>
+        <tr><td>Annual outlay, 4 users</td><td class="hc"><span class="no">₹81,600 – ₹1,20,000</span></td><td class="hc">₹14,352</td><td class="hc hl"><b>₹9,990</b></td><td class="hc">₹59,976</td></tr>
+        <tr><td>Seats on one payment</td><td class="hc"><span class="no">1 — no pooling</span></td><td class="hc">1</td><td class="hc hl"><b>4 pooled accounts</b></td><td class="hc">1 (power seat)</td></tr>
+        <tr><td>Usage model</td><td class="hc"><span class="no">Throttled every few hours</span></td><td class="hc">Priority routing</td><td class="hc hl">Pooled team budget</td><td class="hc">Priority routing</td></tr>
+        <tr><td>Modes included</td><td class="hc">Chat</td><td class="hc">Chat + Work</td><td class="hc hl">Chat + Study + Work</td><td class="hc">Chat + Study + Work</td></tr>
+        <tr><td>Knowledge Vault, page-level citations</td><td class="hc"><span class="no">✗ cloud RAG only</span></td><td class="hc"><span class="yes">✓</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓ full suite</span></td></tr>
+        <tr><td>POCSO-guarded Socratic tutoring</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="no">—</span></td><td class="hc hl"><span class="yes">✓ + textbook grounding</span></td><td class="hc"><span class="yes">✓</span></td></tr>
+        <tr><td>Voice read-aloud, reasoning stripped</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="no">—</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓</span></td></tr>
+        <tr><td>Dual-screen Web IDE &amp; sandbox</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="no">—</span></td><td class="hc hl"><span class="no">—</span></td><td class="hc"><span class="yes">✓ full suite</span></td></tr>
+        <tr><td>Billing</td><td class="hc"><span class="no">USD card, forex + GST</span></td><td class="hc"><span class="yes">UPI / IMPS, GST invoice</span></td><td class="hc hl"><span class="yes">UPI / IMPS, GST invoice</span></td><td class="hc"><span class="yes">UPI / IMPS, GST invoice</span></td></tr>
+      </table>
+    </div>
+    <div class="s-foot"><span>COMMERCIAL AI FIGURES ARE TYPICAL RETAIL RATES, NOVEMBER 2026</span><span>11 / 12</span></div>
+  </section>
 
-    function updateProgress(index) {
-      currentSlide = index;
-      document.getElementById('sCount').textContent = `${currentSlide} / ${totalSlides}`;
-      document.getElementById('pFill').style.width = `${(currentSlide / totalSlides) * 100}%`;
-    }
+  <!-- ═══ 12 · GET STARTED ═══ -->
+  <section class="slide" id="p12">
+    <div class="s-head"><span class="kicker"><b>12</b> · GETTING STARTED</span><span class="brandmark">SATCHIDA AI FOR TEAMS</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Your team is live before lunch</h2>
+      <div class="g3" style="margin-top:.85rem;">
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">STEP 1 · SELECT YOUR TIER</div>
+          <p class="cd" style="margin-top:.3rem;">Standard for the individual, Family &amp; Team for four seats, Pro for your technical lead — or ask us for an enterprise fleet.</p>
+        </div>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">STEP 2 · SCAN &amp; PAY VIA UPI</div>
+          <p class="cd" style="margin-top:.3rem;">Dynamic NPCI QR — Google Pay, PhonePe, Paytm or any banking app. Activation on 12-digit UTR confirmation, instant receipt.</p>
+        </div>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">STEP 3 · TEAM LOGS IN</div>
+          <p class="cd" style="margin-top:.3rem;">Accounts and secure credentials issued immediately. Everyone signs in at <b>ai.satchida.com</b> — any phone, tablet or PC.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:.55rem;margin:.85rem 0;flex-wrap:wrap;">
+        <span class="chip emerald">✓ GST invoice on every payment</span>
+        <span class="chip emerald">✓ No annual lock-in</span>
+        <span class="chip cyan">✓ Export &amp; delete your data from the dashboard</span>
+        <span class="chip amber">✓ Instant receipts for your accountant</span>
+      </div>
+      <div class="cta">
+        <div class="big">Put AI on every desk for ₹249 a seat — this week.</div>
+        <div class="link">AI.SATCHIDA.COM · SUPPORT@SATCHIDA.COM</div>
+      </div>
+    </div>
+    <div class="s-foot"><span>SATCHIDA AI FOR TEAMS · PRODUCTIVITY BRIEFING · NOVEMBER 2026</span><span>12 / 12</span></div>
+  </section>
 
-    function scrollToSlide(index) {
-      if (index < 1 || index > totalSlides) return;
-      const target = document.getElementById(`slide-${index}`);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth' });
-        updateProgress(index);
-      }
-    }
-
-    function nextSlide() {
-      if (currentSlide < totalSlides) scrollToSlide(currentSlide + 1);
-    }
-
-    function prevSlide() {
-      if (currentSlide > 1) scrollToSlide(currentSlide - 1);
-    }
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-        e.preventDefault();
-        nextSlide();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        prevSlide();
-      }
-    });
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const num = parseInt(entry.target.id.replace('slide-', ''));
-          if (!isNaN(num)) updateProgress(num);
-        }
-      });
-    }, { threshold: 0.6 });
-
-    document.querySelectorAll('.slide').forEach(s => observer.observe(s));
-  </script>
+</div>
 </body>
 </html>

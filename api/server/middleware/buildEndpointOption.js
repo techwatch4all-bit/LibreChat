@@ -295,23 +295,16 @@ async function buildEndpointOption(req, res, next) {
     }
   }
 
-  // --- Demo group routing: redirect Satchida-Gateway → Satchida for demo users ---
-  // Done AFTER modelSpec preset application so resolveModelSpecForEndpoint sees
-  // the original endpoint ("Satchida-Gateway") and doesn't fail on mismatch.
-  // Demo users never hit paid DeepInfra models. They are routed through the
-  // Satchida endpoint (Fleet Gateway :4000) with the x-satchida-client: demo
-  // header, which the gateway uses to route to the Satchida Router (:4001) for
-  // free-first/local-fallback mode resolution per clientOverrides in registry.json.
+  // --- Demo group routing: keep demo users on Satchida-Gateway (:4000) ---
+  // Demo users stay on Satchida-Gateway (:4000) with the x-satchida-client: demo
+  // header, which One-API routes to the free/demo channels backed by Bifrost (:8700).
   if (isDemo && endpoint === 'Satchida-Gateway') {
-    const modeLabel = SPEC_TO_MODE[req.body.spec] || req.body.spec;
-    endpoint = 'Satchida';
-    req.body.endpoint = 'Satchida';
-    parsedBody.endpoint = 'Satchida';
+    const modeLabel = SPEC_TO_MODE[req.body.spec] || req.body.spec || 'Chat';
     req.body.model = modeLabel;
     parsedBody.model = modeLabel;
-    delete parsedBody.endpointType;
-    logger.info('[buildEndpointOption] Demo user redirected to Satchida router', {
+    logger.info('[buildEndpointOption] Demo user routed through Satchida-Gateway', {
       spec: req.body.spec,
+      model: modeLabel,
       userId: req.user?.id ?? req.user?._id?.toString(),
     });
   }

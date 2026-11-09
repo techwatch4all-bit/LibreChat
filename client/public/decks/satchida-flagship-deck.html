@@ -1,1132 +1,511 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Satchida Sovereign AI — Flagship Executive Pitch Deck</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --surface: #111827;
-      --surface-elevated: #162032;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(14, 165, 233, 0.3);
-      --text-head: #ffffff;
-      --text-body: #94a3b8;
-      --text-dim: #64748b;
-      --cyan: #0284c7;
-      --cyan-soft: rgba(2, 132, 199, 0.12);
-      --emerald: #059669;
-      --emerald-soft: rgba(5, 150, 105, 0.12);
-      --indigo: #4f46e5;
-      --indigo-soft: rgba(79, 70, 229, 0.12);
-      --amber: #d97706;
-      --rose: #e11d48;
-      --font-heading: 'Plus Jakarta Sans', sans-serif;
-      --font-body: 'Inter', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satchida Sovereign AI — Executive Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+  :root {
+    --paper: #FAFAF7;
+    --card: #FFFFFF;
+    --ink: #16233A;
+    --ink-2: #3D4A5E;
+    --ink-3: #778092;
+    --line: #E5E2DA;
+    --line-2: #D3CFC4;
+    --navy: #122A47;
+    --navy-2: #0C1D33;
+    --cyan: #0E7490;
+    --indigo: #4338CA;
+    --emerald: #047857;
+    --amber: #B45309;
+    --rose: #B42318;
+    --cyan-soft: #EBF5F8;
+    --emerald-soft: #ECF7F1;
+    --rose-soft: #FBEFED;
+    --amber-soft: #FBF3E7;
+    --indigo-soft: #EEF0FB;
+    --serif: 'Source Serif 4', Georgia, serif;
+    --sans: 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html { font-size: clamp(10px, calc(100vw / 80), 26px); }
+  @media print { html { font-size: 16px; } }
+  body { font-family: var(--sans); color: var(--ink); background: var(--paper); font-variant-numeric: tabular-nums; }
+  .deck { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  @media print { .deck { height: auto; overflow: visible; scroll-snap-type: none; } }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+  .slide {
+    width: 100vw; height: 100dvh; scroll-snap-align: start;
+    display: flex; flex-direction: column;
+    padding: 1.55rem 3.1rem 1.15rem;
+    position: relative; overflow: hidden;
+    background: var(--paper);
+    break-after: page; page-break-after: always;
+  }
+  @media print { .slide { width: 13.333in; height: 7.5in; } }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      background: var(--bg);
-      color: var(--text-body);
-      font-family: var(--font-body);
-      font-size: 14px;
-      line-height: 1.5;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
+  .s-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: .62rem; border-bottom: 1px solid var(--line-2); }
+  .kicker { font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+  .kicker b { color: var(--cyan); font-weight: 600; }
+  .brandmark { font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .14em; color: var(--ink-3); }
+  .s-foot { margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; color: var(--ink-3); }
+  .s-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; padding: .85rem 0 .7rem; }
 
-    .deck-container {
-      width: 100vw;
-      height: 100vh;
-      overflow-y: scroll;
-      scroll-snap-type: y mandatory;
-      scroll-behavior: smooth;
-    }
+  .s-title { font-family: var(--serif); font-size: 1.92rem; font-weight: 600; letter-spacing: -.015em; line-height: 1.14; color: var(--navy); margin-bottom: .38rem; }
+  .s-sub { font-size: .84rem; line-height: 1.5; color: var(--ink-2); max-width: 58rem; }
 
-    .slide {
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      scroll-snap-align: start;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 32px 56px 28px 56px;
-      position: relative;
-      background: var(--bg);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      overflow: hidden;
-      page-break-after: always;
-      break-after: page;
-    }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: .55rem; padding: .95rem 1.05rem; }
+  .ct { font-size: .86rem; font-weight: 700; color: var(--navy); margin-bottom: .3rem; }
+  .cd { font-size: .76rem; line-height: 1.52; color: var(--ink-2); }
 
-    /* Subtle background grid pattern for depth without emptiness */
-    .slide::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: 
-        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-    }
+  .stat .n { font-family: var(--serif); font-size: 1.72rem; font-weight: 700; letter-spacing: -.02em; color: var(--navy); line-height: 1.05; }
+  .stat .l { font-size: .68rem; line-height: 1.4; color: var(--ink-3); margin-top: .22rem; }
 
-    /* Header */
-    .slide-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      z-index: 2;
-    }
+  ul.ticks { list-style: none; }
+  ul.ticks li { display: flex; gap: .5rem; font-size: .78rem; line-height: 1.5; color: var(--ink-2); padding: .22rem 0; }
+  ul.ticks li::before { content: "✓"; color: var(--emerald); font-weight: 700; flex: none; }
+  ul.ticks li b { color: var(--ink); font-weight: 600; }
 
-    .brand-mark {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--font-heading);
-      font-weight: 800;
-      font-size: 1.05rem;
-      color: #ffffff;
-      letter-spacing: -0.01em;
-    }
+  .chip { display: inline-flex; align-items: center; gap: .35rem; border-radius: 2rem; padding: .26rem .68rem; font-size: .68rem; font-weight: 600; letter-spacing: .01em; }
+  .chip.cyan { background: var(--cyan-soft); color: var(--cyan); border: 1px solid #C4E0EA; }
+  .chip.emerald { background: var(--emerald-soft); color: var(--emerald); border: 1px solid #BFE3D2; }
+  .chip.amber { background: var(--amber-soft); color: var(--amber); border: 1px solid #EAD4B4; }
+  .chip.rose { background: var(--rose-soft); color: var(--rose); border: 1px solid #EFCBC5; }
 
-    .brand-logo-icon {
-      width: 22px;
-      height: 22px;
-      background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
-      border-radius: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 900;
-    }
+  .steps { display: grid; gap: .5rem; }
+  .step { display: flex; gap: .62rem; align-items: flex-start; }
+  .step .sn { flex: none; width: 1.22rem; height: 1.22rem; border-radius: 50%; background: var(--navy); color: #fff; font-size: .62rem; font-weight: 600; display: grid; place-items: center; margin-top: .12rem; }
+  .step p { font-size: .78rem; line-height: 1.48; color: var(--ink-2); }
+  .step p b { color: var(--ink); font-weight: 600; }
 
-    .slide-tag {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #38bdf8;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      background: var(--cyan-soft);
-      border: 1px solid rgba(2, 132, 199, 0.25);
-      padding: 3px 10px;
-      border-radius: 4px;
-    }
+  .uc-grid { display: grid; grid-template-columns: 1.02fr 1.28fr .92fr; gap: 1rem; align-items: stretch; }
+  .uc-out { display: grid; gap: .55rem; align-content: start; }
+  .oc { border: 1px solid #BFE3D2; background: var(--emerald-soft); border-radius: .55rem; padding: .6rem .75rem; }
+  .oc .t { font-family: var(--serif); font-size: .98rem; font-weight: 700; color: var(--emerald); line-height: 1.15; }
+  .oc .d { font-size: .68rem; line-height: 1.42; color: #33604E; margin-top: .18rem; }
+  .uc-note { font-size: .62rem; color: var(--ink-3); margin-top: .7rem; font-family: var(--mono); letter-spacing: .04em; }
 
-    /* Content Area */
-    .slide-body {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      position: relative;
-      z-index: 2;
-      padding: 18px 0;
-    }
+  table.matrix { width: 100%; border-collapse: collapse; font-size: .72rem; }
+  table.matrix th { font-family: var(--mono); font-size: .58rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: .4rem .55rem; border-bottom: 1.5px solid var(--navy); }
+  table.matrix th.hc { text-align: center; }
+  table.matrix td { padding: .34rem .55rem; border-bottom: 1px solid var(--line); color: var(--ink-2); line-height: 1.35; vertical-align: middle; }
+  table.matrix td:first-child { font-weight: 600; color: var(--ink); }
+  table.matrix td.hc { text-align: center; }
+  table.matrix tr:last-child td { border-bottom: none; }
+  .yes { color: var(--emerald); font-weight: 700; }
+  .no { color: #A8AEB8; }
+  .hl { background: var(--indigo-soft); }
 
-    /* Footer */
-    .slide-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-      position: relative;
-      z-index: 2;
-    }
+  .flow { display: flex; align-items: stretch; gap: .6rem; }
+  .flow .node { flex: 1; border: 1px solid var(--line-2); border-radius: .55rem; background: var(--card); padding: .6rem .7rem; }
+  .flow .node .nt { font-family: var(--mono); font-size: .56rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--cyan); margin-bottom: .25rem; }
+  .flow .node .nd { font-size: .7rem; line-height: 1.4; color: var(--ink-2); }
+  .flow .arr { align-self: center; color: var(--ink-3); font-size: .95rem; flex: none; }
 
-    /* Typography */
-    h1.hero-title {
-      font-family: var(--font-heading);
-      font-size: 2.85rem;
-      font-weight: 800;
-      color: #ffffff;
-      line-height: 1.15;
-      letter-spacing: -0.03em;
-      margin-bottom: 14px;
-    }
+  .tier { display: flex; flex-direction: column; }
+  .tier .price { display: flex; align-items: baseline; gap: .3rem; margin: .35rem 0 .1rem; }
+  .tier .price .p { font-family: var(--serif); font-size: 1.9rem; font-weight: 700; color: var(--navy); letter-spacing: -.02em; }
+  .tier .price .u { font-size: .66rem; color: var(--ink-3); }
+  .tier .best { font-size: .68rem; font-style: italic; color: var(--ink-3); margin-bottom: .45rem; }
+  .tier ul.ticks li { font-size: .72rem; padding: .18rem 0; }
+  .tier.flag { border: 1.5px solid var(--navy); }
 
-    .accent-gradient {
-      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+  .cover { background: linear-gradient(160deg, var(--navy) 0%, var(--navy-2) 78%); color: #fff; }
+  .cover::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 46px 46px; }
+  .cover .s-head, .cover .s-foot { border-color: rgba(255,255,255,.16); }
+  .cover .kicker, .cover .brandmark, .cover .s-foot { color: rgba(255,255,255,.62); }
+  .cover .s-title { color: #fff; font-size: 2.75rem; line-height: 1.1; }
+  .cover .grad { color: #7DD3E8; }
+  .cover .s-sub { color: rgba(255,255,255,.78); font-size: .92rem; max-width: 52rem; }
+  .cover-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-top: 2rem; padding-top: 1.1rem; border-top: 1px solid rgba(255,255,255,.18); }
+  .cover-stats .stat .n { color: #fff; font-size: 1.55rem; }
+  .cover-stats .stat .l { color: rgba(255,255,255,.6); }
+  .logo-mark { width: 1.5rem; height: 1.5rem; border-radius: .3rem; background: linear-gradient(135deg, #0EA5E9, #6366F1); display: inline-grid; place-items: center; color: #fff; font-weight: 800; font-size: .78rem; vertical-align: -.35rem; margin-right: .45rem; }
 
-    .emerald-gradient {
-      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+  .cta { background: var(--navy); color: #fff; border-radius: .65rem; padding: 1rem 1.4rem; display: flex; justify-content: space-between; align-items: center; }
+  .cta .big { font-family: var(--serif); font-size: 1.18rem; font-weight: 600; }
+  .cta .link { font-family: var(--mono); font-size: .74rem; color: #7DD3E8; letter-spacing: .05em; }
 
-    h2.slide-heading {
-      font-family: var(--font-heading);
-      font-size: 2rem;
-      font-weight: 700;
-      color: #ffffff;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-      margin-bottom: 6px;
-    }
-
-    p.slide-subhead {
-      font-size: 0.98rem;
-      color: var(--text-body);
-      max-width: 880px;
-      line-height: 1.5;
-      margin-bottom: 22px;
-    }
-
-    /* Structured Layouts */
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      width: 100%;
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      width: 100%;
-    }
-
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      width: 100%;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 20px 22px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      position: relative;
-    }
-
-    .card.highlight-cyan {
-      background: var(--surface-elevated);
-      border-color: rgba(2, 132, 199, 0.4);
-    }
-
-    .card.highlight-emerald {
-      background: var(--surface-elevated);
-      border-color: rgba(5, 150, 105, 0.4);
-    }
-
-    .card-title {
-      font-family: var(--font-heading);
-      font-size: 1.12rem;
-      font-weight: 700;
-      color: #ffffff;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-desc {
-      font-size: 0.86rem;
-      color: var(--text-body);
-      line-height: 1.5;
-      margin-bottom: 14px;
-    }
-
-    .price-tag {
-      font-family: var(--font-heading);
-      font-size: 1.9rem;
-      font-weight: 800;
-      color: #ffffff;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .price-period {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      margin-bottom: 14px;
-    }
-
-    .list-items {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      font-size: 0.86rem;
-      color: var(--text-body);
-    }
-
-    .list-items li {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      line-height: 1.45;
-    }
-
-    .check-bullet {
-      color: #34d399;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
-
-    .cross-bullet {
-      color: #fb7185;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
-
-    /* Compact Comparison Table */
-    .matrix-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .matrix-table th {
-      background: #0d131f;
-      padding: 12px 16px;
-      text-align: left;
-      font-family: var(--font-heading);
-      font-weight: 700;
-      color: #ffffff;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.85rem;
-    }
-
-    .matrix-table td {
-      padding: 11px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-body);
-    }
-
-    .matrix-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .matrix-table td strong {
-      color: #ffffff;
-    }
-
-    .focus-column {
-      background: rgba(2, 132, 199, 0.04);
-      border-left: 1px solid rgba(2, 132, 199, 0.25);
-      border-right: 1px solid rgba(2, 132, 199, 0.25);
-    }
-
-    /* Architecture Flow Box */
-    .flow-container {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 16px;
-      width: 100%;
-      margin: 10px 0 16px 0;
-    }
-
-    .flow-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 18px 20px;
-    }
-
-    .flow-arrow {
-      color: #38bdf8;
-      font-size: 1.4rem;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    /* Print and Interactive Bar */
-    .deck-toolbar {
-      position: fixed;
-      bottom: 20px;
-      right: 24px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(17, 24, 39, 0.95);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 6px;
-      z-index: 9999;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    }
-
-    .btn-action {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #ffffff;
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 0.74rem;
-      font-family: var(--font-heading);
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-action:hover {
-      background: rgba(255, 255, 255, 0.16);
-    }
-
-    .btn-primary {
-      background: #0284c7;
-      border: 1px solid #0284c7;
-    }
-
-    .btn-primary:hover {
-      background: #0369a1;
-    }
-
-    .slide-counter {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      padding: 0 4px;
-    }
-
-    /* Progress bar */
-    .top-progress {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 3px;
-      background: rgba(255, 255, 255, 0.06);
-      z-index: 9999;
-    }
-
-    .top-progress-fill {
-      height: 100%;
-      width: 10%;
-      background: #0284c7;
-      transition: width 0.2s ease;
-    }
-
-    @media print {
-      @page {
-        size: A4 landscape;
-        margin: 0;
-      }
-
-      html, body {
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        background: #0b0f19 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      .deck-container {
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        scroll-snap-type: none !important;
-      }
-
-      .slide {
-        width: 100vw !important;
-        height: 100vh !important;
-        page-break-after: always !important;
-        break-after: page !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        padding: 30px 48px !important;
-        border: none !important;
-      }
-
-      .deck-toolbar, .top-progress {
-        display: none !important;
-      }
-    }
-  </style>
+  .modes { display: flex; gap: .55rem; margin: .8rem 0 1rem; }
+  .mode { flex: 1; border: 1px solid var(--line-2); background: var(--card); border-radius: .5rem; padding: .5rem .7rem; }
+  .mode .mt { font-family: var(--mono); font-size: .62rem; font-weight: 600; letter-spacing: .12em; color: var(--navy); }
+  .mode .md { font-size: .68rem; color: var(--ink-3); line-height: 1.35; margin-top: .12rem; }
+  .mode.on { border-color: #C4E0EA; background: var(--cyan-soft); }
+</style>
 </head>
 <body>
+<div class="deck">
 
-  <div class="top-progress">
-    <div class="top-progress-fill" id="pFill"></div>
-  </div>
-
-  <div class="deck-toolbar">
-    <button class="btn-action" onclick="prevSlide()">‹ Prev</button>
-    <span class="slide-counter" id="sCount">1 / 10</span>
-    <button class="btn-action" onclick="nextSlide()">Next ›</button>
-    <button class="btn-action btn-primary" onclick="window.print()">🖨️ Print to PDF</button>
-  </div>
-
-  <div class="deck-container" id="deckWrap">
-
-    <!-- SLIDE 1 -->
-    <section class="slide" id="slide-1">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
-        </div>
-        <div class="slide-tag">Executive Engineering Series</div>
+  <!-- ═══ 01 · COVER ═══ -->
+  <section class="slide cover" id="p1">
+    <div class="s-head" style="position:relative;z-index:2;">
+      <span class="brandmark"><span class="logo-mark">S</span>SATCHIDA SOVEREIGN AI</span>
+      <span class="kicker">EXECUTIVE BRIEFING · NOVEMBER 2026</span>
+    </div>
+    <div class="s-body" style="position:relative;z-index:2;">
+      <h1 class="s-title">Frontier AI on your terms.<br><span class="grad">Your identity. Your hardware.</span></h1>
+      <p class="s-sub" style="margin-top:.7rem;">Satchida Sovereign AI is a private AI workspace for engineering and knowledge teams. Every cloud query leaves through our Zero-Knowledge Relay, so upstream model providers never see who asked — and on the Sovereign Privacy tier, confidential work never leaves your building at all. A complete developer toolchain is included, billed in rupees.</p>
+      <div class="cover-stats">
+        <div class="stat"><div class="n">₹0 egress</div><div class="l">On Privacy-mode work — Sovereign Privacy tier, on your own GPU server</div></div>
+        <div class="stat"><div class="n">Priority routing</div><div class="l">Every cloud query via the Satchida gateway — no per-3-hour throttling</div></div>
+        <div class="stat"><div class="n">15 minutes</div><div class="l">From UPI settlement to a working tenant on Track A — no hardware</div></div>
       </div>
-      <div class="slide-body">
-        <h1 class="hero-title">
-          Complete Query Anonymity &<br>
-          <span class="accent-gradient">High-Throughput Engineering Intelligence</span>
-        </h1>
-        <p class="slide-subhead">
-          Sovereign AI infrastructure built for engineering teams, legal firms, and enterprises that require total identity protection and zero prompt tracking without losing frontier model intelligence.
-        </p>
+    </div>
+    <div class="s-foot" style="position:relative;z-index:2;"><span>PRIVATE &amp; CONFIDENTIAL · PREPARED FOR CLIENT DISCUSSION</span><span>AI.SATCHIDA.COM · SALES@SATCHIDA.COM</span></div>
+  </section>
 
-        <div class="grid-3" style="margin-top: 8px;">
-          <div class="card">
-            <div class="card-title" style="color: #38bdf8;">Complete Query Anonymity</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Your identity is hidden from upstream AI providers. Prompts, source code, and queries remain completely anonymous and untraceable to your company.
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color: #34d399;">100% On-Premise Air-Gap</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Run sensitive workloads entirely on local GPU hardware with zero cloud egress, zero external vendor costs, and ephemeral in-RAM session security.
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color: #818cf8;">Dual-Screen Dev Suite</div>
-            <div class="card-desc" style="margin-bottom: 0;">
-              Full browser-based engineering IDE paired with autonomous multi-agent tooling for uninterrupted, high-throughput software development.
-            </div>
-          </div>
+  <!-- ═══ 02 · EXECUTIVE SUMMARY ═══ -->
+  <section class="slide" id="p2">
+    <div class="s-head"><span class="kicker"><b>02</b> · EXECUTIVE SUMMARY</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">The decision, on one page</h2>
+      <div class="g3" style="margin-top:.9rem;">
+        <div class="card" style="border-top:3px solid var(--rose);">
+          <div class="ct">The problem you are paying for today</div>
+          <p class="cd">Commercial cloud AI sends every prompt, source file and client document to foreign servers under your corporate identity — then bills <b>₹1,700–₹2,500 per user, per month</b>, in dollars, with rate limits and no data ownership.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--cyan);">
+          <div class="ct">The platform that replaces it</div>
+          <p class="cd">One private workspace with four modes — <b>Chat, Study, Work, Privacy</b>. Cloud queries are anonymized at our relay before they reach frontier models. On the Sovereign Privacy tier, confidential work runs on your own ≥24GB GPU server with zero egress. VS Code Web IDE, autonomous agents and a cited document vault are built in.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--emerald);">
+          <div class="ct">The commercials</div>
+          <p class="cd"><b>Pro ₹1,499</b>/seat/mo (priority routing) · <b>Pro Family ₹2,499</b> for 4 pooled seats (pooled team budget) · <b>Sovereign Privacy ₹3,499</b>/seat on your own ≥24GB GPU server. GST invoices, NPCI UPI, no annual lock-in, no forex markup.</p>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Satchida AI Platform Architecture</span>
-        <span>Corporate Briefing · ai.satchida.com</span>
+      <div style="display:flex; gap:.55rem; margin-top:1rem; flex-wrap:wrap;">
+        <span class="chip cyan">✓ Query anonymity at the gateway</span>
+        <span class="chip emerald">✓ Air-gapped option on your own hardware</span>
+        <span class="chip indigo" style="background:var(--indigo-soft);color:var(--indigo);border:1px solid #D4D8F3;">✓ Full developer toolchain, one price</span>
+        <span class="chip amber">✓ Rupee billing via UPI &amp; GST invoice</span>
       </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>SATCHIDA AI · PLATFORM BRIEFING</span><span>02 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 2 -->
-    <section class="slide" id="slide-2">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
+  <!-- ═══ 03 · THE PROBLEM ═══ -->
+  <section class="slide" id="p3">
+    <div class="s-head"><span class="kicker"><b>03</b> · MARKET CONTEXT</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Three structural failures of commercial cloud AI</h2>
+      <p class="s-sub">Public AI subscriptions force enterprises to trade confidentiality, engineer hours and budget control for access to good models. None of the three is acceptable for regulated or IP-sensitive work.</p>
+      <div class="g3" style="margin-top:.85rem;">
+        <div class="card" style="border-top:3px solid var(--rose);">
+          <div class="ct" style="color:var(--rose);">1 · Identity &amp; data bleed</div>
+          <p class="cd">Every prompt, code snippet and uploaded file is tied to a named corporate identity and logged on vendor infrastructure abroad. For NDAs, client mandates and the DPDP Act (2023), this is an exposure — not a feature.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--rose-soft);border-radius:.4rem;font-size:.68rem;color:#8C2A20;line-height:1.4;"><b>Exposure:</b> trade secrets, client data and employee identities sit on third-party logs.</div>
         </div>
-        <div class="slide-tag">Industry Context</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">The Three Critical Failures of Commercial Cloud AI</h2>
-        <p class="slide-subhead">Public cloud AI vendors force enterprises to trade away confidentiality, budget sanity, and workflow efficiency.</p>
-
-        <div class="grid-3">
-          <div class="card" style="border-top: 3px solid var(--rose);">
-            <div class="card-title" style="color: #fb7185;">1. Identity & Data Bleed</div>
-            <p class="card-desc">
-              Public cloud subscriptions tie every prompt, file, and code snippet directly to your corporate identity and employee accounts. Prompts and telemetry are logged on remote servers, violating privacy standards under India's DPDP Act (2023) and NDA mandates.
-            </p>
-            <div style="background: rgba(225, 29, 72, 0.08); padding: 8px 12px; border-radius: 4px; font-size: 0.78rem; color: #fca5a5;">
-              Vulnerability: Exposure of trade secrets, intellectual property, and client data.
-            </div>
-          </div>
-
-          <div class="card" style="border-top: 3px solid var(--amber);">
-            <div class="card-title" style="color: #fcd34d;">2. Disconnected Toolchains</div>
-            <p class="card-desc">
-              Developers constantly waste time context-switching: copying prompts into chat tabs, pasting generated code into editors, debugging in separate terminals, and searching external docs. Over 2.5 hours per engineer are lost every day in manual back-and-forth.
-            </p>
-            <div style="background: rgba(217, 119, 6, 0.08); padding: 8px 12px; border-radius: 4px; font-size: 0.78rem; color: #fde68a;">
-              Friction: Fragmented context, constant manual copy-pasting, and workflow drag.
-            </div>
-          </div>
-
-          <div class="card" style="border-top: 3px solid var(--cyan);">
-            <div class="card-title" style="color: #38bdf8;">3. Inflated Seat Taxes</div>
-            <p class="card-desc">
-              Standard big tech subscriptions demand $30 to $60/user/month in foreign currency with 3.5% foreign exchange charges, rigid per-user minimums, and strict throttling limits that punish collaborative team usage.
-            </p>
-            <div style="background: rgba(2, 132, 199, 0.08); padding: 8px 12px; border-radius: 4px; font-size: 0.78rem; color: #bae6fd;">
-              Cost Toll: A small 10-person engineering team burns over ₹3,00,000 every year.
-            </div>
-          </div>
+        <div class="card" style="border-top:3px solid var(--amber);">
+          <div class="ct" style="color:var(--amber);">2 · Fragmented toolchains</div>
+          <p class="cd">Engineers brief an AI in one tab, paste code into an editor, debug in a separate terminal, and hunt documents in a fourth window. Context is manually shuttled between tools all day.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--amber-soft);border-radius:.4rem;font-size:.68rem;color:#7A4308;line-height:1.4;"><b>Drag:</b> industry estimates put the loss at up to 2.5 engineer-hours per day of copy-paste and context switching.</div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--cyan);">
+          <div class="ct" style="color:var(--cyan);">3 · The per-seat toll</div>
+          <p class="cd">₹1,700–₹2,500 per user per month, charged in USD to international cards with 3.5% forex markup plus GST, enforced per-user minimums, and usage throttled every few hours.</p>
+          <div style="margin-top:.55rem;padding:.45rem .6rem;background:var(--cyan-soft);border-radius:.4rem;font-size:.68rem;color:#0B5A70;line-height:1.4;"><b>Toll:</b> a 10-engineer team burns ₹3,00,000+ every year with nothing owned at the end.</div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Strategic Analysis</span>
-        <span>Slide 2 / 10</span>
-      </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>WHY THE STATUS QUO FAILS</span><span>03 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 3 -->
-    <section class="slide" id="slide-3">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
+  <!-- ═══ 04 · PLATFORM / TWO TRACKS ═══ -->
+  <section class="slide" id="p4">
+    <div class="s-head"><span class="kicker"><b>04</b> · PLATFORM ARCHITECTURE</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">One platform. Two deployment tracks.</h2>
+      <div class="modes">
+        <div class="mode"><div class="mt">CHAT</div><div class="md">Frontier reasoning for research, drafting and analysis</div></div>
+        <div class="mode"><div class="mt">STUDY</div><div class="md">Socratic tutoring with textbook citations &amp; child safety</div></div>
+        <div class="mode"><div class="mt">WORK</div><div class="md">Documents, spreadsheets and reports with page-verified sources</div></div>
+        <div class="mode on"><div class="mt">PRIVACY</div><div class="md">On-premise on your own GPU — Privacy tier only; all other modes run on cloud</div></div>
+      </div>
+      <div class="flow" style="margin-bottom:1rem;">
+        <div class="node"><div class="nt">YOUR TENANT</div><div class="nd">Your team, your files, your vault — inside the Satchida workspace</div></div>
+        <div class="arr">→</div>
+        <div class="node" style="border-color:#C4E0EA;background:var(--cyan-soft);"><div class="nt">ZERO-KNOWLEDGE RELAY</div><div class="nd">Identity, account and origin stripped before any request reaches an upstream model</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">FRONTIER MODELS</div><div class="nd">Heavy reasoning, long context, multi-agent builds — providers see an anonymous query</div></div>
+      </div>
+      <div class="g2">
+        <div class="card" style="border-top:3px solid var(--cyan);">
+          <div class="ct" style="color:var(--cyan);">Track A — Cloud-assisted <span style="font-weight:500;color:var(--ink-3);font-size:.66rem;">· no hardware needed</span></div>
+          <p class="cd" style="margin-bottom:.4rem;">Frontier intelligence through the anonymizing relay, plus the full developer toolchain. For teams without GPU infrastructure.</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:.74rem;font-weight:700;color:var(--ink);">Pro ₹1,499 · Pro Family ₹2,499 (4 seats)</span><span class="chip cyan">LIVE IN 15 MIN</span></div>
         </div>
-        <div class="slide-tag">Deployment Strategy</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Two Deployment Architectures Built for Your Needs</h2>
-        <p class="slide-subhead">Whether your team requires cloud-assisted agility or total on-premise hardware isolation, Satchida integrates seamlessly.</p>
-
-        <div class="grid-2">
-          <div class="card highlight-cyan">
-            <div class="card-title" style="font-size: 1.25rem; color: #38bdf8;">Track A: Cloud-Assisted Engineering</div>
-            <p class="card-desc">
-              For engineering teams, technical startups, and collaborative departments who want frontier reasoning models with zero upfront hardware investment.
-            </p>
-            <ul class="list-items" style="margin-bottom: 16px;">
-              <li><span class="check-bullet">✓</span> <span><strong>Anonymous Query Gateway:</strong> Your identity is hidden from upstream providers. Queries and code remain anonymous.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Dual-Screen Dev Suite:</strong> Embedded browser Web IDE plus pop-out live preview portals.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Autonomous Toolchains:</strong> Sandboxed code execution, file manipulation, and project-wide search.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Uncapped Collaborative Value:</strong> Available as solo seats or pooled 4-seat shared team accounts.</span></li>
-            </ul>
-            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 0.8rem; font-weight: 700; color: #ffffff;">Pro (₹1,499) · Pro Family (₹2,499)</span>
-              <span class="slide-tag" style="background: rgba(2, 132, 199, 0.2);">Instant Setup</span>
-            </div>
-          </div>
-
-          <div class="card highlight-emerald">
-            <div class="card-title" style="font-size: 1.25rem; color: #34d399;">Track B: On-Premise Sovereign Air-Gap</div>
-            <p class="card-desc">
-              For law firms, healthcare providers, financial auditors, and high-IP organizations with dedicated workstation hardware (≥24GB GPU).
-            </p>
-            <ul class="list-items" style="margin-bottom: 16px;">
-              <li><span class="check-bullet">✓</span> <span><strong>100% On-Premise Execution:</strong> Highly optimized local GPU acceleration with zero external cloud API bills.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Ephemeral Memory Mode:</strong> Zero prompts or chats written to persistent disk; volatile in-RAM only.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Private Document Vault:</strong> Local vector search and verified document citations on physical storage.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Hybrid Agility:</strong> Full access to anonymous cloud frontier models for non-confidential heavy research.</span></li>
-            </ul>
-            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 0.8rem; font-weight: 700; color: #ffffff;">Sovereign Privacy (₹3,499/seat)</span>
-              <span class="slide-tag" style="background: rgba(5, 150, 105, 0.2); color: #34d399;">24-48h Deployment</span>
-            </div>
-          </div>
+        <div class="card" style="border-top:3px solid var(--emerald);">
+          <div class="ct" style="color:var(--emerald);">Track B — Sovereign air-gap <span style="font-weight:500;color:var(--ink-3);font-size:.66rem;">· your ≥24GB GPU</span></div>
+          <p class="cd" style="margin-bottom:.4rem;">Exclusive to this tier: Privacy mode runs entirely on your own ≥24GB GPU workstation — zero egress, ephemeral in-memory sessions, ₹0 upstream cost on confidential work. Chat, Study and Work stay on cloud via the relay on the same seat.</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:.74rem;font-weight:700;color:var(--ink);">Sovereign Privacy ₹3,499 / seat</span><span class="chip emerald">DEPLOYED IN 24–48H</span></div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Deployment Tracks</span>
-        <span>Slide 3 / 10</span>
-      </div>
-    </section>
+    </div>
+    <div class="s-foot"><span>ARCHITECTURE OVERVIEW</span><span>04 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 4 -->
-    <section class="slide" id="slide-4">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
+  <!-- ═══ 05 · USE CASE 1 ═══ -->
+  <section class="slide" id="p5">
+    <div class="s-head"><span class="kicker"><b>05</b> · USE CASE 01 — PRODUCT ENGINEERING</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">A product studio ships client code without leaking it</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A six-developer studio builds web products under client NDAs. Their codebase cannot touch a third-party cloud — yet the team was losing afternoons to copy-paste between a chat tab, an editor and a terminal, and paying per-seat for AI that logged everything.</p>
         </div>
-        <div class="slide-tag">Track A Commercials</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Track A: Pro Developer & Pro Family Studio</h2>
-        <p class="slide-subhead">Frontier reasoning intelligence paired with complete developer tooling and flexible collaborative budgets.</p>
-
-        <div class="grid-2">
-          <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <div class="slide-tag" style="margin-bottom: 8px;">SOLO DEVELOPER SUITE</div>
-                <div class="card-title">Pro Developer</div>
-              </div>
-              <div style="text-align: right;">
-                <div class="price-tag">₹1,499</div>
-                <div class="price-period">per seat / month (excl. GST)</div>
-              </div>
-            </div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <span><strong>Anonymous Query Protection:</strong> Identity hidden from upstream frontier model providers.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Embedded Web IDE:</strong> Full browser code editor, integrated terminal, Git diffs, and workspace explorer.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Dual-Screen Flow:</strong> Screen 1 prompts agents; Screen 2 executes and previews code in real-time.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Sandboxed Code Execution:</strong> Run Python, JavaScript, and shell scripts in an isolated secure runtime.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Private Document Vault:</strong> Semantic search, exact page citations, and automated document generation.</span></li>
-            </ul>
-          </div>
-
-          <div class="card highlight-cyan">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <div class="slide-tag" style="background: rgba(2, 132, 199, 0.2); margin-bottom: 8px;">4-SEAT POOLED HOUSEHOLD / STUDIO</div>
-                <div class="card-title">Pro Family / Tech Studio</div>
-              </div>
-              <div style="text-align: right;">
-                <div class="price-tag">₹2,499</div>
-                <div class="price-period">Just ₹624 / seat / mo (4 Accounts)</div>
-              </div>
-            </div>
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <span><strong>Full Pro Dev Suite on All 4 Seats:</strong> Every account gets the complete Web IDE and code sandbox.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Flexible Shared Budget:</strong> Single pooled usage allowance for family members or boutique technical teams.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Socratic Academic Tutoring:</strong> Intelligent guidance that explains concepts rather than solving homework.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Child Safety Compliance:</strong> Active real-time safety guardrails compliant with POCSO standards.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Natural Voice Read Aloud:</strong> Clear spoken explanations with internal model deliberation tags automatically removed.</span></li>
-            </ul>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">HOW IT RUNS ON SATCHIDA</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>The architect briefs the change in <b>Screen 1</b> — the agent plans the work and spawns <b>subagents</b> for refactor, tests and review in parallel.</p></div>
+            <div class="step"><span class="sn">2</span><p>The <b>VS Code Web IDE on Screen 2</b> applies patches live across files; the built-in terminal runs builds and tests against the tenant's own repo.</p></div>
+            <div class="step"><span class="sn">3</span><p>The <b>undocked artifacts portal</b> pops the running app onto a third window — previews stream in real time while the agent iterates.</p></div>
+            <div class="step"><span class="sn">4</span><p>Cloud requests leave through the <b>Zero-Knowledge Relay</b> — the provider sees an anonymous query, never the studio, never the client.</p></div>
           </div>
         </div>
-      </div>
-      <div class="slide-footer">
-        <span>Cloud-Assisted Tiers</span>
-        <span>Slide 4 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 5 -->
-    <section class="slide" id="slide-5">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
-        </div>
-        <div class="slide-tag">Developer Workflow</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Dual-Screen Web Productivity: How It Actually Works</h2>
-        <p class="slide-subhead">No cramped single-window chats. Satchida cleanly separates conversational control from code execution across two physical displays.</p>
-
-        <div class="flow-container">
-          <div class="flow-panel" style="border-color: rgba(2, 132, 199, 0.4);">
-            <div class="slide-tag" style="margin-bottom: 8px;">SCREEN 1: CONVERSATIONAL CONTROL</div>
-            <div class="card-title">Satchida Workspace</div>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li>• Chat, Work, Study, or Privacy mode prompt interaction</li>
-              <li>• Directs autonomous subagents and project workflows</li>
-              <li>• Real-time streaming tool execution and status feeds</li>
-              <li>• Issues automated edits and patches to project files</li>
-            </ul>
-          </div>
-
-          <div class="flow-arrow">➔<br><span style="font-size: 0.68rem; font-family: var(--font-mono); color: var(--text-dim);">LIVE SYNC</span></div>
-
-          <div class="flow-panel" style="border-color: rgba(79, 70, 229, 0.4);">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; border-color: rgba(79, 70, 229, 0.25); margin-bottom: 8px;">SCREEN 2: EXECUTION & PREVIEW</div>
-            <div class="card-title">Satchida Web IDE & Pop-Out Portal</div>
-            <ul class="list-items" style="font-size: 0.82rem;">
-              <li>• Full browser code editor with multi-file workspace tabs</li>
-              <li>• Built-in command terminal running dev servers and tests</li>
-              <li>• Real-time file system watchers update open buffers on edit</li>
-              <li>• Pop-out undocked portal renders live UI components</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="card" style="padding: 12px 18px; background: rgba(2, 132, 199, 0.05); border-color: rgba(2, 132, 199, 0.25);">
-          <div style="font-size: 0.84rem; color: #bae6fd; line-height: 1.5;">
-            <strong>Immediate 2-Screen Launch:</strong> Click the IDE icon on your navigation bar and click <strong>"Pop Out"</strong>. Drag that window to Monitor 2. Monitor 1 stays in conversational mode directing agents, while Monitor 2 operates as your full-screen development workstation.
-          </div>
+        <div class="uc-out">
+          <div class="oc"><div class="t">Brief → code → preview on one canvas</div><div class="d">No shuttling between tools; the agent and the IDE share the same workspace</div></div>
+          <div class="oc"><div class="t">Code stays tenant-side</div><div class="d">Repos and context never leave the deployment; queries are unattributable</div></div>
+          <div class="oc"><div class="t">Priority gateway routing</div><div class="d">No per-3-hour throttling on any cloud query — brief to preview without stalls</div></div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Engineering Workflow</span>
-        <span>Slide 5 / 10</span>
-      </div>
-    </section>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · PRO TIER ₹1,499/MO OR PRO FAMILY ₹2,499/MO FOR 4 POOLED SEATS</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 1 OF 3</span><span>05 / 12</span></div>
+  </section>
 
-    <!-- SLIDE 6 -->
-    <section class="slide" id="slide-6">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
+  <!-- ═══ 06 · USE CASE 2 ═══ -->
+  <section class="slide" id="p6">
+    <div class="s-head"><span class="kicker"><b>06</b> · USE CASE 02 — LEGAL PRACTICE</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">A law firm reviews discovery that never leaves the building</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A litigation practice drafts opinions on matters covered by client confidentiality and the DPDP Act (2023). Uploading case files to a foreign cloud is an ethics problem. The partners wanted AI for review and drafting — on their own terms, on their own hardware.</p>
         </div>
-        <div class="slide-tag">Document Intelligence</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Satchida Knowledge Vault: Private Document Intelligence</h2>
-        <p class="slide-subhead">Transform corporate policies, legal agreements, and textbooks into a private searchable repository with verified citations.</p>
-
-        <div class="grid-3">
-          <div class="card">
-            <div class="slide-tag" style="margin-bottom: 8px;">ON-PREMISE VECTOR VAULT</div>
-            <div class="card-title">Zero Cloud Vector Leakage</div>
-            <p class="card-desc">
-              Document embeddings and indexing run on-premise on local disk storage. Zero document text or vector data is transmitted to third-party cloud vector services.
-            </p>
-            <ul class="list-items" style="font-size: 0.8rem;">
-              <li><span class="check-bullet">✓</span> Strict tenant and workspace isolation</li>
-              <li><span class="check-bullet">✓</span> Sub-50ms local semantic search speed</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: var(--emerald-soft); color: #34d399; border-color: rgba(5, 150, 105, 0.25); margin-bottom: 8px;">AUDIT PROOF</div>
-            <div class="card-title">Verified Page-Level Citations</div>
-            <p class="card-desc">
-              Eliminate speculative hallucinations. Every generated response cites exact document titles, page numbers, and paragraph offsets for verifiable compliance.
-            </p>
-            <ul class="list-items" style="font-size: 0.8rem;">
-              <li><span class="check-bullet">✓</span> Precise PDF, Word, and spreadsheet citations</li>
-              <li><span class="check-bullet">✓</span> Instant inspection of original source text</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; border-color: rgba(79, 70, 229, 0.25); margin-bottom: 8px;">FILE GENERATION</div>
-            <div class="card-title">Instant Formatted Deliverables</div>
-            <p class="card-desc">
-              Agents automatically create ready-to-share business files directly in your workspace download tray:
-            </p>
-            <ul class="list-items" style="font-size: 0.8rem;">
-              <li><span class="check-bullet">✓</span> <strong>Presentations:</strong> Slide decks with native charts</li>
-              <li><span class="check-bullet">✓</span> <strong>Reports:</strong> Publication-grade styled PDFs</li>
-              <li><span class="check-bullet">✓</span> <strong>Spreadsheets:</strong> Financial models with live formulas</li>
-              <li><span class="check-bullet">✓</span> <strong>Documents:</strong> Formatted briefs and agreements</li>
-            </ul>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--emerald);">HOW IT RUNS ON SATCHIDA</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>Toggle <b>Privacy mode</b> — exclusive to the Sovereign Privacy tier, the model loads on the firm's own 24GB GPU server and inference runs fully offline, on premises.</p></div>
+            <div class="step"><span class="sn">2</span><p>Case bundles are indexed in the local <b>Knowledge Vault</b>; ask "where does the counterparty concede liability?" — answers cite <b>document, page and paragraph</b>.</p></div>
+            <div class="step"><span class="sn">3</span><p>Drafts are generated to <b>DOCX and PDF</b> locally. Privacy-mode sessions are ephemeral — prompts and chats are never persisted to disk.</p></div>
+            <div class="step"><span class="sn">4</span><p>For non-confidential research, the same seat switches to frontier cloud modes through the <b>anonymizing relay</b> — full cloud access included.</p></div>
           </div>
         </div>
-      </div>
-      <div class="slide-footer">
-        <span>Knowledge Intelligence</span>
-        <span>Slide 6 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 7 -->
-    <section class="slide" id="slide-7">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
+        <div class="uc-out">
+          <div class="oc"><div class="t">₹0 cloud egress on confidential work</div><div class="d">Inference and storage stay on the firm's physical hardware</div></div>
+          <div class="oc"><div class="t">Page-verified citations</div><div class="d">Every proposition traces to the exact source location — not a paraphrase</div></div>
+          <div class="oc"><div class="t">DPDP-aligned by architecture</div><div class="d">Sovereign mode is a structural guarantee, not a policy promise</div></div>
         </div>
-        <div class="slide-tag">Track B Hardware Edition</div>
       </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Track B: Sovereign Privacy Edition (Air-Gapped)</h2>
-        <p class="slide-subhead">Designed for legal counsels, medical clinics, and IP-sensitive departments with ≥24GB GPU workstation hardware.</p>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · SOVEREIGN PRIVACY ₹3,499/SEAT/MO · REQUIRES ≥24GB VRAM GPU</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 2 OF 3</span><span>06 / 12</span></div>
+  </section>
 
-        <div class="grid-2">
-          <div class="card highlight-emerald">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <div class="slide-tag" style="background: var(--emerald-soft); color: #34d399; margin-bottom: 8px;">SOVEREIGN AIR-GAP EDITION</div>
-                <div class="card-title" style="font-size: 1.35rem;">Sovereign Privacy Tier</div>
-              </div>
-              <div style="text-align: right;">
-                <div class="price-tag">₹3,499</div>
-                <div class="price-period">per dedicated seat / month (excl. GST)</div>
-              </div>
-            </div>
-
-            <ul class="list-items" style="margin-top: 10px;">
-              <li><span class="check-bullet">✓</span> <span><strong>Dual-Engine Architecture:</strong> Instant toggle between 100% on-premise GPU and anonymous cloud.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Zero Cloud API Costs on Privacy Queries:</strong> Uncapped local processing with ₹0 external provider charges.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Forced Ephemeral Memory:</strong> Zero prompts or chats written to disk; sessions stay in volatile RAM only.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Anonymous Cloud Reserve:</strong> Generous frontier cloud access included for non-confidential heavy research.</span></li>
-              <li><span class="check-bullet">✓</span> <span><strong>Complete Developer Suite:</strong> Full Web IDE, private document vault, and local execution sandbox.</span></li>
-            </ul>
+  <!-- ═══ 07 · USE CASE 3 ═══ -->
+  <section class="slide" id="p7">
+    <div class="s-head"><span class="kicker"><b>07</b> · USE CASE 03 — ACCOUNTING &amp; RESEARCH</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">An accountancy turns binders into deliverables, with citations</h2>
+      <div class="uc-grid" style="margin-top:.8rem;">
+        <div class="card" style="background:#F7F6F2;">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--ink-3);">THE SITUATION</div>
+          <p class="cd" style="margin-top:.3rem;">A four-partner accountancy turns statutory circulars, client books and prior-year working papers into monthly deliverables. Drafting computation sheets and reply letters consumed the junior team's first week of every month.</p>
+        </div>
+        <div class="card">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--indigo);">HOW IT RUNS ON SATCHIDA</div>
+          <div class="steps" style="margin-top:.4rem;">
+            <div class="step"><span class="sn">1</span><p>Circulars, ledgers and agreements are ingested into the <b>Knowledge Vault</b> — each seat maps to an isolated workspace, so client A's documents are structurally invisible to client B's queries.</p></div>
+            <div class="step"><span class="sn">2</span><p>In <b>Work mode</b>, agents draft computations as <b>XLSX with live formulas</b>, client letters as DOCX, and summaries as formatted PDFs.</p></div>
+            <div class="step"><span class="sn">3</span><p>Every figure carries a <b>citation to the exact page</b> of the source document — the file an auditor would ask for is one click away.</p></div>
+            <div class="step"><span class="sn">4</span><p>Partners review finished drafts instead of writing them; deliverables go out on the 4th instead of the 12th.</p></div>
           </div>
+        </div>
+        <div class="uc-out">
+          <div class="oc"><div class="t">Deliverables generated, not typed</div><div class="d">XLSX, DOCX, PDF and PPTX produced by agents inside the vault</div></div>
+          <div class="oc"><div class="t">Audit-ready traceability</div><div class="d">Exact page and paragraph citations on every extracted figure</div></div>
+          <div class="oc"><div class="t">Per-seat vault isolation</div><div class="d">Cross-client document commingling is structurally impossible</div></div>
+        </div>
+      </div>
+      <p class="uc-note">ILLUSTRATIVE DEPLOYMENT SCENARIO · AVAILABLE ON ALL TIERS · SOVEREIGN PRIVACY KEEPS THE VAULT 100% ON-PREMISE</p>
+    </div>
+    <div class="s-foot"><span>USE CASES · 3 OF 3</span><span>07 / 12</span></div>
+  </section>
 
-          <div class="card">
-            <div class="card-title" style="color: #34d399;">Hardware Qualification Benchmark</div>
-            <p class="card-desc" style="margin-bottom: 12px;">
-              Validated by Satchida deployment engineers prior to turnkey workstation activation:
-            </p>
-            <table class="matrix-table" style="font-size: 0.8rem;">
-              <tr>
-                <td><strong>GPU Hardware</strong></td>
-                <td>NVIDIA RTX 3090 / 4090 (24GB) or Apple Silicon (≥36GB)</td>
-              </tr>
-              <tr>
-                <td><strong>Host RAM</strong></td>
-                <td>32 GB to 64 GB High-Bandwidth Memory</td>
-              </tr>
-              <tr>
-                <td><strong>Storage Engine</strong></td>
-                <td>1 TB to 2 TB NVMe PCIe 4.0 SSD (≥5,000 MB/s)</td>
-              </tr>
-              <tr>
-                <td><strong>Operating System</strong></td>
-                <td>Windows 11 Pro/Enterprise or Ubuntu 22.04 LTS</td>
-              </tr>
-              <tr>
-                <td><strong>Regulatory Position</strong></td>
-                <td>Full DPDP Act (2023) Compliance & Sovereign Immunity</td>
-              </tr>
-            </table>
-            <div style="font-size: 0.74rem; color: var(--text-dim); margin-top: 10px; font-style: italic;">
-              *Turnkey tested workstations pre-configured with Satchida Sovereign software are available on request.
-            </div>
+  <!-- ═══ 08 · DUAL-SCREEN DEEP DIVE ═══ -->
+  <section class="slide" id="p8">
+    <div class="s-head"><span class="kicker"><b>08</b> · CAPABILITY — DEVELOPER WORKFLOW</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Dual-screen productivity: how it actually works</h2>
+      <p class="s-sub">No cramped single-window chat. Satchida separates conversational control from execution across two physical displays — live-synced, zero copy-paste.</p>
+      <div class="g2" style="margin-top:.8rem;">
+        <div class="card" style="border-top:3px solid var(--cyan);">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--cyan);">SCREEN 1 — CONVERSATIONAL CONTROL</div>
+          <ul class="ticks" style="margin-top:.35rem;">
+            <li><span><b>Workspace chat</b> — Chat, Study, Work or Privacy mode, streaming tool status</span></li>
+            <li><span><b>Agent orchestration</b> — delegate research, refactors and multi-file analysis to parallel subagents</span></li>
+            <li><span><b>MCP tool servers</b> — connect databases, repositories and internal systems</span></li>
+            <li><span><b>Automated edits</b> — patches land directly in project files</span></li>
+          </ul>
+        </div>
+        <div class="card" style="border-top:3px solid var(--indigo);">
+          <div class="ct" style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--indigo);">SCREEN 2 — EXECUTION &amp; PREVIEW</div>
+          <ul class="ticks" style="margin-top:.35rem;">
+            <li><span><b>VS Code Server Web IDE</b> — multi-file tabs, integrated terminal, Git diffs, workspace explorer</span></li>
+            <li><span><b>File watchers</b> — agent edits appear in open buffers in real time</span></li>
+            <li><span><b>Undocked artifacts portal</b> — pop out live app previews, diagrams and components to any window</span></li>
+            <li><span><b>Sandboxed execution</b> — Python, JavaScript and shell run isolated from the host</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="margin-top:.8rem;padding:.6rem .9rem;background:var(--indigo-soft);border-color:#D4D8F3;">
+        <p class="cd" style="color:#3730A3;"><b>Two clicks to dual-screen:</b> click the IDE icon in the navigation bar, press <b>Pop Out</b>, and drag the window to your second monitor. Screen 1 directs agents; Screen 2 becomes the full development workstation.</p>
+      </div>
+    </div>
+    <div class="s-foot"><span>CAPABILITY DEEP-DIVE · 1 OF 2</span><span>08 / 12</span></div>
+  </section>
+
+  <!-- ═══ 09 · KNOWLEDGE VAULT DEEP DIVE ═══ -->
+  <section class="slide" id="p9">
+    <div class="s-head"><span class="kicker"><b>09</b> · CAPABILITY — KNOWLEDGE VAULT</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Satchida Knowledge Vault: private document intelligence</h2>
+      <p class="s-sub">A document engine inside the workspace — ingest, interrogate and produce finished deliverables, with every answer traceable to its source page.</p>
+      <div class="flow" style="margin-top:.85rem;">
+        <div class="node"><div class="nt">1 · INGEST</div><div class="nd">PDFs, Word files, spreadsheets and scans — corporate handbooks, contracts, textbooks, client records</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">2 · INDEX</div><div class="nd">Local vector index in a <b>per-seat isolated workspace</b> — cross-seat commingling is structurally impossible</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">3 · INTERROGATE</div><div class="nd">Ask in natural language; answers cite <b>document, page and paragraph</b> — verifiable, not paraphrase</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">4 · PRODUCE</div><div class="nd">Agents generate <b>PPTX, PDF, DOCX and XLSX</b> — styled decks, formatted reports, formula-driven models</div></div>
+      </div>
+      <div class="g3" style="margin-top:.9rem;">
+        <div class="card"><div class="ct" style="color:var(--indigo);">In Work mode</div><p class="cd">SOPs, contracts, vendor statements and financials become instant queries and drafted reports.</p></div>
+        <div class="card"><div class="ct" style="color:var(--emerald);">In Study mode</div><p class="cd">Approved NCERT / CBSE / ICSE textbooks ground tutoring — every explanation cites its chapter and page.</p></div>
+        <div class="card"><div class="ct" style="color:var(--cyan);">In Privacy mode</div><p class="cd">Indexing, embeddings and retrieval stay 100% on-premise. Nothing leaves the physical machine.</p></div>
+      </div>
+    </div>
+    <div class="s-foot"><span>CAPABILITY DEEP-DIVE · 2 OF 2</span><span>09 / 12</span></div>
+  </section>
+
+  <!-- ═══ 10 · COMMERCIALS ═══ -->
+  <section class="slide" id="p10">
+    <div class="s-head"><span class="kicker"><b>10</b> · COMMERCIALS</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Three tiers. One toolchain. Rupee billing.</h2>
+      <div class="g3" style="margin-top:.85rem;">
+        <div class="card tier">
+          <span class="chip cyan" style="align-self:flex-start;">SOLO DEVELOPER SUITE</span>
+          <div class="price"><span class="p">₹1,499</span><span class="u">/ seat / month<br>₹14,990 / year</span></div>
+          <div class="best">For senior engineers, technical founders and researchers</div>
+          <ul class="ticks">
+            <li><span><b>Priority routing</b> on every cloud query</span></li>
+            <li><span>Full dual-screen suite — Web IDE, artifacts, sandbox, agents</span></li>
+            <li><span>Knowledge Vault with document generation</span></li>
+            <li><span>Queries anonymized at the relay</span></li>
+          </ul>
+        </div>
+        <div class="card tier flag">
+          <span class="chip indigo" style="background:var(--indigo-soft);color:var(--indigo);border:1px solid #D4D8F3;align-self:flex-start;">4-SEAT POOLED STUDIO</span>
+          <div class="price"><span class="p">₹2,499</span><span class="u">/ month — just ₹624 / seat<br>₹24,990 / year</span></div>
+          <div class="best">For engineering studios, developer households and student teams</div>
+          <ul class="ticks">
+            <li><span><b>One pooled team budget</b> across 4 accounts</span></li>
+            <li><span><b>Full Pro toolchain on every seat</b> — Web IDE, sandbox, agents</span></li>
+            <li><span>Socratic Study mode with child-safety guardrails</span></li>
+            <li><span>Clean audio read-aloud — reasoning tokens stripped</span></li>
+          </ul>
+        </div>
+        <div class="card tier" style="border-top:3px solid var(--emerald);">
+          <span class="chip emerald" style="align-self:flex-start;">SOVEREIGN AIR-GAP</span>
+          <div class="price"><span class="p">₹3,499</span><span class="u">/ seat / month<br>₹34,990 / year</span></div>
+          <div class="best">For legal, healthcare, audit and IP-sensitive enterprises with a ≥24GB GPU</div>
+          <ul class="ticks">
+            <li><span><b>Uncapped on-premise generation</b> in Privacy mode — ₹0 cloud COGS (this tier only)</span></li>
+            <li><span><b>Full cloud access</b> for frontier modes on the same seat</span></li>
+            <li><span>Ephemeral sessions; nothing persisted in Privacy mode</span></li>
+            <li><span>100% on-premise Knowledge Vault</span></li>
+          </ul>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;padding:.55rem .8rem;background:#F7F6F2;border:1px solid var(--line);border-radius:.5rem;">
+        <span style="font-size:.7rem;color:var(--ink-2);"><b>Privacy tier runs on:</b> 1× RTX 3090/4090 (24GB) or Mac Studio ≥36GB unified · 32GB RAM · 1TB NVMe · Windows 11 Pro / Ubuntu 22.04. <b>No hardware?</b> We ship a turnkey, pre-benchmarked workstation to your premises.</span>
+        <span style="font-size:.7rem;color:var(--ink-3);white-space:nowrap;margin-left:1rem;"><b>Enterprise fleets</b> from ₹15,000/mo — custom.</span>
+      </div>
+    </div>
+    <div class="s-foot"><span>ALL PRICES EXCL. GST · ANNUAL PLANS SAVE 2 MONTHS</span><span>10 / 12</span></div>
+  </section>
+
+  <!-- ═══ 11 · COMPARISON MATRIX ═══ -->
+  <section class="slide" id="p11">
+    <div class="s-head"><span class="kicker"><b>11</b> · SIDE BY SIDE</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Direct capability comparison</h2>
+      <table class="matrix" style="margin-top:.7rem;">
+        <tr><th style="width:26%;">Capability</th><th class="hc">Commercial cloud AI (typical)</th><th class="hc">Pro — ₹1,499</th><th class="hc hl">Pro Family — ₹2,499 / 4 seats</th><th class="hc">Sovereign Privacy — ₹3,499</th></tr>
+        <tr><td>Prompts leave your premises</td><td class="hc"><span class="no">Always, under your identity</span></td><td class="hc"><span class="yes">Stripped &amp; anonymized</span></td><td class="hc hl"><span class="yes">Stripped &amp; anonymized</span></td><td class="hc"><span class="yes">Never in Privacy mode</span></td></tr>
+        <tr><td>Cost per seat / month</td><td class="hc">₹1,700 – ₹2,500 + forex</td><td class="hc">₹1,499 flat</td><td class="hc hl"><b>₹624 effective</b></td><td class="hc">₹3,499 (dedicated GPU)</td></tr>
+        <tr><td>Usage model</td><td class="hc">Throttled every few hours</td><td class="hc">Priority routing</td><td class="hc hl">Pooled team budget</td><td class="hc">Unlimited on-prem + cloud</td></tr>
+        <tr><td>Browser VS Code Web IDE</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="yes">✓</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓</span></td></tr>
+        <tr><td>Dual-screen + undocked artifacts</td><td class="hc"><span class="no">✗ Single window</span></td><td class="hc"><span class="yes">✓</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓</span></td></tr>
+        <tr><td>Sandboxed code execution</td><td class="hc"><span class="no">Python only</span></td><td class="hc"><span class="yes">✓ Full sandbox</span></td><td class="hc hl"><span class="yes">✓ Full sandbox</span></td><td class="hc"><span class="yes">✓ Local sandbox</span></td></tr>
+        <tr><td>Knowledge Vault, page-level citations</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="yes">✓</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓ 100% on-prem</span></td></tr>
+        <tr><td>MCP tools &amp; autonomous agents</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="yes">✓</span></td><td class="hc hl"><span class="yes">✓</span></td><td class="hc"><span class="yes">✓</span></td></tr>
+        <tr><td>POCSO-guarded Socratic tutoring</td><td class="hc"><span class="no">✗</span></td><td class="hc"><span class="no">—</span></td><td class="hc hl"><span class="yes">✓ + textbook grounding</span></td><td class="hc"><span class="yes">✓ air-gapped</span></td></tr>
+        <tr><td>Billing</td><td class="hc"><span class="no">USD card + forex + GST</span></td><td class="hc"><span class="yes">UPI / IMPS</span></td><td class="hc hl"><span class="yes">UPI / IMPS</span></td><td class="hc"><span class="yes">UPI / GST invoice</span></td></tr>
+      </table>
+    </div>
+    <div class="s-foot"><span>COMMERCIAL CLOUD AI FIGURES ARE TYPICAL RETAIL RATES, NOVEMBER 2026</span><span>11 / 12</span></div>
+  </section>
+
+  <!-- ═══ 12 · ONBOARDING & CTA ═══ -->
+  <section class="slide" id="p12">
+    <div class="s-head"><span class="kicker"><b>12</b> · ONBOARDING &amp; GUARANTEES</span><span class="brandmark">SATCHIDA SOVEREIGN AI</span></div>
+    <div class="s-body">
+      <h2 class="s-title">Live this week. Owned by you.</h2>
+      <div class="g2" style="margin-top:.8rem;">
+        <div class="card">
+          <div class="ct" style="color:var(--cyan);">Track A — Cloud Pro / Pro Family</div>
+          <div class="steps" style="margin-top:.35rem;">
+            <div class="step"><span class="sn">1</span><p>Select tier and complete <b>NPCI UPI / IMPS</b> settlement — zero-fee QR, instant 12-digit UTR receipt.</p></div>
+            <div class="step"><span class="sn">2</span><p>Credentials and tenant keys delivered <b>within 15 minutes</b> of confirmation.</p></div>
+            <div class="step"><span class="sn">3</span><p>Team signs in at <b>ai.satchida.com</b> — any phone, tablet or PC. No installation.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ct" style="color:var(--emerald);">Track B — Sovereign Privacy</div>
+          <div class="steps" style="margin-top:.35rem;">
+            <div class="step"><span class="sn">1</span><p>Deployment engineer audits your GPU environment against the <b>production benchmark</b>.</p></div>
+            <div class="step"><span class="sn">2</span><p>Local model weights, quantization tuning and secure local tunnels provisioned.</p></div>
+            <div class="step"><span class="sn">3</span><p>Turnkey go-live within <b>24–48 hours</b> — or we ship the pre-built workstation to you.</p></div>
           </div>
         </div>
       </div>
-      <div class="slide-footer">
-        <span>Hardware Architecture</span>
-        <span>Slide 7 / 10</span>
+      <div style="display:flex;gap:.55rem;margin:.8rem 0;flex-wrap:wrap;">
+        <span class="chip emerald">✓ No long-term lock-in</span>
+        <span class="chip emerald">✓ Database export &amp; deletion from your admin dashboard</span>
+        <span class="chip amber">✓ GST invoice on every payment</span>
+        <span class="chip cyan">✓ Zero-knowledge relay by default</span>
       </div>
-    </section>
-
-    <!-- SLIDE 8 -->
-    <section class="slide" id="slide-8">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
-        </div>
-        <div class="slide-tag">Academic Safety & Pedagogy</div>
+      <div class="cta">
+        <div class="big">See your own documents inside the Vault this week.</div>
+        <div class="link">AI.SATCHIDA.COM · SALES@SATCHIDA.COM</div>
       </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Responsible Tutoring: Study Mode & Child Safety</h2>
-        <p class="slide-subhead">Engineered for schools, universities, and households. Promotes genuine comprehension while actively preventing cheating and harm.</p>
+    </div>
+    <div class="s-foot"><span>SATCHIDA SOVEREIGN AI · EXECUTIVE BRIEFING · NOVEMBER 2026</span><span>12 / 12</span></div>
+  </section>
 
-        <div class="grid-4">
-          <div class="card">
-            <div class="slide-tag" style="background: var(--indigo-soft); color: #818cf8; margin-bottom: 8px;">PEDAGOGY</div>
-            <div class="card-title" style="font-size: 1rem;">Socratic Tutoring</div>
-            <p class="card-desc" style="font-size: 0.8rem; margin-bottom: 0;">
-              Refuses to simply solve homework assignments. Guides students with structured hints, questions, and concept breakdowns.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: rgba(225, 29, 72, 0.12); color: #fb7185; margin-bottom: 8px;">SAFETY FILTERS</div>
-            <div class="card-title" style="font-size: 1rem;">POCSO Compliance</div>
-            <p class="card-desc" style="font-size: 0.8rem; margin-bottom: 0;">
-              Real-time multi-stage moderation immediately intercepts explicit content, adult queries, or predatory interactions.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="margin-bottom: 8px;">AUDIO REFINEMENT</div>
-            <div class="card-title" style="font-size: 1rem;">Natural Read Aloud</div>
-            <p class="card-desc" style="font-size: 0.8rem; margin-bottom: 0;">
-              Voice synthesis cleanly excludes internal model reasoning tags, providing fluid, natural audio lessons.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="slide-tag" style="background: var(--emerald-soft); color: #34d399; margin-bottom: 8px;">CURRICULUM</div>
-            <div class="card-title" style="font-size: 1rem;">Textbook Grounding</div>
-            <p class="card-desc" style="font-size: 0.8rem; margin-bottom: 0;">
-              Explanations are grounded in approved educational syllabi, citing exact chapter headings and page references.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="slide-footer">
-        <span>Academic Architecture</span>
-        <span>Slide 8 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 9 -->
-    <section class="slide" id="slide-9">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
-        </div>
-        <div class="slide-tag">Capability Matrix</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Direct Capability & Architectural Comparison</h2>
-        <p class="slide-subhead">How Satchida Sovereign AI outperforms generic big tech subscriptions across privacy, tools, and pricing.</p>
-
-        <table class="matrix-table">
-          <thead>
-            <tr>
-              <th>Capability</th>
-              <th>Commercial Cloud AI</th>
-              <th class="focus-column">Satchida Pro (Track A)</th>
-              <th>Satchida Pro Family</th>
-              <th style="background: rgba(5, 150, 105, 0.1); color: #34d399;">Satchida Sovereign Privacy (Track B)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Monthly Investment</strong></td>
-              <td>₹1,700 – ₹2,500 / seat (USD)</td>
-              <td class="focus-column"><strong>₹1,499 / seat</strong></td>
-              <td><strong>₹2,499 / 4 seats</strong> (₹624/seat)</td>
-              <td><strong>₹3,499 / seat</strong> (Dedicated)</td>
-            </tr>
-            <tr>
-              <td><strong>Identity & Query Privacy</strong></td>
-              <td><span class="cross-bullet">✗</span> Logged to corporate identity</td>
-              <td class="focus-column"><strong>Identity hidden & queries anonymous</strong></td>
-              <td><strong>Identity hidden & queries anonymous</strong></td>
-              <td><strong>100% On-Premise Air-Gap (Zero Egress)</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Session Storage</strong></td>
-              <td>Retained by vendor indefinitely</td>
-              <td class="focus-column">Controlled tenant retention</td>
-              <td>Controlled tenant retention</td>
-              <td><strong>Forced Ephemeral (In-RAM Only)</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Dual-Screen Dev Suite</strong></td>
-              <td><span class="cross-bullet">✗</span> Chat window only</td>
-              <td class="focus-column"><strong>✓ Full Web IDE + Pop-out Portal</strong></td>
-              <td><strong>✓ Full Web IDE + Pop-out Portal</strong></td>
-              <td><strong>✓ Full Web IDE + Pop-out Portal</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Private Document Vault</strong></td>
-              <td><span class="cross-bullet">✗</span> External cloud vector stores</td>
-              <td class="focus-column"><strong>✓ Local LanceDB + Page Citations</strong></td>
-              <td><strong>✓ Local LanceDB + Page Citations</strong></td>
-              <td><strong>✓ 100% Local On-Premise Vault</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Child Safety & Tutoring</strong></td>
-              <td><span class="cross-bullet">✗</span> Solves homework directly</td>
-              <td class="focus-column">Optional</td>
-              <td><strong>✓ Socratic + POCSO Compliance</strong></td>
-              <td><strong>✓ Air-Gapped Socratic Study</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Payment & Invoicing</strong></td>
-              <td>Credit card with forex fee</td>
-              <td class="focus-column"><strong>Instant UPI / Corporate GST</strong></td>
-              <td><strong>Instant UPI / Corporate GST</strong></td>
-              <td><strong>Instant UPI / Corporate GST</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="slide-footer">
-        <span>Capability Benchmark</span>
-        <span>Slide 9 / 10</span>
-      </div>
-    </section>
-
-    <!-- SLIDE 10 -->
-    <section class="slide" id="slide-10">
-      <div class="slide-header">
-        <div class="brand-mark">
-          <div class="brand-logo-icon">S</div>
-          <span>SATCHIDA SOVEREIGN AI</span>
-        </div>
-        <div class="slide-tag">Deployment & Onboarding</div>
-      </div>
-      <div class="slide-body">
-        <h2 class="slide-heading">Turnkey Onboarding & Immediate Activation</h2>
-        <p class="slide-subhead">Activate sovereign AI intelligence for your team today with zero complex infrastructure setup.</p>
-
-        <div class="grid-3" style="margin-bottom: 20px;">
-          <div class="card">
-            <div class="card-title">Instant Cloud SLA</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Track A (Pro & Pro Family) credentials and isolated workspaces activate within 15 minutes of UPI confirmation.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Turnkey On-Premise Setup</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Track B GPU validation, local acceleration tuning, and secure tunnel lockdown completed within 24 to 48 hours.
-            </p>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Official Corporate Invoicing</div>
-            <p class="card-desc" style="margin-bottom: 0;">
-              Official GST invoices issued for all accounts. Full input tax credit eligibility with zero foreign exchange fees.
-            </p>
-          </div>
-        </div>
-
-        <div class="card highlight-cyan" style="text-align: center; padding: 24px;">
-          <h3 style="font-family: var(--font-heading); font-size: 1.45rem; color: #ffffff; margin-bottom: 6px;">
-            Ready to Take Control of Your Enterprise AI?
-          </h3>
-          <p style="font-size: 0.92rem; color: var(--text-body); margin-bottom: 14px;">
-            Contact our deployment engineering group or schedule an immediate sovereign demonstration.
-          </p>
-          <div style="display: flex; justify-content: center; gap: 28px; font-family: var(--font-mono); font-size: 0.88rem;">
-            <div>Email: <strong style="color: #38bdf8;">sales@satchida.com</strong></div>
-            <div>Web: <strong style="color: #38bdf8;">ai.satchida.com</strong></div>
-            <div>HQ: <strong style="color: #38bdf8;">Bengaluru, Karnataka</strong></div>
-          </div>
-        </div>
-      </div>
-      <div class="slide-footer">
-        <span>Confidential Proposal · Satchida AI Platform</span>
-        <span>Slide 10 / 10</span>
-      </div>
-    </section>
-
-  </div>
-
-  <script>
-    const container = document.getElementById('deckWrap');
-    const totalSlides = 10;
-    let currentSlide = 1;
-
-    function updateProgress(index) {
-      currentSlide = index;
-      document.getElementById('sCount').textContent = `${currentSlide} / ${totalSlides}`;
-      document.getElementById('pFill').style.width = `${(currentSlide / totalSlides) * 100}%`;
-    }
-
-    function scrollToSlide(index) {
-      if (index < 1 || index > totalSlides) return;
-      const target = document.getElementById(`slide-${index}`);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth' });
-        updateProgress(index);
-      }
-    }
-
-    function nextSlide() {
-      if (currentSlide < totalSlides) scrollToSlide(currentSlide + 1);
-    }
-
-    function prevSlide() {
-      if (currentSlide > 1) scrollToSlide(currentSlide - 1);
-    }
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-        e.preventDefault();
-        nextSlide();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        prevSlide();
-      }
-    });
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const num = parseInt(entry.target.id.replace('slide-', ''));
-          if (!isNaN(num)) updateProgress(num);
-        }
-      });
-    }, { threshold: 0.6 });
-
-    document.querySelectorAll('.slide').forEach(s => observer.observe(s));
-  </script>
+</div>
 </body>
 </html>

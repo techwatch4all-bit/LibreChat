@@ -10,6 +10,7 @@ const {
   recordRumProxyRequest,
   getValidOpenIdReuseUserId,
 } = require('@librechat/api');
+const { attachSeatPolicy } = require('~/server/middleware/seatPolicy');
 
 const hasPassportStrategy = (strategy) =>
   typeof passport._strategy === 'function' && passport._strategy(strategy) != null;
@@ -191,11 +192,16 @@ const requireJwtAuth = (req, res, next) => {
       req.user = user;
       req.authStrategy = strategy;
       logFallbackSuccess(strategy);
-      tenantContextMiddleware(req, res, (tenantErr) => {
-        if (tenantErr) {
-          return next(tenantErr);
+      attachSeatPolicy(req, res, (seatErr) => {
+        if (seatErr) {
+          return next(seatErr);
         }
-        refreshCloudFrontCookies(req, res, next);
+        tenantContextMiddleware(req, res, (tenantErr) => {
+          if (tenantErr) {
+            return next(tenantErr);
+          }
+          refreshCloudFrontCookies(req, res, next);
+        });
       });
     })(req, res, next);
   };

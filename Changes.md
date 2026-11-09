@@ -8,6 +8,42 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-09 — Persona & MCP asset consolidation for client shipping
+
+### 1. Persona library copied into the repo (`satchida/personas/`)
+1. **`personas.ts`** — verbatim copy of the 34-persona master library
+   (`personas.constants.ts`) from `D:\LAN-AI-Infra\satchida-ai-unified-suite\src\lib\constants\`,
+   plus a provenance header and `export` on the three previously private rule blocks
+   (`MANDATORY_CITATION_RULES`, `FINANCIAL_OUTPUT_FORMAT`, `NEWS_OUTPUT_FORMAT`).
+   Evidence: `diff --strip-trailing-cr` against origin shows exactly those four
+   planned deltas and nothing else; `grep -c "		id: '"` = 34 personas; LF endings
+   (repo working-tree convention; origin file is CRLF).
+2. **`specification.md`** — copy of the operator specification
+   `SATCHIDA-AI-PERSONAS-SPECIFICATION.md` (codebase map, staging protocol,
+   11 categories / 44 starters, ModelSpec starter overrides).
+3. **`README.md`** — wiring map (the four rule blocks are **not yet** in any mode
+   `promptPrefix` — first P0 action of the persona improvement plan), stale-data
+   audit (PPF/SCSS rates, model-era names, BCD/GST figures), origin-sync rule,
+   shipping checklist.
+
+### 2. MCP shipping manifest (`satchida/mcp/`)
+1. **`recommended-mcp.ts`** — curated external MCP catalog copied from the
+   unified-suite constant (delta: `RecommendedMCPServer` type inlined; body verbatim).
+2. **`README.md`** — all 21 `librechat.yaml` servers inventoried. Custom servers
+   confirmed already git-tracked under `skill/` (292 files). Records packaged-server
+   deps (`uvx`/`npx` + pre-warm step), external sidecars (AnythingLLM :3012,
+   DeepTutor :8001), the per-client rewrite table for hardcoded `D:/LAN-AI-Infra`
+   paths, and audit findings: `deeptutor-mcp/dist/` not tracked (build required on
+   target), hardcoded AnythingLLM API key in `librechat.yaml` (rotate → `${ENV}`),
+   `legal-research` serves US law while governance personas are India-focused,
+   `clinical-research` unbound by any starter, `stem-math-server.py` unreferenced.
+
+### 3. Scope
+No runtime behavior changed — `ConversationStarters.tsx`, `librechat.yaml`, and
+MCP server configs are untouched. The P0–P2 persona improvement plan (rule-block
+wiring, dangling-placeholder fixes, safety rewrites, matrix fixes) is tracked as
+the session todo list; its first execution items follow this entry.
+
 ## 2026-11-08 — AnythingLLM Knowledge Vault, Dual-Screen Web Productivity & Sales Decks Update
 
 ### 1. Architectural & Product Documentation Updates
@@ -1232,3 +1268,23 @@ Conducted full surgical verification of commercial tier alignment across LibreCh
 6. **Recompilation & Process Verification**:
    - Recompiled native Go binary `satchida-gateway.exe` with zero vet/compiler warnings.
    - Verified active listening ports: 3080 (LibreChat HTTP 200), 4000 (Satchida Gateway /api/status HTTP 200), 8700 (Bifrost), and 5173/8085 (VScode-server).
+
+## 2026-11-08 – Executive Sales Deck Rebuild (Use-Case-Driven)
+
+Rebuilt both customer-facing sales decks from scratch after review found them feature-dump style without client use cases, with low-contrast dark styling and residual third-party vendor names in the value deck:
+
+1. **SATCHIDA-FLAGSHIP-SALES-DECK.html/.pdf — 12 pages** (Executive Briefing): cover with anchor stats; one-page executive summary; three structural failures of commercial cloud AI; platform architecture with four modes and the Zero-Knowledge Relay flow; **three illustrative use cases** (product engineering studio dual-screen shipping under NDA, law firm air-gapped discovery with page citations, accountancy vault deliverables with traceable figures); dual-screen deep dive; Knowledge Vault pipeline (ingest → per-seat isolated index → cited answers → PPTX/PDF/DOCX/XLSX); tier cards (Pro ₹1,499 / Pro Family ₹2,499 / Privacy ₹3,499 + hardware spec line); 10-row capability matrix; onboarding tracks and guarantees; CTA.
+2. **SATCHIDA-VALUE-SALES-DECK.html/.pdf — 12 pages** (Team & Productivity Briefing): per-seat AI tax math; platform overview with pooled seats; **three illustrative use cases** (two-partner CA office, coaching institute Study Mode with POCSO + NCERT grounding, four-person boutique agency pooled budget); tier cards (Standard ₹299 / Family ₹999 / Pro ₹1,499 + enterprise from ₹15,000); Knowledge Vault; responsible tutoring deep dive; 4-person ROI ledger with comparison bars (₹81,600 → ₹9,990, 88%); value matrix; 3-step onboarding; CTA.
+3. **Design system**: print-exact 16:9 pages (`@page 13.333in × 7.5in`, zero margin), light consulting-grade theme (paper `#FAFAF7`, navy `#122A47`, cyan/indigo/emerald accents), Source Serif 4 display + Inter body + IBM Plex Mono kickers, situation → workflow → outcome use-case format, proportional CSS bars, highlighted matrix columns, per-slide `#pN` anchor ids. Third-party vendor names fully removed from the value deck (flagship was already clean); comparisons use "leading commercial AI" with observed retail rates.
+4. **Generation & sync**: PDFs rendered via headless Chrome (`--print-to-pdf`, `--virtual-time-budget=20000`), verified `/Count 12` in both page trees; slide-level visual QA via single-slide Chrome screenshots caught and fixed a collapsed `.bfill` span (missing `display:block`) in the value ROI bars. All copies synced: repo root, `client/public/decks/` (lowercase HTML), and `client/dist/decks/` (live serving) — live URLs re-verified over HTTP with new-content grep.
+5. **A4 Print Briefs (one/two-pager format, replaces slide-deck ask for email/print)**: Added `SATCHIDA-FLAGSHIP-A4.html/.pdf` and `SATCHIDA-VALUE-A4.html/.pdf` — 2-page A4 portrait documents (`@page A4`, zero margin, exact page breaks). Page 1 is a standalone sales pitch: serif headline, hand-built isometric SVG hero scene (user team → Zero-Knowledge Relay shield with blocked identity badge and threat arrows → frontier cloud; GPU tower with ₹0-egress chip; value hero shows office building, 4 pooled seats (2 adults + 2 kids), vault with per-seat locks, UPI/GST coin flow, and the student + parent-monitoring vignette with dashboard, POCSO shield blocking an 18+ threat). Page 2 carries three use-case vignette cards (situation → outcome), pricing table, guarantees chips, onboarding timeline (value: 3-step UPI onboarding + 4-person ROI ledger with proportional bars) and CTA band. SVG scenes are generated by `D:\tmp\deckqa\gen_a4.py` (isometric box/human/shield/cloud primitives) and injected into template `<!--SVG:NAME-->` markers — keep the generator authoritative for artwork edits. Visual QA caught and fixed two canvas-clipped labels (centered mono text wider than viewBox) and a vignette label/shield collision. All copies synced to `client/public/decks/` (lowercase HTML + PDFs) and `client/dist/decks/` (live); live URL grep verified. The 12-page 16:9 decks remain available for on-screen presenting.
+6. **Commercial-accuracy corrections to both A4 briefs (operator review)**: removed all explicit token volumes from customer-facing copy (stat "15M tokens/mo", pricing "Monthly volume" column re-titled "Included" with qualitative entries — priority routing / pooled team budget / unlimited on-premise; agency pool vignette now shows ₹999 · 4 seats instead of 25M). Scoped every ₹0 claim explicitly to Privacy-mode egress on the Sovereign Privacy tier so nothing reads as "Chat is free" — stat now "₹0 egress — on Privacy-mode work — Sovereign Privacy tier only", hero chip "PRIVACY TIER · ₹0 EGRESS". Stated exclusivity in five places: Privacy mode (100% on-premise inference on the customer's own ≥24GB GPU server) exists only on the privacy account type; Chat, Study and Work run on frontier cloud providers through the relay in every account type (modes-strip footnote, tier card, hero caption, sub-headline, pricing note). Remaining "tokens" mentions are the generic pooling behavior with no volumes.
+7. **Same commercial-accuracy rules applied to the 12-page 16:9 decks** (operator flagged they still showed the old claims): flagship cover stat "₹0 / 15M tokens/mo" → "₹0 egress — Sovereign Privacy tier, own GPU server" + "Priority routing — no per-3-hour throttling"; exec-summary commercials card, tier cards, use-case outcome, matrix "Monthly token volume" row → "Usage model: Priority routing / Pooled team budget / Unlimited on-prem + cloud"; Privacy-mode exclusivity added at the modes strip, Track B card ("Exclusive to this tier… Chat, Study and Work stay on cloud via the relay"), legal use-case step 1, and cover sub-headline ("on the Sovereign Privacy tier, confidential work never leaves your building"). Value deck: 2M/6M/15M tier bullets → qualitative USPs, uc3 "25M-token pool" → "pooled Pro Family budget", uc-note volumes removed, matrix row → "Usage model", "shared token budget" → "shared usage budget". Both PDFs re-rendered (/Count 12 verified) and synced to root, public and dist; live grep confirms corrected copy.
+8. **A4 briefs rebuilt as formal business proposals (REV 03)** — both A4 documents restructured from pitch-style to a real proposal: letterhead + "BUSINESS PROPOSAL" masthead, meta block (Prepared-for blank, proposal reference SAC/PROP/2026-11/F-001 | T-001, date of issue, 30-day validity), numbered sections — 1 Executive summary · 2 Scope of the offer · 3 Commercial proposal (Option A/B/C licence-fee table) with payment terms folded into the terms note · 4 (flagship) Deployment & activation plan as a milestone/owner/timeline table · capability-evidence vignettes · Service & support · Data protection & compliance (Privacy-mode exclusivity, zero-knowledge relay, per-seat vault isolation, DPDP/POCSO) · Acceptance section with dual signature blocks and option-selection line. Payment-terms and hero-caption sections were folded/removed and scope consolidated 8→6 items to fit the fixed A4 height; all three commercial-accuracy rules (no token volumes, ₹0 only as Privacy-tier egress, Privacy mode exclusive to the privacy account type with customer's own ≥24GB GPU server) carry through. Visible **REV 03 · 08 NOV 2026** tag in every footer for version verification. Both PDFs re-rendered at exactly 2 pages; three overflow passes were caught and fixed via full-document screenshots. All copies synced (root, client/public/decks, client/dist/decks) and live-verified by HTTP grep (REV 03 present, zero token-volume phrases).
+9. **Round-3 operator corrections across all four collateral files (REV 04 · 09 NOV 2026)**:
+   - **Dates removed** from both A4 proposals (Date of issue, Valid until meta fields and the "prices valid 30 days" sentence) so proposals never need re-dating.
+   - **Hero redesigned real-life** (flagship): the abstract relay diagram is replaced by a plain-language scene a principal or RWA president can read — your office with a locked filing cabinet and dual-monitor desk, a Satchida checkpoint shield where the red name-tag is stripped off the outgoing question envelope, snoopers blocked, and a cloud answering an anonymous question ("NO NAME · NO COMPANY · NO LOGS").
+   - **Track A/B eliminated** from customer copy — scope and deployment now use the same Option A/B/C language as the commercials (P1–P4 phases replace A1/B3 milestones).
+   - **Deployment honesty**: all "15 minutes / 24–48 hours" claims removed everywhere (A4s and both 16:9 decks); the deployment plan now shows P1 Planning (days 1–2) → P2 Installation of dependencies + LibreChat & platform services (days 3–5) → P3 Testing (days 6–7) → P4 Go-live (days 8–10), i.e. **1–2 weeks from acceptance**.
+   - **Commercial structure**: both A4 commercial tables add "All options · One-time setup" and "All options · Managed service" line items with fill-in blank amounts (₹ ______) — amounts intentionally not invented; operator fills per client.
+   - **No unverifiable curriculum claims**: every NCERT / CBSE / ICSE textbook-grounding claim removed from both A4s and both decks; tutoring is described only as Socratic (hints/step-checks) with POCSO-aligned filtering, and citations are tied to study material actually loaded into the tenant's vault ("where study material is loaded… answers cite it page by page"). Page-1 CTA band removed from the flagship proposal (Acceptance §9 is the action point); zero residual claim strings verified by grep and live HTTP grep.

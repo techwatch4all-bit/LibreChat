@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import path from 'path';
 
-const DEFAULT_BASE_URL = 'http://localhost:3080';
+/** Off the live deployment's port (:3080), so the harness server and the pm2
+ *  instance can run side by side without an env override (Customizations.md C27). */
+const DEFAULT_BASE_URL = 'http://localhost:3098';
 const DEFAULT_MONGO_URI = 'mongodb://127.0.0.1:27017/LibreChat-e2e';
 const DEFAULT_RUNTIME_ENV_PATH = path.resolve(__dirname, '../specs/.test-results/runtime-env.json');
 const GENERATED_CREDS_KEY = crypto.randomBytes(32).toString('hex');

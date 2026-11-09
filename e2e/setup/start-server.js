@@ -1,7 +1,21 @@
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+/** The production .env is loaded for database/provider config, but fork-only
+ *  operator bootstrap values leak into the isolated harness Mongo, where the
+ *  configured operator user does not exist (Customizations.md C27). Drop the
+ *  key unless the caller set it explicitly for this run. */
+const hadOperatorOverride = Object.prototype.hasOwnProperty.call(
+  process.env,
+  'SATCHIDA_OPERATOR_USER_ID',
+);
 require('dotenv').config();
+if (!hadOperatorOverride) {
+  /** Empty string, not delete: the server's own dotenv.config() runs later in
+   *  this process and would re-load the production .env value into a fresh
+   *  key. An empty value is the lane's proven off-state. */
+  process.env.SATCHIDA_OPERATOR_USER_ID = '';
+}
 
 const DEFAULT_MONGO_URI = 'mongodb://127.0.0.1:27017/LibreChat-e2e';
 const DEFAULT_RUNTIME_ENV_PATH = path.resolve(__dirname, '../specs/.test-results/runtime-env.json');

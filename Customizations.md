@@ -555,5 +555,8 @@ LibreChat contains none of the following.
    `?signin=1` affordance; `e2e/lighthouse/audit.ts` tolerates chrome-launcher's Windows
    teardown-EPERM against a clean saved report; `e2e/lighthouse/load.spec.ts` allows the
    permanent `satchida-chat-watermark` as an LCP element (Chrome counts background-image divs
-   as LCP candidates; canvas/border-image variants are ineligible). Lane invocation on this
-   box: `SATCHIDA_OPERATOR_USER_ID= E2E_BASE_URL=http://localhost:3098 npm run lighthouse`.
+   as LCP candidates; canvas/border-image variants are ineligible). Both former env overrides
+   are now baked into the harness (2026-11-10): `e2e/setup/env.ts` defaults the harness base
+   URL to `http://localhost:3098` (off the live pm2 port), and `e2e/setup/start-server.js`
+   drops a `SATCHIDA_OPERATOR_USER_ID` that leaked in from the production `.env` (unless the
+   caller sets it explicitly), so plain `npm run lighthouse` runs the lane on this box.

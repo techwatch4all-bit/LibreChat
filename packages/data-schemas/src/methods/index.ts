@@ -1,9 +1,9 @@
-import { createBillingMethods, type BillingMethods } from './billing';
 import type { RoleMethods, RoleDeps } from './role';
 import {
   createOpenIDRefreshFlightMethods,
   type OpenIDRefreshFlightMethods,
 } from './openidRefreshFlight';
+import { createBillingMethods, type BillingMethods } from './billing';
 export {
   createMCPAuthorizationFenceRetryStorage,
   type MCPAuthorizationFenceRetryStorage,
@@ -30,7 +30,7 @@ import {
 import { createAgentCategoryMethods, type AgentCategoryMethods } from './agentCategory';
 import { createTenantPolicyMethods } from './tenantPolicy';
 import { createTenantEntitlementMethods } from './tenantEntitlement';
-import type { TenantEntitlementMethods } from './tenantEntitlement';
+import type { TenantEntitlementMethods, EntitlementSeatReservation } from './tenantEntitlement';
 import {
   createPrivacyAssertionMethods,
   type PrivacyAssertionMethods,
@@ -548,6 +548,7 @@ export type {
   ToolFavoriteMethods,
   AgentCategoryMethods,
   TenantEntitlementMethods,
+  EntitlementSeatReservation,
   BillingMethods,
   AgentApiKeyMethods,
   MCPServerMethods,

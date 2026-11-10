@@ -1245,4 +1245,141 @@ describe('createAdminUsersHandlers', () => {
       expect(status).toHaveBeenCalledWith(200);
     });
   });
+
+  describe('seat reservation', () => {
+    const actor = {
+      _id: new Types.ObjectId(),
+      id: 'operator-1',
+      name: 'Operator',
+      tenantId: 'tenant-1',
+    };
+
+    it('reserves a seat when the tenant has an active entitlement', async () => {
+      const reserveTenantSeat = jest.fn().mockResolvedValue({
+        ok: true,
+        summary: { plan: 'pro', seatLimit: 10, activeSeats: 1 },
+      });
+      const deps = createDeps({ reserveTenantSeat });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        body: { email: 'new@example.com', name: 'New User', accountType: 'pro' },
+        user: actor,
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(reserveTenantSeat).toHaveBeenCalledWith('tenant-1', expect.any(String), 'pro');
+      const actions = (deps.recordAuditEntry as jest.Mock).mock.calls.map(([e]) => e.action);
+      expect(actions).toContain('seat.reserved');
+    });
+
+    it('returns 409, rolls the user back, and emits seat.cap_denied when the cap refuses the seat', async () => {
+      const reserveTenantSeat = jest
+        .fn()
+        .mockResolvedValue({ ok: false, code: 'SEAT_CAP_REACHED' });
+      const deps = createDeps({
+        reserveTenantSeat,
+        deleteUserById: jest.fn().mockResolvedValue({ deletedCount: 1, message: 'deleted' }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        body: { email: 'new@example.com', name: 'New User', accountType: 'pro' },
+        user: actor,
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(409);
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ error_code: 'SEAT_CAP_REACHED' }),
+      );
+      expect(deps.deleteUserById).toHaveBeenCalledWith(expect.any(String));
+      expect(deps.upsertBalanceFields).not.toHaveBeenCalled();
+      const actions = (deps.recordAuditEntry as jest.Mock).mock.calls.map(([e]) => e.action);
+      expect(actions).toContain('seat.cap_denied');
+      expect(actions).not.toContain('user.created');
+    });
+
+    it('provisions as before when the tenant has no entitlement document', async () => {
+      const reserveTenantSeat = jest
+        .fn()
+        .mockResolvedValue({ ok: false, code: 'ENTITLEMENT_MISSING' });
+      const deps = createDeps({ reserveTenantSeat });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes({
+        body: { email: 'new@example.com', name: 'New User', accountType: 'pro' },
+        user: actor,
+      });
+
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(deps.upsertBalanceFields).toHaveBeenCalled();
+      const actions = (deps.recordAuditEntry as jest.Mock).mock.calls.map(([e]) => e.action);
+      expect(actions).not.toContain('seat.reserved');
+      expect(actions).not.toContain('seat.cap_denied');
+    });
+
+    it('skips and rolls back bulk rows whose seat the entitlement refuses', async () => {
+      let call = 0;
+      const reserveTenantSeat = jest.fn().mockImplementation(async () => {
+        call += 1;
+        return call === 1
+          ? { ok: true, summary: { plan: 'pro', seatLimit: 1, activeSeats: 1 } }
+          : { ok: false, code: 'SEAT_CAP_REACHED' };
+      });
+      const deps = createDeps({
+        reserveTenantSeat,
+        deleteUserById: jest.fn().mockResolvedValue({ deletedCount: 1, message: 'deleted' }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({
+        body: {
+          users: [
+            { email: 'first@example.com', name: 'First', accountType: 'pro' },
+            { email: 'second@example.com', name: 'Second', accountType: 'pro' },
+          ],
+        },
+        user: actor,
+      });
+
+      await handlers.bulkCreateUsers(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      const body = json.mock.calls[0][0];
+      expect(body.createdCount).toBe(1);
+      const seatSkip = body.skipped.find((s: { reason: string }) =>
+        s.reason.startsWith('seat not available'),
+      );
+      expect(seatSkip.email).toBe('second@example.com');
+      expect(deps.deleteUserById).toHaveBeenCalledTimes(1);
+      const actions = (deps.recordAuditEntry as jest.Mock).mock.calls.map(([e]) => e.action);
+      expect(actions).toContain('seat.cap_denied');
+      expect(actions).toContain('seat.reserved');
+    });
+
+    it('releases the seat when a user in a managed tenant is deleted', async () => {
+      const releaseTenantSeat = jest.fn().mockResolvedValue(true);
+      const deps = createDeps({
+        releaseTenantSeat,
+        findUsers: jest
+          .fn()
+          .mockResolvedValue([
+            { _id: new Types.ObjectId(validUserId), role: 'USER', tenantId: 'tenant-1' },
+          ]),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res } = createReqRes({
+        params: { id: validUserId },
+        user: { _id: new Types.ObjectId(), role: 'admin', tenantId: 'tenant-1' },
+      });
+
+      await handlers.deleteUser(req, res);
+
+      expect(releaseTenantSeat).toHaveBeenCalledWith('tenant-1', validUserId);
+      const actions = (deps.recordAuditEntry as jest.Mock).mock.calls.map(([e]) => e.action);
+      expect(actions).toContain('seat.released');
+    });
+  });
 });

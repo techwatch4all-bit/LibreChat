@@ -4,6 +4,7 @@ import { ACCOUNT_TYPES, logger, isValidObjectIdString, runAsSystem } from '@libr
 import type {
   AuditAction,
   AuditMetadata,
+  EntitlementSeatReservation,
   IUser,
   IConfig,
   AdminUserListItem,
@@ -14,6 +15,7 @@ import type {
   CreateUserRequest,
   RecordAuditEntryInput,
   RecordAuditEntryOptions,
+  TenantAccountType,
 } from '@librechat/data-schemas';
 import type { FilterQuery } from 'mongoose';
 import type { Response } from 'express';
@@ -298,6 +300,18 @@ export interface AdminUsersDeps {
   /** Kills every active session/JWT for the user, so a reset password takes
    * effect on the next login rather than at token expiry. */
   deleteAllUserSessions: (params: { userId: string }) => Promise<unknown>;
+  /** Entitlement-ledger seat management. Optional: when absent, provisioning
+   * behaves exactly as before (no seat accounting). When present, tenants with
+   * a TenantEntitlement get their seats reserved atomically against the
+   * operator-set caps; tenants WITHOUT an entitlement document are unmanaged
+   * (`ENTITLEMENT_MISSING`) and provision as before — a tenant is opted in by
+   * the operator creating its entitlement, never by a silent default. */
+  reserveTenantSeat?: (
+    tenantId: string,
+    subjectKey: string,
+    accountType: TenantAccountType,
+  ) => Promise<EntitlementSeatReservation>;
+  releaseTenantSeat?: (tenantId: string, subjectKey: string) => Promise<boolean>;
   recordAuditEntry?: (
     input: RecordAuditEntryInput,
     options?: RecordAuditEntryOptions,
@@ -343,6 +357,8 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     deleteConfig,
     deleteAclEntries,
     deleteAllUserSessions,
+    reserveTenantSeat,
+    releaseTenantSeat,
     recordAuditEntry,
   } = deps;
 
@@ -568,6 +584,30 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         return res.status(404).json({ error: 'User not found' });
       }
       userDeleted = true;
+      /** Release the entitlement seat the deleted user held. Best-effort: the
+       * user document is already gone, so a failed release is logged loudly —
+       * the assignment keeps consuming a seat until releaseTenantSeat succeeds
+       * for that subject key (delete the user again, or clear the assignment
+       * directly in the entitlement document). */
+      if (releaseTenantSeat && targetUser?.tenantId) {
+        const released = await releaseTenantSeat(targetUser.tenantId, id).catch(
+          (releaseError: unknown) => {
+            logger.error(
+              `[adminUsers] seat release failed for deleted user ${id} in tenant ${targetUser?.tenantId}:`,
+              releaseError,
+            );
+            return false;
+          },
+        );
+        if (released) {
+          await emitUserAudit(
+            req,
+            'seat.released',
+            { id: id, name: targetUser?.name, email: targetUser?.email },
+            { tenantId: targetUser.tenantId },
+          );
+        }
+      }
       let codeEnvironmentCleanupSafe = true;
       try {
         await revokeUserCodeEnvironmentWorkers?.(id);
@@ -712,6 +752,47 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       } as CreateUserRequest);
 
       const userId = created._id?.toString() ?? '';
+
+      /** Seat reservation runs before any other side effect so a refused seat
+       * leaves nothing to clean up but the user document itself. A tenant
+       * without an entitlement document (`ENTITLEMENT_MISSING`) is not under
+       * entitlement management and provisions as before; a managed tenant
+       * whose entitlement is inactive, does not cover the account type, or is
+       * out of seats refuses the seat (fail-closed). The user document is
+       * removed so the 409 never leaves a provisioned user without a seat. */
+      let seatReserved = false;
+      if (accountType.value && reserveTenantSeat && caller.tenantId) {
+        const reservation = await reserveTenantSeat(
+          caller.tenantId,
+          userId,
+          accountType.value as TenantAccountType,
+        );
+        if (!reservation.ok && reservation.code !== 'ENTITLEMENT_MISSING') {
+          await emitUserAudit(
+            req,
+            'seat.cap_denied',
+            { id: userId, name, email },
+            { reason: reservation.code, accountType: accountType.value },
+          );
+          const rollback = await deleteUserById(userId).catch((rollbackError: unknown) => {
+            logger.error(
+              '[adminUsers] CRITICAL: seat refused but the compensating delete failed — ' +
+                `user ${userId} exists without a reserved seat:`,
+              rollbackError,
+            );
+            return null;
+          });
+          if (!rollback || rollback.deletedCount === 0) {
+            logger.error(`[adminUsers] seat rollback did not remove user ${userId}`);
+          }
+          return res.status(409).json({
+            error: `Seat not available for account type '${accountType.value}': ${reservation.code}`,
+            error_code: reservation.code,
+          });
+        }
+        seatReserved = reservation.ok;
+      }
+
       const initialCredits = parseQuota(body.quota);
       await upsertBalanceFields(userId, {
         tokenCredits: initialCredits,
@@ -743,6 +824,17 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         { id: userId, name, email },
         { role, accountType: accountType.value },
       );
+      if (seatReserved) {
+        await emitUserAudit(
+          req,
+          'seat.reserved',
+          { id: userId, name, email },
+          {
+            accountType: accountType.value,
+            tenantId: caller.tenantId ?? null,
+          },
+        );
+      }
 
       return res.status(201).json({
         ok: true,
@@ -893,8 +985,61 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
 
       const idByEmail = new Map(inserted.map((doc) => [doc.email, doc._id.toString()]));
 
+      /** Per-row seat reservation against the caller's tenant entitlement,
+       * before balances or group membership: a row whose seat is refused is
+       * rolled back (its just-inserted document removed) and reported as
+       * skipped, so a capped roster never lands half-provisioned inside the
+       * entitlement. Unmanaged tenants (`ENTITLEMENT_MISSING`) provision as
+       * before. */
+      const seatDenied = new Set<string>();
+      const seatReservedEmails = new Set<string>();
+      if (reserveTenantSeat && caller.tenantId) {
+        for (const { candidate } of prepared) {
+          const userId = idByEmail.get(candidate.email);
+          if (!userId || !candidate.accountType) {
+            continue;
+          }
+          const reservation = await reserveTenantSeat(
+            caller.tenantId,
+            userId,
+            candidate.accountType as TenantAccountType,
+          );
+          if (reservation.ok) {
+            seatReservedEmails.add(candidate.email);
+            continue;
+          }
+          if (reservation.code === 'ENTITLEMENT_MISSING') {
+            continue;
+          }
+          await emitUserAudit(
+            req,
+            'seat.cap_denied',
+            { id: userId, name: candidate.name, email: candidate.email },
+            { reason: reservation.code, accountType: candidate.accountType },
+          );
+          const rollback = await deleteUserById(userId).catch((rollbackError: unknown) => {
+            logger.error(
+              '[adminUsers] CRITICAL: bulk seat refused but the compensating delete failed — ' +
+                `user ${userId} exists without a reserved seat:`,
+              rollbackError,
+            );
+            return null;
+          });
+          if (!rollback || rollback.deletedCount === 0) {
+            logger.error(`[adminUsers] bulk seat rollback did not remove user ${userId}`);
+          }
+          seatDenied.add(candidate.email);
+          skipped.push({
+            email: candidate.email,
+            reason: `seat not available: ${reservation.code}`,
+          });
+        }
+      }
+
       const balances: BulkBalanceDocument[] = prepared
-        .filter(({ candidate }) => idByEmail.has(candidate.email))
+        .filter(
+          ({ candidate }) => idByEmail.has(candidate.email) && !seatDenied.has(candidate.email),
+        )
         .map(({ candidate }) => ({
           userId: idByEmail.get(candidate.email) as string,
           tokenCredits: candidate.quota,
@@ -912,7 +1057,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       const groupMembers = new Map<string, string[]>();
       for (const { candidate } of prepared) {
         const userId = idByEmail.get(candidate.email);
-        if (!userId) {
+        if (!userId || seatDenied.has(candidate.email)) {
           continue;
         }
         const names = new Set<string>();
@@ -942,7 +1087,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           group: candidate.group ?? '',
           tempPassword,
         }))
-        .filter((slip) => slip.id !== null);
+        .filter((slip) => slip.id !== null && !seatDenied.has(slip.email));
 
       logger.info(
         `[adminUsers] bulk provisioned ${slips.length} seat(s), skipped ${skipped.length} ` +
@@ -960,6 +1105,17 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
             group: slip.group,
           },
         );
+        if (seatReservedEmails.has(slip.email)) {
+          await emitUserAudit(
+            req,
+            'seat.reserved',
+            { id: slip.id ?? '', name: slip.name, email: slip.email },
+            {
+              accountType: slip.accountType,
+              tenantId: caller.tenantId ?? null,
+            },
+          );
+        }
       }
 
       return res.status(200).json({

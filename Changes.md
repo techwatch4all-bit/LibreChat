@@ -19,7 +19,7 @@ remain.
    `group`, `user`, `entitlement`; new actions `role.created/updated/deleted/
    permissions_updated`, `group.created/updated/deleted/member_added/member_removed`,
    `user.created/updated/deleted/bulk_created/password_reset`, `payment.approved/rejected`,
-   `entitlement.set`.
+   `entitlement.set`, and `seat.reserved/released/cap_denied`.
 2. **Unaudited operator mutations now audited** — `admin/groups.ts` (all five mutations),
    `admin/users.ts` (create/update/delete/bulk + the reset-password route, which moved from
    inline CJS logic into a `resetPassword` factory handler per the module-boundary rule),
@@ -51,6 +51,20 @@ remain.
    the corpus's 503 `budget_reservation_unavailable` failures clear with it.
 6. **Known remaining audit surface** (operator-only, lower risk): config, code-environment,
    skills-sync and langfuse admin mutations.
+7. **Seat reservation wired into provisioning** (`admin/users.ts`, shipped with this entry):
+   `createUserHandler` reserves the seat atomically after the user document is created and
+   before any other side effect — a refused seat (`SEAT_CAP_REACHED`,
+   `ENTITLEMENT_INACTIVE`, `ACCOUNT_TYPE_NOT_ALLOCATED`) is answered 409 with the data
+   layer's code, audited `seat.cap_denied`, and the just-created document is removed so a
+   409 never leaves a provisioned user without a seat. `bulkCreateUsersHandler` reserves
+   per row: refused rows are rolled back and reported in `skipped` with
+   `seat not available: <code>`, excluded from balances, group membership and credential
+   slips. `deleteUserHandler` releases the deleted user's assignment (`seat.released`,
+   best-effort). Tenants without a `TenantEntitlement` document are **unmanaged**
+   (`ENTITLEMENT_MISSING`) and provision exactly as before — a tenant is opted in by the
+   operator creating its entitlement, never by a silent default. The subject key is the
+   user's ObjectId (matches the opaque-key pattern; re-keyed if seat-token issuance later
+   aliases seats). Admin suites 835/835.
 
 ## 2026-11-10 — A26 & A27: Landing zero-height overlap eliminated, mandala hero restored, Bifrost customer attribution
 

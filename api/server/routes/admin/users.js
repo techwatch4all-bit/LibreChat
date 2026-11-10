@@ -108,6 +108,8 @@ const handlers = createAdminUsersHandlers({
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,
   deleteAllUserSessions: (params) => db.deleteAllUserSessions(params),
+  reserveTenantSeat: db.reserveTenantSeat,
+  releaseTenantSeat: db.releaseTenantSeat,
   recordAuditEntry: db.recordAuditEntry,
 });
 

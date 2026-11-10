@@ -18,11 +18,15 @@ import {
   isProcessMCPServerField,
 } from 'librechat-data-provider';
 import type {
+  AuditAction,
+  AuditMetadata,
   AppConfig,
   ConfigSection,
   IConfig,
   SystemCapability,
   ConfigOverrideIssue,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
 } from '@librechat/data-schemas';
 import type { TCustomConfig } from 'librechat-data-provider';
 import type { Types, ClientSession } from 'mongoose';
@@ -41,6 +45,7 @@ import {
   preserveConfigSecrets,
   redactConfigSecrets,
 } from './secrets';
+import { buildAuditContext } from './context';
 
 const UNSAFE_SEGMENTS = /(?:^|\.)(__[\w]*|constructor|prototype)(?:\.|$)/;
 const MAX_PATCH_ENTRIES = 100;
@@ -251,6 +256,10 @@ export interface AdminConfigDeps {
   }) => Promise<AppConfig>;
   /** Invalidate all config-related caches after a mutation. */
   invalidateConfigCaches?: (tenantId?: string) => Promise<void>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 }
 
 // ── Validation helpers ───────────────────────────────────────────────
@@ -481,7 +490,37 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
     hasCapability = async () => false,
     getAppConfig,
     invalidateConfigCaches,
+    recordAuditEntry,
   } = deps;
+
+  /** Emits one hash-chained audit entry for a config mutation. Fail-open with a
+   * loud error: the override has already been applied and cache-invalidated by
+   * the time the audit runs, and an override write has no compensation this
+   * handler can perform. */
+  async function emitConfigAudit(
+    req: ServerRequest,
+    action: AuditAction,
+    principalType: PrincipalType,
+    principalId: string,
+    metadata: AuditMetadata = {},
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const caller = getCapabilityUser(req);
+    if (!caller || !caller.id) return;
+    try {
+      await recordAuditEntry({
+        action,
+        outcome: 'success',
+        severity: action === 'config.deleted' ? 'warning' : 'info',
+        actor: { type: 'user', id: caller.id, name: caller.id },
+        target: { type: principalType, id: principalId, name: principalId },
+        metadata,
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error(`[adminConfig] ${action} audit failed after the write took effect`, err);
+    }
+  }
 
   /** The deployment's `librechat.yaml` config, which overrides are validated on top of. */
   async function getBaseYamlConfig(tenantId?: string): Promise<Partial<TCustomConfig>> {
@@ -800,6 +839,11 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after upsert:', err),
       );
+      await emitConfigAudit(req, 'config.updated', principalType, principalId, {
+        sections: overrideSections.join(','),
+        priority: requestedPriority,
+        configVersion: config?.configVersion ?? null,
+      });
       return res.status(config?.configVersion === 1 ? 201 : 200).json({
         config: config ? redactConfigForResponse(config) : config,
       });
@@ -970,6 +1014,9 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after patch:', err),
       );
+      await emitConfigAudit(req, 'config.updated', principalType, principalId, {
+        fields: Object.keys(preservedFields).join(','),
+      });
       return res.status(200).json({ config: config ? redactConfigForResponse(config) : config });
     } catch (error) {
       logger.error('[adminConfig] patchConfigField error:', error);
@@ -1083,6 +1130,10 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after field tombstone:', err),
       );
+      await emitConfigAudit(req, 'config.updated', principalType, principalId, {
+        fieldPath,
+        operation: 'tombstone',
+      });
       return res.status(200).json({ config: config ? redactConfigForResponse(config) : config });
     } catch (error) {
       logger.error('[adminConfig] tombstoneConfigField error:', error);
@@ -1174,6 +1225,10 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after field delete:', err),
       );
+      await emitConfigAudit(req, 'config.deleted', principalType, principalId, {
+        fieldPath,
+        operation: 'field_delete',
+      });
       return res.status(200).json({ config: redactConfigForResponse(config) });
     } catch (error) {
       logger.error('[adminConfig] deleteConfigField error:', error);
@@ -1231,6 +1286,9 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after config delete:', err),
       );
+      await emitConfigAudit(req, 'config.deleted', principalType, principalId, {
+        operation: 'overrides_delete',
+      });
       return res.status(200).json({ success: true });
     } catch (error) {
       logger.error('[adminConfig] deleteConfigOverrides error:', error);
@@ -1293,6 +1351,10 @@ export function createAdminConfigHandlers(deps: AdminConfigDeps): {
       invalidateConfigCaches?.(user.tenantId)?.catch((err) =>
         logger.error('[adminConfig] Cache invalidation failed after toggle:', err),
       );
+      await emitConfigAudit(req, 'config.updated', principalType, principalId, {
+        operation: 'toggle_active',
+        isActive,
+      });
       return res.status(200).json({ config: redactConfigForResponse(config) });
     } catch (error) {
       logger.error('[adminConfig] toggleConfig error:', error);

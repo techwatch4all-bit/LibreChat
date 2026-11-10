@@ -9,7 +9,12 @@ import type {
   TLangfuseConnectionTestResponse,
   TLangfuseSessionLinkResponse,
 } from 'librechat-data-provider';
-import type { IConfig, MessageMethods } from '@librechat/data-schemas';
+import type {
+  IConfig,
+  MessageMethods,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
+} from '@librechat/data-schemas';
 import type { Types, ClientSession } from 'mongoose';
 import type { Response } from 'express';
 import type { LangfuseTenantDestination } from '~/langfuse/tenantDestinations';
@@ -24,6 +29,7 @@ import { scopeHeadersToDestination } from '~/langfuse/destinations';
 import { isLangfuseConnectionAvailable } from '~/langfuse/policy';
 import { resolveLangfuseSession } from '~/langfuse/session';
 import { mergeHeaders } from '~/utils/headers';
+import { buildAuditContext } from './context';
 
 const DEFAULT_PRIORITY = 10;
 const ENCRYPTED_PREFIX = 'v3:';
@@ -72,6 +78,10 @@ export interface AdminLangfuseDeps {
   ) => Promise<IConfig | null>;
   getMessages: MessageMethods['getMessages'];
   invalidateConfigCaches?: (tenantId?: string) => Promise<void>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
   recordConnectionUpdate?: (event: LangfuseConnectionEvent) => void;
 }
 
@@ -292,9 +302,40 @@ export function createAdminLangfuseHandlers(deps: AdminLangfuseDeps): {
     toggleConfigActive,
     getMessages,
     invalidateConfigCaches,
+    recordAuditEntry,
     recordConnectionUpdate = (event) =>
       logger.info({ message: '[adminLangfuse] Connection updated', ...event }),
   } = deps;
+
+  /** Emits the hash-chained audit entry for a connection change. Fail-open
+   * with a loud error: the override is applied and cache-invalidated before the
+   * audit runs, and the handler cannot compensate it. */
+  async function emitLangfuseAudit(
+    req: ServerRequest,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?._id?.toString() ?? user?.id;
+    if (!user || !userId) return;
+    try {
+      await recordAuditEntry({
+        action: 'config.updated',
+        outcome: 'success',
+        severity: 'warning',
+        actor: {
+          type: 'user',
+          id: userId,
+          name: user.name || user.username || user.email || userId,
+        },
+        target: { type: PrincipalType.ROLE, id: BASE_CONFIG_PRINCIPAL_ID, name: 'langfuse' },
+        metadata: { operation: 'langfuse_connection', ...metadata },
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error('[adminLangfuse] config.updated audit failed after the write took effect', err);
+    }
+  }
 
   function findBaseConfig(options?: { includeInactive?: boolean }): Promise<IConfig | null> {
     return options
@@ -469,6 +510,13 @@ export function createAdminLangfuseHandlers(deps: AdminLangfuseDeps): {
       invalidateConfigCaches?.(getTenantId(req))?.catch((err) =>
         logger.error('[adminLangfuse] Cache invalidation failed after update:', err),
       );
+
+      await emitLangfuseAudit(req, {
+        configured: status.configured,
+        enabled: status.enabled,
+        destination: status.destination,
+        verification_result: connectionChanged ? 'success' : 'skipped',
+      });
 
       return res.status(200).json(status);
     } catch (error) {

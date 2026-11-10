@@ -93,6 +93,8 @@ export const AUDIT_ACTIONS = [
   'seat.reserved',
   'seat.released',
   'seat.cap_denied',
+  'config.updated',
+  'config.deleted',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -122,6 +124,8 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'seat.reserved': 'entitlement',
   'seat.released': 'entitlement',
   'seat.cap_denied': 'entitlement',
+  'config.updated': 'config',
+  'config.deleted': 'config',
 };
 
 /** Result of the audited operation. Kept first-class instead of being encoded

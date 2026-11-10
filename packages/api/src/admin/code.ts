@@ -1,11 +1,15 @@
+import { logger } from '@librechat/data-schemas';
 import { EModelEndpoint, isSecureCodeEnvironmentControlURL } from 'librechat-data-provider';
-
-import type { AppConfig } from '@librechat/data-schemas';
+import type {
+  AppConfig,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
+} from '@librechat/data-schemas';
 import type { Response } from 'express';
 import type { GetAppConfigOptions } from '~/app/service';
 import type { ServerRequest } from '~/types/http';
-
 import { getCodeApiTenantId } from '~/auth/codeapi';
+import { buildAuditContext } from './context';
 
 const CODE_BRIDGE_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -36,6 +40,10 @@ export interface AdminCodeEnvironmentDeps {
   resolveTenantId?: (req: ServerRequest) => string;
   readSecret?: (name: string) => string | undefined;
   fetchImpl?: FetchImpl;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 }
 
 function environmentId(req: ServerRequest): string {
@@ -94,6 +102,7 @@ export function createAdminCodeEnvironmentHandlers(deps: AdminCodeEnvironmentDep
   revokeWorker: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
   const fetchImpl = deps.fetchImpl ?? fetch;
+  const { recordAuditEntry } = deps;
   const resolveTenantId = deps.resolveTenantId ?? getCodeApiTenantId;
   const readSecret =
     deps.readSecret ??
@@ -171,6 +180,7 @@ export function createAdminCodeEnvironmentHandlers(deps: AdminCodeEnvironmentDep
       if (!validPairingResponse(payload, resolved.pairing.workerId)) {
         return res.status(502).json({ error: 'Code API returned an invalid pairing response' });
       }
+      await emitCodeAudit(req, 'code_pairing_created', resolved.id, payload.workerId);
       return res.status(200).json({
         environmentId: resolved.id,
         workerId: payload.workerId,
@@ -213,6 +223,7 @@ export function createAdminCodeEnvironmentHandlers(deps: AdminCodeEnvironmentDep
       if (!validRevocationResponse(payload)) {
         return res.status(502).json({ error: 'Code API returned an invalid revocation response' });
       }
+      await emitCodeAudit(req, 'code_worker_revoked', resolved.id, resolved.pairing.workerId);
       return res.status(200).json({
         environmentId: resolved.id,
         workerId: resolved.pairing.workerId,
@@ -225,6 +236,34 @@ export function createAdminCodeEnvironmentHandlers(deps: AdminCodeEnvironmentDep
           ? 'Code API revocation request timed out'
           : 'Code API revocation request failed',
       });
+    }
+  }
+
+  /** Emits the hash-chained audit entry for a code-environment bridge op.
+   * Fail-open with a loud error: the bridge call has already succeeded and the
+   * handler cannot compensate it. */
+  async function emitCodeAudit(
+    req: ServerRequest,
+    operation: string,
+    environmentId: string,
+    workerId: string,
+  ): Promise<void> {
+    if (!recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?.id ?? user?._id?.toString?.();
+    if (!user || !userId) return;
+    try {
+      await recordAuditEntry({
+        action: 'config.updated',
+        outcome: 'success',
+        severity: 'warning',
+        actor: { type: 'user', id: userId, name: userId },
+        target: { type: 'deployment', id: environmentId, name: environmentId },
+        metadata: { operation, workerId },
+        context: buildAuditContext(req),
+      });
+    } catch (err) {
+      logger.error('[adminCode] config.updated audit failed after the bridge call succeeded', err);
     }
   }
 

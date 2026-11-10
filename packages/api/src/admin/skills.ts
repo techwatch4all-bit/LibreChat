@@ -1,5 +1,14 @@
-import { SystemCapabilities } from '@librechat/data-schemas';
 import { skillSyncConfigSchema } from 'librechat-data-provider';
+import { logger, SystemCapabilities } from '@librechat/data-schemas';
+import type {
+  ISkillSyncStatus,
+  SkillSyncProvider,
+  SkillSyncCredentialSummary,
+  UpsertSkillSyncCredentialInput,
+  SystemCapability,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
+} from '@librechat/data-schemas';
 import type {
   TGitHubSkillSyncStatusResponse,
   TGitHubSkillSyncSourceStatus,
@@ -7,13 +16,6 @@ import type {
   TGitHubSkillSyncManualRunResponse,
   SkillSyncConfig,
 } from 'librechat-data-provider';
-import type {
-  ISkillSyncStatus,
-  SkillSyncProvider,
-  SkillSyncCredentialSummary,
-  UpsertSkillSyncCredentialInput,
-  SystemCapability,
-} from '@librechat/data-schemas';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { Types } from 'mongoose';
 import type { GitHubSkillSyncRunner } from '~/skills/sync';
@@ -61,6 +63,10 @@ export type AdminSkillSyncDeps = {
     provider: SkillSyncProvider,
     credentialKey: string,
   ) => Promise<{ deleted: boolean }>;
+  recordAuditEntry?: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>;
 };
 
 export type AdminSkillSyncAccessDeps = {
@@ -383,9 +389,36 @@ export function createAdminSkillsSyncHandlers(deps: AdminSkillSyncDeps): AdminSk
     return res.status(200).json(response);
   }
 
+  /** Emits the hash-chained audit entry for a sync or credential mutation.
+   * Fail-open with a loud error: the mutation has already taken effect when the
+   * audit runs and the handler cannot compensate it. */
+  async function emitSkillSyncAudit(
+    req: AdminSkillsRequest,
+    metadata: Record<string, string | number | boolean | null>,
+  ): Promise<void> {
+    if (!deps.recordAuditEntry) return;
+    const user = req.user;
+    const userId = user?.id ?? user?._id?.toString?.();
+    if (!user || !userId) return;
+    try {
+      await deps.recordAuditEntry({
+        action: 'config.updated',
+        outcome: 'success',
+        severity: 'info',
+        actor: { type: 'user', id: userId, name: userId },
+        target: { type: 'config', id: 'skills-sync', name: 'skills-sync' },
+        metadata,
+        context: { ip: req.ip, userAgent: req.headers?.['user-agent'] as string | undefined },
+      });
+    } catch (err) {
+      logger.error('[adminSkills] config.updated audit failed after the write took effect', err);
+    }
+  }
+
   async function runSync(req: AdminSkillsRequest, res: Response) {
     const includeCredentialMetadata = req.skillSyncCanReadCredentials === true;
     const result = await getRunner(req).runOnce();
+    await emitSkillSyncAudit(req, { operation: 'skills_sync_run', result: result.status });
     const response: TGitHubSkillSyncManualRunResponse = {
       status: result.status,
       message: result.message,
@@ -411,6 +444,7 @@ export function createAdminSkillsSyncHandlers(deps: AdminSkillSyncDeps): AdminSk
       token: token.trim(),
       userId: getUserObjectId(req),
     });
+    await emitSkillSyncAudit(req, { operation: 'skills_credential_set', credentialKey });
     return res.status(200).json(serializeCredential(credential));
   }
 
@@ -420,6 +454,11 @@ export function createAdminSkillsSyncHandlers(deps: AdminSkillSyncDeps): AdminSk
       return res.status(400).json({ error: 'Invalid credential key' });
     }
     const result = await deps.deleteCredential('github', credentialKey);
+    await emitSkillSyncAudit(req, {
+      operation: 'skills_credential_deleted',
+      credentialKey,
+      deleted: result.deleted,
+    });
     return res.status(200).json({ credentialKey, deleted: result.deleted });
   }
 

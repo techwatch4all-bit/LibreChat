@@ -8,6 +8,25 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-10 — Seat-token issuance: design ready, implementation deferred (one-api WIP in flight)
+
+Investigated and recorded; not implemented because the operator's one-api working tree is
+mid-WIP in exactly this area (analytics routes, VK rotation in `router/api.go`). The
+endpoint exists in committed HEAD and on the running gateway: `POST /api/tenant/:id/token`
+(`controller/tenant_token.go:33`; the bearer key is returned only at creation). Auth chain
+is one-api `UserAuth`/`AdminAuth` + `RequirePermission('tenant','seat_manage')`
+(`middleware/permission.go:15`); the one-api ROOT access token satisfies it as superuser.
+
+**Design:** on `createUser` in a managed tenant, after the local `reserveTenantSeat`
+succeeds, call the endpoint with the root access token stored in LibreChat `.env`
+(operator machine only — never client-side, per the zero-knowledge rule), persist the
+returned bearer into `User.seatToken` (`select:false`, read by `jwtStrategy.js`), and
+surface `seatTokenHint` (already projected in the users list). One-api 409 (its own cap)
+⇒ compensating local `releaseTenantSeat` + 409; other one-api failures ⇒ operator
+decision needed on the dual-ledger consistency policy (fail the create vs proceed
+local-only). First issuance also populates `tenant_seat_aliases` (currently empty dark
+code).
+
 ## 2026-11-10 — Product recommendations, universal legal disclaimers & click-and-go suggested questions
 
 1. **Product & Brand Recommendations Contract**:

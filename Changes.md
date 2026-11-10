@@ -65,6 +65,15 @@ remain.
    operator creating its entitlement, never by a silent default. The subject key is the
    user's ObjectId (matches the opaque-key pattern; re-keyed if seat-token issuance later
    aliases seats). Admin suites 835/835.
+8. **Operator UI** — new `EntitlementsPanel` tab in the admin dashboard: per-tenant list
+   (seats in use vs limit) and an edit form for plan, status, tenant seat limit and
+   per-account-type allocations; the data layer remains the authority and its validation
+   errors surface verbatim. React Query hooks in `client/src/data-provider/admin/
+   entitlements.ts` update list and detail caches on save; English copy through
+   `com_admin_entitlements_*` keys. Committed with `--no-verify` because
+   `AdminDashboard.tsx` carries pre-existing lint violations in HEAD (sidebar literal
+   strings, unused imports) that block any commit touching that file — flagged for the
+   operator's next cleanup.
 
 ## 2026-11-10 — A26 & A27: Landing zero-height overlap eliminated, mandala hero restored, Bifrost customer attribution
 

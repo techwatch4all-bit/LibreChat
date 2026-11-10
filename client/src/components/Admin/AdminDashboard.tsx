@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Search,
   FolderLock,
+  Landmark,
 } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { useUsersQuery } from '~/data-provider/admin/users';
@@ -27,8 +28,17 @@ import GroupsPanel from './GroupsPanel';
 import AuditLogPanel from './AuditLogPanel';
 import ReconciliationPanel from './ReconciliationPanel';
 import VaultsPanel from './VaultsPanel';
+import EntitlementsPanel from './EntitlementsPanel';
 
-type AdminTab = 'overview' | 'users' | 'roles' | 'groups' | 'vaults' | 'reconciliation' | 'audit';
+type AdminTab =
+  | 'overview'
+  | 'users'
+  | 'roles'
+  | 'groups'
+  | 'vaults'
+  | 'entitlements'
+  | 'reconciliation'
+  | 'audit';
 
 export default function AdminDashboard(): JSX.Element {
   const localize = useLocalize();
@@ -86,6 +96,12 @@ export default function AdminDashboard(): JSX.Element {
       icon: ReceiptIndianRupee,
       badge: pendingPaymentsCount > 0 ? pendingPaymentsCount : undefined,
       badgeColor: 'bg-amber-500 text-white',
+    },
+    {
+      id: 'entitlements' as const,
+      name: localize('com_admin_entitlements_title') || 'Entitlements',
+      icon: Landmark,
+      badge: undefined,
     },
     {
       id: 'audit' as const,
@@ -267,6 +283,12 @@ export default function AdminDashboard(): JSX.Element {
           {activeTab === 'reconciliation' && (
             <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
               <ReconciliationPanel />
+            </div>
+          )}
+
+          {activeTab === 'entitlements' && (
+            <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+              <EntitlementsPanel />
             </div>
           )}
 

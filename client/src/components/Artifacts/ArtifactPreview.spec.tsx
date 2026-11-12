@@ -51,4 +51,43 @@ describe('ArtifactPreview', () => {
     expect(screen.getByTestId('sandpack-provider')).toBeInTheDocument();
     expect(screen.queryByTitle('Artifact Preview')).toBeNull();
   });
+
+  it('inlines /assets/vendor/ scripts with same-origin credentials for Cloudflare Access compatibility', async () => {
+    const previewRef = {
+      current: undefined,
+    } as unknown as React.MutableRefObject<SandpackPreviewRef>;
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'window.THREE = { ok: true };',
+    }) as unknown as typeof fetch;
+
+    try {
+      render(
+        <ArtifactPreview
+          files={{
+            '/index.html':
+              '<html><head><script src="/assets/vendor/three/three.min.js"></script></head><body></body></html>',
+          }}
+          fileKey="/index.html"
+          template="static"
+          sharedProps={{}}
+          previewRef={previewRef}
+        />,
+      );
+
+      const iframe = (await screen.findByTitle('Artifact Preview')) as HTMLIFrameElement;
+      expect(global.fetch).toHaveBeenCalledWith('/assets/vendor/three/three.min.js', {
+        credentials: 'same-origin',
+      });
+      expect(iframe.getAttribute('srcdoc')).toContain(
+        '<script>window.THREE = { ok: true };</script>',
+      );
+      expect(iframe.getAttribute('srcdoc')).not.toContain(
+        'src="/assets/vendor/three/three.min.js"',
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

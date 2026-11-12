@@ -8,6 +8,28 @@ import type { SandpackStartupConfig } from '~/utils/artifacts';
 import type { ArtifactFiles } from '~/common';
 import { sharedFiles, buildSandpackOptions } from '~/utils/artifacts';
 
+const VENDOR_SCRIPT_RE =
+  /<script\b[^>]*\bsrc=["'](\/assets\/vendor\/[^"']+)["'][^>]*>\s*<\/script>/gi;
+const vendorScriptCache = new Map<string, string>();
+
+async function loadVendorScript(path: string): Promise<string | null> {
+  const cached = vendorScriptCache.get(path);
+  if (cached !== undefined) {
+    return cached;
+  }
+  try {
+    const res = await fetch(path, { credentials: 'same-origin' });
+    if (!res.ok) {
+      return null;
+    }
+    const text = await res.text();
+    vendorScriptCache.set(path, text);
+    return text;
+  } catch {
+    return null;
+  }
+}
+
 function injectBaseHref(html: string, origin: string): string {
   if (!origin || /<base\s/i.test(html)) {
     return html;
@@ -37,6 +59,7 @@ export const ArtifactPreview = memo(function ({
   startupConfig?: SandpackStartupConfig;
 }) {
   const [staticRefreshKey, setStaticRefreshKey] = useState(0);
+  const [resolvedStaticHtml, setResolvedStaticHtml] = useState<string | null>(null);
 
   const artifactFiles = useMemo(() => {
     if (Object.keys(files).length === 0) {
@@ -52,7 +75,7 @@ export const ArtifactPreview = memo(function ({
     };
   }, [currentCode, files, fileKey]);
 
-  const staticHtml = useMemo(() => {
+  const rawStaticHtml = useMemo(() => {
     if (template !== 'static') {
       return null;
     }
@@ -64,6 +87,40 @@ export const ArtifactPreview = memo(function ({
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     return injectBaseHref(raw, origin);
   }, [artifactFiles, fileKey, template]);
+
+  useEffect(() => {
+    if (rawStaticHtml === null) {
+      setResolvedStaticHtml(null);
+      return;
+    }
+
+    const matches = [...rawStaticHtml.matchAll(VENDOR_SCRIPT_RE)];
+    if (matches.length === 0 || typeof fetch !== 'function') {
+      setResolvedStaticHtml(rawStaticHtml);
+      return;
+    }
+
+    let cancelled = false;
+    const paths = [...new Set(matches.map((m) => m[1]))];
+    Promise.all(paths.map(async (p) => [p, await loadVendorScript(p)] as const)).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+      const map = new Map(entries);
+      const inlined = rawStaticHtml.replace(VENDOR_SCRIPT_RE, (full, src: string) => {
+        const code = map.get(src);
+        if (!code) {
+          return full;
+        }
+        return `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
+      });
+      setResolvedStaticHtml(inlined);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawStaticHtml]);
 
   useEffect(() => {
     if (template !== 'static' || !previewRef) {
@@ -90,16 +147,20 @@ export const ArtifactPreview = memo(function ({
     return null;
   }
 
-  if (template === 'static' && staticHtml !== null) {
+  if (template === 'static' && resolvedStaticHtml !== null) {
     return (
       <iframe
         key={staticRefreshKey}
         title="Artifact Preview"
-        srcDoc={staticHtml}
+        srcDoc={resolvedStaticHtml}
         sandbox="allow-scripts allow-downloads allow-popups allow-forms"
         className="h-full w-full border-0 bg-[#07111f]"
       />
     );
+  }
+
+  if (template === 'static') {
+    return null;
   }
 
   return (

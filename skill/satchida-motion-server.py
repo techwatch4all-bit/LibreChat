@@ -37,9 +37,11 @@ VENDOR_ASSET_MAP = {
 
 
 def _unwrap_html(raw: str) -> str:
-    """Strip an outer LibreChat :::artifact{...} wrapper or markdown fence if present."""
+    """Strip any preamble, outer LibreChat :::artifact{...} wrapper, or markdown fence if present."""
     text = raw.strip()
-    if text.startswith(":::artifact"):
+    m = re.search(r"^:::artifact\{", text, re.MULTILINE)
+    if m:
+        text = text[m.start():]
         lines = text.splitlines()
         if lines and lines[0].lstrip().startswith(":::artifact"):
             lines = lines[1:]
@@ -54,9 +56,15 @@ def _unwrap_html(raw: str) -> str:
 
 def _wrap_template_artifact(style: str, title: str, html: str) -> str:
     slug = re.sub(r"[^a-z0-9-]+", "-", style.lower()).strip("-") or "simulation"
+    extra = (
+        "\nIMPORTANT: Keep ALL `<style>` and ALL `<script>` functions (`draw2D`, `init3D`, `setViewMode`, `handleResize`) "
+        "100% VERBATIM — only edit the `PLAN` object and `#title-badge`, OR call `build_cad_floorplan` with your custom JSON.\n"
+        if slug == "cad-blueprint"
+        else ""
+    )
     return (
         f"Customize the HTML below and deliver your final response wrapped identically inside "
-        f"`:::artifact{{...}}` + ````html ... ```` + `:::`:\n\n"
+        f"`:::artifact{{...}}` + ````html ... ```` + `:::`:\n{extra}\n"
         f":::artifact{{identifier=\"motion-{slug}\" type=\"text/html\" title=\"{title}\"}}\n"
         f"````html\n{html.strip()}\n````\n"
         f":::"
@@ -595,19 +603,19 @@ def get_motion_template(style: str = "executive") -> str:
         ctx.fillStyle = "#7dd3fc";
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(px(0), py(0) - 22); ctx.lineTo(px(40), py(0) - 22);
+        ctx.moveTo(px(0), py(0) - 22); ctx.lineTo(px(PLAN.width), py(0) - 22);
         ctx.moveTo(px(0), py(0) - 27); ctx.lineTo(px(0), py(0) - 17);
-        ctx.moveTo(px(40), py(0) - 27); ctx.lineTo(px(40), py(0) - 17);
-        ctx.moveTo(px(0) - 22, py(0)); ctx.lineTo(px(0) - 22, py(35));
+        ctx.moveTo(px(PLAN.width), py(0) - 27); ctx.lineTo(px(PLAN.width), py(0) - 17);
+        ctx.moveTo(px(0) - 22, py(0)); ctx.lineTo(px(0) - 22, py(PLAN.depth));
         ctx.moveTo(px(0) - 27, py(0)); ctx.lineTo(px(0) - 17, py(0));
-        ctx.moveTo(px(0) - 27, py(35)); ctx.lineTo(px(0) - 17, py(35));
+        ctx.moveTo(px(0) - 27, py(PLAN.depth)); ctx.lineTo(px(0) - 17, py(PLAN.depth));
         ctx.stroke();
         ctx.font = "600 11px Inter, system-ui, sans-serif";
-        ctx.fillText("40 ft (12.2 m)", px(20), py(0) - 29);
+        ctx.fillText(`${PLAN.width} ft (${(PLAN.width * 0.3048).toFixed(1)} m)`, px(PLAN.width / 2), py(0) - 29);
         ctx.save();
-        ctx.translate(px(0) - 32, py(17.5));
+        ctx.translate(px(0) - 32, py(PLAN.depth / 2));
         ctx.rotate(-Math.PI / 2);
-        ctx.fillText("35 ft (10.7 m)", 0, 0);
+        ctx.fillText(`${PLAN.depth} ft (${(PLAN.depth * 0.3048).toFixed(1)} m)`, 0, 0);
         ctx.restore();
       }
     }
@@ -1163,6 +1171,54 @@ def get_motion_template(style: str = "executive") -> str:
 </body>
 </html>""",
     )
+
+
+@mcp.tool()
+def build_cad_floorplan(
+    title: str = "1,400 sq ft 3BHK Apartment (40' × 35')",
+    width: float = 40.0,
+    depth: float = 35.0,
+    rooms_json: str = "[]",
+    walls_json: str = "[]",
+    furniture_json: str = "[]",
+) -> str:
+    """
+    Build a complete, verified 2D CAD Blueprint + 3D Three.js Extruded Structure HTML artifact
+    from custom floor-plan JSON without rewriting the rendering engine.
+    - rooms_json: JSON array of {id, name, x, z, w, d, floor?, tint?}
+    - walls_json: JSON array of {x1, z1, x2, z2, t, kind: 'ext'|'int'|'rail', openings: [{at, len, kind: 'win'|'door'|'open', swing?: 1|-1}]}
+    - furniture_json: JSON array of {type, x, z, w, d, h, color?}
+    """
+    base_wrapped = get_motion_template("cad_blueprint")
+    html = _unwrap_html(base_wrapped)
+    rooms = json.loads(rooms_json) if rooms_json.strip() not in ("", "[]") else None
+    walls = json.loads(walls_json) if walls_json.strip() not in ("", "[]") else None
+    furniture = json.loads(furniture_json) if furniture_json.strip() not in ("", "[]") else None
+
+    if rooms is not None or walls is not None or furniture is not None:
+        plan_obj = {
+            "width": float(width),
+            "depth": float(depth),
+            "rooms": rooms if rooms is not None else [],
+            "walls": walls if walls is not None else [],
+            "furniture": furniture if furniture is not None else [],
+        }
+        plan_js = f"const PLAN = {json.dumps(plan_obj, indent=2)};"
+        html = re.sub(
+            r"const PLAN = \{[\s\S]*?\n    \};",
+            plan_js,
+            html,
+            count=1,
+        )
+
+    safe_title = title.replace("<", "&lt;").replace(">", "&gt;")
+    html = re.sub(
+        r"<h1>[\s\S]*?</h1>",
+        f"<h1>{safe_title}</h1>",
+        html,
+        count=1,
+    )
+    return _wrap_template_artifact("cad_blueprint", safe_title, html)
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ def _rewrite_vendor_paths(html_content: str) -> str:
 
 @mcp.tool()
 def render_motion_to_video(
-    html_content: str,
+    html_content: str = "",
     filename: str = "",
     duration_seconds: float = 6.0,
     fps: int = 30,
@@ -99,13 +99,18 @@ def render_motion_to_video(
     For interactive HTML simulations or visual previews in chat, DO NOT call this tool — deliver your
     HTML inline wrapped in :::artifact{identifier="..." type="text/html" title="..."} instead.
 
-    :param html_content: Required complete HTML source code of the motion graphic (CSS, GSAP, SVG, Canvas, or Three.js).
+    :param html_content: Complete HTML source code of the motion graphic (CSS, GSAP, SVG, Canvas, or Three.js).
     :param filename: Optional base name for output file (e.g. 'floorplan_3d_tour').
     :param duration_seconds: Total duration of the animation to render in seconds (default: 6.0, max: 60.0).
     :param fps: Frame rate in frames per second (default: 30, range: 10..60).
     :param width: Video pixel width (default: 1280, range: 320..2560). Even dimensions recommended.
     :param height: Video pixel height (default: 720, range: 320..2560).
     """
+    if not html_content or not html_content.strip():
+        return json.dumps({
+            "status": "skipped",
+            "message": "No html_content provided. For interactive chat previews, DO NOT call render_motion_to_video — output your complete HTML directly inside :::artifact{identifier=\"simulation\" type=\"text/html\" title=\"Interactive Simulation\"} ```html ... ``` :::.",
+        })
     if not FFMPEG_BIN:
         return json.dumps({
             "status": "error",
@@ -233,7 +238,7 @@ def render_motion_to_video(
 
 
 @mcp.tool()
-def validate_motion_html(html_content: str) -> str:
+def validate_motion_html(html_content: str = "") -> str:
     """
     Lints and validates an HTML artifact against Satchida-Motion contracts before offline MP4 export.
     Do NOT call this for ordinary inline chat `:::artifact` HTML responses — deliver the inline
@@ -242,6 +247,11 @@ def validate_motion_html(html_content: str) -> str:
 
     :param html_content: Complete HTML source code to analyze.
     """
+    if not html_content or not html_content.strip():
+        return json.dumps({
+            "status": "skipped",
+            "message": "No html_content provided. Deliver your HTML directly inside :::artifact{...} ```html ... ``` :::.",
+        })
     html_content = _unwrap_html(html_content)
     issues = []
     passes = []
@@ -324,6 +334,8 @@ def get_motion_template(style: str = "executive") -> str:
       'accessible_guide' (WCAG AAA high-contrast large-print senior/patient step-by-step guide).
     """
     style = style.lower().strip()
+    if any(k in style for k in ("medical", "anatomy", "clinical", "organ", "diabetes", "stage", "cutaway")):
+        style = "mechanism_cutaway"
 
     if style == "cad_blueprint":
         return _wrap_template_artifact(

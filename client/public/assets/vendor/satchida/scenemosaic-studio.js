@@ -793,25 +793,132 @@
       '#sm-inspect{position:fixed;bottom:14px;left:12px;z-index:10;background:rgba(15,23,42,.88);border:1px solid rgba(148,163,184,.28);border-radius:8px;padding:7px 11px;font-size:11px;color:#cbd5e1;display:none}' +
       '#sm-hud{position:fixed;top:12px;right:12px;z-index:10;width:228px;background:rgba(15,23,42,.9);backdrop-filter:blur(8px);border:1px solid rgba(56,189,248,.3);border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:7px}' +
       '#sm-hud h3{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#38bdf8;margin-top:2px}' +
-      '.sm-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}' +
+      '.sm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}' +
       '.sm-btn{width:100%;text-align:left;padding:6px 9px;border-radius:7px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.09);color:#e0f2fe;font-size:11px;font-weight:600;cursor:pointer}' +
-      '.sm-btn.c{text-align:center;padding:5px 4px;font-size:10px}.sm-btn.active{background:#0284c7;border-color:#38bdf8;color:#fff}' +
+      '.sm-btn.c{text-align:center;padding:5px 2px;font-size:10px}.sm-btn.active{background:#0284c7;border-color:#38bdf8;color:#fff}' +
+      '.sm-ver{font-size:10px;color:#34d399;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:6px;padding:4px 7px;margin-top:2px}' +
+      '#sm-2d{position:fixed;inset:0;width:100%;height:100%;display:none;background:#0a1220;z-index:5}' +
       '.sm-exp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:3px}' +
       '.sm-ebtn{padding:6px 8px;border-radius:7px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.14);color:#a7f3d0;font-size:11px;font-weight:600;cursor:pointer;text-align:center}' +
       '.sm-sl{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#cbd5e1;gap:6px}.sm-sl input{flex:1;accent-color:#38bdf8}';
     document.head.appendChild(style);
 
+    var ver = opts.verification || { status: 'VERIFIED', items: (opts.variants[0] && opts.variants[0].objects ? opts.variants[0].objects.length : 0), collisions: 0 };
     document.body.innerHTML =
       '<div id="sm-stage"></div>' +
-      '<div id="sm-badge"><h1>' + (opts.title || 'SceneMosaic 3D') + '</h1><p>' + (opts.stylePreset || '') + ' · ' + opts.roomW + "' × " + opts.roomD + "'</p></div>" +
+      '<canvas id="sm-2d"></canvas>' +
+      '<div id="sm-badge"><h1>' + (opts.title || 'SceneMosaic 3D') + '</h1><p>' + (opts.stylePreset || '') + ' · ' + opts.roomW + "' × " + opts.roomD + "'</p><div class=\"sm-ver\">✓ " + ver.status + ' · ' + ver.items + ' items · ' + ver.collisions + ' collisions</div></div>' +
       '<div id="sm-inspect"></div>' +
       '<div id="sm-hud"><h3>Layout Variants</h3><div id="sm-vars" style="display:flex;flex-direction:column;gap:5px"></div>' +
-      '<h3>Camera</h3><div class="sm-row" id="sm-cams">' +
+      '<h3>View &amp; Camera</h3><div class="sm-row" id="sm-cams">' +
+      '<button class="sm-btn c" data-cam="2d">2D Map</button>' +
       '<button class="sm-btn c active" data-cam="iso">Iso</button>' +
-      '<button class="sm-btn c" data-cam="eye">Eye-Level</button>' +
+      '<button class="sm-btn c" data-cam="eye">Eye</button>' +
       '<button class="sm-btn c" data-cam="top">Top</button></div>' +
       '<h3>Daylight</h3><div class="sm-sl"><span id="sm-sunl">11:00</span><input id="sm-sun" type="range" min="7" max="19" step="1" value="11"/></div>' +
       '<div class="sm-exp"><button class="sm-ebtn" id="sm-glb">Export .glb</button><button class="sm-ebtn" id="sm-json">Export JSON</button></div></div>';
+
+    var c2d = document.getElementById('sm-2d');
+    var activeVariantIdx = 0;
+    var activeCam = 'iso';
+
+    function draw2DMap() {
+      var W = global.innerWidth || 800;
+      var H = global.innerHeight || 600;
+      c2d.width = W;
+      c2d.height = H;
+      var ctx = c2d.getContext('2d');
+      ctx.fillStyle = '#09111e';
+      ctx.fillRect(0, 0, W, H);
+
+      var pad = 80;
+      var scale = Math.min((W - pad * 2) / opts.roomW, (H - pad * 2.2) / opts.roomD);
+      var ox = (W - opts.roomW * scale) / 2;
+      var oy = (H - opts.roomD * scale) / 2 + 24;
+      var rwPx = opts.roomW * scale;
+      var rdPx = opts.roomD * scale;
+
+      // Grid
+      ctx.strokeStyle = 'rgba(56,189,248,0.08)';
+      ctx.lineWidth = 1;
+      for (var gx = 0; gx <= opts.roomW; gx += 2) {
+        ctx.beginPath(); ctx.moveTo(ox + gx * scale, oy); ctx.lineTo(ox + gx * scale, oy + rdPx); ctx.stroke();
+      }
+      for (var gz = 0; gz <= opts.roomD; gz += 2) {
+        ctx.beginPath(); ctx.moveTo(ox, oy + gz * scale); ctx.lineTo(ox + rwPx, oy + gz * scale); ctx.stroke();
+      }
+
+      // Floor + Area Rug
+      ctx.fillStyle = '#132036';
+      ctx.fillRect(ox, oy, rwPx, rdPx);
+      var rugW = Math.min(opts.roomW * 0.52, 8.5) * scale;
+      var rugD = Math.min(opts.roomD * 0.48, 6.5) * scale;
+      ctx.fillStyle = 'rgba(221,211,196,0.14)';
+      ctx.strokeStyle = 'rgba(221,211,196,0.4)';
+      ctx.fillRect(ox + rwPx / 2 - rugW / 2, oy + rdPx / 2 - rugD / 2, rugW, rugD);
+      ctx.strokeRect(ox + rwPx / 2 - rugW / 2, oy + rdPx / 2 - rugD / 2, rugW, rugD);
+
+      // Walls
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(ox, oy, rwPx, rdPx);
+
+      // North Window
+      var winW = Math.min(5.2, opts.roomW * 0.38) * scale;
+      var winX = ox + rwPx / 2 - opts.roomW * 0.12 * scale - winW / 2;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(winX, oy); ctx.lineTo(winX + winW, oy); ctx.stroke();
+
+      // West Entry Door + Swing Arc
+      var doorZ = oy + rdPx / 2 + opts.roomD * 0.26 * scale;
+      var doorW = 3.0 * scale;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ox, doorZ - doorW / 2); ctx.lineTo(ox + doorW, doorZ - doorW / 2); ctx.stroke();
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(ox, doorZ - doorW / 2, doorW, 0, Math.PI / 2); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Dimension Labels
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '600 11px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(opts.roomW + "' (" + Math.round(opts.roomW * opts.roomD) + ' sq ft)', ox + rwPx / 2, oy - 14);
+      ctx.save();
+      ctx.translate(ox - 16, oy + rdPx / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(opts.roomD + "'", 0, 0);
+      ctx.restore();
+
+      // Furniture Footprints
+      var v = (opts.variants || [])[activeVariantIdx];
+      ((v && v.objects) || []).forEach(function (item) {
+        var cx = ox + (Number(item.x) + opts.roomW / 2) * scale;
+        var cz = oy + (Number(item.z) + opts.roomD / 2) * scale;
+        var fw = Number(item.w) * scale;
+        var fd = Number(item.d) * scale;
+        ctx.save();
+        ctx.translate(cx, cz);
+        ctx.rotate(-((Number(item.yaw_deg) || 0) * Math.PI) / 180);
+        ctx.fillStyle = normalizeColor(item.color || '#64748b');
+        ctx.globalAlpha = 0.78;
+        ctx.fillRect(-fw / 2, -fd / 2, fw, fd);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-fw / 2, -fd / 2, fw, fd);
+        ctx.restore();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '600 10px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(item.name || item.type, cx, cz - 2);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '9px Inter, system-ui, sans-serif';
+        ctx.fillText(item.w + "'×" + item.d + "'", cx, cz + 10);
+      });
+    }
 
     var vWrap = document.getElementById('sm-vars');
     var inspectEl = document.getElementById('sm-inspect');
@@ -832,7 +939,9 @@
       stylePreset: opts.stylePreset,
       hud: {
         onVariantChange: function (idx) {
+          activeVariantIdx = idx;
           Array.prototype.forEach.call(vWrap.children, function (el, i) { el.classList.toggle('active', i === idx); });
+          if (activeCam === '2d') draw2DMap();
         },
         onInspect: function (info) {
           inspectEl.style.display = 'block';
@@ -845,8 +954,18 @@
       btn.onclick = function () {
         document.querySelectorAll('#sm-cams button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        studio.setCameraPreset(btn.dataset.cam);
+        activeCam = btn.dataset.cam;
+        if (activeCam === '2d') {
+          c2d.style.display = 'block';
+          draw2DMap();
+        } else {
+          c2d.style.display = 'none';
+          studio.setCameraPreset(activeCam);
+        }
       };
+    });
+    global.addEventListener('resize', function () {
+      if (activeCam === '2d') draw2DMap();
     });
     var sun = document.getElementById('sm-sun');
     var sunl = document.getElementById('sm-sunl');

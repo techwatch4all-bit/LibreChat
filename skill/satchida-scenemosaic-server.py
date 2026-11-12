@@ -152,18 +152,24 @@ def build_scenemosaic_scene(
     const controls = new THREE.OrbitControls(camera, canvas);
     controls.enableDamping = true;
 
-    scene.add(new THREE.AmbientLight(0xdbeafe, 0.65));
-    const sun = new THREE.DirectionalLight(0xfffbeb, 1.3);
-    sun.position.set(16, 26, 18);
+    scene.add(new THREE.AmbientLight(0xdbeafe, 0.52));
+    scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.4));
+    const sun = new THREE.DirectionalLight(0xfffbeb, 1.1);
+    sun.position.set(18, 28, 20);
     sun.castShadow = true;
     scene.add(sun);
 
     const W = DATA.width, D = DATA.depth;
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.25, D), new THREE.MeshStandardMaterial({{ color: 0xd6bfa9, roughness: 0.7 }}));
+    const fc = document.createElement('canvas'); fc.width = 128; fc.height = 128;
+    const fg = fc.getContext('2d'); fg.fillStyle = '#b88b5c'; fg.fillRect(0, 0, 128, 128);
+    fg.strokeStyle = '#8f653b'; fg.lineWidth = 1.5;
+    for (let y = 0; y < 128; y += 16) {{ fg.beginPath(); fg.moveTo(0, y); fg.lineTo(128, y); fg.stroke(); }}
+    const floorTex = new THREE.CanvasTexture(fc); floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(3, 3);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.25, D), new THREE.MeshStandardMaterial({{ color: 0xe6ccb2, map: floorTex, roughness: 0.72 }}));
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const wallMat = new THREE.MeshStandardMaterial({{ color: 0xe2e8f0, roughness: 0.78 }});
+    const wallMat = new THREE.MeshStandardMaterial({{ color: 0x94a3b8, roughness: 0.8 }});
     const wallSpecs = [
       [W, 8.5, 0.45, 0, 4.3, -D / 2],
       [0.45, 8.5, D, -W / 2, 4.3, 0],
@@ -188,20 +194,42 @@ def build_scenemosaic_scene(
       const items = DATA.variants[name] || [];
       for (const f of items) {{
         const g = new THREE.Group();
-        const mainMat = new THREE.MeshStandardMaterial({{ color: f.color || '#64748b', roughness: 0.65 }});
+        const mainMat = new THREE.MeshStandardMaterial({{ color: f.color || '#475569', roughness: 0.65 }});
         const woodMat = new THREE.MeshStandardMaterial({{ color: 0x8b5e3c, roughness: 0.55 }});
+        const darkWood = new THREE.MeshStandardMaterial({{ color: 0x3b281c, roughness: 0.6 }});
         const cushionMat = new THREE.MeshStandardMaterial({{ color: 0xe2e8f0, roughness: 0.85 }});
+        const steelMat = new THREE.MeshStandardMaterial({{ color: 0x94a3b8, metalness: 0.6, roughness: 0.3 }});
+        const glassMat = new THREE.MeshStandardMaterial({{ color: 0x0f172a, roughness: 0.15 }});
         if (f.type === 'sofa') {{
           addPart(g, new THREE.BoxGeometry(f.w, 0.7, f.d), mainMat, 0, 0.45, 0);
           addPart(g, new THREE.BoxGeometry(f.w, 1.4, f.d * 0.22), mainMat, 0, 1.15, -f.d * 0.39);
-          addPart(g, new THREE.BoxGeometry(f.w * 0.78, 0.32, f.d * 0.68), cushionMat, 0, 0.92, f.d * 0.08);
+          addPart(g, new THREE.BoxGeometry(f.w * 0.14, 1.1, f.d), mainMat, -f.w * 0.43, 0.9, 0);
+          addPart(g, new THREE.BoxGeometry(f.w * 0.14, 1.1, f.d), mainMat, f.w * 0.43, 0.9, 0);
+          addPart(g, new THREE.BoxGeometry(f.w * 0.7, 0.32, f.d * 0.68), cushionMat, 0, 0.92, f.d * 0.08);
+        }} else if (f.type === 'bed') {{
+          addPart(g, new THREE.BoxGeometry(f.w, 0.65, f.d), woodMat, 0, 0.38, 0);
+          addPart(g, new THREE.BoxGeometry(f.w, 2.2, 0.25), darkWood, 0, 1.15, -f.d / 2 + 0.15);
+          addPart(g, new THREE.BoxGeometry(f.w * 0.92, 0.55, f.d * 0.92), cushionMat, 0, 0.95, 0.1);
+          addPart(g, new THREE.BoxGeometry(f.w * 0.94, 0.22, f.d * 0.56), mainMat, 0, 1.24, f.d * 0.18);
+        }} else if (f.type === 'desk') {{
+          addPart(g, new THREE.BoxGeometry(f.w, 0.18, f.d), woodMat, 0, f.h - 0.1, 0);
+          for (const lx of [-f.w * 0.44, f.w * 0.44]) for (const lz of [-f.d * 0.4, f.d * 0.4]) {{
+            addPart(g, new THREE.BoxGeometry(0.16, f.h - 0.18, 0.16), steelMat, lx, (f.h - 0.18) / 2, lz);
+          }}
+          addPart(g, new THREE.BoxGeometry(f.w * 0.42, 1.1, 0.12), glassMat, 0, f.h + 0.68, -f.d * 0.22);
+          addPart(g, new THREE.BoxGeometry(1.3, 0.18, 1.3), mainMat, 0, 1.45, f.d * 0.72);
+        }} else if (f.type === 'table') {{
+          addPart(g, new THREE.BoxGeometry(f.w, 0.18, f.d), woodMat, 0, f.h - 0.09, 0);
+          for (const lx of [-f.w * 0.4, f.w * 0.4]) for (const lz of [-f.d * 0.4, f.d * 0.4]) {{
+            addPart(g, new THREE.BoxGeometry(0.16, f.h - 0.16, 0.16), darkWood, lx, (f.h - 0.16) / 2, lz);
+          }}
         }} else if (f.type === 'planter') {{
           addPart(g, new THREE.CylinderGeometry(f.w * 0.4, f.w * 0.3, f.h * 0.45, 10), woodMat, 0, f.h * 0.22, 0);
           addPart(g, new THREE.DodecahedronGeometry(f.w * 0.48), new THREE.MeshStandardMaterial({{ color: 0x22c55e }}), 0, f.h * 0.72, 0);
         }} else {{
           addPart(g, new THREE.BoxGeometry(f.w, f.h, f.d), mainMat, 0, f.h / 2, 0);
         }}
-        g.position.set(f.x + f.w / 2 - W / 2, 0.12, f.z + f.d / 2 - D / 2);
+        g.position.set(f.x + f.w / 2 - W / 2, 0.14, f.z + f.d / 2 - D / 2);
         objGroup.add(g);
       }}
       document.querySelectorAll('.vbtn').forEach(b => b.classList.toggle('active', b.dataset.name === name));

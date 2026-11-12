@@ -617,4 +617,302 @@ export const ALL_CATEGORIES: StarterCategory[] = [
       },
     ],
   },
+  {
+    id: 'motion_education',
+    label: '🎓 STEM & Algorithms',
+    labelKey: 'starters_cat_motion_education',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Interactive Physics & Force Fields',
+        icon: '⚛️',
+        badge: 'Physics Sim',
+        badgeKey: 'starters_badge_motion_physics',
+        description:
+          'Continuous 3D camera pan around gravitational fields, projectile trajectories, or wave interference',
+        prompt:
+          'Simulate and animate an interactive 3D physics demonstration with particle fields and force vectors for: [Concept: e.g. Double-slit interference, Gravitational orbits, or Electromagnetism laws]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Dynamic Math Proof & Formula Morph',
+        icon: '📐',
+        badge: 'Math Morph',
+        badgeKey: 'starters_badge_motion_math',
+        description:
+          'Step-by-step kinetic geometric derivations with SVG shape transformations and coordinate shifts',
+        prompt:
+          'Build a step-by-step geometric proof animation with SVG shape morphing and coordinate transforms for: [Theorem: e.g. Pythagorean theorem, Fourier transform, or Calculus optimization]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Cellular Biology & Bio-Processes',
+        icon: '🧬',
+        badge: 'Bio Animation',
+        badgeKey: 'starters_badge_motion_bio',
+        description:
+          'Microscopic 3D camera zoom through cell membranes, DNA replication forks, or enzymatic catalysis',
+        prompt:
+          'Animate a microscopic 3D biological journey showing cellular structures and biochemical flow for: [Process: e.g. DNA replication, Photosynthesis Calvin cycle, or CRISPR gene editing]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Algorithm & Sorting Visualizer',
+        icon: '💻',
+        badge: 'Algo Visualizer',
+        badgeKey: 'starters_badge_motion_algo',
+        description:
+          'Kinetic array swapping, graph traversal pathfinding, and binary tree balance rotations',
+        prompt:
+          'Generate an animated algorithm visualizer with stepped array swaps and active pointer indicators for: [Algorithm: e.g. QuickSort, Dijkstra shortest path, or Red-Black tree insertion]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_elderly',
+    label: '👵 Golden Years & Living',
+    labelKey: 'starters_cat_motion_elderly',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Gentle Medicine & Vital Daily Schedule',
+        icon: '💊',
+        badge: 'Senior Routine',
+        badgeKey: 'starters_badge_motion_elderly',
+        description:
+          'Large-type, soothing morning-to-night timeline with pill box visual cues and water reminders',
+        prompt:
+          'Design an accessible, large-text animated daily medication and wellness schedule with soothing colors for: [Medication list, times of day, and hydration/walk routines]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Step-by-Step Pension & Bill Guide',
+        icon: '👵',
+        badge: 'Digital Guide',
+        badgeKey: 'starters_badge_motion_pension',
+        description:
+          'Zoomed-in mobile phone screen walkthrough guiding elders through pension life certificates or utility payments',
+        prompt:
+          'Build a gentle, high-contrast animated guide with magnified buttons showing how to complete: [Task: e.g. Digital Life Certificate Jeevan Pramaan, Electricity bill payment, or WhatsApp video call]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Elder Fraud & OTP Scam Warning',
+        icon: '🛡️',
+        badge: 'Safety Alert',
+        badgeKey: 'starters_badge_motion_fraud',
+        description:
+          'Clear red-flag callouts contrasting fake banking phone calls with safe official procedures',
+        prompt:
+          'Create an easy-to-read, animated scam defense presentation illustrating dangerous caller traps vs safe habits for: [Scam type: e.g. Fake electricity disconnection SMS, Lottery call, or Bank KYC update threat]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_productivity',
+    label: '💼 Professional & SOPs',
+    labelKey: 'starters_cat_motion_productivity',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Animated Standard Operating Procedure (SOP)',
+        icon: '📋',
+        badge: 'Workflow SOP',
+        badgeKey: 'starters_badge_motion_sop',
+        description:
+          'Pulsing swimlane flowchart walking teams through handoffs, approval gates, and SLAs',
+        prompt:
+          'Construct an animated corporate SOP diagram with glowing node transitions and decision branches for: [Business process: e.g. Client onboarding, Incident escalation, or Procurement sign-off]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Agile Sprint Velocity & Milestone Recap',
+        icon: '🏃',
+        badge: 'Sprint Retro',
+        badgeKey: 'starters_badge_motion_retro',
+        description:
+          'Burndown chart sweeps, completed epic highlight reels, and team shoutout cards',
+        prompt:
+          'Produce an upbeat sprint retrospective animation with burndown velocity curves and delivered features for: [Sprint name, velocity stats, key wins, and blockers resolved]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Cross-Team Project Roadmap & Milestones',
+        icon: '📅',
+        badge: 'Gantt Motion',
+        badgeKey: 'starters_badge_motion_gantt',
+        description:
+          '3D Gantt timeline track showing critical path milestones, launch gates, and deliverable deadlines',
+        prompt:
+          'Create a cinema-grade project milestone timeline with horizontal camera glide and milestone beacons for: [Initiative name, phase dates Q1-Q4, and team deliverables]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_creative',
+    label: '🎨 Art, Cartoon & Sketch',
+    labelKey: 'starters_cat_motion_creative',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Pencil Sketch to Ink Line-Art Reveal',
+        icon: '✏️',
+        badge: 'Sketch Draw',
+        badgeKey: 'starters_badge_motion_sketch',
+        description:
+          'Simulated pencil stroke-by-stroke drafting that progressively resolves into a detailed line art illustration',
+        prompt:
+          'Animate a realistic SVG stroke-dasharray drawing effect simulating an artist sketching by hand for: [Art subject: e.g. Architectural monument, Botanical flower, or Mechanical watch movement]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Cartoon Storyboard & Comic Panel Sequence',
+        icon: '🎨',
+        badge: 'Cartoon Story',
+        badgeKey: 'starters_badge_motion_cartoon',
+        description:
+          'Dynamic manga/comic panel transitions with speech bubble pop-ins and stylized camera shakes',
+        prompt:
+          'Build an animated comic-book/cartoon sequence with panel punch-ins, kinetic dialogue bubbles, and action lines for: [Story premise: e.g. Hero discovering a magic lantern, Cat astronaut on Mars, or Detective puzzle]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Generative Sacred Geometry & Kaleidoscope',
+        icon: '🌀',
+        badge: 'Generative Art',
+        badgeKey: 'starters_badge_motion_generative',
+        description:
+          'Hypnotic rotating mandalas, golden ratio spirals, and blooming parametric SVG shapes',
+        prompt:
+          'Craft an ambient, generative kinetic art piece with pulsing color palettes and kaleidoscopic rotation for: [Art style: e.g. Cyberpunk neon geometric, Golden spiral Fibonacci bloom, or Minimalist Bauhaus forms]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_home',
+    label: '🏡 Home, Interior & Living',
+    labelKey: 'starters_cat_motion_home',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Festive Home Décor & Lighting Showcase',
+        icon: '✨',
+        badge: 'Décor Styling',
+        badgeKey: 'starters_badge_motion_decor',
+        description:
+          'Layer-by-layer room visualizer showing floral arrangements, warm ambient lighting, and table setups',
+        prompt:
+          'Design an animated room makeover walkthrough showing layered festive decoration and lighting setups for: [Occasion/Room: e.g. Diwali living room makeover, Christmas dinner table, or Cozy balcony garden]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Weekly Family Meal & Nutrition Planner',
+        icon: '🍱',
+        badge: 'Meal Rhythm',
+        badgeKey: 'starters_badge_motion_meal',
+        description:
+          'Interactive Monday-to-Sunday rotating calendar with ingredient prep lists and smart leftover re-use',
+        prompt:
+          'Create an animated weekly meal prep planner with rotating recipe cards and grocery checklist sweeps for: [Dietary preferences: e.g. Balanced Indian vegetarian, High-protein family meals, or Quick school tiffins]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Wardrobe & Kitchen Decluttering Blueprint',
+        icon: '🏡',
+        badge: 'Home Organize',
+        badgeKey: 'starters_badge_motion_organize',
+        description:
+          'Before-and-after spatial drawer/shelf animations demonstrating modular container systems',
+        prompt:
+          'Animate a satisfying step-by-step room organization guide with before/after shelf transitions for: [Area: e.g. Modular kitchen spice rack, Master wardrobe capsule, or Kids study corner]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_medical',
+    label: '🫀 Medical & Anatomy',
+    labelKey: 'starters_cat_motion_medical',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Disease Progression & Anatomical Impact',
+        icon: '🫀',
+        badge: 'Clinical Pathology',
+        badgeKey: 'starters_badge_motion_pathology',
+        description:
+          'Cross-section anatomical view showing cellular infiltration, plaque accumulation, or inflammation over time',
+        prompt:
+          'Simulate an anatomical cross-section animation demonstrating how a condition affects organ tissue over time for: [Medical condition: e.g. Atherosclerosis plaque buildup, Type-2 Diabetes insulin resistance, or Asthma airway restriction]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Drug Mechanism of Action (MoA) Journey',
+        icon: '💊',
+        badge: 'Drug MoA',
+        badgeKey: 'starters_badge_motion_moa',
+        description:
+          'Receptor-binding 3D camera flight showing therapeutic drug molecules interacting with target enzymes',
+        prompt:
+          'Build a cinema-grade 3D pharmacological animation showing drug molecules binding to target cell receptors for: [Drug class / Molecule name: e.g. ACE inhibitors, GLP-1 agonists, or Monoclonal antibodies]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Surgical Procedure & Patient Visual Guide',
+        icon: '🏥',
+        badge: 'Surgical Guide',
+        badgeKey: 'starters_badge_motion_surgical',
+        description:
+          'Calm, objective vector explanation of operative steps, stent placement, or arthroscopic repair',
+        prompt:
+          'Design a reassuring, clinical-grade animated procedural explainer breaking down operative phases for: [Procedure: e.g. Cardiac stent angioplasty, Knee arthroscopy, or Cataract lens replacement]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_wellness',
+    label: '🥗 Fitness, Yoga & Diet',
+    labelKey: 'starters_cat_motion_wellness',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Biomechanical Exercise Form & Angle Guide',
+        icon: '🏋️',
+        badge: 'Exercise Form',
+        badgeKey: 'starters_badge_motion_form',
+        description:
+          'Vector skeleton overlay showing prime mover muscle activation and joint safety angles',
+        prompt:
+          'Construct an animated exercise form tutorial with skeleton vector overlays and muscle highlight pulses for: [Exercise: e.g. Barbell back squat, Kettlebell swing, or Deadlift spine alignment]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Yoga Asana Flow & Breath Guide',
+        icon: '🧘',
+        badge: 'Yoga Alignment',
+        badgeKey: 'starters_badge_motion_yoga',
+        description:
+          'Soothing visual breath pacer (Inhale 4s, Hold 4s, Exhale 6s) with transition posture cues',
+        prompt:
+          'Create an animated restorative yoga flow with an expanding breath pacer circle and alignment cues for: [Sequence / Goal: e.g. Surya Namaskar 12 steps, Evening spine decompression, or Box breathing pranayama]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Metabolic Calorie & Macro Plate Visualizer',
+        icon: '🥗',
+        badge: 'Nutrition Lab',
+        badgeKey: 'starters_badge_motion_nutrition',
+        description:
+          'Interactive rotating dinner plate decomposing carbs, proteins, fats, and fiber with metabolic impact',
+        prompt:
+          'Animate an interactive healthy meal plate decomposition showing macro percentages and satiety scores for: [Target: e.g. 1800 kcal fat-loss deficit, Vegan athlete muscle gain, or PCOS hormone balance plate]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
 ];

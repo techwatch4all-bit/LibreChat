@@ -187,7 +187,7 @@ const ConversationStarters = () => {
   const displayedStarters = useMemo(() => {
     if (selectedCategory === 'all') {
       if (activeMode === 'Motion') {
-        return modeCategories.flatMap((c) => c.starters.slice(0, 2));
+        return modeCategories.flatMap((c) => c.starters.slice(0, 1));
       }
       if (customStarters.length > 0) {
         return customStarters.slice(0, 10).map((s: string) => ({ prompt: s }));

@@ -51,6 +51,9 @@ const privacyCat = ALL_CATEGORIES.find((c) => c.id === 'privacy_vault')!;
 const familyCat = ALL_CATEGORIES.find((c) => c.id === 'family_health')!;
 const motionExecCat = ALL_CATEGORIES.find((c) => c.id === 'motion_executive')!;
 const motionKineticCat = ALL_CATEGORIES.find((c) => c.id === 'motion_kinetic')!;
+const motionEducationCat = ALL_CATEGORIES.find((c) => c.id === 'motion_education')!;
+const motionMedicalCat = ALL_CATEGORIES.find((c) => c.id === 'motion_medical')!;
+const motionElderlyCat = ALL_CATEGORIES.find((c) => c.id === 'motion_elderly')!;
 
 const setMode = (spec: string) => {
   mockConversation = { spec, conversationId: 'convo-starters-test', endpoint: 'custom' };
@@ -91,6 +94,9 @@ describe('ConversationStarters', () => {
     render(<ConversationStarters />);
     expect(screen.getByText(motionExecCat.label)).toBeInTheDocument();
     expect(screen.getByText(motionKineticCat.label)).toBeInTheDocument();
+    expect(screen.getByText(motionEducationCat.label)).toBeInTheDocument();
+    expect(screen.getByText(motionMedicalCat.label)).toBeInTheDocument();
+    expect(screen.getByText(motionElderlyCat.label)).toBeInTheDocument();
     expect(screen.queryByText(marketCat.label)).not.toBeInTheDocument();
     expect(screen.queryByText(privacyCat.label)).not.toBeInTheDocument();
   });

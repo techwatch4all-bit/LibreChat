@@ -2038,3 +2038,21 @@ Shipped:
      * Captured `client/public/motion/motion_personas_screen.png` verifying all 4 motion categories and 8 rich cards.
      * Captured `client/public/motion/motion_staged_input.png` verifying that clicking a card stages the prompt into the textarea with parameter slot selected and 0 chat messages sent.
 
+4. **Multi-Segment Expansion across 7 User Types (Gold Standard)**:
+   - Added 7 specialized persona categories (33 total motion personas) in `starters.ts` and `translation.json`:
+     * `🎓 STEM & Algorithms` (`motion_education`): Physics 3D force fields, KaTeX geometric proofs, microscopic cellular biology, and sorting/graph algorithm visualizers.
+     * `👵 Golden Years & Living` (`motion_elderly`): Medication & daily wellness routines, step-by-step pension/bill guides, and elder fraud/scam warning alerts.
+     * `💼 Professional & SOPs` (`motion_productivity`): Animated corporate SOP swimlanes, Agile sprint velocity retros, and multi-quarter milestone roadmaps.
+     * `🎨 Art, Cartoon & Sketch` (`motion_creative`): Pencil sketch to ink reveals, cartoon comic storyboards, and generative sacred geometry mandalas.
+     * `🏡 Home, Interior & Living` (`motion_home`): Festive room decor walkthroughs, weekly meal prep planners, and wardrobe/kitchen declutter blueprints.
+     * `🫀 Medical & Anatomy` (`motion_medical`): Disease pathology progression, pharmacological drug mechanism of action (MoA), and calm surgical procedure patient guides.
+     * `🥗 Fitness, Yoga & Diet` (`motion_wellness`): Biomechanical exercise joint angles, restorative yoga flow breath pacers, and macro plate nutrient breakdowns.
+   - All 33 starters feature parameterized slots `[...]` that stage into the input box with the slot highlighted without auto-submitting.
+
+
+
+## 2026-11-12 (cont.) — Cline inventory corrected; IDE blocked solely on Access-bypass step
+
+Correction: Cline (saoudrizwan.claude-dev@4.1.26) IS installed in code-server — the earlier extensions-dir listing was truncated at 10 entries. Full inventory (13 extensions): Cline, Continue, GitLens, Python+debugpy+envs, ESLint, Prettier, Code Runner, Error Lens, spell-checker, material icons, markdown preview. Nothing needs installing; the extension host simply cannot start until the WebSocket path works.
+
+Deployed state: origin-side JWT enforcement on /api/ide WS verified (anonymous→401, cookie→101 authenticated); CSP per-document fix live; [IDE-WS]/[titleConvo]/[addTitle] diagnostics live. Pending: operator adds the Access Bypass application for path ai.satchida.com/api/ide (dashboard-only), then hard-refreshes the IDE. After that: WS reaches origin authenticated → extension host starts → dark theme + all 13 extensions (incl. Cline) activate.

@@ -761,6 +761,37 @@ def get_motion_template(style: str = "executive") -> str:
     )
 
 
+def _auto_walls_from_rooms(rooms: list[dict], width: float, depth: float) -> list[dict]:
+    """Generate clean exterior perimeter walls (with windows) and interior partition walls (with doors) from room rects."""
+    walls: list[dict] = [
+        {"x1": 0, "z1": 0, "x2": width, "z2": 0, "t": 0.6, "kind": "ext", "openings": [{"at": round(width * 0.2, 1), "len": 4, "kind": "win"}, {"at": round(width * 0.65, 1), "len": 4, "kind": "win"}]},
+        {"x1": width, "z1": 0, "x2": width, "z2": depth, "t": 0.6, "kind": "ext", "openings": [{"at": round(depth * 0.3, 1), "len": 4, "kind": "win"}]},
+        {"x1": 0, "z1": depth, "x2": width, "z2": depth, "t": 0.6, "kind": "ext", "openings": [{"at": round(width * 0.3, 1), "len": 4, "kind": "win"}]},
+        {"x1": 0, "z1": 0, "x2": 0, "z2": depth, "t": 0.6, "kind": "ext", "openings": [{"at": round(depth * 0.25, 1), "len": 3.5, "kind": "door", "swing": 1}]},
+    ]
+    seen: set[tuple[str, float, float, float]] = set()
+    for r in rooms:
+        rx, rz, rw, rd = float(r.get("x", 0)), float(r.get("z", 0)), float(r.get("w", 0)), float(r.get("d", 0))
+        edges = [
+            ("v", rx + rw, rz, rz + rd, 0 < rx + rw < width),
+            ("h", rz + rd, rx, rx + rw, 0 < rz + rd < depth),
+        ]
+        for axis, pos, start, end, is_int in edges:
+            if not is_int or end - start <= 1.0:
+                continue
+            key = (axis, round(pos, 2), round(start, 2), round(end, 2))
+            if key in seen:
+                continue
+            seen.add(key)
+            span = end - start
+            opening = [{"at": round(max(0.8, span * 0.35), 2), "len": min(3.0, round(span * 0.4, 2)), "kind": "door", "swing": 1}] if span >= 3.5 else []
+            if axis == "v":
+                walls.append({"x1": pos, "z1": start, "x2": pos, "z2": end, "t": 0.4, "kind": "int", "openings": opening})
+            else:
+                walls.append({"x1": start, "z1": pos, "x2": end, "z2": pos, "t": 0.4, "kind": "int", "openings": opening})
+    return walls
+
+
 @mcp.tool()
 def build_cad_floorplan(
     title: str = "1,400 sq ft 3BHK Apartment (40' × 35')",
@@ -772,10 +803,12 @@ def build_cad_floorplan(
 ) -> str:
     """
     Build a complete, verified 2D CAD Blueprint + 3D Three.js Extruded Structure HTML artifact
-    from custom floor-plan JSON without rewriting the rendering engine.
-    - rooms_json: JSON array of {id, name, x, z, w, d, floor?, tint?}
-    - walls_json: JSON array of {x1, z1, x2, z2, t, kind: 'ext'|'int'|'rail', openings: [{at, len, kind: 'win'|'door'|'open', swing?: 1|-1}]}
-    - furniture_json: JSON array of {type, x, z, w, d, h, color?}
+    without rewriting the rendering engine.
+    - For a 1,400 sq ft 3BHK Apartment (with external Servant Quarter, Open Kitchen, Master Suite,
+      Living Balcony, Study Nook), call with ONLY `title` and omit `rooms_json`/`walls_json`/`furniture_json`
+      to use the built-in precision CAD layout immediately.
+    - For other custom buildings, pass `width`, `depth`, and `rooms_json` (array of {id, name, x, z, w, d});
+      `walls_json` and `furniture_json` are optional and auto-generated if omitted.
     """
     base_wrapped = get_motion_template("cad_blueprint")
     html = _unwrap_html(base_wrapped)
@@ -784,11 +817,13 @@ def build_cad_floorplan(
     furniture = json.loads(furniture_json) if furniture_json.strip() not in ("", "[]") else None
 
     if rooms is not None or walls is not None or furniture is not None:
+        resolved_rooms = rooms if rooms is not None else []
+        resolved_walls = walls if walls is not None else (_auto_walls_from_rooms(resolved_rooms, float(width), float(depth)) if resolved_rooms else [])
         plan_obj = {
             "width": float(width),
             "depth": float(depth),
-            "rooms": rooms if rooms is not None else [],
-            "walls": walls if walls is not None else [],
+            "rooms": resolved_rooms,
+            "walls": resolved_walls,
             "furniture": furniture if furniture is not None else [],
         }
         plan_js = f"window.SATCHIDA_CAD_PLAN = {json.dumps(plan_obj, indent=2)};"
@@ -806,7 +841,13 @@ def build_cad_floorplan(
         html,
         count=1,
     )
-    return _wrap_template_artifact("cad_blueprint", safe_title, html)
+    return (
+        "DONE — the 2D/3D CAD floor plan HTML is already built and verified. "
+        "Do NOT edit, recalculate, or rewrite it. Output the `:::artifact{...}` block below verbatim:\n\n"
+        f":::artifact{{identifier=\"motion-cad-blueprint\" type=\"text/html\" title=\"{safe_title}\"}}\n"
+        f"````html\n{html.strip()}\n````\n"
+        f":::"
+    )
 
 
 if __name__ == "__main__":

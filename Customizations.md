@@ -589,6 +589,23 @@ LibreChat contains none of the following.
    codesandbox.io. Static-preview self-hosting is gated on a `*.satchida.com` DNS record +
    `SANDPACK_STATIC_BUNDLER_URL` (Changes.md 2026-11-10 "Self-hosted sandpack runtimes").
 
+## C30. Motion Studio Artifact Preview, Ephemeral Tool Isolation & Cross-Origin Sandpack (2026-11-12)
+
+Upstream LibreChat lacked automated artifact syntax healing for LLMs that emit unclosed or malformed directives, lacked honor for `executeCode: false` on ephemeral model specifications (forcing the code-runner tool on specs that forbid it), and injected `X-Frame-Options: SAMEORIGIN` on self-hosted Sandpack static preview relays preventing cross-origin wildcard frame loading.
+
+**Customization:**
+1. **Model Specification Tool Isolation & Token Limit Retention (`packages/api/src/agents/load.ts`, `packages/api/src/endpoints/openai/llm.ts`)**:
+   - Enforced `modelSpec.executeCode !== false` in `loadAgent` before registering `Tools.execute_code` on the ephemeral agent, hiding the `Run Code` UI toggle and preventing execution unauthorized errors.
+   - Preserved `modelSpec.artifacts` propagation onto ephemeral agents.
+   - Fixed `defaultParams` handling in `llm.ts` so spec-level `max_tokens` (e.g. 16,384 for Motion Studio) is not overwritten by gateway-level defaults (4,096).
+2. **Artifact Syntax Heuristics & Stream State Management (`client/src/utils/artifactDirective.ts`, `client/src/hooks/Artifacts/useArtifacts.ts`, `client/src/components/Chat/Messages/Content/Markdown.tsx`)**:
+   - Introduced `normalizeArtifactDirectives` to normalize custom container tags (e.g., `:::apartment-blueprint` -> `:::artifact`), auto-wrap uncontained `<!DOCTYPE html>` code blocks in `:::artifact{...}`, and seal open blocks during streaming.
+   - Added stream completion latch in `useArtifacts.ts` so the viewer remains on `preview` upon submission finish without flicking back to code.
+3. **Cross-Origin Wildcard Sandpack Static Preview & Vendor Script Delivery (`packages/api/src/artifacts/staticPreview.ts`, `api/server/index.js`, `client/public/assets/vendor/sandpack-static-preview/__csb_sw.rpfsli6sirrzs1630o3lgzuxwlr2uqc.js`, `client/src/utils/artifacts.ts`)**:
+   - Stripped `X-Frame-Options` and set `Cross-Origin-Resource-Policy: cross-origin` and `Cross-Origin-Opener-Policy: unsafe-none` on `createStaticPreviewRelayMiddleware` responses so wildcard session hosts (`<hex>-ai.satchida.com`) can be embedded without frameguard violations.
+   - Allowed cross-origin access to `/assets/vendor` and bypassed `__csb_sw` interception on vendor and cross-origin assets.
+   - Configured `buildSandpackOptions` to route `externalResources` through `staticBundlerURL` (`https://ai.satchida.com`) to prevent private-network loopback blocks.
+
 ## C29. Satchida Motion Studio Engine, Offline Three.js Vendor & 70-Persona Navigator (2026-11-12)
 
 Upstream LibreChat includes no motion-graphics studio mode, grouped persona navigator, or headless Playwright MP4/WebGL renderer.

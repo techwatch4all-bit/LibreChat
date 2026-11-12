@@ -1,11 +1,12 @@
 import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { getRemarkPlugins, getRehypePlugins, getMarkdownComponents } from './markdownConfig';
+import { normalizeArtifactDirectives } from '~/utils/artifactDirective';
 import useSmoothStreaming from '~/hooks/Messages/useSmoothStreaming';
 import MarkdownErrorBoundary from './MarkdownErrorBoundary';
+import SuggestedQuestions from './SuggestedQuestions';
 import { FADE_HYDRATION_THRESHOLD } from './animate';
 import { useMessageContext } from '~/Providers';
-import SuggestedQuestions from './SuggestedQuestions';
 import MarkdownBlocks from './MarkdownBlocks';
 import store from '~/store';
 
@@ -26,7 +27,7 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
   const { mainContent, questions } = useMemo(() => {
     if (!content) return { mainContent: '', questions: [] };
     const match = content.match(SUGGESTED_QUESTIONS_REGEX);
-    if (!match) return { mainContent: content, questions: [] };
+    if (!match) return { mainContent: normalizeArtifactDirectives(content), questions: [] };
 
     let main = content.slice(0, match.index).trim();
     main = main.replace(/(?:^|\n)[-*_]{3,}\s*$/g, '').trim();
@@ -35,14 +36,14 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
       .split('\n')
       .map((line) =>
         line
-          .replace(/^[\s*\d\.\-\>•\u2022\(\)]+\s*/, '')
+          .replace(/^[\s*\d.->•\u2022()]+\s*/, '')
           .replace(/^\[|\]$/g, '')
           .replace(/^\*\*|\*\*$/g, '')
           .trim(),
       )
       .filter((q) => q.length > 3 && !/^(?:Note|Disclaimer|Warning):/i.test(q));
 
-    return { mainContent: main, questions: parsed };
+    return { mainContent: normalizeArtifactDirectives(main), questions: parsed };
   }, [content]);
 
   const streaming = isLatestMessage && isSubmitting;

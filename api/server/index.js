@@ -411,6 +411,10 @@ const startServer = async () => {
       }),
     );
   }
+  app.use('/assets/vendor', (_req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
   app.use(staticCache(appConfig.paths.dist));
   app.use(staticCache(appConfig.paths.fonts));
   app.use(staticCache(appConfig.paths.assets));
@@ -628,9 +632,8 @@ const startServer = async () => {
        *  IDE session. The token comes from the ide_token cookie (set by the
        *  /api/ide route after its own auth) or the ?token= query parameter.
        *  Browsers send cookies on WS upgrades automatically. */
-      const parsedCookies = typeof req.headers.cookie === 'string'
-        ? cookie.parse(req.headers.cookie)
-        : {};
+      const parsedCookies =
+        typeof req.headers.cookie === 'string' ? cookie.parse(req.headers.cookie) : {};
       const authToken = url.searchParams.get('token') ?? parsedCookies.ide_token;
       if (!authToken) {
         logger.warn('[IDE-WS] rejected: no auth token on upgrade request');

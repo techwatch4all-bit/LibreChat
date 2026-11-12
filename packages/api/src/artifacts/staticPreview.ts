@@ -1,7 +1,6 @@
-import { existsSync, readdirSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-
+import { readFile } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 export const STATIC_PREVIEW_VENDOR_DIR = 'vendor/sandpack-static-preview';
@@ -98,6 +97,9 @@ export const createStaticPreviewRelayMiddleware = (options: {
     loadFile(route)
       .then((body) => {
         const ext = route.slice(route.lastIndexOf('.'));
+        res.removeHeader('X-Frame-Options');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
         res.setHeader('Content-Type', MIME_BY_EXT[ext] ?? 'application/octet-stream');
         res.setHeader('Cache-Control', 'no-cache');
         if (req.method === 'HEAD') {

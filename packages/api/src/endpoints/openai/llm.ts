@@ -728,6 +728,19 @@ export function getOpenAILLMConfig({
           }) || hasModelKwargs;
         continue;
       }
+      if (key === 'max_tokens' || key === 'maxTokens' || key === 'maxCompletionTokens') {
+        if (
+          value != null &&
+          value !== '' &&
+          llmConfig.max_tokens == null &&
+          llmConfig.maxTokens == null &&
+          llmConfig.maxCompletionTokens == null
+        ) {
+          const targetKey = key === 'max_tokens' ? 'maxTokens' : key;
+          (llmConfig as Record<string, unknown>)[targetKey] = value;
+        }
+        continue;
+      }
 
       if (knownOpenAIParams.has(key)) {
         applyDefaultParams(llmConfig as Record<string, unknown>, { [key]: value });

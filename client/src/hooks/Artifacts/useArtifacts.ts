@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Constants } from 'librechat-data-provider';
 import { useRecoilState, useRecoilValue, useResetRecoilState } from 'recoil';
+import { normalizeArtifactDirectives } from '~/utils/artifactDirective';
 import { isCodeOnlyArtifact } from '~/utils/artifacts';
 import { useArtifactsContext } from '~/Providers';
 import { logger } from '~/utils';
@@ -97,7 +98,7 @@ const hasUnfencedArtifactClose = (text: string, start: number): boolean => {
 };
 
 const hasEnclosedArtifact = (messageText: string): boolean => {
-  const text = messageText.trim();
+  const text = normalizeArtifactDirectives(messageText).trim();
   const artifactPattern = /:::artifact(?:\{[^}]*\})?/g;
   let artifactMatch = artifactPattern.exec(text);
 
@@ -244,10 +245,15 @@ export default function useArtifacts() {
 
     // Only switch to code tab if we haven't detected an enclosed artifact yet
     if (!hasEnclosedArtifactRef.current && !hasAutoSwitchedToCodeRef.current) {
-      const artifactStartContent = latestArtifact?.content?.slice(0, 50) ?? '';
-      if (artifactStartContent.length > 0 && latestMessageText.includes(artifactStartContent)) {
-        setActiveTab('code');
-        hasAutoSwitchedToCodeRef.current = true;
+      if (hasEnclosedArtifact(latestMessageText)) {
+        hasEnclosedArtifactRef.current = true;
+        setActiveTab('preview');
+      } else {
+        const artifactStartContent = latestArtifact?.content?.slice(0, 50) ?? '';
+        if (artifactStartContent.length > 0 && latestMessageText.includes(artifactStartContent)) {
+          setActiveTab('code');
+          hasAutoSwitchedToCodeRef.current = true;
+        }
       }
     }
   }, [

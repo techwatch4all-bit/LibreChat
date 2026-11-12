@@ -8,6 +8,38 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-12 — Motion Studio Live Artifact Preview, Cross-Origin Isolation & CAD Blueprint Rendering Fix
+
+Operator reports:
+1. "Tried the first persona about drawing the floor plan, getting errors... After many errors, it just dumped a php code on the chat, no integrated mermaid or similar 3D floor plan at all."
+2. "Preview still not working while the html file for 3D floor plan is just too bad... This rendering has not even started."
+
+Diagnosed & Shipped:
+1. **Tool & Capability Failures Eliminated (`packages/api/src/agents/load.ts`, `added.ts`, `endpoints/openai/llm.ts`, `skill/satchida-motion-server.py`)**:
+   - Fixed `loadAgent` to respect `modelSpec.executeCode !== false` so `Tools.execute_code` is not injected onto the ephemeral agent when the spec explicitly disables code execution, hiding the erroneous `Run Code` badge and eliminating `"Code execution is not authorized"`.
+   - Propagated `modelSpec.artifacts` into the ephemeral agent.
+   - Fixed `defaultParams` handling in `packages/api/src/endpoints/openai/llm.ts` so `Motion`'s `max_tokens: 16384` is honored and not overwritten by `Satchida-Gateway` default `4096`.
+   - Updated `get_motion_template` in `satchida-motion-server.py` to auto-wrap scaffolds inside `:::artifact{...}` + ````html ... ````.
+2. **Artifact Syntax Normalization & Auto-Open (`client/src/utils/artifactDirective.ts`, `client/src/hooks/Artifacts/useArtifacts.ts`, `client/src/components/Chat/Messages/Content/Markdown.tsx`)**:
+   - Built `normalizeArtifactDirectives(content)` to catch and normalize malformed model artifacts: fixes custom container names (e.g. `:::apartment-blueprint` -> `:::artifact`), wraps closed standalone `<!DOCTYPE html>...</html>` code blocks in `:::artifact{...}`, and closes unclosed directives.
+   - Added stream completion guard in `useArtifacts.ts` ensuring `activeTab` stays `'preview'` without reverting to `'code'`.
+3. **Sandpack Static Preview Wildcard Host & Cross-Origin Isolation Fix (`packages/api/src/artifacts/staticPreview.ts`, `api/server/index.js`, `client/public/assets/vendor/sandpack-static-preview/__csb_sw.rpfsli6sirrzs1630o3lgzuxwlr2uqc.js`, `client/src/utils/artifacts.ts`)**:
+   - Stripped `X-Frame-Options: SAMEORIGIN` and added `Cross-Origin-Resource-Policy: cross-origin` + `Cross-Origin-Opener-Policy: unsafe-none` in `createStaticPreviewRelayMiddleware` so wildcard session hosts (`<sessionId>-ai.satchida.com`) can be framed cross-origin by LibreChat.
+   - Added `Cross-Origin-Resource-Policy: cross-origin` to `/assets/vendor` in `index.js`.
+   - Patched `__csb_sw.rpfsli6sirrzs1630o3lgzuxwlr2uqc.js` to bypass cross-origin and `/assets/vendor/` requests, eliminating synthetic 404s.
+   - Updated `buildSandpackOptions` in `client/src/utils/artifacts.ts` so `static` preview templates resolve `externalResources` against `staticBundlerURL` (`https://ai.satchida.com`), preventing loopback address space blocks from `127.0.0.1:3080`.
+4. **Architectural CAD Floor Plan Blueprint Upgraded (`skill/satchida-motion-server.py`, `librechat.yaml`)**:
+   - Enforced `Visible-at-t0 Law`: eliminated initial `opacity: 0` on structural walls/furniture.
+   - Upgraded `cad_blueprint` scaffold with full 2D CAD blueprint walls, dimension ticks, room labels, furniture, door swing arcs, sun beam & shadow controls, and 3D camera controls (`2D Top`, `Iso 3D`, `Walkthrough`).
+
+Evidence:
+- `packages/api` Jest suites (`staticPreview.spec.ts`, `llm.spec.ts`, `load.spec.ts`): 164/164 passed.
+- `client` Jest suites (`artifactDirective.spec.ts`, `useArtifacts.test.ts`, `MarkdownBlocks.artifacts.test.tsx`): 103/103 passed.
+- `build:api` and `build:client` compiled cleanly.
+- Full live Playwright E2E (`http://127.0.0.1:3080`) verified `#artifact-viewer` opens, loads iframe (`bodyLen: 18614`, `hasGsap: true`, `hasTimeline: true`, `buttons: ["2D Top", "Iso 3D", "Walkthrough", "Pause", "Restart"]`), with 0 console errors and 0 HTTP errors. Visual verification captured in `motion_e2e_artifact.png` and `motion_e2e_artifact_3d.png`.
+
+---
+
 ## 2026-11-12 — Motion Studio Gold-Standard Expansion (70 Interactive Personas, Two-Tier Navigator & Offline Three.js/WebGL Renderer)
 
 Operator request: Upgrade Motion Studio into a gold-standard interactive simulation, engineering, and storytelling studio covering students (physics, math, chemistry, biology, coding, networks), senior citizens, office productivity, artists/cartoonists, homemakers/interior planners, doctors/medical practitioners, fitness/nutrition consultants, architects (2D/3D floor plans, sun-path, MEP), drone & UAV design, robotics/kinematics, and "How Things Work" cutaways — presented through an approachable non-overwhelming UI that stages multi-slot templates for user customization rather than firing immediately.

@@ -939,5 +939,40 @@ describe('useArtifacts', () => {
 
       expect(result.current.activeTab).toBe('preview');
     });
+
+    it('should stay on preview when standalone HTML block closes on stream completion', () => {
+      const htmlDoc = [
+        '<!DOCTYPE html>',
+        '<html>',
+        '<head><style>body { color: white; }</style></head>',
+        '<body><div id="app">Ready</div></body>',
+        '</html>',
+      ].join('\n');
+      const artifact = createArtifact({
+        id: 'html-1',
+        type: 'text/html',
+        content: htmlDoc,
+        messageId: 'msg-1',
+      });
+      (useRecoilValue as jest.Mock).mockReturnValue({ 'html-1': artifact });
+      (useRecoilState as jest.Mock).mockReturnValue(['html-1', mockSetCurrentArtifactId]);
+      (useArtifactsContext as jest.Mock).mockReturnValue({
+        ...defaultContext,
+        isSubmitting: true,
+        latestMessageText: `\`\`\`html\n${htmlDoc}`,
+      });
+
+      const { result, rerender } = renderHook(() => useArtifacts());
+
+      (useArtifactsContext as jest.Mock).mockReturnValue({
+        ...defaultContext,
+        isSubmitting: false,
+        latestMessageText: `\`\`\`html\n${htmlDoc}\n\`\`\``,
+      });
+
+      rerender();
+
+      expect(result.current.activeTab).toBe('preview');
+    });
   });
 });

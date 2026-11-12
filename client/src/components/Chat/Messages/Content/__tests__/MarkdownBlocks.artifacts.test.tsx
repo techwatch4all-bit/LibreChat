@@ -181,4 +181,19 @@ describe.each([
     const [artifactNode] = await screen.findAllByTestId('art');
     expect(artifactNode.getAttribute('data-content')).toBe(`${markdown}\n`);
   });
+
+  it('promotes a bare closed <!DOCTYPE html> block into a clickable Artifact', async () => {
+    const html = [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head><title>CAD Floor Plan</title><style>body{margin:0}</style></head>',
+      '<body><div id="plan">2BHK</div></body>',
+      '</html>',
+    ].join('\n');
+    const content = `Intro.\n\n\`\`\`html\n${html}\n\`\`\`\n\nOutro.`;
+
+    renderMessage(content, streamed);
+
+    expect(await readArtifacts()).toEqual([{ idx: '0', id: 'cad-floor-plan' }]);
+  });
 });

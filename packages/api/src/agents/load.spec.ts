@@ -1,7 +1,14 @@
-import { EModelEndpoint, parseEphemeralAgentId } from 'librechat-data-provider';
+import {
+  Tools,
+  ArtifactModes,
+  EModelEndpoint,
+  parseEphemeralAgentId,
+} from 'librechat-data-provider';
+import type { TConversation } from 'librechat-data-provider';
 import type { LoadAgentDeps } from './load';
 import { loadEphemeralAgent } from './load';
 import { resolveSender } from './sender';
+import { loadAddedAgent } from './added';
 
 const deps: LoadAgentDeps = {
   getAgent: async () => null,
@@ -98,5 +105,152 @@ describe('loadEphemeralAgent → resolveSender parity', () => {
     });
     expect(sender).toBe('My Opus');
     expect(sender).toBe(parseEphemeralAgentId(agent?.id ?? '')?.sender);
+  });
+});
+
+describe('loadEphemeralAgent modelSpec capabilities fallback', () => {
+  test('inherits modelSpec.artifacts when ephemeralAgent.artifacts is omitted', async () => {
+    const req = {
+      user: { id: 'user-1' },
+      config: {
+        modelSpecs: {
+          list: [
+            { name: 'motion-spec', label: 'Motion Studio', artifacts: true },
+            { name: 'custom-art-spec', label: 'Custom', artifacts: 'custom' },
+          ],
+        },
+      },
+      body: {},
+    } as unknown as Parameters<typeof loadEphemeralAgent>[0]['req'];
+
+    const boolSpecAgent = await loadEphemeralAgent(
+      {
+        req,
+        spec: 'motion-spec',
+        endpoint: 'Satchida-Gateway',
+        model_parameters: { model: 'Work' } as never,
+      },
+      deps,
+    );
+    expect(boolSpecAgent?.artifacts).toBe(ArtifactModes.DEFAULT);
+
+    const customSpecAgent = await loadEphemeralAgent(
+      {
+        req,
+        spec: 'custom-art-spec',
+        endpoint: 'Satchida-Gateway',
+        model_parameters: { model: 'Work' } as never,
+      },
+      deps,
+    );
+    expect(customSpecAgent?.artifacts).toBe(ArtifactModes.CUSTOM);
+  });
+
+  test('respects explicit ephemeralAgent.artifacts override and opt-out', async () => {
+    const reqWithOverride = {
+      user: { id: 'user-1' },
+      config: {
+        modelSpecs: { list: [{ name: 'motion-spec', label: 'Motion Studio', artifacts: true }] },
+      },
+      body: { ephemeralAgent: { artifacts: ArtifactModes.SHADCNUI } },
+    } as unknown as Parameters<typeof loadEphemeralAgent>[0]['req'];
+
+    const overridden = await loadEphemeralAgent(
+      { req: reqWithOverride, spec: 'motion-spec', endpoint: 'Satchida-Gateway' },
+      deps,
+    );
+    expect(overridden?.artifacts).toBe(ArtifactModes.SHADCNUI);
+
+    const reqWithOptOut = {
+      ...reqWithOverride,
+      body: { ephemeralAgent: { artifacts: '' } },
+    } as unknown as Parameters<typeof loadEphemeralAgent>[0]['req'];
+
+    const optedOut = await loadEphemeralAgent(
+      { req: reqWithOptOut, spec: 'motion-spec', endpoint: 'Satchida-Gateway' },
+      deps,
+    );
+    expect(optedOut?.artifacts).toBeUndefined();
+  });
+
+  test('disables execute_code and skills when modelSpec sets executeCode: false and skills: false', async () => {
+    const req = {
+      user: { id: 'user-1' },
+      config: {
+        modelSpecs: {
+          list: [
+            {
+              name: 'motion-spec',
+              label: 'Motion Studio',
+              executeCode: false,
+              skills: false,
+            },
+          ],
+        },
+      },
+      body: { ephemeralAgent: { execute_code: true } },
+    } as unknown as Parameters<typeof loadEphemeralAgent>[0]['req'];
+
+    const agent = await loadEphemeralAgent(
+      {
+        req,
+        spec: 'motion-spec',
+        endpoint: 'Satchida-Gateway',
+        model_parameters: { model: 'Work' } as never,
+      },
+      deps,
+    );
+    expect(agent?.tools).not.toContain(Tools.execute_code);
+    expect(agent?.skills_enabled).toBe(false);
+    expect(agent?.skills).toEqual([]);
+  });
+
+  test('loadAddedAgent mirrors modelSpec.artifacts inheritance and executeCode: false guard', async () => {
+    const req = {
+      user: { id: 'user-1' },
+      config: {
+        modelSpecs: {
+          list: [
+            {
+              name: 'motion-spec',
+              label: 'Motion Studio',
+              artifacts: true,
+              executeCode: false,
+              skills: false,
+            },
+          ],
+        },
+      },
+    } as unknown as Parameters<typeof loadAddedAgent>[0]['req'];
+
+    const added = await loadAddedAgent(
+      {
+        req,
+        conversation: {
+          endpoint: 'Satchida-Gateway',
+          model: 'Work',
+          spec: 'motion-spec',
+          ephemeralAgent: { execute_code: true },
+        } as unknown as TConversation,
+      },
+      deps,
+    );
+    expect(added?.artifacts).toBe(ArtifactModes.DEFAULT);
+    expect(added?.tools).not.toContain(Tools.execute_code);
+    expect(added?.skills_enabled).toBe(false);
+
+    const optedOut = await loadAddedAgent(
+      {
+        req,
+        conversation: {
+          endpoint: 'Satchida-Gateway',
+          model: 'Work',
+          spec: 'motion-spec',
+          ephemeralAgent: { artifacts: '' },
+        } as unknown as TConversation,
+      },
+      deps,
+    );
+    expect(optedOut?.artifacts).toBeUndefined();
   });
 });

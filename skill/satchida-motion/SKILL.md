@@ -70,8 +70,25 @@ Pick the exact visual technology that makes the requested persona feel museum-gr
 
 ---
 
+## LibreChat Inline Artifact Delivery Format (Mandatory)
+
+- Deliver every HTML simulation inline directly in chat using LibreChat's exact directive wrapper (do **not** attempt filesystem/shell tools like `create_file` or `bash_tool`, do **not** invent custom `:::directive` names, and do **not** emit raw unwrapped `<!DOCTYPE html>`):
+
+  ```markdown
+  :::artifact{identifier="kebab-case-id" type="text/html" title="Concise Descriptive Title"}
+  ````html
+  <!DOCTYPE html>
+  <html lang="en">...</html>
+  ````
+  :::
+  ```
+
+- Keep each single-file HTML artifact crisp and complete (~160–280 lines with no placeholders) so the interactive preview renders in one pass without truncation.
+
+---
+
 ## Validation & 60fps MP4 Export Workflow
 
-1. Build the complete `index.html` artifact.
-2. Call `validate_motion_html({ html_content })` before finalizing complex scenes when verifying compliance.
-3. Call `render_motion_to_video({ html_content, filename, duration_seconds, fps: 60, width: 1280, height: 720 })` whenever the user requests an MP4 download or social reel (`1080x1920` for 9:16 reels).
+1. Build the complete standalone HTML artifact and emit it directly inline in `:::artifact{identifier="..." type="text/html" title="..."}` in a single pass.
+2. **NEVER** call `validate_motion_html` prior to emitting an inline chat `:::artifact` — self-verify the Anti-PPT and `window.__TIMELINE__` checklist mentally so you do not serialize the HTML twice. Reserve `validate_motion_html` only for debugging a failed MP4 export.
+3. Call `render_motion_to_video({ html_content, filename, duration_seconds, fps: 60, width: 1280, height: 720 })` **only** when the user explicitly requests an MP4 download or social reel (`1080x1920` for 9:16 reels).

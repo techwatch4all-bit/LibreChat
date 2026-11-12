@@ -2,6 +2,7 @@ import { logger } from '@librechat/data-schemas';
 import {
   Tools,
   Constants,
+  ArtifactModes,
   isAgentsEndpoint,
   isEphemeralAgentId,
   getEphemeralSender,
@@ -110,7 +111,10 @@ export async function loadEphemeralAgent(
     ephemeralAgent.mcp = [...mcpServers];
   }
   const tools: string[] = [];
-  if (ephemeralAgent?.execute_code === true || modelSpec?.executeCode === true) {
+  if (
+    modelSpec?.executeCode === true ||
+    (modelSpec?.executeCode !== false && ephemeralAgent?.execute_code === true)
+  ) {
     tools.push(Tools.execute_code);
   }
   if (ephemeralAgent?.file_search === true || modelSpec?.fileSearch === true) {
@@ -211,8 +215,14 @@ export async function loadEphemeralAgent(
     result.tool_options = mergeSynthesizedToolOptions(result.tool_options, intentToolOptions);
   }
 
-  if (ephemeralAgent?.artifacts) {
-    result.artifacts = ephemeralAgent.artifacts;
+  if (ephemeralAgent?.artifacts != null) {
+    if (ephemeralAgent.artifacts) {
+      result.artifacts = ephemeralAgent.artifacts;
+    }
+  } else if (modelSpec?.artifacts === true) {
+    result.artifacts = ArtifactModes.DEFAULT;
+  } else if (typeof modelSpec?.artifacts === 'string' && modelSpec.artifacts !== '') {
+    result.artifacts = modelSpec.artifacts as ArtifactModes;
   }
   if (modelSpec?.subagents) {
     result.subagents = modelSpec.subagents;

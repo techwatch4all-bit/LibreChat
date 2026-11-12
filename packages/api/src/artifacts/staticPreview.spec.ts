@@ -1,10 +1,10 @@
-import express from 'express';
 import http from 'node:http';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import express from 'express';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createStaticPreviewRelayMiddleware } from './staticPreview';
+import { createSecurityHeaders } from '../security/headers';
 
 const BASE_HOST = 'ai.satchida.com';
 const SESSION_HOST = `1a2b3c-${BASE_HOST}`;
@@ -127,5 +127,52 @@ describe('createStaticPreviewRelayMiddleware', () => {
   it('rejects session hosts built on a different base', async () => {
     const res = await request('/', '1a2b3c-other.example.com');
     expect(res.status).toBe(404);
+  });
+
+  it('strips X-Frame-Options and allows cross-origin embedding when securityHeaders runs first', async () => {
+    const securedApp = express();
+    const securityHeaders = createSecurityHeaders({});
+    if (securityHeaders) {
+      securedApp.use(securityHeaders);
+    }
+    securedApp.use(
+      createStaticPreviewRelayMiddleware({ assets: assetsDir, sessionBaseHost: BASE_HOST }),
+    );
+    const securedServer = await new Promise<http.Server>((resolve) => {
+      const srv = securedApp.listen(0, '127.0.0.1', () => resolve(srv));
+    });
+    try {
+      const addr = securedServer.address();
+      if (!addr || typeof addr === 'string') {
+        throw new Error('unexpected address');
+      }
+      const res = await new Promise<{ status: number; headers: http.IncomingHttpHeaders }>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              host: '127.0.0.1',
+              port: addr.port,
+              path: '/',
+              method: 'GET',
+              headers: { Host: SESSION_HOST },
+            },
+            (incoming) => {
+              incoming.resume();
+              incoming.on('end', () =>
+                resolve({ status: incoming.statusCode ?? 0, headers: incoming.headers }),
+              );
+            },
+          );
+          req.on('error', reject);
+          req.end();
+        },
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers['x-frame-options']).toBeUndefined();
+      expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+      expect(res.headers['cross-origin-opener-policy']).toBe('unsafe-none');
+    } finally {
+      await new Promise<void>((resolve) => securedServer.close(() => resolve()));
+    }
   });
 });

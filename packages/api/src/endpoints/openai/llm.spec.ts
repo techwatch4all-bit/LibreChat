@@ -1867,6 +1867,65 @@ describe('getOpenAILLMConfig', () => {
       expect(result.llmConfig.modelKwargs).not.toHaveProperty('verbosity');
     });
   });
+
+  describe('Default max_tokens Handling', () => {
+    it('applies defaultParams.max_tokens to llmConfig.maxTokens when modelOptions omits it without leaking into modelKwargs', () => {
+      const result = getOpenAILLMConfig({
+        apiKey: 'test-api-key',
+        streaming: true,
+        endpoint: 'Satchida-Gateway',
+        defaultParams: {
+          max_tokens: 4096,
+        },
+        modelOptions: {
+          model: 'Chat',
+        },
+      });
+
+      expect(result.llmConfig.maxTokens).toBe(4096);
+      expect(result.llmConfig).not.toHaveProperty('max_tokens');
+      expect(result.llmConfig.modelKwargs).toBeUndefined();
+    });
+
+    it('preserves higher caller/preset modelOptions.max_tokens over defaultParams.max_tokens', () => {
+      const result = getOpenAILLMConfig({
+        apiKey: 'test-api-key',
+        streaming: true,
+        endpoint: 'Satchida-Gateway',
+        defaultParams: {
+          max_tokens: 4096,
+        },
+        modelOptions: {
+          model: 'Work',
+          max_tokens: 16384,
+        },
+      });
+
+      expect(result.llmConfig.maxTokens).toBe(16384);
+      expect(result.llmConfig).not.toHaveProperty('max_tokens');
+      expect(result.llmConfig.modelKwargs).toBeUndefined();
+    });
+
+    it('allows addParams.max_tokens to override both defaultParams and modelOptions when configured', () => {
+      const result = getOpenAILLMConfig({
+        apiKey: 'test-api-key',
+        streaming: true,
+        endpoint: 'custom',
+        defaultParams: {
+          max_tokens: 4096,
+        },
+        addParams: {
+          max_tokens: 2048,
+        },
+        modelOptions: {
+          model: 'Work',
+          max_tokens: 16384,
+        },
+      });
+
+      expect(result.llmConfig.modelKwargs).toHaveProperty('max_tokens', 2048);
+    });
+  });
 });
 
 describe('extractDefaultParams', () => {

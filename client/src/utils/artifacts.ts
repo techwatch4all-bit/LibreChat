@@ -387,8 +387,17 @@ export function buildSandpackOptions(
     return sharedOptions;
   }
 
+  const assetOrigin =
+    template === 'static' && startupConfig.staticBundlerURL
+      ? startupConfig.staticBundlerURL
+      : window.location.origin;
+
   return {
     ...sharedOptions,
+    externalResources: [
+      `${assetOrigin}/assets/vendor/tailwind-3.4.17.js`,
+      `${assetOrigin}/assets/vendor/gsap/gsap.min.js`,
+    ],
     bundlerURL:
       template === 'static'
         ? startupConfig.staticBundlerURL

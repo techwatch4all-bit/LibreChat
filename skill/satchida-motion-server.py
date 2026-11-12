@@ -32,7 +32,9 @@ VENDOR_ASSET_MAP = {
     "/assets/vendor/gsap/TextPlugin.min.js": os.path.join(VENDOR_DIR, "gsap", "TextPlugin.min.js"),
     "/assets/vendor/three/three.min.js": os.path.join(VENDOR_DIR, "three", "three.min.js"),
     "/assets/vendor/three/OrbitControls.js": os.path.join(VENDOR_DIR, "three", "OrbitControls.js"),
+    "/assets/vendor/three/GLTFExporter.js": os.path.join(VENDOR_DIR, "three", "GLTFExporter.js"),
     "/assets/vendor/satchida/cad-studio.js": os.path.join(VENDOR_DIR, "satchida", "cad-studio.js"),
+    "/assets/vendor/satchida/scenemosaic-studio.js": os.path.join(VENDOR_DIR, "satchida", "scenemosaic-studio.js"),
     "/assets/vendor/tailwind-3.4.17.js": os.path.join(VENDOR_DIR, "tailwind-3.4.17.js"),
 }
 
@@ -75,6 +77,7 @@ def _wrap_template_artifact(style: str, title: str, html: str) -> str:
 
 def _rewrite_vendor_paths(html_content: str) -> str:
     content = _unwrap_html(html_content)
+    content = re.sub(r'(/assets/vendor/[a-zA-Z0-9_\-\./]+)\?[a-zA-Z0-9_=&]+', r'\1', content)
     for web_path, fs_path in VENDOR_ASSET_MAP.items():
         if web_path in content and os.path.exists(fs_path):
             file_uri = "file:///" + fs_path.replace("\\", "/")
@@ -334,8 +337,653 @@ def get_motion_template(style: str = "executive") -> str:
       'accessible_guide' (WCAG AAA high-contrast large-print senior/patient step-by-step guide).
     """
     style = style.lower().strip()
-    if any(k in style for k in ("medical", "anatomy", "clinical", "organ", "diabetes", "stage", "cutaway")):
+    if any(k in style for k in ("medical", "anatomy", "clinical", "organ", "diabetes", "insulin", "perfusion", "pathology")):
+        style = "clinical_anatomy"
+    elif any(k in style for k in ("engine", "piston", "rpm", "mechanism", "cutaway")):
         style = "mechanism_cutaway"
+
+    if style == "clinical_anatomy":
+        return _wrap_template_artifact(
+            "clinical-anatomy",
+            "Clinical-Grade Anatomical Cross-Section — Type-2 Diabetes Insulin Resistance",
+            """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinical Anatomical Cross-Section — Type-2 Diabetes & Organ Perfusion</title>
+  <script src="/assets/vendor/gsap/gsap.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js';"></script>
+  <style>
+    :root {
+      --bg: #070d18;
+      --surface: rgba(15, 23, 42, 0.92);
+      --surface-card: rgba(30, 41, 59, 0.7);
+      --border: rgba(56, 189, 248, 0.22);
+      --accent: #38bdf8;
+      --glucose: #f59e0b;
+      --insulin: #06b6d4;
+      --normal: #10b981;
+      --warning: #f97316;
+      --severe: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 74px;
+    }
+    header {
+      padding: 14px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      backdrop-filter: blur(10px);
+    }
+    .title-group h1 { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+    .title-group p { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+    .stages-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+    .stage-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-muted);
+      border-radius: 9999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .stage-btn:hover { background: rgba(56, 189, 248, 0.15); color: #fff; }
+    .stage-btn.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px 20px;
+      flex: 1;
+    }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+    .view-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }
+    .card-header h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .badge-normal { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+    .badge-pathology { background: rgba(249, 115, 22, 0.18); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
+    .svg-container { flex: 1; width: 100%; min-height: 270px; display: flex; align-items: center; justify-content: center; }
+    svg { width: 100%; height: 100%; max-height: 310px; }
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 0 20px 16px;
+    }
+    @media (max-width: 760px) { .telemetry-row { grid-template-columns: repeat(2, 1fr); } }
+    .tele-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .tele-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .tele-val { font-size: 20px; font-weight: 800; color: #fff; font-family: monospace; }
+    .tele-unit { font-size: 10.5px; color: var(--text-muted); font-weight: 500; }
+    .tele-status { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+    .clinical-narrative {
+      margin: 0 20px 16px;
+      background: rgba(15, 23, 42, 0.95);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #cbd5e1;
+    }
+    .clinical-narrative strong { color: #fff; }
+    #satchida-controls {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 18px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    #satchida-controls button {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+      border-radius: 9999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #satchida-controls button:hover { background: #0284c7; color: #fff; }
+    #timeline-scrubber { width: 170px; accent-color: var(--accent); }
+    footer {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      padding: 4px 10px;
+      font-size: 9.5px;
+      color: #64748b;
+      background: rgba(7, 13, 24, 0.95);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      z-index: 40;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1>Type-2 Diabetes — Insulin Resistance &amp; Organ Perfusion Cross-Section</h1>
+      <p>Clinical Histological Progression · Capillary Perfusion · Receptor &amp; GLUT4 Translocation Dynamics</p>
+    </div>
+    <div class="stages-nav">
+      <button class="stage-btn active" data-stage="0">1 · Healthy</button>
+      <button class="stage-btn" data-stage="1">2 · Compensated IR</button>
+      <button class="stage-btn" data-stage="2">3 · Decompensated</button>
+      <button class="stage-btn" data-stage="3">4 · Severe T2D</button>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <!-- LEFT: Normal Reference Anatomy -->
+    <div class="view-card">
+      <div class="card-header">
+        <h2 style="color: #34d399;">Healthy Normal Reference (Euglycemia)</h2>
+        <span class="badge badge-normal">Baseline Control</span>
+      </div>
+      <div class="svg-container">
+        <svg viewBox="0 0 460 300">
+          <defs>
+            <linearGradient id="capGradNorm" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ef4444" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#dc2626" stop-opacity="0.9"/>
+            </linearGradient>
+            <linearGradient id="cellGradNorm" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+          </defs>
+          <!-- Capillary vessel -->
+          <rect x="20" y="24" width="420" height="48" rx="24" fill="url(#capGradNorm)" opacity="0.32" stroke="#ef4444" stroke-width="2"/>
+          <text x="35" y="44" fill="#fca5a5" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 100%)</text>
+          <!-- Normal RBCs & Glucose -->
+          <circle cx="90" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+          <circle cx="150" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+          <circle cx="210" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+          <circle cx="270" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+          <circle cx="330" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+          <!-- Insulin Monomers (Cyan) -->
+          <polygon points="120,40 126,48 120,56 114,48" fill="#06b6d4"/>
+          <polygon points="240,40 246,48 240,56 234,48" fill="#06b6d4"/>
+          <polygon points="360,40 366,48 360,56 354,48" fill="#06b6d4"/>
+          <!-- Glucose (Amber) -->
+          <circle cx="178" cy="48" r="5" fill="#f59e0b"/>
+          <circle cx="295" cy="48" r="5" fill="#f59e0b"/>
+
+          <!-- Interstitial Space -->
+          <line x1="20" y1="88" x2="440" y2="88" stroke="#334155" stroke-dasharray="4 4" stroke-width="1"/>
+          <text x="35" y="84" fill="#94a3b8" font-size="9">INTERSTITIUM · DIFFUSION GRADIENT</text>
+
+          <!-- Skeletal Muscle / Hepatocyte Membrane -->
+          <rect x="20" y="100" width="420" height="180" rx="16" fill="url(#cellGradNorm)" stroke="#38bdf8" stroke-width="2"/>
+          <text x="35" y="122" fill="#7dd3fc" font-size="11" font-weight="700">MYOCYTE / HEPATOCYTE CYTOPLASM</text>
+
+          <!-- Insulin Receptor (Active) -->
+          <path d="M 80 100 L 80 82 M 72 82 L 80 92 L 88 82" stroke="#06b6d4" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <polygon points="80,72 85,79 80,86 75,79" fill="#06b6d4"/>
+          <text x="96" y="90" fill="#38bdf8" font-size="9" font-weight="600">Active IR (Tyrosine Kinase)</text>
+
+          <!-- Second Insulin Receptor -->
+          <path d="M 280 100 L 280 82 M 272 82 L 280 92 L 288 82" stroke="#06b6d4" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <polygon points="280,72 285,79 280,86 275,79" fill="#06b6d4"/>
+
+          <!-- Open GLUT4 Transporter Channels -->
+          <rect x="170" y="96" width="34" height="12" rx="4" fill="#10b981" stroke="#34d399" stroke-width="2"/>
+          <path d="M 187 88 L 187 116 M 181 110 L 187 116 L 193 110" stroke="#f59e0b" stroke-width="2.5" fill="none"/>
+          <text x="145" y="132" fill="#34d399" font-size="9" font-weight="700">OPEN GLUT4 PORE</text>
+
+          <rect x="370" y="96" width="34" height="12" rx="4" fill="#10b981" stroke="#34d399" stroke-width="2"/>
+          <path d="M 387 88 L 387 116 M 381 110 L 387 116 L 393 110" stroke="#f59e0b" stroke-width="2.5" fill="none"/>
+
+          <!-- Intracellular Glucose Uptake & Glycogen Synthesis -->
+          <circle cx="187" cy="154" r="6" fill="#f59e0b"/>
+          <circle cx="210" cy="180" r="6" fill="#f59e0b"/>
+          <circle cx="387" cy="154" r="6" fill="#f59e0b"/>
+          <rect x="250" y="160" width="130" height="45" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.2"/>
+          <text x="262" y="180" fill="#34d399" font-size="10" font-weight="700">GLYCOGEN SYNTHESIS</text>
+          <text x="262" y="194" fill="#a7f3d0" font-size="9">Hexokinase · Normal ATP yield</text>
+
+          <!-- Pancreatic Islet Inset -->
+          <circle cx="80" cy="210" r="38" fill="rgba(6,182,212,0.12)" stroke="#06b6d4" stroke-width="1.5"/>
+          <text x="80" y="200" fill="#7dd3fc" font-size="8.5" font-weight="700" text-anchor="middle">PANCREATIC ISLET</text>
+          <circle cx="68" cy="218" r="5" fill="#06b6d4"/>
+          <circle cx="82" cy="216" r="6" fill="#06b6d4"/>
+          <circle cx="94" cy="222" r="5" fill="#06b6d4"/>
+          <text x="80" y="235" fill="#cbd5e1" font-size="7.5" text-anchor="middle">Normal β-cell Mass</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- RIGHT: Dynamic Pathophysiological Cross-Section -->
+    <div class="view-card">
+      <div class="card-header">
+        <h2 id="path-title" style="color: #fb923c;">Compensated Insulin Resistance</h2>
+        <span class="badge badge-pathology" id="path-badge">Stage 2</span>
+      </div>
+      <div class="svg-container">
+        <svg viewBox="0 0 460 300" id="path-svg">
+          <defs>
+            <linearGradient id="capGradPath" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop id="cap-stop1" offset="0%" stop-color="#f97316" stop-opacity="0.32"/>
+              <stop id="cap-stop2" offset="100%" stop-color="#dc2626" stop-opacity="0.45"/>
+            </linearGradient>
+            <linearGradient id="cellGradPath" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#1e1b2e"/>
+              <stop offset="100%" stop-color="#0f111a"/>
+            </linearGradient>
+          </defs>
+          <!-- Capillary vessel (Constricts in later stages) -->
+          <rect id="path-capillary" x="20" y="24" width="420" height="48" rx="24" fill="url(#capGradPath)" stroke="#f97316" stroke-width="2"/>
+          <text id="path-cap-text" x="35" y="44" fill="#fdba74" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 94%)</text>
+          <!-- Circulating Particles Group (Populated via JS) -->
+          <g id="path-particles"></g>
+
+          <!-- Interstitial Barrier with lipid accumulation -->
+          <line x1="20" y1="88" x2="440" y2="88" stroke="#f59e0b" stroke-dasharray="3 3" stroke-width="1.2" id="path-interstitium"/>
+          <text x="35" y="84" fill="#fbbf24" font-size="9" id="path-inter-text">DIACYLGLYCEROL &amp; CERAMIDE ACCUMULATION</text>
+
+          <!-- Muscle Membrane -->
+          <rect id="path-membrane" x="20" y="100" width="420" height="180" rx="16" fill="url(#cellGradPath)" stroke="#f97316" stroke-width="2"/>
+          <text id="path-cyto-text" x="35" y="122" fill="#fdba74" font-size="11" font-weight="700">DESENSITIZED RECEPTOR CYTOPLASM</text>
+
+          <!-- Receptors -->
+          <path id="path-receptor" d="M 80 100 L 80 82 M 72 82 L 80 92 L 88 82" stroke="#f97316" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <circle id="path-ir-phos" cx="80" cy="92" r="5" fill="#ef4444" opacity="0.8"/>
+          <text id="path-ir-status" x="96" y="90" fill="#fca5a5" font-size="9" font-weight="600">Serine Phosphorylated (Blunted)</text>
+
+          <!-- GLUT4 Transporters (Trapped inside vesicles in Stage 3/4) -->
+          <rect id="path-glut4-gate1" x="170" y="96" width="34" height="12" rx="4" fill="#eab308" stroke="#ca8a04" stroke-width="2"/>
+          <circle id="path-glut4-vesicle1" cx="187" cy="140" r="14" fill="rgba(234,179,8,0.2)" stroke="#eab308" stroke-dasharray="2 2" stroke-width="1.5"/>
+          <text id="path-glut4-label" x="140" y="168" fill="#eab308" font-size="8.5" font-weight="700">GLUT4 VESICLE RETENTION</text>
+
+          <!-- Intracellular Pathology -->
+          <rect id="path-glyco-box" x="250" y="160" width="150" height="50" rx="8" fill="rgba(249,115,22,0.12)" stroke="#f97316" stroke-width="1.2"/>
+          <text id="path-meta-title" x="262" y="180" fill="#fdba74" font-size="10" font-weight="700">COMPENSATORY WORKLOAD</text>
+          <text id="path-meta-sub" x="262" y="196" fill="#fed7aa" font-size="8.5">Mitochondrial ROS · Fatty Acid Spillover</text>
+
+          <!-- Pancreatic Islet Stress Inset -->
+          <circle id="path-islet" cx="80" cy="210" r="38" fill="rgba(249,115,22,0.15)" stroke="#f97316" stroke-width="1.5"/>
+          <text x="80" y="198" fill="#fed7aa" font-size="8.5" font-weight="700" text-anchor="middle">PANCREATIC ISLET</text>
+          <g id="path-beta-cells">
+            <circle cx="68" cy="214" r="7" fill="#f97316"/>
+            <circle cx="84" cy="212" r="8" fill="#f97316"/>
+            <circle cx="96" cy="220" r="7" fill="#f97316"/>
+          </g>
+          <text id="path-islet-sub" x="80" y="236" fill="#cbd5e1" font-size="7.5" text-anchor="middle">Hyperinsulinemic Secretion</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Telemetry Dashboard -->
+  <div class="telemetry-row">
+    <div class="tele-card">
+      <div class="tele-label">Fasting Blood Glucose</div>
+      <div class="tele-val" id="val-glucose">86</div>
+      <div class="tele-unit">mg/dL</div>
+      <div class="tele-status badge-normal" id="stat-glucose">Normal</div>
+    </div>
+    <div class="tele-card">
+      <div class="tele-label">Glycated Hemoglobin (HbA1c)</div>
+      <div class="tele-val" id="val-hba1c">5.1</div>
+      <div class="tele-unit">%</div>
+      <div class="tele-status badge-normal" id="stat-hba1c">Euglycemic</div>
+    </div>
+    <div class="tele-card">
+      <div class="tele-label">Fasting Serum Insulin</div>
+      <div class="tele-val" id="val-insulin">7.2</div>
+      <div class="tele-unit">μIU/mL</div>
+      <div class="tele-status badge-normal" id="stat-insulin">Optimal Basal</div>
+    </div>
+    <div class="tele-card">
+      <div class="tele-label">Microvascular Perfusion</div>
+      <div class="tele-val" id="val-perfusion">100</div>
+      <div class="tele-unit">%</div>
+      <div class="tele-status badge-normal" id="stat-perfusion">Intact Glycocalyx</div>
+    </div>
+  </div>
+
+  <!-- Clinical Explanatory Narrative -->
+  <div class="clinical-narrative" id="narrative-box">
+    <strong>Stage 1 (Normal Euglycemia):</strong> Insulin binds physiological tyrosine kinase receptors on skeletal muscle and adipocytes, prompting IRS-1 phosphorylation and rapid GLUT4 vesicle exocytosis. Capillary perfusion is 100% with no microvascular shear stress.
+  </div>
+
+  <!-- Controls Bar -->
+  <div id="satchida-controls">
+    <button id="btn-play">Pause</button>
+    <button id="btn-restart">Reset</button>
+    <input type="range" id="timeline-scrubber" min="0" max="300" value="0" step="1">
+    <span id="stage-display" style="font-size:11px;color:#94a3b8;font-weight:600;min-width:60px;">Stage 1</span>
+  </div>
+
+  <footer>
+    Educational &amp; Pathophysiological Visualization — Not Medical Advice. Generated for clinical training, academic reference &amp; patient comprehension.
+  </footer>
+
+  <script>
+    const STAGES = [
+      {
+        name: "Stage 1 · Healthy Euglycemia",
+        badge: "Normal",
+        badgeClass: "badge-normal",
+        titleColor: "#34d399",
+        glucose: 86,
+        glucoseStat: "Normal",
+        glucoseColor: "#10b981",
+        hba1c: 5.1,
+        hba1cStat: "Normal (<5.7%)",
+        insulin: 7.2,
+        insulinStat: "Normal Basal",
+        perfusion: 100,
+        perfusionStat: "Intact Glycocalyx",
+        capColor: "#10b981",
+        capText: "CAPILLARY LUMEN (PERFUSION 100%)",
+        irText: "Active IR (Tyrosine Kinase)",
+        irColor: "#06b6d4",
+        phosOpacity: 0,
+        glut4Color: "#10b981",
+        glut4Y: 96,
+        metaTitle: "GLYCOGENESIS INTACT",
+        metaSub: "Normal Hexokinase Activity",
+        metaBorder: "#10b981",
+        isletText: "Normal β-cell Mass",
+        isletBorder: "#06b6d4",
+        betaCellsCount: 3,
+        betaCellRadius: 5.5,
+        betaCellColor: "#06b6d4",
+        narrative: "<strong>Stage 1 (Normal Euglycemia):</strong> Insulin binds physiological tyrosine kinase receptors on skeletal muscle and adipocytes, prompting IRS-1 phosphorylation and rapid GLUT4 vesicle exocytosis. Capillary perfusion is 100% with no microvascular shear stress."
+      },
+      {
+        name: "Stage 2 · Compensated Insulin Resistance",
+        badge: "Compensated",
+        badgeClass: "badge-pathology",
+        titleColor: "#fb923c",
+        glucose: 98,
+        glucoseStat: "Near-Normal",
+        glucoseColor: "#fbbf24",
+        hba1c: 5.5,
+        hba1cStat: "Normal / Upper Limit",
+        insulin: 26.4,
+        insulinStat: "Hyperinsulinemia (3x)",
+        perfusion: 94,
+        perfusionStat: "Mild Vasomotor Stress",
+        capColor: "#f97316",
+        capText: "CAPILLARY LUMEN (PERFUSION 94% · ELEVATED INSULIN)",
+        irText: "Serine Phosphorylated (Receptor Desensitized)",
+        irColor: "#f97316",
+        phosOpacity: 0.8,
+        glut4Color: "#eab308",
+        glut4Y: 108,
+        metaTitle: "COMPENSATORY WORKLOAD",
+        metaSub: "Mitochondrial ROS · Intramyocellular Lipid",
+        metaBorder: "#f97316",
+        isletText: "β-Cell Hyperplasia (Overdrive)",
+        isletBorder: "#f97316",
+        betaCellsCount: 5,
+        betaCellRadius: 7.5,
+        betaCellColor: "#f97316",
+        narrative: "<strong>Stage 2 (Compensated Insulin Resistance):</strong> Ectopic lipid metabolites (diacylglycerols, ceramides) activate PKCθ, causing inhibitory serine phosphorylation of IRS-1. The pancreas compensates with massive hyperinsulinemia to force glucose into cells."
+      },
+      {
+        name: "Stage 3 · Impaired Glucose Tolerance (Pre-Diabetes)",
+        badge: "Decompensating",
+        badgeClass: "badge-pathology",
+        titleColor: "#f43f5e",
+        glucose: 145,
+        glucoseStat: "Impaired Fasting",
+        glucoseColor: "#f43f5e",
+        hba1c: 6.9,
+        hba1cStat: "Elevated (6.5-7.0%)",
+        insulin: 36.8,
+        insulinStat: "Secretory Fatigue",
+        perfusion: 76,
+        perfusionStat: "Endothelial Dysfunction",
+        capColor: "#e11d48",
+        capText: "CAPILLARY LUMEN (PERFUSION 76% · GLUCOSE ACCUMULATION)",
+        irText: "Uncoupled Receptor Cascade",
+        irColor: "#e11d48",
+        phosOpacity: 1.0,
+        glut4Color: "#dc2626",
+        glut4Y: 125,
+        metaTitle: "UNCHECKED GLUCONEOGENESIS",
+        metaSub: "GLUT4 Vesicle Translocation Blocked",
+        metaBorder: "#e11d48",
+        isletText: "β-Cell Secretory Exhaustion",
+        isletBorder: "#e11d48",
+        betaCellsCount: 4,
+        betaCellRadius: 6.0,
+        betaCellColor: "#e11d48",
+        narrative: "<strong>Stage 3 (Decompensation / Impaired Glucose Tolerance):</strong> Pancreatic β-cells can no longer sustain extreme hyperinsulinemia due to endoplasmic reticulum stress. GLUT4 vesicles fail to reach the plasma membrane, causing glucose to pool in the bloodstream."
+      },
+      {
+        name: "Stage 4 · Severe Type-2 Diabetes & Islet Failure",
+        badge: "Severe T2D",
+        badgeClass: "badge-pathology",
+        titleColor: "#ef4444",
+        glucose: 220,
+        glucoseStat: "Severe Hyperglycemia",
+        glucoseColor: "#ef4444",
+        hba1c: 9.8,
+        hba1cStat: "Critical (>9.0%)",
+        insulin: 6.1,
+        insulinStat: "Beta-Cell Failure",
+        perfusion: 52,
+        perfusionStat: "Microvascular Ischemia",
+        capColor: "#991b1b",
+        capText: "CAPILLARY LUMEN (PERFUSION 52% · SEVERE MICROVASCULAR DAMAGE)",
+        irText: "Complete Receptor Resistance",
+        irColor: "#991b1b",
+        phosOpacity: 1.0,
+        glut4Color: "#7f1d1d",
+        glut4Y: 140,
+        metaTitle: "GLUCOTOXICITY & AMYLOIDOSIS",
+        metaSub: "Advanced Glycation End-products (AGEs)",
+        metaBorder: "#ef4444",
+        isletText: "β-Cell Apoptosis & Amyloid (IAPP)",
+        isletBorder: "#991b1b",
+        betaCellsCount: 2,
+        betaCellRadius: 4.0,
+        betaCellColor: "#64748b",
+        narrative: "<strong>Stage 4 (Severe Type-2 Diabetes & Beta-Cell Failure):</strong> Marked by β-cell apoptosis and islet amyloid polypeptide (IAPP) fibril deposition. Profound insulin deficiency superimposed on receptor resistance leads to persistent hyperglycemia, advanced glycation, and microvascular basement membrane thickening."
+      }
+    ];
+
+    let currentStage = 0;
+
+    function renderStage(idx, lerpP = 0) {
+      currentStage = Math.max(0, Math.min(3, idx));
+      const s = STAGES[currentStage];
+      document.querySelectorAll(".stage-btn").forEach((btn, i) => btn.classList.toggle("active", i === currentStage));
+
+      document.getElementById("path-title").textContent = s.name;
+      document.getElementById("path-title").style.color = s.titleColor;
+      const bEl = document.getElementById("path-badge");
+      bEl.textContent = s.badge;
+      bEl.className = "badge " + s.badgeClass;
+
+      // Telemetry
+      document.getElementById("val-glucose").textContent = s.glucose;
+      document.getElementById("val-glucose").style.color = s.glucoseColor;
+      document.getElementById("stat-glucose").textContent = s.glucoseStat;
+
+      document.getElementById("val-hba1c").textContent = s.hba1c.toFixed(1);
+      document.getElementById("stat-hba1c").textContent = s.hba1cStat;
+
+      document.getElementById("val-insulin").textContent = s.insulin.toFixed(1);
+      document.getElementById("stat-insulin").textContent = s.insulinStat;
+
+      document.getElementById("val-perfusion").textContent = s.perfusion;
+      document.getElementById("stat-perfusion").textContent = s.perfusionStat;
+
+      document.getElementById("narrative-box").innerHTML = s.narrative;
+      document.getElementById("stage-display").textContent = "Stage " + (currentStage + 1);
+
+      // SVG Updates
+      const cap = document.getElementById("path-capillary");
+      cap.setAttribute("stroke", s.capColor);
+      document.getElementById("path-cap-text").textContent = s.capText;
+      document.getElementById("path-ir-status").textContent = s.irText;
+      document.getElementById("path-ir-status").setAttribute("fill", s.irColor);
+      document.getElementById("path-receptor").setAttribute("stroke", s.irColor);
+      document.getElementById("path-ir-phos").setAttribute("opacity", s.phosOpacity);
+
+      const gGate = document.getElementById("path-glut4-gate1");
+      gGate.setAttribute("fill", s.glut4Color);
+      gGate.setAttribute("y", s.glut4Y);
+
+      document.getElementById("path-meta-title").textContent = s.metaTitle;
+      document.getElementById("path-meta-sub").textContent = s.metaSub;
+      document.getElementById("path-glyco-box").setAttribute("stroke", s.metaBorder);
+
+      document.getElementById("path-islet").setAttribute("stroke", s.isletBorder);
+      document.getElementById("path-islet-sub").textContent = s.isletText;
+
+      // Regenerate particles
+      const pGroup = document.getElementById("path-particles");
+      pGroup.innerHTML = "";
+      // RBCs
+      for (let i = 0; i < 5; i++) {
+        const cx = 90 + i * 60;
+        const cy = 48 + Math.sin(i + currentStage) * 3;
+        const rbc = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        rbc.setAttribute("cx", cx);
+        rbc.setAttribute("cy", cy);
+        rbc.setAttribute("r", 9 - currentStage * 0.5);
+        rbc.setAttribute("fill", currentStage > 2 ? "#7f1d1d" : "#b91c1c");
+        rbc.setAttribute("stroke", currentStage > 2 ? "#b91c1c" : "#f87171");
+        rbc.setAttribute("stroke-width", "1.5");
+        pGroup.appendChild(rbc);
+      }
+      // Glucose dots density increases in Stage 3 and 4
+      const gCount = currentStage === 0 ? 3 : currentStage === 1 ? 5 : currentStage === 2 ? 14 : 26;
+      for (let i = 0; i < gCount; i++) {
+        const gx = 40 + ((i * 37) % 360);
+        const gy = 32 + ((i * 19) % 30);
+        const gDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        gDot.setAttribute("cx", gx);
+        gDot.setAttribute("cy", gy);
+        gDot.setAttribute("r", "4.5");
+        gDot.setAttribute("fill", "#f59e0b");
+        pGroup.appendChild(gDot);
+      }
+      // Insulin particles (Peak in Stage 2, drops in Stage 4)
+      const insCount = currentStage === 0 ? 3 : currentStage === 1 ? 9 : currentStage === 2 ? 6 : 1;
+      for (let i = 0; i < insCount; i++) {
+        const ix = 60 + ((i * 49) % 340);
+        const iy = 35 + ((i * 23) % 24);
+        const ins = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        ins.setAttribute("points", `${ix},${iy-6} ${ix+5},${iy} ${ix},${iy+6} ${ix-5},${iy}`);
+        ins.setAttribute("fill", "#06b6d4");
+        pGroup.appendChild(ins);
+      }
+    }
+
+    renderStage(0);
+
+    document.querySelectorAll(".stage-btn").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.stage);
+        tl.pause();
+        tl.progress(idx / 3);
+      };
+    });
+
+    const tl = gsap.timeline({
+      id: "clinical",
+      repeat: -1,
+      defaults: { ease: "none" },
+      onUpdate: () => {
+        const p = tl.progress();
+        const stageIdx = Math.min(3, Math.floor(p * 4));
+        renderStage(stageIdx, (p * 4) % 1);
+        document.getElementById("timeline-scrubber").value = p * 300;
+      }
+    });
+    window.__TIMELINE__ = tl;
+    tl.to({}, { duration: 16 });
+
+    document.getElementById("btn-play").onclick = () => {
+      if (tl.paused()) {
+        tl.play();
+        document.getElementById("btn-play").textContent = "Pause";
+      } else {
+        tl.pause();
+        document.getElementById("btn-play").textContent = "Play";
+      }
+    };
+    document.getElementById("btn-restart").onclick = () => {
+      tl.restart();
+      document.getElementById("btn-play").textContent = "Pause";
+    };
+    document.getElementById("timeline-scrubber").oninput = (e) => {
+      tl.pause();
+      document.getElementById("btn-play").textContent = "Play";
+      tl.progress(e.target.value / 300);
+    };
+  </script>
+</body>
+</html>""",
+        )
 
     if style == "cad_blueprint":
         return _wrap_template_artifact(

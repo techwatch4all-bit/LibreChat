@@ -441,16 +441,33 @@
       pLight.position.set(0, h * 0.82, 0);
       group.add(pLight);
     } else if (t === 'planter' || t === 'plant') {
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.36, w * 0.28, h * 0.35, 16), mats.terracotta, 0, h * 0.175, 0);
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.33, w * 0.33, 0.04, 14), mats.darkWood, 0, h * 0.34, 0);
-      [
-        [0, h * 0.62, 0, w * 0.38],
-        [-w * 0.18, h * 0.54, w * 0.14, w * 0.24],
-        [w * 0.2, h * 0.58, -w * 0.1, w * 0.26],
-        [0, h * 0.78, 0.08, w * 0.22],
-      ].forEach(function (blob) {
-        addMesh(THREE, group, new THREE.IcosahedronGeometry(blob[3], 1), mats.foliage, blob[0], blob[1], blob[2]);
+      // Ceramic ribbed/fluted pot
+      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.38, w * 0.30, h * 0.38, 20), mats.ceramic, 0, h * 0.19, 0);
+      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.40, w * 0.40, 0.05, 20), mats.brass, 0, h * 0.38, 0);
+      // Dark potting soil
+      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.35, w * 0.35, 0.03, 16), mats.darkWood, 0, h * 0.36, 0);
+      // Bamboo support stake
+      addMesh(THREE, group, new THREE.CylinderGeometry(0.025, 0.025, h * 0.65, 8), mats.darkWood, 0, h * 0.65, 0);
+      // Elegant broad architectural leaves (Fiddle-Leaf Fig / Monstera style)
+      var leafMat = new THREE.MeshStandardMaterial({
+        color: 0x2e6638,
+        roughness: 0.65,
+        metalness: 0.08,
+        side: THREE.DoubleSide,
       });
+      var leafCount = 6;
+      for (var li = 0; li < leafCount; li++) {
+        var ang = (li / leafCount) * Math.PI * 2 + (li % 2) * 0.3;
+        var ly = h * (0.42 + (li / leafCount) * 0.45);
+        var lDist = w * 0.22 + (li % 3) * 0.08;
+        var lx = Math.cos(ang) * lDist;
+        var lz = Math.sin(ang) * lDist;
+        var leaf = new THREE.Mesh(softBox(THREE, w * 0.32, 0.02, w * 0.22, 0.005), leafMat);
+        leaf.position.set(lx, ly, lz);
+        leaf.rotation.set(0.35 * Math.sin(ang), -ang, 0.45);
+        leaf.castShadow = true;
+        group.add(leaf);
+      }
     } else if (t === 'kitchen') {
       addMesh(THREE, group, softBox(THREE, w, h * 0.92, d, 0.02), woodMat, 0, h * 0.46, 0);
       addMesh(THREE, group, softBox(THREE, w + 0.06, h * 0.08, d + 0.06, 0.02), mats.stone, 0, h * 0.96, 0);
@@ -661,20 +678,52 @@
 
     var currentIdx = 0;
 
-    function setCameraPreset(mode) {
+    var camTween = null;
+    function tweenCameraTo(targetPos, targetTarget, durationMs) {
+      if (camTween && camTween.raf) global.cancelAnimationFrame(camTween.raf);
+      var startPos = camera.position.clone();
+      var startTarget = controls.target.clone();
+      var startTime = performance.now();
+      var dur = durationMs || 650;
+      function step(now) {
+        var elapsed = now - startTime;
+        var p = Math.min(1.0, elapsed / dur);
+        // Astryx-style cubic ease-out: 1 - Math.pow(1 - p, 3)
+        var ease = 1.0 - Math.pow(1.0 - p, 3);
+        camera.position.lerpVectors(startPos, targetPos, ease);
+        controls.target.lerpVectors(startTarget, targetTarget, ease);
+        controls.update();
+        if (p < 1.0) {
+          camTween = { raf: global.requestAnimationFrame(step) };
+        } else {
+          camTween = null;
+        }
+      }
+      camTween = { raf: global.requestAnimationFrame(step) };
+    }
+
+    function setCameraPreset(mode, instant) {
       var aspectFactor = Math.max(1.0, 0.92 / Math.max(0.35, camera.aspect || 1));
       var span = Math.max(roomW, roomD);
+      var targetPos = new THREE.Vector3();
+      var targetLookAt = new THREE.Vector3();
       if (mode === 'top') {
-        camera.position.set(0, span * 1.45 * aspectFactor, 0.01);
-        controls.target.set(0, 0, 0);
+        targetPos.set(0, span * 1.45 * aspectFactor, 0.01);
+        targetLookAt.set(0, 0, 0);
       } else if (mode === 'eye') {
-        camera.position.set(roomW * 0.44, 4.6, roomD * 0.46);
-        controls.target.set(-roomW * 0.12, 2.6, -roomD * 0.12);
+        targetPos.set(roomW * 0.44, 4.6, roomD * 0.46);
+        targetLookAt.set(-roomW * 0.12, 2.6, -roomD * 0.12);
       } else {
-        camera.position.set(roomW * 0.95 * aspectFactor, wallH * 1.48 * aspectFactor, roomD * 1.08 * aspectFactor);
-        controls.target.set(0, 1.8, 0);
+        targetPos.set(roomW * 0.95 * aspectFactor, wallH * 1.48 * aspectFactor, roomD * 1.08 * aspectFactor);
+        targetLookAt.set(0, 1.8, 0);
       }
-      controls.update();
+      if (instant) {
+        camera.position.copy(targetPos);
+        controls.target.copy(targetLookAt);
+        controls.update();
+      } else {
+        tweenCameraTo(targetPos, targetLookAt, 650);
+      }
     }
 
     function loadVariant(idx) {
@@ -786,21 +835,34 @@
   function mountWithHUD(opts) {
     var style = document.createElement('style');
     style.textContent =
-      '*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:#0c111d;color:#f8fafc;font-family:Inter,system-ui,sans-serif}' +
+      ':root{' +
+      '--astryx-surface:rgba(15,23,42,0.94);' +
+      '--astryx-surface-subtle:rgba(30,41,59,0.7);' +
+      '--astryx-border:rgba(255,255,255,0.12);' +
+      '--astryx-border-focus:rgba(56,189,248,0.45);' +
+      '--astryx-accent:#38bdf8;' +
+      '--astryx-text:#f8fafc;' +
+      '--astryx-text-muted:#94a3b8;' +
+      '--astryx-radius:12px;' +
+      '--astryx-shadow:0 12px 36px rgba(0,0,0,0.48);' +
+      '}' +
+      '*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:#090d16;color:var(--astryx-text);font-family:Inter,system-ui,sans-serif}' +
       '#sm-stage{position:fixed;inset:0;width:100%;height:100%}' +
-      '#sm-badge{position:fixed;top:12px;left:12px;z-index:10;background:rgba(15,23,42,.88);backdrop-filter:blur(8px);border:1px solid rgba(56,189,248,.28);border-radius:10px;padding:9px 13px;max-width:320px}' +
-      '#sm-badge h1{font-size:13px;font-weight:700;color:#f8fafc}#sm-badge p{font-size:11px;color:#94a3b8;margin-top:2px}' +
-      '#sm-inspect{position:fixed;bottom:14px;left:12px;z-index:10;background:rgba(15,23,42,.88);border:1px solid rgba(148,163,184,.28);border-radius:8px;padding:7px 11px;font-size:11px;color:#cbd5e1;display:none}' +
-      '#sm-hud{position:fixed;top:12px;right:12px;z-index:10;width:228px;background:rgba(15,23,42,.9);backdrop-filter:blur(8px);border:1px solid rgba(56,189,248,.3);border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:7px}' +
-      '#sm-hud h3{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#38bdf8;margin-top:2px}' +
+      '#sm-badge{position:fixed;top:14px;left:14px;z-index:10;background:var(--astryx-surface);backdrop-filter:blur(12px);border:1px solid var(--astryx-border);border-radius:var(--astryx-radius);padding:10px 14px;max-width:340px;box-shadow:var(--astryx-shadow)}' +
+      '#sm-badge h1{font-size:13.5px;font-weight:700;color:#fff;letter-spacing:-0.01em}#sm-badge p{font-size:11px;color:var(--astryx-text-muted);margin-top:2px}' +
+      '#sm-inspect{position:fixed;bottom:14px;left:14px;z-index:10;background:var(--astryx-surface);border:1px solid var(--astryx-border);border-radius:8px;padding:7px 12px;font-size:11px;color:#cbd5e1;display:none;backdrop-filter:blur(8px)}' +
+      '#sm-hud{position:fixed;top:14px;right:14px;z-index:10;width:240px;background:var(--astryx-surface);backdrop-filter:blur(14px);border:1px solid var(--astryx-border);border-radius:var(--astryx-radius);padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--astryx-shadow)}' +
+      '#sm-hud h3{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--astryx-accent);margin-top:3px}' +
       '.sm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}' +
-      '.sm-btn{width:100%;text-align:left;padding:6px 9px;border-radius:7px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.09);color:#e0f2fe;font-size:11px;font-weight:600;cursor:pointer}' +
-      '.sm-btn.c{text-align:center;padding:5px 2px;font-size:10px}.sm-btn.active{background:#0284c7;border-color:#38bdf8;color:#fff}' +
-      '.sm-ver{font-size:10px;color:#34d399;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:6px;padding:4px 7px;margin-top:2px}' +
-      '#sm-2d{position:fixed;inset:0;width:100%;height:100%;display:none;background:#0a1220;z-index:5}' +
-      '.sm-exp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:3px}' +
-      '.sm-ebtn{padding:6px 8px;border-radius:7px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.14);color:#a7f3d0;font-size:11px;font-weight:600;cursor:pointer;text-align:center}' +
-      '.sm-sl{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#cbd5e1;gap:6px}.sm-sl input{flex:1;accent-color:#38bdf8}';
+      '.sm-btn{width:100%;text-align:left;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#e2e8f0;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.18s ease}' +
+      '.sm-btn:hover{background:rgba(56,189,248,0.12);border-color:rgba(56,189,248,0.3)}' +
+      '.sm-btn.c{text-align:center;padding:6px 2px;font-size:10.5px}.sm-btn.active{background:#0284c7;border-color:#38bdf8;color:#fff;box-shadow:0 0 12px rgba(56,189,248,0.35)}' +
+      '.sm-ver{font-size:10px;color:#34d399;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:6px;padding:4px 8px;margin-top:4px;display:inline-block}' +
+      '#sm-2d{position:fixed;inset:0;width:100%;height:100%;display:none;background:#070d18;z-index:5}' +
+      '.sm-exp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}' +
+      '.sm-ebtn{padding:7px 8px;border-radius:8px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.14);color:#a7f3d0;font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:background 0.18s ease}' +
+      '.sm-ebtn:hover{background:rgba(16,185,129,.24)}' +
+      '.sm-sl{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--astryx-text-muted);gap:8px}.sm-sl input{flex:1;accent-color:var(--astryx-accent)}';
     document.head.appendChild(style);
 
     var ver = opts.verification || { status: 'VERIFIED', items: (opts.variants[0] && opts.variants[0].objects ? opts.variants[0].objects.length : 0), collisions: 0 };
@@ -823,23 +885,26 @@
     var activeCam = 'iso';
 
     function draw2DMap() {
+      var dpr = global.devicePixelRatio || 2;
       var W = global.innerWidth || 800;
       var H = global.innerHeight || 600;
-      c2d.width = W;
-      c2d.height = H;
+      c2d.width = W * dpr;
+      c2d.height = H * dpr;
       var ctx = c2d.getContext('2d');
-      ctx.fillStyle = '#09111e';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      ctx.fillStyle = '#070d18';
       ctx.fillRect(0, 0, W, H);
 
-      var pad = 80;
+      var pad = 90;
       var scale = Math.min((W - pad * 2) / opts.roomW, (H - pad * 2.2) / opts.roomD);
       var ox = (W - opts.roomW * scale) / 2;
-      var oy = (H - opts.roomD * scale) / 2 + 24;
+      var oy = (H - opts.roomD * scale) / 2 + 20;
       var rwPx = opts.roomW * scale;
       var rdPx = opts.roomD * scale;
 
-      // Grid
-      ctx.strokeStyle = 'rgba(56,189,248,0.08)';
+      // Architectural Blueprint Grid (Fine dots and grid lines)
+      ctx.strokeStyle = 'rgba(56,189,248,0.06)';
       ctx.lineWidth = 1;
       for (var gx = 0; gx <= opts.roomW; gx += 2) {
         ctx.beginPath(); ctx.moveTo(ox + gx * scale, oy); ctx.lineTo(ox + gx * scale, oy + rdPx); ctx.stroke();
@@ -848,75 +913,171 @@
         ctx.beginPath(); ctx.moveTo(ox, oy + gz * scale); ctx.lineTo(ox + rwPx, oy + gz * scale); ctx.stroke();
       }
 
-      // Floor + Area Rug
-      ctx.fillStyle = '#132036';
+      // Room Floor Slab
+      ctx.fillStyle = '#0f172a';
       ctx.fillRect(ox, oy, rwPx, rdPx);
+
+      // Central Area Rug with woven border
       var rugW = Math.min(opts.roomW * 0.52, 8.5) * scale;
       var rugD = Math.min(opts.roomD * 0.48, 6.5) * scale;
-      ctx.fillStyle = 'rgba(221,211,196,0.14)';
-      ctx.strokeStyle = 'rgba(221,211,196,0.4)';
-      ctx.fillRect(ox + rwPx / 2 - rugW / 2, oy + rdPx / 2 - rugD / 2, rugW, rugD);
-      ctx.strokeRect(ox + rwPx / 2 - rugW / 2, oy + rdPx / 2 - rugD / 2, rugW, rugD);
+      var rugX = ox + rwPx / 2 - rugW / 2;
+      var rugZ = oy + rdPx / 2 - rugD / 2 + 8;
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.08)';
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.28)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(rugX, rugZ, rugW, rugD);
+      ctx.strokeRect(rugX, rugZ, rugW, rugD);
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.16)';
+      ctx.strokeRect(rugX + 6, rugZ + 6, rugW - 12, rugD - 12);
+      ctx.setLineDash([]);
 
-      // Walls
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 5;
+      // Double-line Architectural Outer Walls
+      ctx.fillStyle = '#e2e8f0';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
       ctx.strokeRect(ox, oy, rwPx, rdPx);
+      ctx.strokeRect(ox - 5, oy - 5, rwPx + 10, rdPx + 10);
 
-      // North Window
+      // North Window (Triple-line architectural glazing)
       var winW = Math.min(5.2, opts.roomW * 0.38) * scale;
       var winX = ox + rwPx / 2 - opts.roomW * 0.12 * scale - winW / 2;
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(winX, oy); ctx.lineTo(winX + winW, oy); ctx.stroke();
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(winX, oy - 5, winW, 10);
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(winX, oy - 2); ctx.lineTo(winX + winW, oy - 2);
+      ctx.moveTo(winX, oy + 2); ctx.lineTo(winX + winW, oy + 2);
+      ctx.stroke();
 
-      // West Entry Door + Swing Arc
+      // West Entry Door + 90-degree dashed Swing Arc
       var doorZ = oy + rdPx / 2 + opts.roomD * 0.26 * scale;
       var doorW = 3.0 * scale;
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2.5;
+      // Door leaf
       ctx.beginPath(); ctx.moveTo(ox, doorZ - doorW / 2); ctx.lineTo(ox + doorW, doorZ - doorW / 2); ctx.stroke();
-      ctx.setLineDash([4, 4]);
+      // Door swing arc
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.arc(ox, doorZ - doorW / 2, doorW, 0, Math.PI / 2); ctx.stroke();
       ctx.setLineDash([]);
 
-      // Dimension Labels
+      // Dimension Ticks & Lines (Top and Left)
+      ctx.strokeStyle = '#38bdf8';
       ctx.fillStyle = '#7dd3fc';
+      ctx.lineWidth = 1.2;
+      // Top dimension
+      ctx.beginPath();
+      ctx.moveTo(ox, oy - 22); ctx.lineTo(ox + rwPx, oy - 22);
+      ctx.moveTo(ox, oy - 27); ctx.lineTo(ox, oy - 17);
+      ctx.moveTo(ox + rwPx, oy - 27); ctx.lineTo(ox + rwPx, oy - 17);
+      // Left dimension
+      ctx.moveTo(ox - 22, oy); ctx.lineTo(ox - 22, oy + rdPx);
+      ctx.moveTo(ox - 27, oy); ctx.lineTo(ox - 17, oy);
+      ctx.moveTo(ox - 27, oy + rdPx); ctx.lineTo(ox - 17, oy + rdPx);
+      ctx.stroke();
+
+      // Dimension Text
       ctx.font = '600 11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(opts.roomW + "' (" + Math.round(opts.roomW * opts.roomD) + ' sq ft)', ox + rwPx / 2, oy - 14);
+      ctx.fillText(opts.roomW + "'-0\" (" + (opts.roomW * 0.3048).toFixed(1) + 'm) · ' + Math.round(opts.roomW * opts.roomD) + ' sq ft', ox + rwPx / 2, oy - 30);
       ctx.save();
-      ctx.translate(ox - 16, oy + rdPx / 2);
+      ctx.translate(ox - 32, oy + rdPx / 2);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillText(opts.roomD + "'", 0, 0);
+      ctx.fillText(opts.roomD + "'-0\" (" + (opts.roomD * 0.3048).toFixed(1) + 'm)', 0, 0);
       ctx.restore();
 
-      // Furniture Footprints
+      // Furniture Footprints with Architectural CAD Vector Symbols
       var v = (opts.variants || [])[activeVariantIdx];
       ((v && v.objects) || []).forEach(function (item) {
         var cx = ox + (Number(item.x) + opts.roomW / 2) * scale;
         var cz = oy + (Number(item.z) + opts.roomD / 2) * scale;
         var fw = Number(item.w) * scale;
         var fd = Number(item.d) * scale;
+        var yaw = Number(item.yaw_deg) || 0;
+        var t = String(item.type || '').toLowerCase();
+
         ctx.save();
         ctx.translate(cx, cz);
-        ctx.rotate(-((Number(item.yaw_deg) || 0) * Math.PI) / 180);
-        ctx.fillStyle = normalizeColor(item.color || '#64748b');
-        ctx.globalAlpha = 0.78;
+        ctx.rotate(-(yaw * Math.PI) / 180);
+
+        // Base fill & outline
+        ctx.fillStyle = normalizeColor(item.color || '#475569');
+        ctx.globalAlpha = 0.85;
         ctx.fillRect(-fw / 2, -fd / 2, fw, fd);
         ctx.globalAlpha = 1;
         ctx.strokeStyle = '#f8fafc';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(-fw / 2, -fd / 2, fw, fd);
+
+        // Architectural Vector Details
+        if (t === 'sofa' || t === 'couch') {
+          // Armrests
+          var armW = Math.max(4, fw * 0.12);
+          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.fillRect(-fw / 2, -fd / 2, armW, fd);
+          ctx.fillRect(fw / 2 - armW, -fd / 2, armW, fd);
+          // Backrest
+          var backD = Math.max(4, fd * 0.22);
+          ctx.fillRect(-fw / 2, -fd / 2, fw, backD);
+          // Cushion Dividers
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-fw / 6, -fd / 2 + backD); ctx.lineTo(-fw / 6, fd / 2);
+          ctx.moveTo(fw / 6, -fd / 2 + backD); ctx.lineTo(fw / 6, fd / 2);
+          ctx.stroke();
+        } else if (t === 'desk') {
+          // Computer monitor footprint on back edge
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(-fw * 0.3, -fd / 2 + 2, fw * 0.6, 3);
+          // Keyboard outline
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+          ctx.strokeRect(-fw * 0.2, -fd * 0.1, fw * 0.4, fd * 0.35);
+        } else if (t === 'tv') {
+          // Screen line along rear
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(-fw * 0.42, -fd / 2 + 1, fw * 0.84, 3);
+        } else if (t === 'coffee_table') {
+          // Inset decorative tray
+          ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+          ctx.strokeRect(-fw * 0.35, -fd * 0.35, fw * 0.7, fd * 0.7);
+        } else if (t === 'planter' || t === 'plant') {
+          // Circular ceramic rim + radiating leaf lines
+          ctx.fillStyle = '#15803d';
+          ctx.beginPath(); ctx.arc(0, 0, Math.min(fw, fd) * 0.38, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#86efac';
+          for (var a = 0; a < 6; a++) {
+            var rad = (a / 6) * Math.PI * 2;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(rad) * fw * 0.44, Math.sin(rad) * fd * 0.44); ctx.stroke();
+          }
+        } else if (t === 'lamp') {
+          // Glowing circle
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath(); ctx.arc(0, 0, Math.min(fw, fd) * 0.34, 0, Math.PI * 2); ctx.fill();
+        }
+
         ctx.restore();
 
+        // Label pill (prevents overlapping illegibility)
+        var label = item.name || item.type;
+        var sub = item.w + "'×" + item.d + "'";
+        ctx.font = '600 9.5px Inter, system-ui, sans-serif';
+        var tw = Math.max(ctx.measureText(label).width, ctx.measureText(sub).width) + 8;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.fillRect(cx - tw / 2, cz - 12, tw, 22);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(cx - tw / 2, cz - 12, tw, 22);
+
         ctx.fillStyle = '#f8fafc';
-        ctx.font = '600 10px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(item.name || item.type, cx, cz - 2);
-        ctx.fillStyle = '#cbd5e1';
-        ctx.font = '9px Inter, system-ui, sans-serif';
-        ctx.fillText(item.w + "'×" + item.d + "'", cx, cz + 10);
+        ctx.fillText(label, cx, cz - 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 8px Inter, system-ui, sans-serif';
+        ctx.fillText(sub, cx, cz + 8);
       });
     }
 

@@ -1,7 +1,8 @@
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useAtom } from 'jotai';
+import { Search, X } from 'lucide-react';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
-import type { StarterItem } from '~/common/starters';
+import type { MotionStudioGroupId, StarterItem } from '~/common/starters';
 import {
   useChatContext,
   useChatFormContext,
@@ -15,8 +16,8 @@ import {
   useGetStartupConfig,
 } from '~/data-provider';
 import { getIconEndpoint, getEntity, getModelSpec, cn } from '~/utils';
+import { ALL_CATEGORIES, MOTION_GROUPS } from '~/common/starters';
 import { useSubmitMessage, useLocalize } from '~/hooks';
-import { ALL_CATEGORIES } from '~/common/starters';
 import { mcpValuesAtomFamily } from '~/store/mcp';
 import { forceResize } from '~/utils/textarea';
 import { mainTextareaId } from '~/common';
@@ -37,6 +38,13 @@ const ConversationStarters = () => {
   const { data: startupConfig } = useGetStartupConfig();
   const localize = useLocalize();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedGroup, setSelectedGroup] = useState<'spotlight' | MotionStudioGroupId>(
+    'spotlight',
+  );
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [stagedHint, setStagedHint] = useState<boolean>(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const activeMode = conversation?.spec ?? 'Chat';
 
@@ -46,10 +54,32 @@ const ConversationStarters = () => {
     return matched.length > 0 ? matched : ALL_CATEGORIES;
   }, [activeMode]);
 
-  // Reset selected category to 'all' whenever the user switches mode/spec
+  const hasGroupedNavigation = useMemo(
+    () => modeCategories.some((cat) => Boolean(cat.group)),
+    [modeCategories],
+  );
+
+  const groupCategories = useMemo(() => {
+    if (!hasGroupedNavigation || selectedGroup === 'spotlight') {
+      return [];
+    }
+    return modeCategories.filter((cat) => cat.group === selectedGroup);
+  }, [hasGroupedNavigation, modeCategories, selectedGroup]);
+
+  // Reset navigation state whenever the user switches mode/spec
   useEffect(() => {
     setSelectedCategory('all');
+    setSelectedGroup('spotlight');
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setStagedHint(false);
   }, [activeMode]);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   const convoKey = conversation?.conversationId ?? Constants.NEW_CONVO;
   const [, setMCPValues] = useAtom(mcpValuesAtomFamily(convoKey));
@@ -175,20 +205,59 @@ const ConversationStarters = () => {
           };
           textarea.addEventListener('keydown', stagedTabHandler);
         }
+        if (hasGroupedNavigation) {
+          setStagedHint(true);
+        }
         return;
       }
 
       // Standalone queries can execute immediately
       submitMessage({ text });
     },
-    [submitMessage, setMCPValues, badgeContext, methods, activeMode],
+    [submitMessage, setMCPValues, badgeContext, methods, activeMode, hasGroupedNavigation],
   );
 
   const displayedStarters = useMemo(() => {
-    if (selectedCategory === 'all') {
-      if (activeMode === 'Motion') {
-        return modeCategories.flatMap((c) => c.starters.slice(0, 1));
+    if (hasGroupedNavigation) {
+      const normalizedQuery = searchQuery.trim().toLowerCase();
+      if (isSearchOpen && normalizedQuery.length > 0) {
+        const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+        return modeCategories
+          .flatMap((cat) => cat.starters)
+          .filter((item) => {
+            const haystack = [
+              item.title,
+              item.description,
+              item.badge,
+              item.engineTag,
+              ...(item.keywords ?? []),
+              item.prompt,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
+            return tokens.every((token) => haystack.includes(token));
+          });
       }
+
+      if (selectedGroup === 'spotlight') {
+        const spotlight = modeCategories.flatMap((cat) =>
+          cat.starters.filter((item) => item.featured),
+        );
+        return spotlight.length > 0
+          ? spotlight
+          : modeCategories.flatMap((c) => c.starters.slice(0, 1));
+      }
+
+      if (selectedCategory === 'all') {
+        return groupCategories.flatMap((cat) => cat.starters);
+      }
+
+      const activeCat = groupCategories.find((cat) => cat.id === selectedCategory);
+      return activeCat ? activeCat.starters : [];
+    }
+
+    if (selectedCategory === 'all') {
       if (customStarters.length > 0) {
         return customStarters.slice(0, 10).map((s: string) => ({ prompt: s }));
       }
@@ -196,175 +265,360 @@ const ConversationStarters = () => {
     }
     const cat = modeCategories.find((c) => c.id === selectedCategory);
     return cat ? cat.starters.slice(0, 10) : [];
-  }, [selectedCategory, customStarters, modeCategories, activeMode]);
+  }, [
+    hasGroupedNavigation,
+    searchQuery,
+    isSearchOpen,
+    modeCategories,
+    selectedGroup,
+    selectedCategory,
+    groupCategories,
+    customStarters,
+  ]);
+
+  const isScrollableGrid = hasGroupedNavigation && displayedStarters.length > 8;
 
   return (
     <div className="mb-2 mt-0 flex w-full flex-col items-center gap-1.5 px-0">
-      {/* Category Tabs */}
-      <div className="mb-0.5 flex flex-wrap items-center justify-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setSelectedCategory('all')}
-          className={cn(
-            'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
-            selectedCategory === 'all'
-              ? 'shadow-xs bg-surface-inverted text-text-inverted'
-              : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+      {hasGroupedNavigation ? (
+        <>
+          {/* Row 1: Studio Discipline Groups + Search Toggle */}
+          <div className="mb-0.5 flex w-full flex-wrap items-center justify-center gap-1">
+            <button
+              type="button"
+              aria-pressed={!isSearchOpen && selectedGroup === 'spotlight'}
+              onClick={() => {
+                setIsSearchOpen(false);
+                setSearchQuery('');
+                setSelectedGroup('spotlight');
+                setSelectedCategory('all');
+              }}
+              className={cn(
+                'cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium transition-all sm:px-2.5 sm:text-[11.5px]',
+                !isSearchOpen && selectedGroup === 'spotlight'
+                  ? 'shadow-xs bg-surface-inverted text-text-inverted'
+                  : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+              )}
+            >
+              {`✨ ${localize('com_ui_motion_spotlight')}`}
+            </button>
+            {MOTION_GROUPS.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                aria-pressed={!isSearchOpen && selectedGroup === group.id}
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  setSearchQuery('');
+                  setSelectedGroup(group.id);
+                  setSelectedCategory('all');
+                }}
+                className={cn(
+                  'cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium transition-all sm:px-2.5 sm:text-[11.5px]',
+                  !isSearchOpen && selectedGroup === group.id
+                    ? 'shadow-xs bg-surface-inverted text-text-inverted'
+                    : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+                )}
+              >
+                {localize(group.labelKey, { defaultValue: group.label })}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={isSearchOpen}
+              aria-expanded={isSearchOpen}
+              aria-label={localize('com_ui_motion_search_button')}
+              onClick={() => {
+                setIsSearchOpen((prev) => {
+                  if (prev) {
+                    setSearchQuery('');
+                  }
+                  return !prev;
+                });
+              }}
+              className={cn(
+                'inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 transition-all',
+                isSearchOpen
+                  ? 'shadow-xs bg-surface-inverted text-text-inverted'
+                  : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+              )}
+            >
+              <Search className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Row 2: Live Inline Filter Input OR Contextual Group Sub-Pills */}
+          {isSearchOpen ? (
+            <div className="relative flex w-full max-w-md items-center">
+              <Search
+                className="pointer-events-none absolute left-3 size-3.5 text-text-tertiary"
+                aria-hidden="true"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                role="searchbox"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setIsSearchOpen(false);
+                    setSearchQuery('');
+                  }
+                }}
+                aria-label={localize('com_ui_motion_search_label')}
+                placeholder={localize('com_ui_motion_search_placeholder')}
+                className="w-full rounded-full border border-border-medium bg-surface-secondary py-1.5 pl-8 pr-8 text-xs text-text-primary placeholder:text-text-tertiary focus:border-border-heavy focus:outline-none"
+              />
+              <button
+                type="button"
+                aria-label={localize('com_ui_motion_search_clear')}
+                onClick={() => {
+                  if (searchQuery) {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  } else {
+                    setIsSearchOpen(false);
+                  }
+                }}
+                className="absolute right-2 rounded-full p-1 text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            selectedGroup !== 'spotlight' &&
+            groupCategories.length > 0 && (
+              <div className="flex w-full flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  aria-pressed={selectedCategory === 'all'}
+                  onClick={() => setSelectedCategory('all')}
+                  className={cn(
+                    'cursor-pointer whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all',
+                    selectedCategory === 'all'
+                      ? 'border border-border-heavy bg-surface-tertiary text-text-primary'
+                      : 'border border-border-light/80 bg-surface-secondary/60 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+                  )}
+                >
+                  {localize('com_ui_motion_group_all')}
+                </button>
+                {groupCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    aria-pressed={selectedCategory === cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={cn(
+                      'cursor-pointer whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all',
+                      selectedCategory === cat.id
+                        ? 'border border-border-heavy bg-surface-tertiary text-text-primary'
+                        : 'border border-border-light/80 bg-surface-secondary/60 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+                    )}
+                  >
+                    {localize(cat.labelKey, { defaultValue: cat.label })}
+                  </button>
+                ))}
+              </div>
+            )
           )}
-        >
-          {`✨ ${localize('com_ui_suggested')}`}
-        </button>
-        {modeCategories.map((cat) => (
+        </>
+      ) : (
+        /* Category Tabs (Non-grouped standard modes) */
+        <div className="mb-0.5 flex flex-wrap items-center justify-center gap-1.5">
           <button
-            key={cat.id}
             type="button"
-            onClick={() => setSelectedCategory(cat.id)}
+            onClick={() => setSelectedCategory('all')}
             className={cn(
               'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
-              selectedCategory === cat.id
+              selectedCategory === 'all'
                 ? 'shadow-xs bg-surface-inverted text-text-inverted'
                 : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
             )}
           >
-            {localize(cat.labelKey, { defaultValue: cat.label })}
+            {`✨ ${localize('com_ui_suggested')}`}
           </button>
-        ))}
-      </div>
+          {modeCategories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setSelectedCategory(cat.id)}
+              className={cn(
+                'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
+                selectedCategory === cat.id
+                  ? 'shadow-xs bg-surface-inverted text-text-inverted'
+                  : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
+              )}
+            >
+              {localize(cat.labelKey, { defaultValue: cat.label })}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Professional Persona Cards Grid */}
-      <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-        {displayedStarters.map((item: StarterItem, index: number) => {
-          // Parse title, icon, and description if not explicitly set
-          let title = item.title;
-          let icon = item.icon;
-          let description = item.description;
+      {displayedStarters.length === 0 ? (
+        <div className="w-full rounded-xl border border-border-light/70 bg-surface-secondary/60 px-4 py-4 text-center text-xs text-text-secondary">
+          {localize('com_ui_motion_no_matches')}
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'grid w-full grid-cols-1 gap-2 sm:grid-cols-2',
+            isScrollableGrid && 'max-h-[290px] overflow-y-auto pr-0.5',
+          )}
+        >
+          {displayedStarters.map((item: StarterItem, index: number) => {
+            // Parse title, icon, and description if not explicitly set
+            let title = item.title;
+            let icon = item.icon;
+            let description = item.description;
 
-          if (!title || !description) {
-            const promptText = item.prompt;
-            const colonIndex = promptText.indexOf(':');
-            if (colonIndex > 0 && colonIndex < 70) {
-              title = title ?? promptText.slice(0, colonIndex).trim();
-              description = description ?? promptText.slice(colonIndex + 1).trim();
-            } else {
-              title = title ?? (item.badge ? `${item.badge} Directive` : promptText.slice(0, 36));
-              description = description ?? promptText;
+            if (!title || !description) {
+              const promptText = item.prompt;
+              const colonIndex = promptText.indexOf(':');
+              if (colonIndex > 0 && colonIndex < 70) {
+                title = title ?? promptText.slice(0, colonIndex).trim();
+                description = description ?? promptText.slice(colonIndex + 1).trim();
+              } else {
+                title = title ?? (item.badge ? `${item.badge} Directive` : promptText.slice(0, 36));
+                description = description ?? promptText;
+              }
             }
-          }
 
-          // Extract leading emoji from title if icon wasn't explicitly provided
-          if (title && !icon) {
-            const emojiMatch = title.match(
-              /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/u,
-            );
-            if (emojiMatch) {
-              icon = emojiMatch[1];
-              title = title.slice(emojiMatch[0].length).trim();
+            // Extract leading emoji from title if icon wasn't explicitly provided
+            if (title && !icon) {
+              const emojiMatch = title.match(
+                /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/u,
+              );
+              if (emojiMatch) {
+                icon = emojiMatch[1];
+                title = title.slice(emojiMatch[0].length).trim();
+              }
             }
-          }
 
-          if (!icon) {
-            // Assign distinct contextual icon based on badge or title keywords
-            const lower = `${title} ${item.badge ?? ''}`.toLowerCase();
-            if (lower.includes('gold') || lower.includes('bullion') || lower.includes('rates')) {
-              icon = '🌟';
-            } else if (
-              lower.includes('model') ||
-              lower.includes('ai') ||
-              lower.includes('tech') ||
-              lower.includes('code')
-            ) {
-              icon = '🤖';
-            } else if (
-              lower.includes('law') ||
-              lower.includes('court') ||
-              lower.includes('govt') ||
-              lower.includes('precedent')
-            ) {
-              icon = '⚖️';
-            } else if (
-              lower.includes('alert') ||
-              lower.includes('disaster') ||
-              lower.includes('sos') ||
-              lower.includes('emergency')
-            ) {
-              icon = '🚨';
-            } else if (
-              lower.includes('stock') ||
-              lower.includes('market') ||
-              lower.includes('crypto') ||
-              lower.includes('equity')
-            ) {
-              icon = '📈';
-            } else if (
-              lower.includes('health') ||
-              lower.includes('pharma') ||
-              lower.includes('clinic') ||
-              lower.includes('medicine')
-            ) {
-              icon = '🩺';
-            } else if (
-              lower.includes('rail') ||
-              lower.includes('transit') ||
-              lower.includes('flight') ||
-              lower.includes('traffic')
-            ) {
-              icon = '🚆';
-            } else if (
-              lower.includes('research') ||
-              lower.includes('policy') ||
-              lower.includes('audit') ||
-              lower.includes('scholar')
-            ) {
-              icon = '🔬';
-            } else if (
-              lower.includes('vault') ||
-              lower.includes('rag') ||
-              lower.includes('security') ||
-              lower.includes('privacy')
-            ) {
-              icon = '🛡️';
-            } else if (lower.includes('panchang') || lower.includes('vedic')) {
-              icon = '🕉️';
-            } else if (lower.includes('ayurv')) {
-              icon = '🌿';
-            } else {
-              icon = '💡';
+            if (!icon) {
+              // Assign distinct contextual icon based on badge or title keywords
+              const lower = `${title} ${item.badge ?? ''}`.toLowerCase();
+              if (lower.includes('gold') || lower.includes('bullion') || lower.includes('rates')) {
+                icon = '🌟';
+              } else if (
+                lower.includes('model') ||
+                lower.includes('ai') ||
+                lower.includes('tech') ||
+                lower.includes('code')
+              ) {
+                icon = '🤖';
+              } else if (
+                lower.includes('law') ||
+                lower.includes('court') ||
+                lower.includes('govt') ||
+                lower.includes('precedent')
+              ) {
+                icon = '⚖️';
+              } else if (
+                lower.includes('alert') ||
+                lower.includes('disaster') ||
+                lower.includes('sos') ||
+                lower.includes('emergency')
+              ) {
+                icon = '🚨';
+              } else if (
+                lower.includes('stock') ||
+                lower.includes('market') ||
+                lower.includes('crypto') ||
+                lower.includes('equity')
+              ) {
+                icon = '📈';
+              } else if (
+                lower.includes('health') ||
+                lower.includes('pharma') ||
+                lower.includes('clinic') ||
+                lower.includes('medicine')
+              ) {
+                icon = '🩺';
+              } else if (
+                lower.includes('rail') ||
+                lower.includes('transit') ||
+                lower.includes('flight') ||
+                lower.includes('traffic')
+              ) {
+                icon = '🚆';
+              } else if (
+                lower.includes('research') ||
+                lower.includes('policy') ||
+                lower.includes('audit') ||
+                lower.includes('scholar')
+              ) {
+                icon = '🔬';
+              } else if (
+                lower.includes('vault') ||
+                lower.includes('rag') ||
+                lower.includes('security') ||
+                lower.includes('privacy')
+              ) {
+                icon = '🛡️';
+              } else if (lower.includes('panchang') || lower.includes('vedic')) {
+                icon = '🕉️';
+              } else if (lower.includes('ayurv')) {
+                icon = '🌿';
+              } else {
+                icon = '💡';
+              }
             }
-          }
 
-          return (
-            <button
-              key={index}
-              type="button"
-              aria-label={item.prompt}
-              onClick={() => handleStarterClick(item)}
-              style={{ animationDelay: `${index * 25}ms`, animationFillMode: 'backwards' }}
-              className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
-            >
-              <div className="flex w-full items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1.5 overflow-hidden">
-                  <span className="shrink-0 text-sm leading-none" aria-hidden="true">
-                    {icon}
-                  </span>
-                  <span className="truncate text-xs font-semibold text-text-primary group-hover:text-text-primary">
-                    {title}
-                  </span>
+            return (
+              <button
+                key={`${item.badgeKey ?? item.badge ?? index}-${title ?? index}`}
+                type="button"
+                aria-label={item.prompt}
+                onClick={() => handleStarterClick(item)}
+                style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
+                className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
+              >
+                <div className="flex w-full items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+                      {icon}
+                    </span>
+                    <span className="truncate text-xs font-semibold text-text-primary group-hover:text-text-primary">
+                      {title}
+                    </span>
+                  </div>
+                  {item.badge && (
+                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[9px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted">
+                      {item.badgeKey
+                        ? localize(item.badgeKey, { defaultValue: item.badge })
+                        : item.badge}
+                    </span>
+                  )}
                 </div>
-                {item.badge && (
-                  <span className="shrink-0 rounded bg-surface-tertiary px-1 py-0.5 text-[9px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted">
-                    {item.badgeKey
-                      ? localize(item.badgeKey, { defaultValue: item.badge })
-                      : item.badge}
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 line-clamp-1 text-[11px] leading-normal text-text-secondary group-hover:text-text-primary/90">
-                {description}
-              </p>
-            </button>
-          );
-        })}
-      </div>
+                <p className="mt-0.5 line-clamp-1 text-[11px] leading-normal text-text-secondary group-hover:text-text-primary/90">
+                  {description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Staged Prompt Coach Strip (Motion Studio) */}
+      {hasGroupedNavigation && stagedHint && (
+        <div
+          role="status"
+          className="flex w-full items-center justify-between gap-2 rounded-lg border border-border-medium/70 bg-surface-secondary/90 px-3 py-1.5 text-[11px] text-text-secondary"
+        >
+          <span>{localize('com_ui_motion_staged_hint')}</span>
+          <button
+            type="button"
+            onClick={() => setStagedHint(false)}
+            aria-label={localize('com_ui_motion_dismiss_hint')}
+            className="shrink-0 rounded p-0.5 text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

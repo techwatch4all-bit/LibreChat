@@ -8,6 +8,38 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-12 — Motion Studio Gold-Standard Expansion (70 Interactive Personas, Two-Tier Navigator & Offline Three.js/WebGL Renderer)
+
+Operator request: Upgrade Motion Studio into a gold-standard interactive simulation, engineering, and storytelling studio covering students (physics, math, chemistry, biology, coding, networks), senior citizens, office productivity, artists/cartoonists, homemakers/interior planners, doctors/medical practitioners, fitness/nutrition consultants, architects (2D/3D floor plans, sun-path, MEP), drone & UAV design, robotics/kinematics, and "How Things Work" cutaways — presented through an approachable non-overwhelming UI that stages multi-slot templates for user customization rather than firing immediately.
+
+Diagnosed & Shipped:
+1. **Two-Tier Studio Navigator & Inline Search (`client/src/components/Chat/Input/ConversationStarters.tsx`, `client/src/locales/en/translation.json`)**:
+   - Added grouped navigation (`hasGroupedNavigation`) scoped strictly to `Motion` mode while keeping all other modes (`Chat`, `Work`, `Study`, `Privacy`, etc.) unchanged.
+   - Row 1 renders 1 crisp horizontal row: `✨ Spotlight` (8-card `4×2` showcase covering top flagship domains) + 5 Discipline Groups (`🏛️ Arch & Drones`, `🤖 Robotics & How`, `🔬 STEM & Cyber`, `💼 Business & Art`, `❤️ Health & Home`) + `🔍` inline search toggle (`type="text" role="searchbox"` with custom clear button).
+   - Row 2 renders contextual sub-category pills when a Discipline Group is selected (`All in group` + 3–4 sub-categories), with `max-h-[290px]` scroll container when >8 cards display.
+   - Enforced `activeMode === 'Motion'` always-stage behavior into `#prompt-textarea` with `Tab`/`Shift+Tab` multi-slot parameter cycling, auto-binding of companion MCP servers, and a dismissible `role="status"` staged-prompt coach banner.
+   - 100% localized UI strings in `client/src/locales/en/translation.json` (`com_ui_motion_*`, 20 `starters_cat_motion_*`, and badge keys).
+2. **20 Categories / 70 Interactive Motion Studio Personas (`client/src/common/starters.ts`)**:
+   - Exported `MotionStudioGroupId` and `MOTION_GROUPS` plus `engineTag`, `featured`, and `keywords` fields on `StarterItem`.
+   - Replaced the previous Motion cluster with 20 sub-categories and 70 interactive personas (all <= 35-char titles, multi-slot `[...]` parameters never starting with `[` at index `0`):
+     * `arch_engineering`: Floor Plans & Arch (`motion_architecture`, 4), Drones & UAV (`motion_drones`, 3), Civil & Supply Chains (`motion_civil_logistics`, 3).
+     * `robotics_how`: Robotics & Kinematics (`motion_robotics`, 3), How Things Work (`motion_how_it_works`, 4), Circuits & AI Silicon (`motion_electronics`, 3).
+     * `stem_tech`: STEM, Chem & Coding (`motion_education`, 5), Networks & Cyber (`motion_networks`, 3), Space, Earth & Sound (`motion_earth_space`, 3), History & Early Learning (`motion_history_kids`, 3).
+     * `business_creative`: Executive & Metrics (`motion_executive`, 3), Professional & SOPs (`motion_productivity`, 4), Kinetic Typography (`motion_kinetic`, 3), Product & SaaS Launch (`motion_product`, 3), Art, Cartoon & Sketch (`motion_creative`, 4), Teasers & Video Render (`motion_media`, 3).
+     * `care_living`: Medical & Clinical (`motion_medical`, 4 with objective educational disclaimers), Fitness, Yoga & Diet (`motion_wellness`, 4), Home, Interior & Living (`motion_home`, 4), Golden Years & Living (`motion_elderly`, 4 enforcing WCAG AAA >= 20px body typography, >= 7:1 contrast, and 0.6x–0.65x slow pacing).
+3. **Offline Three.js Vendor, Headless WebGL Export & Companion MCP Wiring (`client/public/assets/vendor/three/`, `skill/satchida-motion-server.py`, `skill/satchida-motion/SKILL.md`, `librechat.yaml`)**:
+   - Vendored `three@0.128.0` UMD (`three.min.js` + `OrbitControls.js`) for 100% air-gapped 3D artifacts without network dependencies.
+   - Fixed headless Chromium `CONTEXT_LOST_WEBGL` during MP4 export in `skill/satchida-motion-server.py` using SwiftShader WebGL flags (`--use-gl=angle --use-angle=swiftshader --enable-webgl --ignore-gpu-blocklist`), added local `/assets/vendor/three/` & `/assets/vendor/gsap/` `file:///` rewriting, invoked deterministic `window.__SEEK_FRAME__(seekTime, progress)` per captured frame, added 4 interactive templates (`cad_blueprint`, `interactive_3d`, `mechanism_cutaway`, `accessible_guide`), and expanded `validate_motion_html()`.
+   - Updated `skill/satchida-motion/SKILL.md` (v2.0.0) and allowlisted 8 MCP servers (`satchida-motion`, `satchida-maker-engineering`, `satchida-stem-study`, `satchida-health-wellness`, `satchida-ai-engineer`, `satchida-work-suite`, `satchida-web-search`, `time-server`) on the `Motion` preset in `.gitignore`'d `librechat.yaml`.
+4. **Verification**:
+   - Python MCP smoke test verified all 5 `get_motion_template` archetypes pass `validate_motion_html` (`valid: true`) and exported `smoke_cad_blueprint.mp4` (`68,507` bytes) and `smoke_interactive_3d.mp4` (`87,430` bytes) cleanly before cleanup.
+   - `npm run sort-imports -- client/src/common/starters.ts client/src/components/Chat/Input/ConversationStarters.tsx client/src/components/Chat/Input/__tests__/ConversationStarters.spec.tsx` & `npx eslint`: 0 errors, 0 warnings; `translation.json` key parity check: 162/162 keys present, 0 missing; `tsc --noEmit`: 0 errors in touched files.
+   - Focused Jest (`ConversationStarters.spec.tsx`): 12/12 tests passing.
+   - `vite build`: 9,767 modules bundled cleanly; `pm2 reload librechat` initialized 27 MCP servers (124 tools) and returned HTTP 200 OK.
+   - Round-2 Playwright visual QA across `1440×900` and `1280×800` verified single-row Discipline Groups (`rowButtonCount: 7`, zero line wrap), 8 un-truncated Spotlight cards, contextual group drilling (`Arch & Drones` -> `Floor Plans & Arch`), non-submitting template staging (`Message Count: 0`), `Tab` slot cycling, `role="status"` coach bar, live `"chemistry"` search, and `0` console errors.
+
+---
+
 ## 2026-11-12 — Executive Gold Standard Model Selector & BYOK/Agents Polish
 
 Operator feedback:

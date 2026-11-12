@@ -10,6 +10,47 @@
  */
 import type { TranslationKeys } from '~/hooks/useLocalize';
 
+export type MotionStudioGroupId =
+  | 'arch_engineering'
+  | 'robotics_how'
+  | 'stem_tech'
+  | 'business_creative'
+  | 'care_living';
+
+export interface MotionStudioGroup {
+  id: MotionStudioGroupId;
+  label: string;
+  labelKey: TranslationKeys;
+}
+
+export const MOTION_GROUPS: MotionStudioGroup[] = [
+  {
+    id: 'arch_engineering',
+    label: '🏗️ Arch & Drones',
+    labelKey: 'com_ui_motion_group_arch_engineering',
+  },
+  {
+    id: 'robotics_how',
+    label: '🤖 Robotics & How',
+    labelKey: 'com_ui_motion_group_robotics_how',
+  },
+  {
+    id: 'stem_tech',
+    label: '🎓 STEM & Cyber',
+    labelKey: 'com_ui_motion_group_stem_tech',
+  },
+  {
+    id: 'business_creative',
+    label: '💼 Business & Art',
+    labelKey: 'com_ui_motion_group_business_creative',
+  },
+  {
+    id: 'care_living',
+    label: '❤️ Health & Home',
+    labelKey: 'com_ui_motion_group_care_living',
+  },
+];
+
 export interface StarterItem {
   prompt: string;
   badge?: string;
@@ -18,12 +59,16 @@ export interface StarterItem {
   title?: string;
   icon?: string;
   description?: string;
+  engineTag?: string;
+  featured?: boolean;
+  keywords?: string[];
 }
 
 export interface StarterCategory {
   id: string;
   label: string;
   labelKey: TranslationKeys;
+  group?: MotionStudioGroupId;
   modes?: string[]; // Allowed modes: 'Chat', 'Work', 'Study', 'Study-Local', 'Privacy', 'Motion'
   starters: StarterItem[];
 }
@@ -454,9 +499,759 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     ],
   },
   {
+    id: 'motion_architecture',
+    label: '🏛️ Floor Plans & Arch',
+    labelKey: 'starters_cat_motion_architecture',
+    group: 'arch_engineering',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: '2D-to-3D Architectural Floor Plan',
+        icon: '🏛️',
+        badge: 'CAD · 3D Floorplan',
+        badgeKey: 'starters_badge_motion_arch_cad',
+        engineTag: 'CAD · 3D',
+        featured: true,
+        keywords: [
+          'architect',
+          'floor plan',
+          'blueprint',
+          'cad',
+          '3bhk',
+          'apartment',
+          'interior',
+          'extrude',
+        ],
+        description:
+          '2D orthographic CAD walls & door arcs smoothly morphing into an extruded isometric 3D plan with toggleable layers',
+        prompt:
+          'Build a precision orthographic 2D architectural CAD blueprint (dimension ticks, sq-ft room labels, wall thickness, door swing arcs) that smoothly morphs into an isometric 3D extruded model with toggleable Furniture/Dimension layers and Top/Isometric/Walkthrough camera presets for [Building or Plot: e.g. 1,400 sq ft 3BHK Apartment or Modern Café] featuring [Rooms & Zoning: e.g. Open Kitchen, Master Suite, Living Balcony, Study Nook] styled in [Orientation & Palette: e.g. North-Facing Warm Minimalist Wood & Concrete].',
+        mcpServers: ['satchida-motion', 'satchida-work-suite'],
+      },
+      {
+        title: 'Solar Sun-Path & Ventilation Sim',
+        icon: '☀️',
+        badge: 'Sun & Vastu Sim',
+        badgeKey: 'starters_badge_motion_sun_path',
+        engineTag: 'Daylight · Sim',
+        keywords: ['vastu', 'sun', 'daylight', 'shadow', 'ventilation', 'airflow', 'architecture'],
+        description:
+          'Time-of-day solar shadow polygons, solstice switch, Vastu compass overlay, and natural cross-ventilation streams',
+        prompt:
+          'Create an architectural floor and cross-section daylight simulator with an interactive Time-of-Day slider (06:00–20:00), Summer/Winter Solstice toggle, real-time shadow polygons, directional compass/Vastu ring, and cross-ventilation airflow streamlines for [Home or Office Layout & Plot Facing] located in [City / Climate: e.g. Bengaluru Tropical or Delhi Hot-Dry].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'MEP & Structural X-Ray Layers',
+        icon: '🏗️',
+        badge: 'MEP X-Ray',
+        badgeKey: 'starters_badge_motion_mep_xray',
+        engineTag: 'X-Ray · SVG',
+        keywords: ['mep', 'plumbing', 'hvac', 'electrical', 'structural', 'beams', 'blueprint'],
+        description:
+          'Interactive structural beam, electrical conduit, plumbing riser, and HVAC duct X-ray layer opacity switcher',
+        prompt:
+          'Generate an interactive building X-Ray cutaway explorer with opacity toggles for Structural Beams, Electrical Conduits, Plumbing Risers, and HVAC Ducts, plus clickable load and routing pins for [Structure Type: e.g. 2-Storey Duplex Villa or Modular Clinic Wing] prioritizing [System Focus: e.g. Graywater Plumbing, Drain Slopes & Solar Backup Wiring].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Interior Elevation & Kelvin Lab',
+        icon: '🛋️',
+        badge: 'Room Lighting',
+        badgeKey: 'starters_badge_motion_room_lighting',
+        engineTag: '2700K–5000K',
+        keywords: [
+          'interior',
+          'kitchen',
+          'lighting',
+          'kelvin',
+          'cabinetry',
+          'elevation',
+          'ergonomic',
+        ],
+        description:
+          'Wall elevation lighting tester (2700K warm to 5000K task) with material swatch swaps and clearance rulers',
+        prompt:
+          'Design an interactive interior wall elevation and lighting laboratory featuring a live Color Temperature slider (2700K Warm to 5000K Task), cabinetry and flooring swatch switchers, and ADA ergonomic clearance rulers for [Room: e.g. U-Shaped Modular Kitchen or Studio Bedroom] styled with [Material Palette & Lighting Mood].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_drones',
+    label: '🚁 Drones & UAV',
+    labelKey: 'starters_cat_motion_drones',
+    group: 'arch_engineering',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Multirotor TWR & Propulsion Lab',
+        icon: '🚁',
+        badge: 'UAV Propulsion',
+        badgeKey: 'starters_badge_motion_uav_prop',
+        engineTag: 'Three.js · UAV',
+        featured: true,
+        keywords: [
+          'drone',
+          'uav',
+          'quadcopter',
+          'hexacopter',
+          'fpv',
+          'thrust',
+          'twr',
+          'propeller',
+          'lipo',
+        ],
+        description:
+          'Exploded-to-assembled 3D multirotor frame with CW/CCW prop wash rings, throttle slider, and verified hover math',
+        prompt:
+          'Compute thrust-to-weight ratio, hover current, and safe endurance first using drone_aerodynamics_and_propulsion, then build an interactive exploded-to-assembled 3D/SVG multirotor simulation with counter-rotating CW/CCW prop wash rings, Center-of-Gravity marker, and a live Throttle slider (0–100%) for [Airframe: e.g. 5-inch FPV Freestyle Quad or 10kg Agri-Sprayer Hexacopter] configured with [Specs: All-up weight (g), Motor thrust (g), Propeller size & LiPo S/mAh].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+      {
+        title: 'Drone SLAM & Waypoint Mission',
+        icon: '📡',
+        badge: 'Flight Pathfinding',
+        badgeKey: 'starters_badge_motion_uav_slam',
+        engineTag: 'SLAM · 3D',
+        keywords: ['drone', 'slam', 'lidar', 'geofence', 'waypoint', 'pid', 'rth', 'autonomous'],
+        description:
+          'Terrain corridor with LiDAR cone, no-fly geofence cylinders, wind-drift vector disturbance, and PID stabilization',
+        prompt:
+          'Animate an autonomous UAV mission corridor with a rotating 3D LiDAR detection cone, dynamic geofence/no-fly cylinders, wind-drift vector disturbance toggle, PID attitude telemetry plot, and low-battery RTH trigger for [Mission Profile: e.g. Warehouse Inventory Scan, Forest Search & Rescue, or Bridge Inspection] navigating [Obstacle or Wind Constraints].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Airfoil Lift, Stall & Vortex Lab',
+        icon: '🌬️',
+        badge: 'Aerodynamics',
+        badgeKey: 'starters_badge_motion_aero',
+        engineTag: 'CFD · Lab',
+        keywords: [
+          'airfoil',
+          'vtol',
+          'lift',
+          'drag',
+          'stall',
+          'wind tunnel',
+          'naca',
+          'aerodynamics',
+        ],
+        description:
+          'Interactive wind-tunnel streamline particle solver with Angle-of-Attack slider (-10° to +25°) and stall vortices',
+        prompt:
+          'Build an interactive wind-tunnel streamline particle solver around a cambered airfoil or VTOL tilt-rotor with a live Angle-of-Attack slider (-10 to +25 deg) visualizing laminar flow breakdown into stall vortices plus live Lift/Drag vectors for [Airfoil or Aircraft: e.g. NACA 2412 Survey Glider or Quad Tilt-Rotor Transition] across [Flight Regime: Takeoff / Cruise / High-AoA Stall].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+    ],
+  },
+  {
+    id: 'motion_civil_logistics',
+    label: '🌉 Civil & Supply Chains',
+    labelKey: 'starters_cat_motion_civil_logistics',
+    group: 'arch_engineering',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Bridge Truss Stress & Load Sim',
+        icon: '🌉',
+        badge: 'Structural Truss',
+        badgeKey: 'starters_badge_motion_truss',
+        engineTag: 'FEA · Sim',
+        keywords: [
+          'bridge',
+          'truss',
+          'civil',
+          'structural',
+          'tension',
+          'compression',
+          'beam',
+          'load',
+        ],
+        description:
+          'Color-coded Tension vs Compression truss members bending dynamically as truck load moves across spans',
+        prompt:
+          'Verify beam stress formulas with mechanical_gear_and_stress, then create a precision vector structural bridge simulator with Tension (cyan) vs Compression (coral) force color-coding, span deflection curves, and a moving Truck Weight & Speed slider for [Bridge Structure: e.g. 120m Steel Warren Truss or Cable-Stayed River Flyover] under [Load Scenario: e.g. Heavy Freight Convoy + Lateral Gust].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+      {
+        title: 'Supply & Cold-Chain Digital Twin',
+        icon: '🚢',
+        badge: 'Logistics Twin',
+        badgeKey: 'starters_badge_motion_logistics',
+        engineTag: 'Digital Twin',
+        keywords: [
+          'supply chain',
+          'logistics',
+          'port',
+          'warehouse',
+          'cold chain',
+          'inventory',
+          'freight',
+        ],
+        description:
+          'End-to-end spatial corridor tracing factory AGV, port cranes, rail/vessel, and bottleneck fault injection',
+        prompt:
+          'Choreograph a spatial logistics corridor camera flight tracing Raw Material -> Factory AGV -> Smart Port Crane -> Vessel/Rail -> Cold-Chain Truck with live node buffer bars, SLA clock, and a Bottleneck Fault Injection button for [Supply Network / Cargo: e.g. -20C Vaccine Cold-Chain or EV Battery Pack Supply] testing [Disruption Scenario: e.g. Port Congestion Reroute].',
+        mcpServers: ['satchida-motion', 'satchida-work-suite'],
+      },
+      {
+        title: 'Smart Traffic & EV Microgrid Flow',
+        icon: '🚦',
+        badge: 'Smart Mobility',
+        badgeKey: 'starters_badge_motion_traffic',
+        engineTag: 'Flow · Sim',
+        keywords: ['traffic', 'intersection', 'ev', 'smart city', 'urban', 'signals', 'microgrid'],
+        description:
+          'Adaptive traffic light phase timing simulator with emergency green-wave override and EV charger queue meters',
+        prompt:
+          'Simulate an interactive urban intersection & EV fast-charging microgrid with queue-length gauges, adaptive signal timing sliders, and an emergency ambulance green-corridor toggle for [City Junction / Campus Zone] balancing [Peak Vehicle Volume & Solar Buffer Target].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_robotics',
+    label: '🤖 Robotics & Kinematics',
+    labelKey: 'starters_cat_motion_robotics',
+    group: 'robotics_how',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: '6-DOF Robotic Arm IK & Torque Lab',
+        icon: '🦾',
+        badge: 'Arm Kinematics',
+        badgeKey: 'starters_badge_motion_arm_ik',
+        engineTag: 'Three.js · IK',
+        featured: true,
+        keywords: [
+          'robot',
+          'arm',
+          'kinematics',
+          'ik',
+          'fk',
+          '6dof',
+          'scara',
+          'torque',
+          'mechatronics',
+        ],
+        description:
+          'Articulated robotic arm with draggable target crosshair (live IK solver), J1–J6 sliders, and reach envelope',
+        prompt:
+          'Validate joint torque and gear reduction via mechanical_gear_and_stress, then build an interactive articulated robotic arm with a draggable 2D/3D target crosshair (live inverse kinematics solver), individual Joint angle sliders (J1–J6), workspace reach envelope arc, and telemetry HUD for [Robot Config: e.g. 6-Axis Articulated Welder, 4-Axis SCARA Pick-and-Place, or Surgical Arm] handling [Payload & Task: e.g. 5kg Gearbox Assembly].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+      {
+        title: 'Rover SLAM & LiDAR Maze Mapper',
+        icon: '🤖',
+        badge: 'SLAM Navigation',
+        badgeKey: 'starters_badge_motion_rover_slam',
+        engineTag: 'LiDAR · Split',
+        keywords: ['rover', 'slam', 'lidar', 'astar', 'rrt', 'maze', 'occupancy', 'amr'],
+        description:
+          'Split-screen rover emitting 360° raycast LiDAR beams alongside a real-time occupancy grid and A* path planner',
+        prompt:
+          'Construct a synchronized split-screen robotics SLAM simulator: Left shows a differential-drive rover sweeping 360-degree raycast LiDAR beams around obstacles; Right builds the real-time occupancy grid and A*/RRT* planned path with Pause and Shuffle Obstacles controls for [Environment: e.g. Hospital Delivery Corridor, Mars Crater Field, or Autonomous Warehouse] comparing [Planner Strategy].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Factory Cell & PLC State Machine',
+        icon: '🏭',
+        badge: 'PLC Automation',
+        badgeKey: 'starters_badge_motion_plc',
+        engineTag: 'State · Sim',
+        keywords: ['plc', 'factory', 'conveyor', 'oee', 'automation', 'gripper', 'industrial'],
+        description:
+          'Synchronized conveyor, optical proximity sensors, diverter piston, live state graph, and E-Stop test toggle',
+        prompt:
+          'Design an automated industrial conveyor workcell synchronized with optical proximity sensors, pneumatic diverter pistons, robotic gripper pick cycles, a live highlighted PLC state-transition graph, OEE counter, and Emergency E-Stop toggle for [Workcell Line: e.g. EV Cell Sorting & Weld, Beverage Cap Inspector, or Automated Pharmacy] targeting [Cycle Rate & Fault Condition].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_how_it_works',
+    label: '⚙️ How Things Work',
+    labelKey: 'starters_cat_motion_how_it_works',
+    group: 'robotics_how',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Engine & Drivetrain Cutaway Lab',
+        icon: '⚙️',
+        badge: 'Engine Cutaway',
+        badgeKey: 'starters_badge_motion_engine',
+        engineTag: 'Cutaway · RPM',
+        featured: true,
+        keywords: [
+          'how things work',
+          'engine',
+          'piston',
+          'turbine',
+          'jet',
+          'ev motor',
+          'cutaway',
+          'wankel',
+        ],
+        description:
+          'Synchronized cutaway animation with RPM throttle slider (600–7000 RPM), spark/exhaust particles, and phase gauges',
+        prompt:
+          'Create an intricate synchronized mechanical cutaway animation featuring an interactive RPM Throttle slider (600–7000 RPM), intake/compression/power/exhaust phase indicators, thermal spark/airflow particle bursts, and crank-angle telemetry explaining [Machine: e.g. 4-Stroke Otto ICE Engine, High-Bypass Turbofan Jet, Brushless EV Traction Motor, or Wankel Rotary] in [View Style: Isometric Cutaway / Thermal Stress].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Gearbox, Hydraulics & Lever Lab',
+        icon: '🔧',
+        badge: 'Mechanical Lab',
+        badgeKey: 'starters_badge_motion_gearbox',
+        engineTag: 'Gears · Force',
+        keywords: [
+          'gearbox',
+          'planetary',
+          'differential',
+          'hydraulics',
+          'brake',
+          'escapement',
+          'torque',
+        ],
+        description:
+          'Meshing involute gear teeth / hydraulic pistons with RPM & load sliders, torque math, and exploded scrubber',
+        prompt:
+          'Calculate exact gear ratios, torque multiplication, and Pascal pressure using mechanical_gear_and_stress, then animate meshing involute gears or hydraulic cylinders with Input RPM & Load sliders plus an Exploded Assembly scrubber for [Mechanism: e.g. Planetary Epicyclic Gearbox, Car Bevel Differential, Hydraulic Disc Brake, or Mechanical Watch Escapement] at [Ratio / Pressure Target].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+      {
+        title: 'Optics, Lens & Laser Ray-Tracing',
+        icon: '🔭',
+        badge: 'Optics Lab',
+        badgeKey: 'starters_badge_motion_optics',
+        engineTag: 'Raytrace · Lab',
+        keywords: [
+          'optics',
+          'camera',
+          'lens',
+          'aperture',
+          'laser',
+          'telescope',
+          'refraction',
+          'eye',
+        ],
+        description:
+          'Live light-ray refraction through multi-element glass lenses with f-stop Aperture and Focal Distance sliders',
+        prompt:
+          'Simulate geometric ray-tracing through curved glass lenses or mirrors with interactive Aperture (f/1.4 to f/16) and Focal Distance sliders visualizing focal plane convergence, bokeh spread, and dispersion for [Optical System: e.g. 50mm Camera Prime Lens, Reflecting Astronomical Telescope, Human Eye Myopia Correction, or Fiber-Optic Total Internal Reflection].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'Inside Everyday Appliances & Tech',
+        icon: '🔋',
+        badge: 'Inside Devices',
+        badgeKey: 'starters_badge_motion_devices',
+        engineTag: 'Exploded · 3D',
+        keywords: [
+          'microwave',
+          'refrigerator',
+          'battery',
+          'lithium',
+          'headphones',
+          'anc',
+          'appliances',
+        ],
+        description:
+          'Peel-away cutaway revealing lithium-ion migration, refrigerant heat loops, magnetron microwaves, or ANC cancellation',
+        prompt:
+          'Build a multi-layer peeled cutaway revealing invisible working physics—such as ion intercalation, phase-change cooling loops, acoustic wave cancellation, or RF heating—with toggleable housing layers and annotated callouts for [Device: e.g. Microwave Oven Magnetron, Inverter Refrigerator Compressor, Active Noise-Cancelling Headphones, or Lithium-Ion Battery Cell].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_electronics',
+    label: '🔌 Circuits & AI Silicon',
+    labelKey: 'starters_cat_motion_electronics',
+    group: 'robotics_how',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Circuit Simulator & Oscilloscope',
+        icon: '🔌',
+        badge: 'Circuit Scope',
+        badgeKey: 'starters_badge_motion_circuit',
+        engineTag: 'Scope · Live',
+        keywords: [
+          'circuit',
+          'pcb',
+          'oscilloscope',
+          '555',
+          'op-amp',
+          'buck',
+          'rectifier',
+          'voltage',
+        ],
+        description:
+          'Animated current pulse dots along schematics synced with R/C/Gain sliders and dual-channel oscilloscope traces',
+        prompt:
+          'Compute RC/RLC timing and component values using electronics_circuit_designer, then animate glowing current flow along a crisp vector schematic paired with interactive R/C/Gain sliders and a live dual-channel Oscilloscope waveform for [Circuit: e.g. 555 Timer Astable Blinker, Inverting Op-Amp, Full-Wave Bridge Rectifier, or Buck DC-DC Converter] targeting [Voltage / Frequency Spec].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+      {
+        title: 'CPU Pipeline & LLM AI Silicon',
+        icon: '🧠',
+        badge: 'Compute Arch',
+        badgeKey: 'starters_badge_motion_compute',
+        engineTag: 'Logic · AI',
+        keywords: [
+          'cpu',
+          'riscv',
+          'logic gates',
+          'adder',
+          'pipeline',
+          'transformer',
+          'kv cache',
+          'gpu',
+        ],
+        description:
+          'Clock-stepped datapath showing ALU/logic signal pulses OR Transformer Q-K-V attention & KV-cache memory meters',
+        prompt:
+          'Construct a synchronized clock-stepped compute visualizer with Single-Step and Auto-Clock controls tracing gate/pipeline execution or Transformer Q-K-V self-attention & KV-cache memory meters (verified with llm_vram_and_compute_estimator where AI applies) for [Architecture: e.g. 4-Bit Ripple-Carry Adder, RISC-V 5-Stage Pipeline, or LLM Self-Attention & KV-Cache].',
+        mcpServers: ['satchida-motion', 'satchida-ai-engineer'],
+      },
+      {
+        title: 'Solar MPPT & EV Battery BMS Lab',
+        icon: '⚡',
+        badge: 'Power Electronics',
+        badgeKey: 'starters_badge_motion_mppt',
+        engineTag: 'MPPT · Sim',
+        keywords: ['solar', 'mppt', 'inverter', 'bms', 'ev', 'charger', 'grid', 'battery'],
+        description:
+          'PV string DC -> MPPT tracker -> BMS cell balancing -> pure sine inverter trace with Irradiance & Load sliders',
+        prompt:
+          'Design an interactive renewable power-electronics schematic with Solar Irradiance & Home Load sliders tracing PV DC -> MPPT duty-cycle tracking -> BMS cell balance bars -> pure sine-wave grid output for [System: e.g. 5kW Hybrid Home Solar + LFP Pack or 800V EV Fast Charger] under [Cloud / Grid Outage Scenario].',
+        mcpServers: ['satchida-motion', 'satchida-maker-engineering'],
+      },
+    ],
+  },
+  {
+    id: 'motion_education',
+    label: '🎓 STEM, Chem & Coding',
+    labelKey: 'starters_cat_motion_education',
+    group: 'stem_tech',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Physics Forces & Wave-Field Lab',
+        icon: '⚛️',
+        badge: 'Physics Sim',
+        badgeKey: 'starters_badge_motion_physics',
+        engineTag: 'Physics · Lab',
+        featured: true,
+        keywords: [
+          'physics',
+          'wave',
+          'gravity',
+          'electromagnetism',
+          'pendulum',
+          'jee',
+          'quantum',
+          'optics',
+        ],
+        description:
+          'Interactive force vectors, particle waves, tunable Mass/Field/Slit sliders, and verified quantitative readouts',
+        prompt:
+          'Verify quantitative physics relations using scientific_physics_solver, then simulate an interactive physics experiment with live vector force arrows, particle wave fields, tunable parameter sliders (Mass / Wavelength / Field), and Play/Reset controls for [Physics Topic: e.g. Double-Slit Quantum Interference, Orbital Escape Velocity, or Faraday Electromagnetic Induction] at [Student Level: e.g. CBSE Class 12 / JEE / University].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'Dynamic Math & Calculus Proofs',
+        icon: '📐',
+        badge: 'Math Morph',
+        badgeKey: 'starters_badge_motion_math',
+        engineTag: 'SymPy · SVG',
+        keywords: [
+          'math',
+          'calculus',
+          'fourier',
+          'derivative',
+          'integral',
+          'theorem',
+          'geometry',
+          'algebra',
+        ],
+        description:
+          'SVG geometric shear/morph proofs with interactive Fourier harmonic N-sliders and tangent derivative steppers',
+        prompt:
+          'Verify symbolic math derivations using solve_symbolic_math or calculus_derivative_integral, then build a smooth geometric SVG morphing proof with interactive Secant-to-Tangent or Fourier N-Harmonic sliders (N=1..15) and KaTeX equation highlights for [Theorem or Concept: e.g. Pythagorean Area Shear Proof, Fourier Square-Wave Harmonics, or Gradient Descent Optimization].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'Chemistry Orbitals & Kinetics',
+        icon: '🧪',
+        badge: 'Chemistry Lab',
+        badgeKey: 'starters_badge_motion_chemistry',
+        engineTag: '3D · Chem',
+        keywords: [
+          'chemistry',
+          'molecule',
+          'orbitals',
+          'reaction',
+          'titration',
+          'ph',
+          'catalyst',
+          'benzene',
+        ],
+        description:
+          'Balanced molecular orbital covalent bonding, activation-energy catalyst curve slider, or pH titration drop sim',
+        prompt:
+          'Balance stoichiometry and verify molar ratios with balance_chemical_equation, then animate 3D/2D electron orbital hybridization, bond formation arrows, an Activation Energy barrier chart with Catalyst & Temperature sliders, or an interactive burette pH titration curve for [Reaction or Molecule: e.g. SN2 Nucleophilic Attack, Benzene Pi Orbitals, NaOH + HCl Titration, or Haber Ammonia Synthesis] focusing on [Orbital / Equilibrium Focus].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'Cellular Biology Micro-Journey',
+        icon: '🧬',
+        badge: 'Bio Animation',
+        badgeKey: 'starters_badge_motion_bio',
+        engineTag: 'Bio · 3D',
+        keywords: [
+          'biology',
+          'dna',
+          'cell',
+          'crispr',
+          'mitosis',
+          'photosynthesis',
+          'synapse',
+          'neet',
+        ],
+        description:
+          'Microscopic 3D flythrough across cell membranes and DNA forks with Organelle X-Ray labels and Phase Stepper',
+        prompt:
+          'Animate a microscopic 3D biological spatial flythrough showing membranes, enzymes, and genetic complexes with toggleable Organelle X-Ray callouts and a manual Phase Stepper (Pause / Next Phase) for [Biological Process: e.g. DNA Replication Fork, CRISPR-Cas9 Target Cleavage, Photosynthesis ATP Synthase, or Synapse Neurotransmission].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Algorithm & Recursion Tracer',
+        icon: '💻',
+        badge: 'Algo & Code',
+        badgeKey: 'starters_badge_motion_algo',
+        engineTag: 'Trace · Step',
+        keywords: [
+          'algorithm',
+          'coding',
+          'sorting',
+          'dijkstra',
+          'recursion',
+          'heap',
+          'stack',
+          'trees',
+        ],
+        description:
+          'Steppable array/graph visualizer with custom input editor, live call-stack frames, and Big-O swap counters',
+        prompt:
+          'Build a deterministic interactive algorithm & code tracer featuring an editable custom input array/graph, Step Forward/Back & Speed buttons, synchronized visual swap/path canvas, and a live Call-Stack / Heap Pointer / Big-O telemetry panel for [Algorithm: e.g. QuickSort Partitioning, Dijkstra Priority Queue, DFS/BFS Maze Solver, or Dynamic Programming Knapsack].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+    ],
+  },
+  {
+    id: 'motion_networks',
+    label: '🌐 Networks & Cyber',
+    labelKey: 'starters_cat_motion_networks',
+    group: 'stem_tech',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'DNS, TCP & TLS 1.3 Packet Journey',
+        icon: '🌐',
+        badge: 'Packet Flow',
+        badgeKey: 'starters_badge_motion_packet',
+        engineTag: 'Network · Lab',
+        keywords: ['network', 'tcp', 'dns', 'tls', 'https', 'bgp', 'quic', 'packet', 'handshake'],
+        description:
+          'Flying inspectable network packets across Client/Resolver/CDN/Origin with Latency & Packet-Drop fault sliders',
+        prompt:
+          'Animate an end-to-end network swimlane & sequence flight where any flying packet can be paused to inspect frame headers, equipped with a Latency & Packet-Loss slider plus Retransmit animation for [Protocol Flow: e.g. HTTPS DNS + TCP + TLS 1.3 0-RTT, BGP Anycast Routing, WebSocket Upgrade, or OAuth2 PKCE Exchange] under [Condition: Healthy vs Packet Drop].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'K8s Autoscaling & Failover Sim',
+        icon: '☸️',
+        badge: 'Cloud Topology',
+        badgeKey: 'starters_badge_motion_cloud',
+        engineTag: 'K8s · Chaos',
+        keywords: [
+          'kubernetes',
+          'k8s',
+          'cloud',
+          'autoscaling',
+          'failover',
+          'kafka',
+          'load balancer',
+          'sre',
+        ],
+        description:
+          'Isometric node/pod cluster with load pulses and interactive "Spike Load / Kill Node" chaos engineering controls',
+        prompt:
+          'Create an isometric distributed cluster showing load-balancer traffic pulses, CPU/memory gauge bars, HPA pod scaling animations, and interactive "Spike Traffic" and "Kill Primary Node" chaos buttons for [Architecture: e.g. Kubernetes HPA Microservices, Kafka Partition Rebalance, or Multi-Region Database Failover] under [Traffic Target].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Kill-Chain vs Zero-Trust Defense',
+        icon: '🛡️',
+        badge: 'Cyber Defense',
+        badgeKey: 'starters_badge_motion_cyber',
+        engineTag: 'Red vs Blue',
+        keywords: [
+          'cybersecurity',
+          'zero trust',
+          'sqli',
+          'phishing',
+          'waf',
+          'ddos',
+          'mitre',
+          'mfa',
+        ],
+        description:
+          'Side-by-side Red-Team intrusion kill-chain neutralized by Blue-Team mTLS, WAF sanitization, and hardware MFA',
+        prompt:
+          'Contrast an attack kill-chain against hardened defense side-by-side: animate intrusion payloads meeting WAF sanitization, mTLS verification, micro-segmentation, and EDR containment shields with clear stage callouts for [Threat Scenario: e.g. Credential Phishing vs Hardware Passkey MFA, Volumetric DDoS Mitigation, or SQL Injection Parameterization].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_earth_space',
+    label: '🌌 Space, Earth & Sound',
+    labelKey: 'starters_cat_motion_earth_space',
+    group: 'stem_tech',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Orbital & Hohmann Transfer Sim',
+        icon: '🛰️',
+        badge: 'Orbital Sim',
+        badgeKey: 'starters_badge_motion_orbital',
+        engineTag: 'Three.js · Space',
+        keywords: [
+          'space',
+          'orbit',
+          'satellite',
+          'hohmann',
+          'isro',
+          'chandrayaan',
+          'mars',
+          'gravity',
+        ],
+        description:
+          '2D/3D planetary gravity well with Δv thruster burns, live apogee/perigee telemetry, and time-warp scrubber',
+        prompt:
+          'Verify orbital period and velocity parameters with scientific_physics_solver, then create a 3D/2D orbital mechanics simulator featuring delta-v burn ignition pulses, live apogee/perigee & velocity HUD, and a Time-Warp / Launch Window scrubber for [Mission: e.g. Earth-to-Mars Hohmann Transfer, Chandrayaan Trans-Lunar Injection, or JWST L2 Halo Orbit] highlighting [Maneuver Controls].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+      {
+        title: 'Tectonics, Cyclones & Clean Grid',
+        icon: '🌍',
+        badge: 'Earth & Climate',
+        badgeKey: 'starters_badge_motion_earth',
+        engineTag: 'Earth · Sim',
+        keywords: ['earth', 'tectonic', 'cyclone', 'climate', 'earthquake', 'weather', 'renewable'],
+        description:
+          'Geological crust subduction cutaway, cyclone Coriolis wind bands, or solar-wind-battery grid dispatch flow',
+        prompt:
+          'Construct an interactive Earth-science cross-section simulator with Time/Intensity sliders showing fault-line crust subduction stress, atmospheric Coriolis cyclone streamlines, or clean microgrid load balancing for [Earth System: e.g. Himalayan Tectonic Collision, Tropical Cyclone Eye & Storm Surge, or 24-Hour Solar-Wind-Battery Dispatch].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Standing Waves & Music Acoustics',
+        icon: '🎵',
+        badge: 'Sound & Music',
+        badgeKey: 'starters_badge_motion_music',
+        engineTag: 'Audio · FFT',
+        keywords: [
+          'music',
+          'sound',
+          'acoustics',
+          'fft',
+          'harmonics',
+          'guitar',
+          'chords',
+          'frequency',
+        ],
+        description:
+          'Vibrating string/pipe harmonics synced with FFT overtone meters, Circle-of-Fifths ring, and optional mute audio',
+        prompt:
+          'Build an acoustics & music visualizer combining vibrating standing-wave nodes, live FFT overtone bar charts, interactive Harmonic / Chord sliders, and an optional muted-by-default Web Audio playback toggle for [Acoustics Topic: e.g. Plucked Guitar Overtones & Timbre, Noise-Cancellation Phase Inversion, or Jazz ii-V-I Chord Voice Leading].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_history_kids',
+    label: '🏛️ History & Early Learning',
+    labelKey: 'starters_cat_motion_history_kids',
+    group: 'stem_tech',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Historical Atlas & Trade Timeline',
+        icon: '🗺️',
+        badge: 'History Map',
+        badgeKey: 'starters_badge_motion_history',
+        engineTag: 'Timeline · Map',
+        keywords: [
+          'history',
+          'civilization',
+          'atlas',
+          'trade routes',
+          'silk road',
+          'indus',
+          'timeline',
+        ],
+        description:
+          'Interactive century-scrubber map tracing trade routes, empire boundaries, and era artifact discoveries',
+        prompt:
+          'Choreograph a stylized SVG/spatial map flyover paired with an interactive Century Scrubber slider animating maritime & overland trade routes, city beacons, and era artifact cards for [Historical Era or Topic: e.g. Indus Valley & Maritime Spice Trade, Golden Age Indian Mathematics, Silk Road Caravans, or Space Race Milestones].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Kids Fractions & Phonics Play',
+        icon: '🧩',
+        badge: 'Kids Playbook',
+        badgeKey: 'starters_badge_motion_kids',
+        engineTag: 'K-5 · Playful',
+        keywords: ['kids', 'children', 'fractions', 'phonics', 'counting', 'school', 'math games'],
+        description:
+          'Oversized playful tactile counters, interactive fraction pizza slices, and bouncing frog number-line hops',
+        prompt:
+          'Create an oversized, joyful, child-friendly interactive learning playground with tactile click/step buttons, bouncy visual counters, colorful fraction pizza slices, and hopping number-line animations for [Concept & Age Group: e.g. Equivalent Fractions Age 8, Phonetic Blending Rhymes Age 6, or Place-Value Blocks Age 7].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Vedic Astronomy & Sundial Lab',
+        icon: '🔭',
+        badge: 'Cosmic Heritage',
+        badgeKey: 'starters_badge_motion_cosmic',
+        engineTag: 'Astronomy · 3D',
+        keywords: [
+          'jantar mantar',
+          'sundial',
+          'nakshatra',
+          'astronomy',
+          'ecliptic',
+          'solstice',
+          'aryabhata',
+        ],
+        description:
+          'Jantar Mantar shadow-angle sundial and 27-Nakshatra lunar ecliptic wheel with Day-of-Year & Latitude sliders',
+        prompt:
+          'Animate celestial shadow angles across an interactive Samrat Yantra sundial and 27-Nakshatra ecliptic wheel with Day-of-Year and Latitude sliders for [Subject: e.g. Equinox & Solstice Shadow Geometry, Lunar Nakshatra Orbit Wheel, or Classical Indian Trigonometry & Sine Chords].',
+        mcpServers: ['satchida-motion', 'satchida-stem-study'],
+      },
+    ],
+  },
+  {
     id: 'motion_executive',
     label: '📊 Executive & Metrics',
     labelKey: 'starters_cat_motion_executive',
+    group: 'business_creative',
     modes: ['Motion'],
     starters: [
       {
@@ -464,10 +1259,13 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         icon: '📊',
         badge: 'Executive',
         badgeKey: 'starters_badge_motion_executive',
+        engineTag: '3D · KPI',
+        featured: true,
+        keywords: ['executive', 'qbr', 'revenue', 'boardroom', 'kpi', 'growth', 'metrics'],
         description:
-          'Spatial camera sweep across 3D revenue bars, glowing KPI metrics, and year-over-year growth stats',
+          'Spatial 3D camera sweep across revenue charts, counting KPI tickers, and Base/Bull scenario toggles',
         prompt:
-          'Generate an animated 3D executive report with 60fps camera pan, kinetic charts, and KPI counters for: [Company Name & Key Metrics / Q3 Revenue & Growth Highlights]',
+          'Generate an animated 3D executive report with 60fps camera pan, kinetic SVG charts, interactive hover tooltips, KPI counters, and a Scenario Toggle (Conservative / Base / Bull) for [Company Name & Quarter] highlighting [Key Metrics: Revenue, NRR & Growth Highlights].',
         mcpServers: ['satchida-motion'],
       },
       {
@@ -475,10 +1273,12 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         icon: '🚀',
         badge: 'Investor Pitch',
         badgeKey: 'starters_badge_motion_pitch',
+        engineTag: 'Spatial · Deck',
+        keywords: ['investor', 'pitch', 'startup', 'tam', 'sam', 'ltv', 'traction', 'fundraising'],
         description:
-          'High-energy kinetic deck with glowing glass cards, TAM/SAM sizing, and unit economics',
+          'High-energy 3D glass deck with concentric TAM/SAM/SOM rings, cohort retention curves, and unit economics',
         prompt:
-          'Build a high-energy kinetic investor pitch presentation with 3D perspective depth, glowing glass cards, and market traction figures for: [Startup Name & Value Proposition / Problem & Solution]',
+          'Build a high-energy kinetic investor pitch presentation with 3D perspective depth, glowing glass cards, animated TAM/SAM/SOM rings, and unit economics counters for [Startup Name & Value Proposition] detailing [Traction Milestones & Capital Ask].',
         mcpServers: ['satchida-motion'],
       },
       {
@@ -486,226 +1286,12 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         icon: '🗺️',
         badge: 'Milestone Roadmap',
         badgeKey: 'starters_badge_motion_roadmap',
+        engineTag: 'Timeline · 3D',
+        keywords: ['roadmap', 'strategy', 'milestones', 'q1', 'q4', 'deliverables', 'executive'],
         description:
-          'Continuous forward camera track through a floating 3D chronological roadmap with phased deliverables',
+          'Continuous forward 3D timeline track through phased deliverables, dependency connectors, and owner pills',
         prompt:
-          'Design an immersive 3D timeline camera flight navigating through phased strategic milestones and deliverables for: [Product / Project Initiative Roadmap]',
-        mcpServers: ['satchida-motion'],
-      },
-    ],
-  },
-  {
-    id: 'motion_kinetic',
-    label: '⚡ Kinetic Typography',
-    labelKey: 'starters_cat_motion_kinetic',
-    modes: ['Motion'],
-    starters: [
-      {
-        title: 'Kinetic Typography Manifesto',
-        icon: '⚡',
-        badge: 'Kinetic Speech',
-        badgeKey: 'starters_badge_motion_kinetic',
-        description:
-          'Fast-paced rhythmic typography with staggered word reveals, dynamic camera shifts, and contrast bursts',
-        prompt:
-          'Create a dynamic kinetic typography motion graphic with staggered character animations, bold camera push-throughs, and dramatic audio/visual pacing for: [Core Message / Speech Excerpt / Brand Manifesto]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Distributed Systems & Architecture Flow',
-        icon: '🧩',
-        badge: 'Tech Explainer',
-        badgeKey: 'starters_badge_motion_tech',
-        description:
-          'Interactive 3D particle simulation of request routing, API gateways, and distributed event pipelines',
-        prompt:
-          'Build an interactive 3D motion graphic explaining distributed system flow, microservice handshakes, and data pipelines for: [System Architecture / Pipeline Topic]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Scientific & Physics Simulation',
-        icon: '🔬',
-        badge: 'STEM Visualizer',
-        badgeKey: 'starters_badge_motion_stem',
-        description:
-          'SVG path morphing, vector fields, and 3D camera zoom illustrating complex mathematical or physical laws',
-        prompt:
-          'Simulate and animate complex physical or scientific concepts with GSAP SVG path morphing, particle field, and camera zoom for: [Scientific Phenomenon / Mathematical Formula / Physics Concept]',
-        mcpServers: ['satchida-motion'],
-      },
-    ],
-  },
-  {
-    id: 'motion_product',
-    label: '✨ Product & SaaS Launch',
-    labelKey: 'starters_cat_motion_product',
-    modes: ['Motion'],
-    starters: [
-      {
-        title: 'Dark-Mode SaaS Hero Launch',
-        icon: '💎',
-        badge: 'SaaS Launch',
-        badgeKey: 'starters_badge_motion_saas',
-        description:
-          'Cinema-grade teaser featuring floating glass UI mockup cards, pulsing neon laser borders, and feature highlights',
-        prompt:
-          'Produce a 60fps dark-mode SaaS product launch teaser with glassmorphism, floating UI mockups, and glowing beam highlights for: [Product / Feature Name & Top 3 Capabilities]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Live Animated Analytics Dashboard',
-        icon: '📈',
-        badge: 'KPI Analytics',
-        badgeKey: 'starters_badge_motion_kpi',
-        description:
-          'Animated dashboard with rolling number tickers, SVG gradient chart sweeps, and live status beacons',
-        prompt:
-          'Construct an animated real-time analytics dashboard with counting numbers, glowing SVG line graphs, and donut chart sweeps for: [Metric Dashboard Domain / E-commerce, Cloud Ops, or Financial Analytics]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: '3D Mobile App UX Showcase',
-        icon: '📱',
-        badge: 'Mobile UX',
-        badgeKey: 'starters_badge_motion_mobile',
-        description:
-          'Sleek angled 3D smartphone frame with swipe transitions, floating UI callouts, and tactile micro-interactions',
-        prompt:
-          'Create an animated 3D mobile mockup showcase highlighting new mobile app UX, smooth screen transitions, and feature badges for: [App Name & Key Features]',
-        mcpServers: ['satchida-motion'],
-      },
-    ],
-  },
-  {
-    id: 'motion_media',
-    label: '🎬 Teasers & Video Render',
-    labelKey: 'starters_cat_motion_media',
-    modes: ['Motion'],
-    starters: [
-      {
-        title: 'Futuristic Brand Intro & Logo Reveal',
-        icon: '✨',
-        badge: 'Brand Stinger',
-        badgeKey: 'starters_badge_motion_stinger',
-        description:
-          '5-second high-octane 3D spatial logo reveal with particle grid sweep, anamorphic lens flares, and sonic typography',
-        prompt:
-          'Generate a sleek, futuristic 5-second branded video intro/stinger with neon grid particles, camera tilt, and logo reveal for: [Channel / Show Name & Brand Slogan]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Vertical 9:16 Kinetic Social Reel',
-        icon: '📲',
-        badge: 'Social Reel',
-        badgeKey: 'starters_badge_motion_social',
-        description:
-          'Mobile-first vertical kinetic graphic with striking hook typography, animated stat callout, and call-to-action',
-        prompt:
-          'Design an attention-grabbing 9:16 vertical motion graphic with bold typography, animated bar chart, and quote reveal for: [Quote or Statistic / Target Audience]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Playwright 60fps MP4 Video Exporter',
-        icon: '🎥',
-        badge: 'MP4 Exporter',
-        badgeKey: 'starters_badge_motion_mp4',
-        description:
-          'Render any GSAP HTML motion graphic artifact directly into a smooth 1080p 60fps MP4 video file',
-        prompt:
-          'Validate this motion artifact timeline and render a crisp 1080p 60fps MP4 video export with smooth transitions for: [Paste HTML code or describe motion scene]',
-        mcpServers: ['satchida-motion'],
-      },
-    ],
-  },
-  {
-    id: 'motion_education',
-    label: '🎓 STEM & Algorithms',
-    labelKey: 'starters_cat_motion_education',
-    modes: ['Motion'],
-    starters: [
-      {
-        title: 'Interactive Physics & Force Fields',
-        icon: '⚛️',
-        badge: 'Physics Sim',
-        badgeKey: 'starters_badge_motion_physics',
-        description:
-          'Continuous 3D camera pan around gravitational fields, projectile trajectories, or wave interference',
-        prompt:
-          'Simulate and animate an interactive 3D physics demonstration with particle fields and force vectors for: [Concept: e.g. Double-slit interference, Gravitational orbits, or Electromagnetism laws]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Dynamic Math Proof & Formula Morph',
-        icon: '📐',
-        badge: 'Math Morph',
-        badgeKey: 'starters_badge_motion_math',
-        description:
-          'Step-by-step kinetic geometric derivations with SVG shape transformations and coordinate shifts',
-        prompt:
-          'Build a step-by-step geometric proof animation with SVG shape morphing and coordinate transforms for: [Theorem: e.g. Pythagorean theorem, Fourier transform, or Calculus optimization]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Cellular Biology & Bio-Processes',
-        icon: '🧬',
-        badge: 'Bio Animation',
-        badgeKey: 'starters_badge_motion_bio',
-        description:
-          'Microscopic 3D camera zoom through cell membranes, DNA replication forks, or enzymatic catalysis',
-        prompt:
-          'Animate a microscopic 3D biological journey showing cellular structures and biochemical flow for: [Process: e.g. DNA replication, Photosynthesis Calvin cycle, or CRISPR gene editing]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Algorithm & Sorting Visualizer',
-        icon: '💻',
-        badge: 'Algo Visualizer',
-        badgeKey: 'starters_badge_motion_algo',
-        description:
-          'Kinetic array swapping, graph traversal pathfinding, and binary tree balance rotations',
-        prompt:
-          'Generate an animated algorithm visualizer with stepped array swaps and active pointer indicators for: [Algorithm: e.g. QuickSort, Dijkstra shortest path, or Red-Black tree insertion]',
-        mcpServers: ['satchida-motion'],
-      },
-    ],
-  },
-  {
-    id: 'motion_elderly',
-    label: '👵 Golden Years & Living',
-    labelKey: 'starters_cat_motion_elderly',
-    modes: ['Motion'],
-    starters: [
-      {
-        title: 'Gentle Medicine & Vital Daily Schedule',
-        icon: '💊',
-        badge: 'Senior Routine',
-        badgeKey: 'starters_badge_motion_elderly',
-        description:
-          'Large-type, soothing morning-to-night timeline with pill box visual cues and water reminders',
-        prompt:
-          'Design an accessible, large-text animated daily medication and wellness schedule with soothing colors for: [Medication list, times of day, and hydration/walk routines]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Step-by-Step Pension & Bill Guide',
-        icon: '👵',
-        badge: 'Digital Guide',
-        badgeKey: 'starters_badge_motion_pension',
-        description:
-          'Zoomed-in mobile phone screen walkthrough guiding elders through pension life certificates or utility payments',
-        prompt:
-          'Build a gentle, high-contrast animated guide with magnified buttons showing how to complete: [Task: e.g. Digital Life Certificate Jeevan Pramaan, Electricity bill payment, or WhatsApp video call]',
-        mcpServers: ['satchida-motion'],
-      },
-      {
-        title: 'Elder Fraud & OTP Scam Warning',
-        icon: '🛡️',
-        badge: 'Safety Alert',
-        badgeKey: 'starters_badge_motion_fraud',
-        description:
-          'Clear red-flag callouts contrasting fake banking phone calls with safe official procedures',
-        prompt:
-          'Create an easy-to-read, animated scam defense presentation illustrating dangerous caller traps vs safe habits for: [Scam type: e.g. Fake electricity disconnection SMS, Lottery call, or Bank KYC update threat]',
+          'Design an immersive 3D timeline camera flight navigating through phased strategic milestones, team ownership pills, and dependency lines for [Initiative / Product Roadmap] spanning [Phase Windows: e.g. Q1–Q4 Launch Gates].',
         mcpServers: ['satchida-motion'],
       },
     ],
@@ -714,39 +1300,190 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'motion_productivity',
     label: '💼 Professional & SOPs',
     labelKey: 'starters_cat_motion_productivity',
+    group: 'business_creative',
     modes: ['Motion'],
     starters: [
       {
-        title: 'Animated Standard Operating Procedure (SOP)',
+        title: 'Animated Workflow & SOP Replay',
         icon: '📋',
         badge: 'Workflow SOP',
         badgeKey: 'starters_badge_motion_sop',
+        engineTag: 'Flow · Step',
+        keywords: ['sop', 'workflow', 'onboarding', 'approval', 'process', 'sla', 'operations'],
         description:
-          'Pulsing swimlane flowchart walking teams through handoffs, approval gates, and SLAs',
+          'Pulsing swimlane diagram guiding teams through handoffs, decision gates, SLAs, and Pause/Step controls',
         prompt:
-          'Construct an animated corporate SOP diagram with glowing node transitions and decision branches for: [Business process: e.g. Client onboarding, Incident escalation, or Procurement sign-off]',
+          'Construct an interactive animated corporate SOP diagram with glowing node transitions, decision branches, SLA clocks, and Pause/Next-Gate stepping for [Business Process: e.g. Enterprise Client Onboarding, Change Advisory Review, or Procurement Sign-Off] detailing [Handoff Teams & SLAs].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Agile Sprint Velocity & Milestone Recap',
+        title: 'SaaS Unit Economics & Runway Lab',
+        icon: '💹',
+        badge: 'Financial Sim',
+        badgeKey: 'starters_badge_motion_fincalc',
+        engineTag: 'Live · Model',
+        keywords: [
+          'finance',
+          'saas',
+          'unit economics',
+          'churn',
+          'cac',
+          'ltv',
+          'arr',
+          'pricing',
+          'sensitivity',
+        ],
+        description:
+          'Interactive Price, Churn %, and CAC sliders dynamically re-animating payback period & 36-month ARR runway',
+        prompt:
+          'Build an interactive business unit-economics simulator with live sliders for Monthly ARPA, Churn %, Gross Margin %, and CAC that recalculate and animate LTV:CAC ratio, CAC payback months, and a 36-month ARR sensitivity curve for [Business / Product Tier] modeling [Baseline & Expansion Assumptions].',
+        mcpServers: ['satchida-motion', 'satchida-work-suite'],
+      },
+      {
+        title: 'Incident Postmortem & SLA Replay',
+        icon: '🚨',
+        badge: 'Incident Replay',
+        badgeKey: 'starters_badge_motion_postmortem',
+        engineTag: 'Postmortem',
+        keywords: [
+          'incident',
+          'postmortem',
+          'outage',
+          'sre',
+          'sla',
+          'rca',
+          'latency',
+          'mitigation',
+        ],
+        description:
+          'Interactive timeline scrubber tracing Alert Trigger -> Blast Radius -> Mitigation -> Follow-up Actions',
+        prompt:
+          'Create an objective, blameless incident postmortem replay combining a synchronized latency graph, cascading service blast-radius map, interactive Phase Scrubber (Detection -> Triage -> Mitigation -> Resolution), and hardened action items for [Incident Summary & Impacted Services].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Sprint Velocity & Gantt Timeline',
         icon: '🏃',
-        badge: 'Sprint Retro',
+        badge: 'Sprint & Gantt',
         badgeKey: 'starters_badge_motion_retro',
+        engineTag: 'Agile · Gantt',
+        keywords: ['sprint', 'agile', 'retrospective', 'gantt', 'burndown', 'velocity', 'pmo'],
         description:
-          'Burndown chart sweeps, completed epic highlight reels, and team shoutout cards',
+          'Burndown velocity curve sweeps, critical-path Gantt dependencies, epic highlights, and team shoutouts',
         prompt:
-          'Produce an upbeat sprint retrospective animation with burndown velocity curves and delivered features for: [Sprint name, velocity stats, key wins, and blockers resolved]',
+          'Produce an upbeat sprint retrospective and critical-path Gantt timeline animation with burndown velocity curves, critical dependency highlights, and delivered feature cards for [Sprint or Program Name] covering [Dates, Velocity Stats & Key Deliverables].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_kinetic',
+    label: '⚡ Kinetic Typography',
+    labelKey: 'starters_cat_motion_kinetic',
+    group: 'business_creative',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Kinetic Typography Manifesto',
+        icon: '⚡',
+        badge: 'Kinetic Speech',
+        badgeKey: 'starters_badge_motion_kinetic',
+        engineTag: 'Kinetic · 60fps',
+        keywords: ['kinetic', 'typography', 'speech', 'manifesto', 'keynote', 'quotes', 'text'],
+        description:
+          'High-impact rhythmic word staggers, spatial camera punch-ins, beat markers, and font-style switcher',
+        prompt:
+          'Create a dynamic kinetic typography motion graphic with staggered word choreography, bold camera push-throughs, visual beat markers, and a Typography Theme Switcher (Editorial Serif / Brutalist Mono / Broadcast Sans) for [Core Message / Keynote Quote] in [Mood & Color Palette].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Cross-Team Project Roadmap & Milestones',
-        icon: '📅',
-        badge: 'Gantt Motion',
-        badgeKey: 'starters_badge_motion_gantt',
+        title: 'Distributed Systems & API Flow',
+        icon: '🧩',
+        badge: 'Tech Explainer',
+        badgeKey: 'starters_badge_motion_tech',
+        engineTag: 'Arch · Spatial',
+        keywords: [
+          'architecture',
+          'api',
+          'microservices',
+          'events',
+          'pipeline',
+          'kafka',
+          'explainer',
+        ],
         description:
-          '3D Gantt timeline track showing critical path milestones, launch gates, and deliverable deadlines',
+          'Interactive 3D particle simulation tracing API gateways, async queues, caches, and failover flows',
         prompt:
-          'Create a cinema-grade project milestone timeline with horizontal camera glide and milestone beacons for: [Initiative name, phase dates Q1-Q4, and team deliverables]',
+          'Build an interactive 3D spatial explainer illustrating request routing, microservice handshakes, queue backpressure, and Healthy vs Latency-Spike toggles for [System Architecture / Pipeline Topic] covering [Key Services].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Book & Mental-Model Summary',
+        icon: '📚',
+        badge: 'Book Digest',
+        badgeKey: 'starters_badge_motion_book',
+        engineTag: 'Story · Morph',
+        keywords: ['book', 'summary', 'framework', 'essay', 'mental models', 'venn', 'explainer'],
+        description:
+          'Chapter-by-chapter animated digest morphing mental models smoothly between Venn, matrix, and quote cards',
+        prompt:
+          'Transform a non-fiction book, whitepaper, or strategy thesis into a chapter-by-chapter kinetic visual summary where SVG frameworks morph cleanly between mental models and pull-quotes for [Book Title / Paper / Framework] emphasizing [3 Core Takeaways].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_product',
+    label: '✨ Product & SaaS Launch',
+    labelKey: 'starters_cat_motion_product',
+    group: 'business_creative',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Dark-Mode SaaS Hero Launch',
+        icon: '💎',
+        badge: 'SaaS Launch',
+        badgeKey: 'starters_badge_motion_saas',
+        engineTag: 'UI · Teaser',
+        keywords: ['saas', 'launch', 'product', 'hero', 'glassmorphism', 'feature', 'landing'],
+        description:
+          'Floating glass UI cards, laser border beams, interactive feature-tab switcher, and capability spotlights',
+        prompt:
+          'Produce a 60fps dark-mode SaaS product launch teaser featuring glassmorphism, floating UI mockups, glowing beam highlights, and interactive feature tabs for [Product / Feature Name] showcasing [Top 3 Capabilities].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Live Animated Analytics Dashboard',
+        icon: '📈',
+        badge: 'KPI Analytics',
+        badgeKey: 'starters_badge_motion_kpi',
+        engineTag: 'Dashboard · SVG',
+        keywords: [
+          'analytics',
+          'dashboard',
+          'charts',
+          'telemetry',
+          'revenue',
+          'ecommerce',
+          'metrics',
+        ],
+        description:
+          'Counting tickers, cubic-bezier SVG area sweeps, donut breakdowns, and 7D/30D/YTD time-range filters',
+        prompt:
+          'Construct an animated real-time analytics dashboard with rolling tickers, glowing SVG area graphs, donut chart sweeps, and interactive Time-Range filters (7D / 30D / YTD) for [Dashboard Domain: e.g. E-commerce Growth, Cloud FinOps, or Payment Gateway Volume].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: '3D Mobile App UX Showcase',
+        icon: '📱',
+        badge: 'Mobile UX',
+        badgeKey: 'starters_badge_motion_mobile',
+        engineTag: '3D · Mobile',
+        keywords: ['mobile', 'app', 'iphone', 'android', 'ux', 'prototype', 'swipe', 'mockup'],
+        description:
+          'Angled 3D phone stage with choreographed gesture swipes, tap ripples, and Light/Dark UI theme preview',
+        prompt:
+          'Create an animated 3D mobile mockup showcase highlighting smooth screen transitions, tap ripple indicators, floating feature badges, and Light/Dark UI preview toggle for [App Name & Target Users] walking through [Core 3-Screen Flow].',
         mcpServers: ['satchida-motion'],
       },
     ],
@@ -755,121 +1492,211 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'motion_creative',
     label: '🎨 Art, Cartoon & Sketch',
     labelKey: 'starters_cat_motion_creative',
+    group: 'business_creative',
     modes: ['Motion'],
     starters: [
       {
-        title: 'Pencil Sketch to Ink Line-Art Reveal',
+        title: '2D Rigged Character Walk-Cycle',
+        icon: '🎭',
+        badge: 'Character Rig',
+        badgeKey: 'starters_badge_motion_char_rig',
+        engineTag: '2D Rig · SVG',
+        keywords: [
+          'character',
+          'rig',
+          'walk cycle',
+          'cartoon',
+          'animation',
+          'expressions',
+          'onion skin',
+        ],
+        description:
+          'Articulated SVG character rig with Gait speed slider (Idle/Walk/Run), Emotion switcher, and Onion-Skinning',
+        prompt:
+          'Design an articulated multi-limb SVG character rig featuring squash-and-stretch physics, interactive Gait Speed slider (Idle / Walk / Run), Expression switcher buttons (Joy / Curious / Shock), and toggleable Onion-Skinning motion trails for [Character Concept: e.g. Explorer Astronaut, Friendly Bot Mascot, or Comic Hero] set against [Backdrop Style].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Pencil Sketch to Ink Line Reveal',
         icon: '✏️',
         badge: 'Sketch Draw',
         badgeKey: 'starters_badge_motion_sketch',
+        engineTag: 'Stroke · SVG',
+        keywords: ['sketch', 'drawing', 'pencil', 'ink', 'line art', 'illustration', 'artist'],
         description:
-          'Simulated pencil stroke-by-stroke drafting that progressively resolves into a detailed line art illustration',
+          'Hand-drafted construction guidelines progressively resolving via stroke-dasharray into inked & tinted illustration',
         prompt:
-          'Animate a realistic SVG stroke-dasharray drawing effect simulating an artist sketching by hand for: [Art subject: e.g. Architectural monument, Botanical flower, or Mechanical watch movement]',
+          'Animate a realistic artist drafting progression using staggered SVG stroke-dasharray underdrawing lines resolving into crisp ink cross-hatching and watercolor wash fills with Speed & Step-Replay scrubber for [Art Subject: e.g. Heritage Arch Monument, Botanical Lotus, or Vintage Watch Movement].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Cartoon Storyboard & Comic Panel Sequence',
+        title: 'Cartoon Storyboard & Comic',
         icon: '🎨',
         badge: 'Cartoon Story',
         badgeKey: 'starters_badge_motion_cartoon',
+        engineTag: 'Comic · Panels',
+        keywords: ['comic', 'manga', 'storyboard', 'cartoon', 'speech bubbles', 'storytelling'],
         description:
-          'Dynamic manga/comic panel transitions with speech bubble pop-ins and stylized camera shakes',
+          'Multi-panel manga/comic transitions with halftone shading, bouncing dialogue bubbles, and panel stepper',
         prompt:
-          'Build an animated comic-book/cartoon sequence with panel punch-ins, kinetic dialogue bubbles, and action lines for: [Story premise: e.g. Hero discovering a magic lantern, Cat astronaut on Mars, or Detective puzzle]',
+          'Build an animated comic-book/cartoon storyboard sequence with camera panel punch-ins, kinetic speech bubbles, halftone shading, action bursts, and Next/Previous Panel buttons for [Story Premise: e.g. Cat Astronaut on Mars, Time-Traveling Inventor, or Classroom Mystery].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Generative Sacred Geometry & Kaleidoscope',
+        title: 'Sacred Geometry & Perspective',
         icon: '🌀',
         badge: 'Generative Art',
         badgeKey: 'starters_badge_motion_generative',
+        engineTag: 'Parametric',
+        keywords: [
+          'geometry',
+          'mandala',
+          'perspective',
+          'fibonacci',
+          'kaleidoscope',
+          'vanishing point',
+        ],
         description:
-          'Hypnotic rotating mandalas, golden ratio spirals, and blooming parametric SVG shapes',
+          'Parametric mandalas or interactive 1-Point/2-Point vanishing perspective guide with symmetry & palette sliders',
         prompt:
-          'Craft an ambient, generative kinetic art piece with pulsing color palettes and kaleidoscopic rotation for: [Art style: e.g. Cyberpunk neon geometric, Golden spiral Fibonacci bloom, or Minimalist Bauhaus forms]',
+          'Craft an interactive generative art or architectural drawing studio featuring kaleidoscopic symmetry OR 1-Point/2-Point Perspective vanishing-point guides with Symmetry Fold & Color Palette sliders for [Art Mode: e.g. Golden-Ratio Fibonacci Bloom, Sacred Mandala, or 2-Point Street Perspective Tutor].',
         mcpServers: ['satchida-motion'],
       },
     ],
   },
   {
-    id: 'motion_home',
-    label: '🏡 Home, Interior & Living',
-    labelKey: 'starters_cat_motion_home',
+    id: 'motion_media',
+    label: '🎬 Teasers & Video Render',
+    labelKey: 'starters_cat_motion_media',
+    group: 'business_creative',
     modes: ['Motion'],
     starters: [
       {
-        title: 'Festive Home Décor & Lighting Showcase',
+        title: 'Brand Intro & 3D Logo Stinger',
         icon: '✨',
-        badge: 'Décor Styling',
-        badgeKey: 'starters_badge_motion_decor',
+        badge: 'Brand Stinger',
+        badgeKey: 'starters_badge_motion_stinger',
+        engineTag: '5s Stinger',
+        keywords: ['intro', 'logo', 'stinger', 'brand', 'youtube', 'opener', 'reveal'],
         description:
-          'Layer-by-layer room visualizer showing floral arrangements, warm ambient lighting, and table setups',
+          'High-octane 5s 3D logo stinger with neon light trails, glass prism text, and deterministic MP4 timing',
         prompt:
-          'Design an animated room makeover walkthrough showing layered festive decoration and lighting setups for: [Occasion/Room: e.g. Diwali living room makeover, Christmas dinner table, or Cozy balcony garden]',
+          'Generate a sleek 5-second branded video intro stinger with neon particle sweep, 3D camera tilt, chromatic logo lockup, and clean MP4-ready window.__TIMELINE__ pacing for [Channel / Brand Name] featuring [Slogan & Accent Color].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Weekly Family Meal & Nutrition Planner',
-        icon: '🍱',
-        badge: 'Meal Rhythm',
-        badgeKey: 'starters_badge_motion_meal',
+        title: 'Vertical 9:16 Kinetic Social Reel',
+        icon: '📲',
+        badge: 'Social Reel',
+        badgeKey: 'starters_badge_motion_social',
+        engineTag: '9:16 · Reel',
+        keywords: ['shorts', 'reels', 'vertical', '9:16', 'instagram', 'youtube shorts', 'social'],
         description:
-          'Interactive Monday-to-Sunday rotating calendar with ingredient prep lists and smart leftover re-use',
+          'Mobile-first vertical 1080×1920 format with instant 1.5s hook typography, animated stat bar, and CTA',
         prompt:
-          'Create an animated weekly meal prep planner with rotating recipe cards and grocery checklist sweeps for: [Dietary preferences: e.g. Balanced Indian vegetarian, High-protein family meals, or Quick school tiffins]',
+          'Design an attention-grabbing 9:16 vertical motion graphic (1080x1920 composition) with instant hook typography, animated chart callout, readable timed captions, and bold CTA for [Topic / Hero Stat] aimed at [Target Audience].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Wardrobe & Kitchen Decluttering Blueprint',
-        icon: '🏡',
-        badge: 'Home Organize',
-        badgeKey: 'starters_badge_motion_organize',
+        title: 'Playwright 60fps MP4 Video Exporter',
+        icon: '🎥',
+        badge: 'MP4 Exporter',
+        badgeKey: 'starters_badge_motion_mp4',
+        engineTag: 'FFmpeg · MP4',
+        keywords: ['mp4', 'export', 'video', 'render', 'ffmpeg', '60fps', 'playwright'],
         description:
-          'Before-and-after spatial drawer/shelf animations demonstrating modular container systems',
+          'Validate deterministic timeline + window.__SEEK_FRAME__ hooks and render H.264 60fps MP4 file',
         prompt:
-          'Animate a satisfying step-by-step room organization guide with before/after shelf transitions for: [Area: e.g. Modular kitchen spice rack, Master wardrobe capsule, or Kids study corner]',
+          'Validate timeline determinism using validate_motion_html (fixing any unlinked animation loops via window.__SEEK_FRAME__ if needed) and call render_motion_to_video to export a crisp H.264 MP4 file for [Paste HTML code or describe scene, resolution 1280x720 or 1080x1920, duration & fps].',
         mcpServers: ['satchida-motion'],
       },
     ],
   },
   {
     id: 'motion_medical',
-    label: '🫀 Medical & Anatomy',
+    label: '🫀 Medical & Clinical',
     labelKey: 'starters_cat_motion_medical',
+    group: 'care_living',
     modes: ['Motion'],
     starters: [
       {
-        title: 'Disease Progression & Anatomical Impact',
+        title: 'Disease & Anatomical Progression',
         icon: '🫀',
         badge: 'Clinical Pathology',
         badgeKey: 'starters_badge_motion_pathology',
+        engineTag: 'Bio · 3D',
+        featured: true,
+        keywords: [
+          'medical',
+          'doctor',
+          'disease',
+          'anatomy',
+          'pathology',
+          'diabetes',
+          'heart',
+          'asthma',
+        ],
         description:
-          'Cross-section anatomical view showing cellular infiltration, plaque accumulation, or inflammation over time',
+          'Anatomical cross-section comparing Healthy vs Progressive stages with interactive Stage Scrubber',
         prompt:
-          'Simulate an anatomical cross-section animation demonstrating how a condition affects organ tissue over time for: [Medical condition: e.g. Atherosclerosis plaque buildup, Type-2 Diabetes insulin resistance, or Asthma airway restriction]',
+          'Simulate a clinical-grade anatomical cross-section with a Stage Progression scrubber (Healthy -> Early -> Moderate -> Severe) comparing normal vs affected organ perfusion/structure, plus an objective "Educational visualization — not medical advice" footer for [Medical Condition: e.g. Coronary Atherosclerosis, Type-2 Diabetes Insulin Resistance, or Asthmatic Airway Constriction].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Drug Mechanism of Action (MoA) Journey',
+        title: 'ECG, Lab Panel & Spirometry',
+        icon: '🩺',
+        badge: 'Lab & Vitals',
+        badgeKey: 'starters_badge_motion_ecg',
+        engineTag: 'ECG · Wave',
+        keywords: [
+          'ecg',
+          'ekg',
+          'spirometry',
+          'hba1c',
+          'vitals',
+          'labs',
+          'patient education',
+          'doctor',
+        ],
+        description:
+          'Side-by-side Normal vs Altered ECG/Spirometry/HbA1c waveform explorer with callout pins & BPM slider',
+        prompt:
+          'Build a patient-friendly diagnostic waveform explorer comparing Normal vs Altered traces side-by-side with clear anatomical callout pins, Heart-Rate/Severity slider, and educational disclaimer footer for [Diagnostic Visual: e.g. 12-Lead ECG P-QRS-T vs Atrial Fibrillation, Spirometry Healthy vs COPD Flow Loop, or HbA1c 90-Day Glucose Curve].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Drug Mechanism of Action (MoA)',
         icon: '💊',
         badge: 'Drug MoA',
         badgeKey: 'starters_badge_motion_moa',
+        engineTag: 'Molecular',
+        keywords: ['pharma', 'drug', 'moa', 'receptor', 'enzyme', 'glp1', 'clinical', 'doctor'],
         description:
-          'Receptor-binding 3D camera flight showing therapeutic drug molecules interacting with target enzymes',
+          'Molecular 3D receptor-docking flight illustrating target enzyme binding and downstream therapeutic effect',
         prompt:
-          'Build a cinema-grade 3D pharmacological animation showing drug molecules binding to target cell receptors for: [Drug class / Molecule name: e.g. ACE inhibitors, GLP-1 agonists, or Monoclonal antibodies]',
+          'Build a 3D pharmacological mechanism-of-action animation showing therapeutic molecules docking with target cell receptors, modulating signaling pathways, and step-by-step Pause/Next captions (educational only) for [Drug Class / Molecule: e.g. GLP-1 Receptor Agonists, ACE Inhibitors, or SGLT2 Renal Transport Blockers].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Surgical Procedure & Patient Visual Guide',
+        title: 'Surgical, Inhaler & CPR Trainer',
         icon: '🏥',
-        badge: 'Surgical Guide',
+        badge: 'Clinical Skills',
         badgeKey: 'starters_badge_motion_surgical',
+        engineTag: 'Trainer · Step',
+        keywords: [
+          'surgery',
+          'stent',
+          'inhaler',
+          'cpr',
+          'epipen',
+          'patient',
+          'procedure',
+          'first aid',
+        ],
         description:
-          'Calm, objective vector explanation of operative steps, stent placement, or arthroscopic repair',
+          'Step-by-step reassuring clinical procedure guide or timed Inhaler/CPR/Auto-Injector practice trainer',
         prompt:
-          'Design a reassuring, clinical-grade animated procedural explainer breaking down operative phases for: [Procedure: e.g. Cardiac stent angioplasty, Knee arthroscopy, or Cataract lens replacement]',
+          'Design a calm, clinical-grade procedural explainer or patient technique trainer (including timed countdown rings or 110 BPM compression metronome visual where applicable) with numbered Phase Tabs and safety footer for [Procedure or Skill: e.g. Metered-Dose Inhaler with Spacer Technique, Coronary Stent Angioplasty, Auto-Injector Epinephrine, or Hands-Only CPR].',
         mcpServers: ['satchida-motion'],
       },
     ],
@@ -878,39 +1705,234 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'motion_wellness',
     label: '🥗 Fitness, Yoga & Diet',
     labelKey: 'starters_cat_motion_wellness',
+    group: 'care_living',
     modes: ['Motion'],
     starters: [
       {
-        title: 'Biomechanical Exercise Form & Angle Guide',
+        title: 'Exercise Form & Joint Angle Lab',
         icon: '🏋️',
         badge: 'Exercise Form',
         badgeKey: 'starters_badge_motion_form',
+        engineTag: 'Form · Lab',
+        keywords: ['fitness', 'exercise', 'squat', 'deadlift', 'workout', 'form', 'posture', 'gym'],
         description:
-          'Vector skeleton overlay showing prime mover muscle activation and joint safety angles',
+          'Skeleton vector overlay showing prime-mover glow, safe joint angles, Ideal vs Common Mistake toggle & tempo slider',
         prompt:
-          'Construct an animated exercise form tutorial with skeleton vector overlays and muscle highlight pulses for: [Exercise: e.g. Barbell back squat, Kettlebell swing, or Deadlift spine alignment]',
+          'Construct an interactive exercise biomechanics lab with an articulated skeleton overlay highlighting active prime-mover muscles, live knee/hip/spine joint-angle protractors, Common Mistake vs Ideal Form toggle, and Rep Tempo slider for [Exercise: e.g. Bodyweight / Barbell Squat, Romanian Deadlift Hinge, Scapular Push-Up, or Kettlebell Swing].',
         mcpServers: ['satchida-motion'],
       },
       {
-        title: 'Yoga Asana Flow & Breath Guide',
+        title: 'Yoga Asana Flow & Breath Pacer',
         icon: '🧘',
         badge: 'Yoga Alignment',
         badgeKey: 'starters_badge_motion_yoga',
+        engineTag: 'Breath · Flow',
+        keywords: [
+          'yoga',
+          'pranayama',
+          'breathing',
+          'asana',
+          'surya namaskar',
+          'flexibility',
+          'meditation',
+        ],
         description:
-          'Soothing visual breath pacer (Inhale 4s, Hold 4s, Exhale 6s) with transition posture cues',
+          'Expanding breath-pacer geometry (Inhale/Hold/Exhale) paired with calm spine alignment & safety contraindications',
         prompt:
-          'Create an animated restorative yoga flow with an expanding breath pacer circle and alignment cues for: [Sequence / Goal: e.g. Surya Namaskar 12 steps, Evening spine decompression, or Box breathing pranayama]',
-        mcpServers: ['satchida-motion'],
+          'Verify classical alignment & safety notes with yoga_asana_and_pranayama_guide, then create a soothing yoga & pranayama pacer with an expanding geometric breath ring (Inhale / Hold / Exhale counters), alignment vectors, and gentle contraindication flags for [Sequence / Goal: e.g. Surya Namaskar 12-Step Flow, Evening Spine Decompression, or Nadi Shodhana / 4-7-8 Breathwork].',
+        mcpServers: ['satchida-motion', 'satchida-health-wellness'],
       },
       {
-        title: 'Metabolic Calorie & Macro Plate Visualizer',
+        title: 'Metabolic Calorie & Macro Plate',
         icon: '🥗',
         badge: 'Nutrition Lab',
         badgeKey: 'starters_badge_motion_nutrition',
+        engineTag: 'Macros · Calc',
+        keywords: [
+          'diet',
+          'nutrition',
+          'calories',
+          'macros',
+          'protein',
+          'weight loss',
+          'tdee',
+          'meal',
+        ],
         description:
-          'Interactive rotating dinner plate decomposing carbs, proteins, fats, and fiber with metabolic impact',
+          'TDEE-backed interactive meal plate decomposing carbs, protein, fiber, and fats with live macro sliders',
         prompt:
-          'Animate an interactive healthy meal plate decomposition showing macro percentages and satiety scores for: [Target: e.g. 1800 kcal fat-loss deficit, Vegan athlete muscle gain, or PCOS hormone balance plate]',
+          'Compute personalized TDEE and macro splits first using metabolic_nutrition_planner, then animate an interactive rotating meal plate where adjusting protein, complex carbs, fiber, and healthy fat portions updates real-time satiety & calorie bars for [Target Profile: e.g. 1800 kcal Fat-Loss Indian Veg Plate, 2500 kcal Muscle Recomposition, or High-Fiber PCOS Balance].',
+        mcpServers: ['satchida-motion', 'satchida-health-wellness'],
+      },
+      {
+        title: 'Desk Rehab & Meal Glycemic Curve',
+        icon: '🩺',
+        badge: 'Rehab & Glucose',
+        badgeKey: 'starters_badge_motion_rehab',
+        engineTag: 'Curve · Sim',
+        keywords: [
+          'glucose',
+          'glycemic',
+          'diabetes',
+          'rehab',
+          'neck pain',
+          'back pain',
+          'desk',
+          'posture',
+        ],
+        description:
+          '180-minute blood-glucose meal comparison curve OR cervical/lumbar desk mobility stretch routine timer',
+        prompt:
+          'Ground nutritional numbers via glycemic_and_calorie_lookup when diet applies, then build a clean comparison simulator showing EITHER a 180-minute Blood Glucose curve ([Meal A vs Meal B]) OR a Cervical/Lumbar Desk Posture Rehab sequence with muscle-release timers for [Focus: e.g. White Rice vs Millets + Dal Glucose Curve or 5-Minute Neck & Hip Flexor Desk Stretch].',
+        mcpServers: ['satchida-motion', 'satchida-health-wellness'],
+      },
+    ],
+  },
+  {
+    id: 'motion_home',
+    label: '🏡 Home, Interior & Living',
+    labelKey: 'starters_cat_motion_home',
+    group: 'care_living',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Room Layout & Festive Makeover',
+        icon: '✨',
+        badge: 'Décor & Room',
+        badgeKey: 'starters_badge_motion_decor',
+        engineTag: 'Room · 2D/3D',
+        featured: true,
+        keywords: [
+          'home',
+          'interior',
+          'decor',
+          'room',
+          'diwali',
+          'furniture',
+          'homemaker',
+          'lighting',
+        ],
+        description:
+          'Day-to-Festive Evening room styler with interactive wall/cushion color swatches and furniture clearance layout',
+        prompt:
+          'Design an interactive home interior layout & festive styling studio where users toggle Day vs Warm Evening lighting, swap wall/curtain color swatches, and preview sofa/table placements with walking-clearance dimensions for [Room & Occasion: e.g. 16x12ft Living Room Diwali Makeover, Cozy Study & Guest Room, or Balcony Tea Corner] in [Preferred Palette & Furniture List].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Weekly Family Meal & Pantry Plan',
+        icon: '🍱',
+        badge: 'Meal Rhythm',
+        badgeKey: 'starters_badge_motion_meal',
+        engineTag: 'Planner · SVG',
+        keywords: ['meal plan', 'grocery', 'kitchen', 'tiffin', 'family', 'homemaker', 'recipes'],
+        description:
+          'Mon–Sun rotating meal matrix with smart leftover reuse, prep-batch timers, and clickable pantry checklist',
+        prompt:
+          'Create an animated Monday-to-Sunday family kitchen meal & grocery planner with rotating dish cards, Sunday Prep Batch timelines, and an interactive clickable pantry/veggie checklist for [Dietary Style & Family Size: e.g. 4-Person Indian Vegetarian Weeknight Plan, Kids Nutritious School Tiffins, or Diabetic-Friendly Household Menu].',
+        mcpServers: ['satchida-motion', 'satchida-health-wellness'],
+      },
+      {
+        title: 'Wardrobe & Kitchen Decluttering',
+        icon: '🏡',
+        badge: 'Home Organize',
+        badgeKey: 'starters_badge_motion_organize',
+        engineTag: 'Zones · Grid',
+        keywords: ['wardrobe', 'declutter', 'pantry', 'kitchen', 'organize', 'storage', 'shelf'],
+        description:
+          'Before/After spatial drawer & shelf transformation slider zoning Daily Reach, Weekly, and Seasonal bins',
+        prompt:
+          'Animate a satisfying Before-vs-After spatial storage organization blueprint dividing shelves and drawers into Daily Reach, Weekly, and Seasonal zones with modular bin footprints for [Space: e.g. Modular Kitchen Spice & Pantry Drawers, Capsule Master Wardrobe, or Compact Craft Corner].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Balcony Garden & Home Budget',
+        icon: '🪴',
+        badge: 'Home Garden',
+        badgeKey: 'starters_badge_motion_garden',
+        engineTag: 'Seasonal · Sim',
+        keywords: ['garden', 'balcony', 'plants', 'herbs', 'budget', 'household', 'homemaker'],
+        description:
+          'Sun-exposure companion-planting balcony grid by season OR visual Monthly Household Envelope Budget flow',
+        prompt:
+          'Build an animated seasonal planner showing sun-angle exposure, companion-plant pot spacing grids (mint, tomato, basil, marigold), and a Season Switcher (Summer / Monsoon / Winter) OR a Monthly Household Envelope Budget flow for [Space or Goal: e.g. West-Facing 8x4ft Herb Balcony Garden or Family Monthly Groceries, Gold & School Savings Flow].',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_elderly',
+    label: '👵 Golden Years & Living',
+    labelKey: 'starters_cat_motion_elderly',
+    group: 'care_living',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Large-Print Medicine & Water',
+        icon: '💊',
+        badge: 'Senior Routine',
+        badgeKey: 'starters_badge_motion_elderly',
+        engineTag: 'AAA · Large',
+        keywords: ['senior', 'elderly', 'medicine', 'pills', 'hydration', 'routine', 'accessible'],
+        description:
+          'Soothing >= 20px WCAG AAA high-contrast Morning-to-Night pillbox guide with calm 0.65x pacing & giant buttons',
+        prompt:
+          'Build a gentle, ultra-clear Daily Medicine & Wellness Schedule strictly enforcing large >= 20px body typography, high WCAG AAA contrast (dark navy on warm cream or crisp white on deep slate), slow 0.65x speed, Morning/Afternoon/Night pillbox visuals, water check buttons, and giant Play/Pause controls for [Medication & Routine: e.g. Morning BP & Sugar Tablets Before Breakfast, Evening Walk & Calcium].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Smartphone & UPI Safety Tutor',
+        icon: '📱',
+        badge: 'Phone & UPI Tutor',
+        badgeKey: 'starters_badge_motion_pension',
+        engineTag: 'AAA · Practice',
+        keywords: [
+          'upi',
+          'senior',
+          'smartphone',
+          'pension',
+          'jeevan pramaan',
+          'bill',
+          'whatsapp',
+          'tutorial',
+        ],
+        description:
+          'Magnified interactive phone mockup with numbered glowing tap circles, >= 20px text & Next/Repeat buttons',
+        prompt:
+          'Create a reassuring, magnified smartphone practice simulator strictly using >= 20px jargon-free captions, numbered glowing tap rings, slow 0.6x pacing, and giant Next Step / Repeat buttons illustrating safely step by step how to complete [Digital Task: e.g. Scanning a Shopkeeper UPI QR Code, Jeevan Pramaan Life Certificate, or Family Video Call].',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Chair Physio & Joint Mobility',
+        icon: '🪑',
+        badge: 'Senior Mobility',
+        badgeKey: 'starters_badge_motion_mobility',
+        engineTag: 'AAA · 0.6x Calm',
+        keywords: [
+          'senior',
+          'physiotherapy',
+          'chair yoga',
+          'arthritis',
+          'knee',
+          'balance',
+          'elderly',
+        ],
+        description:
+          'Calm seated mobility guide with >= 20px instructions, 0.6x slow repetition counter, and Anytime Rest button',
+        prompt:
+          'Build a calm, seated senior physiotherapy & joint-mobility guide strictly enforcing >= 20px captions, soft WCAG AAA contrast, slow 0.6x repetition pacing, ankle/knee/shoulder range highlights, and an anytime Rest/Pause button for [Mobility Focus: e.g. Morning Knee & Ankle Chair Warmup, Gentle Neck & Shoulder Relief, or Deep Calm Breathing].',
+        mcpServers: ['satchida-motion', 'satchida-health-wellness'],
+      },
+      {
+        title: 'Elder Fraud & OTP Scam Shield',
+        icon: '🛡️',
+        badge: 'Safety Alert',
+        badgeKey: 'starters_badge_motion_fraud',
+        engineTag: 'AAA · Safety',
+        keywords: ['scam', 'fraud', 'otp', 'senior', 'safety', 'cyber', 'digital arrest', 'bank'],
+        description:
+          'High-contrast >= 20px Red-Flag Trap vs Safe Golden Rule cards guarding elders against OTP & impersonation scams',
+        prompt:
+          'Create an unmistakable, calm high-contrast Scam Shield guide enforcing >= 20px typography and WCAG AAA >= 7:1 contrast comparing Dangerous Caller Traps side-by-side against Safe Golden Rules ("Never share OTP, PIN, or install screen-sharing apps") with numbered hang-up checklist steps for [Scam Scenario: e.g. Fake Bank KYC / Electricity Disconnection SMS, Fake Digital Arrest Video Call, or Parcel OTP Trap].',
         mcpServers: ['satchida-motion'],
       },
     ],

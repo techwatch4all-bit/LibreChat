@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from 'test/layout-test-utils';
+import { ALL_CATEGORIES, MOTION_GROUPS } from '~/common/starters';
 import ConversationStarters from '../ConversationStarters';
-import { ALL_CATEGORIES } from '~/common/starters';
 
 const mockSubmitMessage = jest.fn();
 const mockSetBadgeMCP = jest.fn();
@@ -49,11 +49,18 @@ const vedicCat = ALL_CATEGORIES.find((c) => c.id === 'vedic_wellness')!;
 const governanceCat = ALL_CATEGORIES.find((c) => c.id === 'governance_law')!;
 const privacyCat = ALL_CATEGORIES.find((c) => c.id === 'privacy_vault')!;
 const familyCat = ALL_CATEGORIES.find((c) => c.id === 'family_health')!;
-const motionExecCat = ALL_CATEGORIES.find((c) => c.id === 'motion_executive')!;
-const motionKineticCat = ALL_CATEGORIES.find((c) => c.id === 'motion_kinetic')!;
+
+const motionArchCat = ALL_CATEGORIES.find((c) => c.id === 'motion_architecture')!;
+const motionDronesCat = ALL_CATEGORIES.find((c) => c.id === 'motion_drones')!;
+const motionRoboticsCat = ALL_CATEGORIES.find((c) => c.id === 'motion_robotics')!;
+const motionHowCat = ALL_CATEGORIES.find((c) => c.id === 'motion_how_it_works')!;
 const motionEducationCat = ALL_CATEGORIES.find((c) => c.id === 'motion_education')!;
+const motionExecCat = ALL_CATEGORIES.find((c) => c.id === 'motion_executive')!;
 const motionMedicalCat = ALL_CATEGORIES.find((c) => c.id === 'motion_medical')!;
+const motionHomeCat = ALL_CATEGORIES.find((c) => c.id === 'motion_home')!;
 const motionElderlyCat = ALL_CATEGORIES.find((c) => c.id === 'motion_elderly')!;
+
+const motionCategories = ALL_CATEGORIES.filter((c) => c.modes?.includes('Motion'));
 
 const setMode = (spec: string) => {
   mockConversation = { spec, conversationId: 'convo-starters-test', endpoint: 'custom' };
@@ -89,27 +96,102 @@ describe('ConversationStarters', () => {
     expect(screen.queryByText(privacyCat.label)).not.toBeInTheDocument();
   });
 
-  it('filters category tabs to Motion mode categories and displays rich motion starters', () => {
+  it('renders 5 Motion Discipline Groups and exact 8 Spotlight cards on default landing', () => {
     setMode('Motion');
     render(<ConversationStarters />);
-    expect(screen.getByText(motionExecCat.label)).toBeInTheDocument();
-    expect(screen.getByText(motionKineticCat.label)).toBeInTheDocument();
-    expect(screen.getByText(motionEducationCat.label)).toBeInTheDocument();
-    expect(screen.getByText(motionMedicalCat.label)).toBeInTheDocument();
-    expect(screen.getByText(motionElderlyCat.label)).toBeInTheDocument();
+
+    for (const group of MOTION_GROUPS) {
+      expect(screen.getByText(group.label)).toBeInTheDocument();
+    }
     expect(screen.queryByText(marketCat.label)).not.toBeInTheDocument();
     expect(screen.queryByText(privacyCat.label)).not.toBeInTheDocument();
+
+    const featured = motionCategories.flatMap((c) => c.starters.filter((s) => s.featured));
+    expect(featured).toHaveLength(8);
+    for (const item of featured) {
+      expect(screen.getByLabelText(item.prompt)).toBeInTheDocument();
+    }
   });
 
-  it('always stages motion starters into textarea without submitting', () => {
+  it('switches Motion Discipline Groups and filters contextual sub-categories', () => {
     setMode('Motion');
     render(<ConversationStarters />);
-    const starter = motionExecCat.starters[0];
-    fireEvent.click(screen.getByLabelText(starter.prompt));
+
+    const roboticsGroup = MOTION_GROUPS.find((g) => g.id === 'robotics_how')!;
+    fireEvent.click(screen.getByText(roboticsGroup.label));
+
+    expect(screen.getByText(motionRoboticsCat.label)).toBeInTheDocument();
+    expect(screen.getByText(motionHowCat.label)).toBeInTheDocument();
+    expect(screen.queryByText(motionArchCat.label)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(motionHowCat.label));
+    for (const starter of motionHowCat.starters) {
+      expect(screen.getByLabelText(starter.prompt)).toBeInTheDocument();
+    }
+  });
+
+  it('filters Motion personas cleanly via inline search', () => {
+    setMode('Motion');
+    render(<ConversationStarters />);
+
+    fireEvent.click(screen.getByLabelText('com_ui_motion_search_button'));
+    const searchBox = screen.getByRole('searchbox');
+    expect(searchBox).toBeInTheDocument();
+    fireEvent.change(searchBox, { target: { value: 'chemistry orbital' } });
+
+    const chemStarter = motionEducationCat.starters.find((s) => s.title?.includes('Chemistry'))!;
+    expect(screen.getByLabelText(chemStarter.prompt)).toBeInTheDocument();
+    expect(screen.queryByLabelText(motionExecCat.starters[0].prompt)).not.toBeInTheDocument();
+
+    fireEvent.change(searchBox, { target: { value: 'zzzznonexistent999' } });
+    expect(screen.getByText('com_ui_motion_no_matches')).toBeInTheDocument();
+  });
+
+  it('always stages motion starters into textarea without submitting, shows hint, and binds MCPs', () => {
+    setMode('Motion');
+    render(<ConversationStarters />);
+
+    const archGroup = MOTION_GROUPS.find((g) => g.id === 'arch_engineering')!;
+    fireEvent.click(screen.getByText(archGroup.label));
+    fireEvent.click(screen.getByText(motionDronesCat.label));
+
+    const droneStarter = motionDronesCat.starters[0];
+    fireEvent.click(screen.getByLabelText(droneStarter.prompt));
+
     expect(mockSubmitMessage).not.toHaveBeenCalled();
-    expect(textarea.value).toBe(starter.prompt);
-    expect(textarea.selectionStart).toBe(starter.prompt.indexOf('['));
-    expect(textarea.selectionEnd).toBe(starter.prompt.indexOf(']') + 1);
+    expect(textarea.value).toBe(droneStarter.prompt);
+    expect(textarea.selectionStart).toBe(droneStarter.prompt.indexOf('['));
+    expect(textarea.selectionEnd).toBe(droneStarter.prompt.indexOf(']') + 1);
+    expect(mockSetBadgeMCP).toHaveBeenCalledWith(droneStarter.mcpServers);
+
+    const statusBanner = screen.getByRole('status');
+    expect(statusBanner).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('com_ui_motion_dismiss_hint'));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('ensures every Motion persona contains staging slots and none lead with [ at index 0', () => {
+    expect(motionCategories).toHaveLength(20);
+    const allMotionStarters = motionCategories.flatMap((c) => c.starters);
+    expect(allMotionStarters.length).toBeGreaterThanOrEqual(65);
+
+    for (const starter of allMotionStarters) {
+      const firstOpen = starter.prompt.indexOf('[');
+      const firstClose = starter.prompt.indexOf(']', firstOpen);
+      expect(firstOpen).toBeGreaterThan(0);
+      expect(firstClose).toBeGreaterThan(firstOpen);
+    }
+
+    // Also verify Spotlight domains span Arch, Drones, Robotics, How, STEM, Medical, Executive, Home
+    expect(motionArchCat.starters[0].featured).toBe(true);
+    expect(motionDronesCat.starters[0].featured).toBe(true);
+    expect(motionRoboticsCat.starters[0].featured).toBe(true);
+    expect(motionHowCat.starters[0].featured).toBe(true);
+    expect(motionEducationCat.starters[0].featured).toBe(true);
+    expect(motionMedicalCat.starters[0].featured).toBe(true);
+    expect(motionExecCat.starters[0].featured).toBe(true);
+    expect(motionHomeCat.starters[0].featured).toBe(true);
+    expect(motionElderlyCat.starters.length).toBeGreaterThanOrEqual(4);
   });
 
   it('stages template starters into the textarea without submitting', () => {

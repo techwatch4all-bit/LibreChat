@@ -588,3 +588,18 @@ LibreChat contains none of the following.
    (`assets/vendor/sandpack-static-preview/`). Upstream ships these from jsdelivr and
    codesandbox.io. Static-preview self-hosting is gated on a `*.satchida.com` DNS record +
    `SANDPACK_STATIC_BUNDLER_URL` (Changes.md 2026-11-10 "Self-hosted sandpack runtimes").
+
+## C29. Satchida Motion Studio Engine, Offline Three.js Vendor & 70-Persona Navigator (2026-11-12)
+
+Upstream LibreChat includes no motion-graphics studio mode, grouped persona navigator, or headless Playwright MP4/WebGL renderer.
+
+**Customization:**
+1. **Motion Studio Two-Tier Navigator & 70-Persona Catalog (`client/src/common/starters.ts`, `client/src/components/Chat/Input/ConversationStarters.tsx`, `client/src/locales/en/translation.json`)**:
+   - Exported `MOTION_GROUPS` (5 Discipline Groups: `arch_engineering`, `robotics_how`, `stem_tech`, `business_creative`, `care_living`) and 20 `motion_*` categories containing 70 multi-slot simulation, CAD/floorplan, drone/UAV, robotics, cutaway, STEM/cyber, art/cartoon, medical, fitness/nutrition, home/interior, and WCAG AAA senior personas.
+   - Added `hasGroupedNavigation` in `ConversationStarters.tsx` (1-row Discipline Groups + 8-card `4×2` `✨ Spotlight` grid + contextual sub-category filter pills + inline `role="searchbox"` search + dismissible `role="status"` staged coach banner) while keeping standard non-Motion modes unchanged.
+   - Enforced `activeMode === 'Motion'` always-stage behavior into `#prompt-textarea` with `Tab`/`Shift+Tab` parameter cycling and automatic MCP server selection (`satchida-motion` plus domain companion MCP servers).
+2. **Self-Hosted Three.js Vendor (`client/public/assets/vendor/three/`)**:
+   - Vendored offline `three@0.128.0` UMD (`three.min.js` + `OrbitControls.js`) for air-gapped 3D WebGL artifacts without relying on external CDNs.
+3. **Sovereign Motion MCP Renderer & Skill (`skill/satchida-motion-server.py`, `skill/satchida-motion/SKILL.md`, `.gitignore`'d `librechat.yaml`)**:
+   - Added `window.__SEEK_FRAME__` deterministic frame-seeking, SwiftShader WebGL Chromium flags (`--use-gl=angle --use-angle=swiftshader --enable-webgl --ignore-gpu-blocklist`) fixing headless `CONTEXT_LOST_WEBGL`, local `/assets/vendor/three/` & `/assets/vendor/gsap/` `file:///` URI rewriting, 4 interactive reference archetypes (`cad_blueprint`, `interactive_3d`, `mechanism_cutaway`, `accessible_guide`), and expanded `validate_motion_html()`.
+   - Updated the `Motion` model spec allowlist in `librechat.yaml` to bind 8 MCP servers (`satchida-motion`, `satchida-maker-engineering`, `satchida-stem-study`, `satchida-health-wellness`, `satchida-ai-engineer`, `satchida-work-suite`, `satchida-web-search`, `time-server`).

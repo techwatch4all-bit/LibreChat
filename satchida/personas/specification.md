@@ -1,6 +1,6 @@
 # Satchida Unified AI Personas & Conversation Starters Specification
 
-> **Document Purpose**: Complete architectural and prompt specification of the Satchida Enterprise Personas, their 11 operational clusters, exact prompt strings, input staging/parameter mechanics, MCP tool bindings, and precise code locations within the LibreChat codebase. Designed for technical review, prompt engineering audits, and model alignment benchmarks.
+> **Document Purpose**: Complete architectural and prompt specification of the Satchida Enterprise Personas, the 11 core operational clusters plus the 20-category / 70-persona **Motion Studio** simulation showcase, exact prompt contracts, input staging/`Tab`-cycling mechanics, MCP tool bindings, and precise code locations within the LibreChat codebase.
 
 ---
 
@@ -10,9 +10,10 @@ Any reviewing AI or engineer can locate all persona logic and configurations in 
 
 | Component / Layer | Absolute Path in Repository | Role / Responsibility |
 |---|---|---|
-| **Frontend UI Component** | [`client/src/components/Chat/Input/ConversationStarters.tsx`](file:///d:/LAN-AI-Infra/LibreChat/client/src/components/Chat/Input/ConversationStarters.tsx) | Renders category pill buttons, starter chips, triggers MCP server selection, and handles the smart composer staging logic. |
-| **System Model Specifications** | [`librechat.yaml`](file:///d:/LAN-AI-Infra/LibreChat/librechat.yaml#L422-L776) | Declares default mode specs (`Chat`, `Work`, `Study`, `Study-Local`, `Vibecoding`, `Pro`, `Privacy`), their temporal anchors, system prefixes, allowed `mcpServers`, and fallback starters. |
-| **Source Persona Repository** | `D:\LAN-AI-Infra\satchida-ai-unified-suite\src\lib\constants\personas.constants.ts` | The upstream 34-persona master library defining full system prompts, domain schemas, and output format constraints (financial tables, news wires, emergency triage). |
+| **Starter Data Catalog** | [`client/src/common/starters.ts`](file:///d:/LAN-AI-Infra/LibreChat/client/src/common/starters.ts) | Defines `ALL_CATEGORIES` (core modes + 20 Motion Studio categories / 70 personas) and `MOTION_GROUPS` (5 top-level Discipline Groups). |
+| **Frontend UI Component** | [`client/src/components/Chat/Input/ConversationStarters.tsx`](file:///d:/LAN-AI-Infra/LibreChat/client/src/components/Chat/Input/ConversationStarters.tsx) | Renders standard mode tabs OR the Two-Tier Studio Navigator (`✨ Spotlight`, 5 Discipline Groups, inline search, contextual sub-pills, `Tab` parameter cycling, `role="status"` coach bar) and pre-selects bound MCP servers. |
+| **System Model Specifications** | [`librechat.yaml`](file:///d:/LAN-AI-Infra/LibreChat/librechat.yaml#L422-L887) | Declares default mode specs (`Chat`, `Work`, `Study`, `Study-Local`, `Vibecoding`, `Pro`, `Privacy`, `Motion`), their temporal anchors, system prefixes, allowed `mcpServers`, and fallback starters. |
+| **Motion Rendering MCP** | [`skill/satchida-motion-server.py`](file:///d:/LAN-AI-Infra/LibreChat/skill/satchida-motion-server.py) | Stdio MCP exposing `render_motion_to_video` (SwiftShader headless WebGL + deterministic `window.__SEEK_FRAME__`), `validate_motion_html`, and `get_motion_template` (5 archetypes). |
 | **Composer Form Context** | [`client/src/components/Chat/Input/ChatForm.tsx`](file:///d:/LAN-AI-Infra/LibreChat/client/src/components/Chat/Input/ChatForm.tsx) | Hosts the `prompt-textarea` (`#prompt-textarea`), handles form values via React Hook Form, and receives the staged prompt text. |
 | **MCP Values Atom Store** | [`client/src/store/mcp.ts`](file:///d:/LAN-AI-Infra/LibreChat/client/src/store/mcp.ts) | Jotai atom family `mcpValuesAtomFamily(convoKey)` holding selected MCP server names sent with every generation request. |
 
@@ -43,31 +44,18 @@ To prevent premature execution before the user supplies context (such as pasting
 
 ### Staging Logic in `ConversationStarters.tsx`:
 ```typescript
-const isTemplate = /\[|\<|this message/i.test(text);
-
-if (isTemplate) {
-  const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
-  if (textarea) {
-    textarea.value = text;
-    methods.setValue('text', text, { shouldDirty: true, shouldValidate: true });
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    forceResize(textarea);
-    textarea.focus();
-
-    // Auto-select the first placeholder parameter
-    const openBracket = text.indexOf('[');
-    const closeBracket = text.indexOf(']', openBracket);
-    if (openBracket !== -1 && closeBracket !== -1) {
-      textarea.setSelectionRange(openBracket, closeBracket + 1);
-    }
-  }
-  return; // Halted: waits for user to customize & click send
-}
+const isTemplate =
+  activeMode === 'Motion' ||
+  /\[|<|this (message|code|query|plan|dataset|documents?|snippet|requirement|pdf|image)\b/i.test(
+    text,
+  );
 ```
+1. **Motion Studio Always-Stage Invariant**: When `activeMode === 'Motion'`, every card forces `isTemplate = true` so clicking a persona ALWAYS populates `#prompt-textarea`, binds required MCP servers, highlights the first `[...]` parameter slot (skipping leading bracket tags), enables `Tab`/`Shift+Tab` multi-slot cycling across parameters, and displays a dismissible `role="status"` coach bar without ever triggering premature inference.
+2. **Scoped Localization**: All Motion Studio UI copy (`com_ui_motion_*`, 20 `starters_cat_motion_*`, and badge keys) resides in `client/src/locales/en/translation.json` and is rendered via `useLocalize()`.
 
 ---
 
-## 3. Comprehensive Persona Catalog (11 Categories & 44 Starters)
+## 3. Core Chat/Work/Study/Privacy Personas (11 Categories & 44+ Starters)
 
 ### Category 1: 📊 Markets & Bullion (`markets_finance`)
 * **Visible Modes**: `Chat`, `Work`, `Pro`
@@ -225,7 +213,26 @@ if (isTemplate) {
 
 ---
 
-## 4. ModelSpec Starter Overrides in `librechat.yaml`
+## 4. Motion Studio Catalog (5 Discipline Groups, 20 Categories & 70 Personas)
+
+Activated exclusively when `conversation.spec === 'Motion'` (`hasGroupedNavigation === true`). The Two-Tier Studio Navigator renders a single-row Row 1 (`✨ Spotlight` 8-card `4×2` landing grid + 5 Discipline Groups + `🔍` inline search) and contextual Row 2 sub-category pills:
+
+| Discipline Group | Category IDs | Personas | Bound Companion MCPs (beyond `satchida-motion`) |
+|---|---|---|---|
+| **🏛️ Arch & Drones** (`arch_engineering`) | `motion_architecture` (4), `motion_drones` (3), `motion_civil_logistics` (3) | 10 | `satchida-maker-engineering`, `satchida-stem-study`, `satchida-work-suite` |
+| **🤖 Robotics & How** (`robotics_how`) | `motion_robotics` (3), `motion_how_it_works` (4), `motion_electronics` (3) | 10 | `satchida-maker-engineering`, `satchida-stem-study`, `satchida-ai-engineer` |
+| **🔬 STEM & Cyber** (`stem_tech`) | `motion_education` (5), `motion_networks` (3), `motion_earth_space` (3), `motion_history_kids` (3) | 14 | `satchida-stem-study` |
+| **💼 Business & Art** (`business_creative`) | `motion_executive` (3), `motion_productivity` (4), `motion_kinetic` (3), `motion_product` (3), `motion_creative` (4), `motion_media` (3) | 20 | `satchida-work-suite` |
+| **❤️ Health & Home** (`care_living`) | `motion_medical` (4), `motion_wellness` (4), `motion_home` (4), `motion_elderly` (4) | 16 | `satchida-health-wellness` |
+
+### Domain Safety & Accessibility Contracts
+1. **Senior Accessibility (`motion_elderly`, 4 personas)**: Prompts explicitly enforce `>= 20px` body typography, WCAG AAA contrast (`>= 7:1`), calm `0.6x–0.65x` animation pacing, large action controls (`Next Step` / `Repeat` / `Rest`), and scam protection patterns.
+2. **Clinical Education (`motion_medical`, 4 personas)**: Prompts mandate an objective educational visualization disclaimer (`"Educational visualization — not medical advice"`) without prescribing diagnoses or treatment changes.
+3. **Deterministic Rendering (`window.__SEEK_FRAME__`)**: Every Canvas/Three.js artifact registers both `window.__TIMELINE__` and `window.__SEEK_FRAME__(timeSeconds, progress)` using air-gapped `/assets/vendor/three/` and `/assets/vendor/gsap/` scripts, verified by `validate_motion_html` and headless SwiftShader WebGL capture in `render_motion_to_video`.
+
+---
+
+## 5. ModelSpec Starter Overrides in `librechat.yaml`
 
 When the user selects the default **`✨ Suggested`** tab in the UI, LibreChat resolves the starters specified in the active mode's `modelSpec.conversation_starters` array.
 
@@ -241,7 +248,7 @@ In [`librechat.yaml`](file:///d:/LAN-AI-Infra/LibreChat/librechat.yaml#L543-L557
 
 ---
 
-## 5. Review Guidelines for Evaluating Agents
+## 6. Review Guidelines for Evaluating Agents
 
 When another AI or engineer audits this setup, they should verify:
 1. **Context Safety**: Confirm that any prompt containing brackets `[...]` or references to an unsupplied input will never trigger an immediate backend inference request.

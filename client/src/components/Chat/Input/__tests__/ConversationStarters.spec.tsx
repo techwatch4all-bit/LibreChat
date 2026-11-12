@@ -49,6 +49,8 @@ const vedicCat = ALL_CATEGORIES.find((c) => c.id === 'vedic_wellness')!;
 const governanceCat = ALL_CATEGORIES.find((c) => c.id === 'governance_law')!;
 const privacyCat = ALL_CATEGORIES.find((c) => c.id === 'privacy_vault')!;
 const familyCat = ALL_CATEGORIES.find((c) => c.id === 'family_health')!;
+const motionExecCat = ALL_CATEGORIES.find((c) => c.id === 'motion_executive')!;
+const motionKineticCat = ALL_CATEGORIES.find((c) => c.id === 'motion_kinetic')!;
 
 const setMode = (spec: string) => {
   mockConversation = { spec, conversationId: 'convo-starters-test', endpoint: 'custom' };
@@ -82,6 +84,26 @@ describe('ConversationStarters', () => {
     render(<ConversationStarters />);
     expect(screen.getByText(marketCat.label)).toBeInTheDocument();
     expect(screen.queryByText(privacyCat.label)).not.toBeInTheDocument();
+  });
+
+  it('filters category tabs to Motion mode categories and displays rich motion starters', () => {
+    setMode('Motion');
+    render(<ConversationStarters />);
+    expect(screen.getByText(motionExecCat.label)).toBeInTheDocument();
+    expect(screen.getByText(motionKineticCat.label)).toBeInTheDocument();
+    expect(screen.queryByText(marketCat.label)).not.toBeInTheDocument();
+    expect(screen.queryByText(privacyCat.label)).not.toBeInTheDocument();
+  });
+
+  it('always stages motion starters into textarea without submitting', () => {
+    setMode('Motion');
+    render(<ConversationStarters />);
+    const starter = motionExecCat.starters[0];
+    fireEvent.click(screen.getByLabelText(starter.prompt));
+    expect(mockSubmitMessage).not.toHaveBeenCalled();
+    expect(textarea.value).toBe(starter.prompt);
+    expect(textarea.selectionStart).toBe(starter.prompt.indexOf('['));
+    expect(textarea.selectionEnd).toBe(starter.prompt.indexOf(']') + 1);
   });
 
   it('stages template starters into the textarea without submitting', () => {

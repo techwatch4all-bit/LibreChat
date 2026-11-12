@@ -2008,3 +2008,33 @@ Fix: proxyRes rewriter rewritten — assigns the result and broadens script-src,
 Also found during triage (fix-list): the `/api/ide` WS upgrade path in api/server/index.js forwards to code-server WITHOUT authentication — unauthenticated WebSocket reach to the IDE instance. To be closed with a JWT check in the upgrade handler.
 
 Operator action: hard-refresh the IDE (Ctrl+F5) — the extension host, installed extensions and Dark Modern theme should now load; extensions additionally need "Trust this folder" if Restricted Mode shows.
+
+## 2026-11-12 — VibeStudio WS root cause isolated: Cloudflare Access kills browser WS upgrades; origin now JWT-enforced
+
+Deep-dive evidence (server-side [IDE-WS] instrumentation): the browser's WS upgrades DO pass Access and reach the origin (logged with distinct reconnectionTokens), then the socket closes in 1-2ms with no proxy error — ~10 rapid retries per load. Control matrix: local proxy upgrade stays open 34s+; tunnel upgrade via ungated session host → 101 + open; tunnel via Access-gated ai.satchida.com (browser) → instant close. Conclusion: the Access edge layer severs the upgraded connection (known flaky area: Access + WebSocket session cookies on upgrade). Also fixed en route: the CSP rewriter no-op bug (previous entry) and, now, the unauthenticated /api/ide WS upgrade — the handler verifies a JWT (ide_token cookie or ?token=) before proxying; anonymous upgrades get 401 (verified live: anonymous→401, cookie→101 authenticated).
+
+Remaining step (operator, dashboard-only): create an Access **Bypass** application scoped to path ai.satchida.com/api/ide so IDE WebSockets skip the Access edge; the origin-side JWT check above keeps the IDE authenticated and private. Everything else stays gated. After the bypass: browser WS reaches origin with ide_token cookie → authenticated 101 → extension host connects → dark theme + extensions load.
+
+## 2026-11-12 — Satchida Motion Studio Personas & Non-Executing Template Starters
+
+Operator feedback:
+When clicking on Motion Studio, no domain-relevant personas/examples were presented (only general chat/market categories were visible), and starters auto-submitted without allowing the user to add extra context or input.
+
+Shipped:
+1. **Motion Studio Specific Personas & Categories (`client/src/common/starters.ts`, `client/src/locales/en/translation.json`)**:
+   - Added 4 curated motion graphics categories scoped strictly to `modes: ['Motion']`:
+     * `📊 Executive & Metrics` (`motion_executive`): 3D Executive QBR & Revenue Deck, Investor Pitch & Market Traction, Strategic Milestone Roadmap.
+     * `⚡ Kinetic Typography` (`motion_kinetic`): Kinetic Typography Manifesto, Distributed Systems & Architecture Flow, Scientific & Physics Simulation.
+     * `✨ Product & SaaS Launch` (`motion_product`): Dark-Mode SaaS Hero Launch, Live Animated Analytics Dashboard, 3D Mobile App UX Showcase.
+     * `🎬 Teasers & Video Render` (`motion_media`): Futuristic Brand Intro & Logo Reveal, Vertical 9:16 Kinetic Social Reel, Playwright 60fps MP4 Video Exporter.
+   - Filtered out all non-motion categories (Markets & Bullion, Health & Emergency, Vedic, Citizen, Law, etc.) from Motion Studio so users only see domain-relevant motion options.
+2. **Non-Executing Template Staging & Slot Highlighting (`client/src/components/Chat/Input/ConversationStarters.tsx`)**:
+   - Enforced `activeMode === 'Motion'` in `isTemplate` condition: clicking any motion starter or persona card NEVER directly submits the message to the LLM.
+   - Automatically stages the prompt text into the chat textarea, auto-focuses the input, and pre-selects the bracketed parameter slot (e.g. `[Company Name & Key Metrics / Q3 Revenue & Growth Highlights]`) so the user can immediately type their context or press Tab to cycle parameters.
+   - Surfaced top motion personas directly in the default `Suggested` tab in a 2-column executive card grid with colored icons, metadata badges, and descriptions.
+3. **Automated Visual & Unit Test Verification**:
+   - Extended `ConversationStarters.spec.tsx` with dedicated test suites for mode filtering and template staging in Motion Studio (9/9 passed).
+   - Executed Playwright automated test (`scratch/verify_motion_personas.js`):
+     * Captured `client/public/motion/motion_personas_screen.png` verifying all 4 motion categories and 8 rich cards.
+     * Captured `client/public/motion/motion_staged_input.png` verifying that clicking a card stages the prompt into the textarea with parameter slot selected and 0 chat messages sent.
+

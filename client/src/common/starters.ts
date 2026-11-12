@@ -24,7 +24,7 @@ export interface StarterCategory {
   id: string;
   label: string;
   labelKey: TranslationKeys;
-  modes?: string[]; // Allowed modes: 'Chat', 'Work', 'Study', 'Study-Local', 'Privacy'
+  modes?: string[]; // Allowed modes: 'Chat', 'Work', 'Study', 'Study-Local', 'Privacy', 'Motion'
   starters: StarterItem[];
 }
 
@@ -351,7 +351,12 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'HyperResearch Dossier: Conduct a full 6-phase sovereign deep research investigation on: [Emerging Technology / Scientific Topic / Policy]. Execute — (1) Atomic decomposition into 5–8 falsifiable sub-questions, (2) Multi-tier parallel sweeps across official registers, academic citations, and empirical benchmarks, (3) Build a Contradiction & Correlation Matrix for conflicting claims, (4) Identify unresolved empirical gaps and retracted literature, (5) Run a 4-critic adversarial self-audit (Dialectic / Depth / Width / Citation), then (6) Generate and save a downloadable PDF dossier using create_formatted_document and provide a 1-click download link.',
         badge: 'Deep Research',
         badgeKey: 'starters_badge_deep_research',
-        mcpServers: ['satchida-web-search', 'satchida-knowledge-vault', 'academic-search', 'arxiv-search'],
+        mcpServers: [
+          'satchida-web-search',
+          'satchida-knowledge-vault',
+          'academic-search',
+          'arxiv-search',
+        ],
       },
       {
         prompt:
@@ -445,6 +450,170 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         badge: 'Forensic Audit',
         badgeKey: 'starters_badge_forensic_audit',
         mcpServers: ['satchida-knowledge-vault'],
+      },
+    ],
+  },
+  {
+    id: 'motion_executive',
+    label: '📊 Executive & Metrics',
+    labelKey: 'starters_cat_motion_executive',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: '3D Executive QBR & Revenue Deck',
+        icon: '📊',
+        badge: 'Executive',
+        badgeKey: 'starters_badge_motion_executive',
+        description:
+          'Spatial camera sweep across 3D revenue bars, glowing KPI metrics, and year-over-year growth stats',
+        prompt:
+          'Generate an animated 3D executive report with 60fps camera pan, kinetic charts, and KPI counters for: [Company Name & Key Metrics / Q3 Revenue & Growth Highlights]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Investor Pitch & Market Traction',
+        icon: '🚀',
+        badge: 'Investor Pitch',
+        badgeKey: 'starters_badge_motion_pitch',
+        description:
+          'High-energy kinetic deck with glowing glass cards, TAM/SAM sizing, and unit economics',
+        prompt:
+          'Build a high-energy kinetic investor pitch presentation with 3D perspective depth, glowing glass cards, and market traction figures for: [Startup Name & Value Proposition / Problem & Solution]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Strategic Milestone Roadmap',
+        icon: '🗺️',
+        badge: 'Milestone Roadmap',
+        badgeKey: 'starters_badge_motion_roadmap',
+        description:
+          'Continuous forward camera track through a floating 3D chronological roadmap with phased deliverables',
+        prompt:
+          'Design an immersive 3D timeline camera flight navigating through phased strategic milestones and deliverables for: [Product / Project Initiative Roadmap]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_kinetic',
+    label: '⚡ Kinetic Typography',
+    labelKey: 'starters_cat_motion_kinetic',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Kinetic Typography Manifesto',
+        icon: '⚡',
+        badge: 'Kinetic Speech',
+        badgeKey: 'starters_badge_motion_kinetic',
+        description:
+          'Fast-paced rhythmic typography with staggered word reveals, dynamic camera shifts, and contrast bursts',
+        prompt:
+          'Create a dynamic kinetic typography motion graphic with staggered character animations, bold camera push-throughs, and dramatic audio/visual pacing for: [Core Message / Speech Excerpt / Brand Manifesto]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Distributed Systems & Architecture Flow',
+        icon: '🧩',
+        badge: 'Tech Explainer',
+        badgeKey: 'starters_badge_motion_tech',
+        description:
+          'Interactive 3D particle simulation of request routing, API gateways, and distributed event pipelines',
+        prompt:
+          'Build an interactive 3D motion graphic explaining distributed system flow, microservice handshakes, and data pipelines for: [System Architecture / Pipeline Topic]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Scientific & Physics Simulation',
+        icon: '🔬',
+        badge: 'STEM Visualizer',
+        badgeKey: 'starters_badge_motion_stem',
+        description:
+          'SVG path morphing, vector fields, and 3D camera zoom illustrating complex mathematical or physical laws',
+        prompt:
+          'Simulate and animate complex physical or scientific concepts with GSAP SVG path morphing, particle field, and camera zoom for: [Scientific Phenomenon / Mathematical Formula / Physics Concept]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_product',
+    label: '✨ Product & SaaS Launch',
+    labelKey: 'starters_cat_motion_product',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Dark-Mode SaaS Hero Launch',
+        icon: '💎',
+        badge: 'SaaS Launch',
+        badgeKey: 'starters_badge_motion_saas',
+        description:
+          'Cinema-grade teaser featuring floating glass UI mockup cards, pulsing neon laser borders, and feature highlights',
+        prompt:
+          'Produce a 60fps dark-mode SaaS product launch teaser with glassmorphism, floating UI mockups, and glowing beam highlights for: [Product / Feature Name & Top 3 Capabilities]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Live Animated Analytics Dashboard',
+        icon: '📈',
+        badge: 'KPI Analytics',
+        badgeKey: 'starters_badge_motion_kpi',
+        description:
+          'Animated dashboard with rolling number tickers, SVG gradient chart sweeps, and live status beacons',
+        prompt:
+          'Construct an animated real-time analytics dashboard with counting numbers, glowing SVG line graphs, and donut chart sweeps for: [Metric Dashboard Domain / E-commerce, Cloud Ops, or Financial Analytics]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: '3D Mobile App UX Showcase',
+        icon: '📱',
+        badge: 'Mobile UX',
+        badgeKey: 'starters_badge_motion_mobile',
+        description:
+          'Sleek angled 3D smartphone frame with swipe transitions, floating UI callouts, and tactile micro-interactions',
+        prompt:
+          'Create an animated 3D mobile mockup showcase highlighting new mobile app UX, smooth screen transitions, and feature badges for: [App Name & Key Features]',
+        mcpServers: ['satchida-motion'],
+      },
+    ],
+  },
+  {
+    id: 'motion_media',
+    label: '🎬 Teasers & Video Render',
+    labelKey: 'starters_cat_motion_media',
+    modes: ['Motion'],
+    starters: [
+      {
+        title: 'Futuristic Brand Intro & Logo Reveal',
+        icon: '✨',
+        badge: 'Brand Stinger',
+        badgeKey: 'starters_badge_motion_stinger',
+        description:
+          '5-second high-octane 3D spatial logo reveal with particle grid sweep, anamorphic lens flares, and sonic typography',
+        prompt:
+          'Generate a sleek, futuristic 5-second branded video intro/stinger with neon grid particles, camera tilt, and logo reveal for: [Channel / Show Name & Brand Slogan]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Vertical 9:16 Kinetic Social Reel',
+        icon: '📲',
+        badge: 'Social Reel',
+        badgeKey: 'starters_badge_motion_social',
+        description:
+          'Mobile-first vertical kinetic graphic with striking hook typography, animated stat callout, and call-to-action',
+        prompt:
+          'Design an attention-grabbing 9:16 vertical motion graphic with bold typography, animated bar chart, and quote reveal for: [Quote or Statistic / Target Audience]',
+        mcpServers: ['satchida-motion'],
+      },
+      {
+        title: 'Playwright 60fps MP4 Video Exporter',
+        icon: '🎥',
+        badge: 'MP4 Exporter',
+        badgeKey: 'starters_badge_motion_mp4',
+        description:
+          'Render any GSAP HTML motion graphic artifact directly into a smooth 1080p 60fps MP4 video file',
+        prompt:
+          'Validate this motion artifact timeline and render a crisp 1080p 60fps MP4 video export with smooth transitions for: [Paste HTML code or describe motion scene]',
+        mcpServers: ['satchida-motion'],
       },
     ],
   },

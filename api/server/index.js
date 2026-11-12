@@ -90,6 +90,8 @@ const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
+const jwt = require('jsonwebtoken');
+const cookie = require('cookie');
 const agentEventMethods = require('~/models');
 
 /** Route admin file-config MIME patterns through a linear-time engine (ReDoS-safe) on upload. */
@@ -622,6 +624,33 @@ const startServer = async () => {
       logger.info(
         `[IDE-WS] upgrade path=${url.pathname} query=${url.search.slice(0, 120)} host=${req.headers.host ?? ''} ua=${(req.headers['user-agent'] ?? '').slice(0, 60)}`,
       );
+      /** The upgrade must not be anonymous: code-server's WS carries the whole
+       *  IDE session. The token comes from the ide_token cookie (set by the
+       *  /api/ide route after its own auth) or the ?token= query parameter.
+       *  Browsers send cookies on WS upgrades automatically. */
+      const parsedCookies = typeof req.headers.cookie === 'string'
+        ? cookie.parse(req.headers.cookie)
+        : {};
+      const authToken = url.searchParams.get('token') ?? parsedCookies.ide_token;
+      if (!authToken) {
+        logger.warn('[IDE-WS] rejected: no auth token on upgrade request');
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      try {
+        const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+        if (!decoded.id) {
+          throw new Error('token carries no user id');
+        }
+        req.user = { id: decoded.id, role: decoded.role };
+        logger.info(`[IDE-WS] authenticated user ${decoded.id} on upgrade`);
+      } catch (err) {
+        logger.warn(`[IDE-WS] rejected: invalid token (${err.message})`);
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
       const upgradedAt = Date.now();
       socket.on('close', () => {
         logger.info(`[IDE-WS] socket closed after ${Date.now() - upgradedAt}ms`);

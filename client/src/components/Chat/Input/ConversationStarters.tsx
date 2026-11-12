@@ -115,7 +115,9 @@ const ConversationStarters = () => {
       // Requires context? Any [...] placeholder, a <...> slot, or a deictic
       // reference to content the user has not pasted yet ("this code", "this
       // plan", ...) stages the prompt instead of submitting an empty turn.
+      // In Motion Studio, always stage the prompt for user input & customization.
       const isTemplate =
+        activeMode === 'Motion' ||
         /\[|<|this (message|code|query|plan|dataset|documents?|snippet|requirement|pdf|image)\b/i.test(
           text,
         );
@@ -179,11 +181,14 @@ const ConversationStarters = () => {
       // Standalone queries can execute immediately
       submitMessage({ text });
     },
-    [submitMessage, setMCPValues, badgeContext, methods],
+    [submitMessage, setMCPValues, badgeContext, methods, activeMode],
   );
 
   const displayedStarters = useMemo(() => {
     if (selectedCategory === 'all') {
+      if (activeMode === 'Motion') {
+        return modeCategories.flatMap((c) => c.starters.slice(0, 2));
+      }
       if (customStarters.length > 0) {
         return customStarters.slice(0, 10).map((s: string) => ({ prompt: s }));
       }
@@ -191,7 +196,7 @@ const ConversationStarters = () => {
     }
     const cat = modeCategories.find((c) => c.id === selectedCategory);
     return cat ? cat.starters.slice(0, 10) : [];
-  }, [selectedCategory, customStarters, modeCategories]);
+  }, [selectedCategory, customStarters, modeCategories, activeMode]);
 
   return (
     <div className="mb-2 mt-0 flex w-full flex-col items-center gap-1.5 px-0">

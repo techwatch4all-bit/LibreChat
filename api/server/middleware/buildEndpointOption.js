@@ -130,6 +130,7 @@ async function buildEndpointOption(req, res, next) {
     'Study-Local',
     'Privacy',
     'Motion',
+    'SceneMosaic',
   ];
   const isByokOrAgent =
     req.body.endpoint === 'openAI' ||

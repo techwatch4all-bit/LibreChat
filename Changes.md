@@ -8,7 +8,224 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
-## 2026-11-10 — Seat-token issuance: design ready, implementation deferred (one-api WIP in flight)
+## 2026-11-12 — Executive Gold Standard Model Selector & BYOK/Agents Polish
+
+Operator feedback:
+1. Model selector previously duplicated modes across top curated items and nested submenus under `Satchida >` and `Satchida-Gateway >`.
+2. Preserved access to `My Agents` (direct in-chat agent picker) and BYOK endpoints (`OpenAI`, `Anthropic`).
+
+Shipped:
+1. **Model Selector Redesign (`client/src/components/Chat/Menus/Endpoints/`)**:
+   - `ModelSpecItem.tsx`: Converted generic items into luxury cards with Lucide icons (`MessageSquare`, `Sparkles`, `Terminal`, `GraduationCap`, `ShieldCheck`, `Film`), glowing badges (`FAST & LIVE`, `EXECUTIVE & PRD`, `CODE ARCHITECTURE`, `STEM TUTOR`, `100% LOCAL · SOVEREIGN`, `CINEMA 60FPS · GSAP`), and descriptions.
+   - `ModelSelector.tsx`: Divided menu into two distinct tiers:
+     * Tier 1: **Satchida Intelligence (`Sovereign Modes`)** with green pulsing status indicator.
+     * Tier 2: **Agents & Cloud BYOK (`Custom Keys`)** containing `OpenAI` (with gear button for user keys), `My Agents` (flyout with agent selection and marketplace), and `Anthropic`.
+   - `CustomMenu.tsx`: Upgraded popover styling to 430px width, `backdrop-blur-xl bg-surface-primary/95`, and rounded-2xl border.
+   - `ModelSelectorContext.tsx`: Filtered out internal gateway duplicates (`Satchida`, `Satchida-Gateway`) so only distinct modes and user-facing endpoints appear.
+2. **Backend Route & Middleware Updates (`api/server/routes/config.js`, `api/server/middleware/buildEndpointOption.js`)**:
+   - Added `Motion` and `Vibecoding` to `allowedSpecs` and `SPEC_TO_MODE`.
+   - Permitted non-operator requests with `openAI`, `anthropic`, or `agents` (`isByokOrAgent`) to bypass spec enforcement.
+   - Preserved `enforce: false` in `librechat.yaml` to ensure BYOK keys and agents remain active.
+3. **Visual Verification**:
+   - Automated Playwright browser verification script (`scratch/visual_verify.js`) captured pristine state with all 6 sovereign modes, `My Agents` flyout, and BYOK providers.
+
+---
+
+## 2026-11-11 — Satchida-Motion Graphics Engine & Cinema-Grade Video Exporter
+
+Operator request: Add browser motion graphics capability based on `bang-motion`, rebranded as `satchida-motion`, with full functionality (interactive web animation, scrubber controls, and frame-by-frame 60 FPS MP4 video export) into LibreChat.
+
+Shipped:
+1. **Deployment Skill (`skill/satchida-motion/SKILL.md`)**:
+   - Integrated comprehensive cinema-grade web animation rules: The Anti-PPT Law (spatial camera staging and continuous 3D coordinate movement over static slide fades), deterministic timeline contracts (`window.__TIMELINE__`), floating playback scrubber bar, and embedded client-side recording.
+   - Tested automatic loading by LibreChat's `DeploymentSkillRegistry` (`loadDeploymentSkillsFromDirectory('./skill')`).
+2. **Local GSAP Vendor Integration (`client/src/utils/artifacts.ts` & `client/public/assets/vendor/gsap/`)**:
+   - Vendored GSAP 3.12.5 (`gsap.min.js`, `ScrollTrigger.min.js`, `TextPlugin.min.js`) locally to guarantee 100% offline, air-gap resilient playback.
+   - Registered `GSAP_RUNTIME_URL` in `artifacts.ts` under Sandpack's `sharedOptions.externalResources` so every HTML artifact preview automatically has access to GSAP without external CDN requests.
+3. **Wand Dropdown Integration (`client/src/components/Chat/Input/SatchiToolbar.tsx`)**:
+   - Added `Satchida Motion Animation` under `Creative Tools` in the input bar's Wand menu (`Wand2`), allowing users to transform any draft, report, or concept into an interactive motion graphic artifact with a single click.
+4. **Satchida-Motion MCP Stdio Server (`skill/satchida-motion-server.py`)**:
+   - Built a local sovereign stdio MCP server exposing:
+     * `render_motion_to_video`: Uses local headless Chromium (Playwright) and native `ffmpeg.exe` to scrub `window.__TIMELINE__` frame-by-frame and encode pristine H.264 MP4 videos into `client/public/motion/`.
+     * `validate_motion_html`: Lints motion HTML artifacts for anti-PPT compliance, GSAP imports, and timeline registrations.
+     * `get_motion_template`: Supplies production-ready starter templates (Executive Data Report, Product Teaser, Concept Explainer).
+   - Registered under `mcpServers.satchida-motion` in `librechat.yaml`.
+5. **Dedicated Motion Studio Preset (`librechat.yaml`)**:
+   - Created `Motion Studio 🎬` model preset primed for creative motion direction and video production.
+6. **Verification**:
+   - Bundled client with `vite build` (9,767 modules, 7.61s).
+   - Validated frame-by-frame MP4 video rendering (`test_exec_report.mp4`, 3.0s, 30fps, 55.7 KB).
+   - Reloaded PM2 `librechat` process; confirmed clean initialization in 2,308ms and HTTP 200 OK.
+
+---
+
+## 2026-11-11 — Click-and-Go Suggested Questions Regex Repair & Commercial Recommendations Enforcement
+
+Operator report:
+1. The assistant response in chat was missing commercial product/brand recommendations and Amazon.in search links with legal warnings.
+2. The suggested next questions were rendering as static plain text instead of interactive click-and-go cards.
+3. Domain disclaimers needed universal reinforcement across all responses.
+
+Diagnosed & Shipped:
+1. **Interactive Suggested Questions Regex Repair (`client/src/components/Chat/Messages/Content/Markdown.tsx`)**:
+   - Root cause identified: The previous `SUGGESTED_QUESTIONS_REGEX` required `#{2,4}\s*` markdown heading hashes. When the LLM emitted `🔲 Suggested Next Questions` or `**Suggested Next Questions**` without `#` symbols (or preceded by a `---` horizontal divider), the regex failed to match. The question block was thus treated as plain markdown and rendered as an ordinary numbered list (`<ol><li>...</li></ol>`).
+   - Broadened `SUGGESTED_QUESTIONS_REGEX` to match flexibly:
+     `/(?:^|\n)(?:[-*_]{3,}\s*\n)?\s*(?:#{1,4}\s*)?(?:\*\*)?(?:[\p{Emoji}\p{Extended_Pictographic}\u25A0-\u2BFF\s]*)(?:Suggested\s+(?:Next\s+|Follow-up\s+)?Questions?|Follow-up\s+Questions?|Next\s+Questions?|Related\s+Questions?)(?:\*\*)?:?[^\n]*\n([\s\S]*)$/iu`
+   - Added automatic stripping of trailing horizontal divider lines (`---` / `___`) from `mainContent`.
+   - Enhanced question parser to strip numbers, bullets, bolding asterisks (`**`), and enclosing brackets (`[...]`).
+   - Verified that `SuggestedQuestions.tsx` renders high-contrast interactive cards with `submitMessage({ text: cleanPrompt })` immediate execution.
+2. **Prioritized ModelSpecs in Configuration (`librechat.yaml`)**:
+   - Set `modelSpecs.prioritize: true` (was `false`). This ensures every new conversation and query prioritizes the configured `Chat` model specification and injects the comprehensive `promptPrefix` containing both the `PRODUCT & BRAND RECOMMENDATIONS CONTRACT` (3–4 concrete commercial formulations with Amazon.in search links) and the `MANDATORY LEGAL PROTECTION DISCLAIMER`.
+3. **Prompt Enhancer Domain Alignment (`client/src/store/satchiStore.ts`)**:
+   - Aligned the `heuristicEnhance` function's Clinical & Skincare and General branches to explicitly instruct the model to output commercial market product links, domain legal disclaimers, and interactive suggested questions.
+4. **Verification**:
+   - Built client bundle with `npm run build` (`vite build`: 9,767 modules, 8.47s, zero bundle errors).
+   - Reloaded LibreChat PM2 service (PID 57544); verified HTTP 200 OK on `http://127.0.0.1:3080/`.
+
+---
+
+## 2026-11-11 — Deduped Research Control & Enriched Wand Prompt Menu
+
+Operator request: Remove duplicate 'Deep research' option from the Wand dropdown so the new toolbar 'Research' button is the single source of truth, improve Wand menu options to work with quality, and diagnose popping up terminal windows.
+
+Shipped:
+1. `client/src/components/Chat/Input/SatchiToolbar.tsx`:
+   - Removed redundant "Deep Research" item from Wand dropdown. The top-level `Research` toolbar toggle button is now the single clean entry point.
+   - Enhanced the Wand menu with high-utility, structured prompt generation options:
+     * **Auto-Enhance Draft**: Deconstructs user input into an executive specification using domain heuristics.
+     * **Architectural Blueprint**: Prompts the model to act as a Principal Staff Architect, delivering component diagrams (`mermaid`), edge-case bottlenecks, concurrency trade-offs, and an implementation checklist.
+     * **Adversarial Reviewer**: Adversarial stress-testing prompt highlighting top 3 fatal assumptions/race conditions, regressions, and security vectors.
+     * **Image Generation**: Creative mode toggle for photorealistic visual generation.
+2. Built client production bundle (`vite build`: 9,767 modules, 8.49s).
+3. Restarted LibreChat under PM2 (PID 51268), verified HTTP 200 OK.
+4. Process & Terminal Diagnostic:
+   - Root cause identified: `SatchidaBifrostSentinel` scheduled task runs `python.exe sentinel.py` every 5 minutes (`PT5M`) with `LogonType: Interactive`, which momentarily launches a visible terminal window on screen before exiting. A second source was an interactive node test loop holding `node.exe` processes. Recommended backgrounding via `pythonw.exe` or hidden logon mode.
+
+---
+
+## 2026-11-11 — Visible Research/HyperResearch Toggle Button on Chatbox Controls
+
+Operator request: Make 'Deepresearch' or 'Hyperresearch' explicitly visible on the chatbox in some way so that it can be selected.
+
+Shipped:
+1. `client/src/components/Chat/Input/SatchiToolbar.tsx`:
+   - Promoted Deep Research from hidden sub-menu item into a prominent top-level pill toggle button on the chatbox toolbar (`FlaskConical` icon + "Research" label).
+   - Styled with distinct indigo accent when active (`border-indigo-500/70 bg-indigo-950/40 text-indigo-300 ring-1 ring-indigo-500/50`) with an animated ping indicator.
+   - When toggled ON, it automatically:
+     - Turns on live web search.
+     - Automatically registers all required MCP servers for deep research & dossier creation: `satchida-web-search`, `satchida-knowledge-vault`, `academic-search`, and `arxiv-search`.
+     - Displays an informative toast notification: *"🔬 HyperResearch Active: 6-phase deep sweep, contradiction matrix & PDF dossier enabled!"*.
+2. `client/src/store/satchiStore.ts` & `client/src/hooks/useSatchiExtraBody.ts`:
+   - Defined `HYPERRESEARCH_PROMPT_PREFIX` containing the 6-phase protocol (Atomic decomposition, parallel sweeps, contradiction & correlation matrix, gap analysis, 4-critic panel, and mandatory `create_formatted_document` PDF call).
+   - Injected `HYPERRESEARCH_PROMPT_PREFIX` into `stylePromptPrefix` whenever `satchida_research` is active, ensuring every model receives the HyperResearch protocol on submit.
+3. Client production build: `vite build` completed cleanly (9767 modules, 10.11s).
+4. Restarted LibreChat PM2 (PID 3000), HTTP 200 OK verified on `http://127.0.0.1:3080/`.
+
+---
+
+## 2026-11-11 — HyperResearch 6-phase protocol & automated dossier file creation
+
+Operator request: Upgrade LibreChat's deep research capabilities to leverage Hyperresearch's architectural pattern (`https://github.com/jordan-gibbs/hyperresearch`). Resolve critical failure modes where deep research previously failed to create persistent dossier files, omitted multi-tier parallel sweeps, and lacked contradiction/correlation analysis.
+
+Shipped:
+- `satchida/personas/personas.ts`: Upgraded `deep_research_oracle` persona (`🔬 Sovereign HyperResearch & Deep Dossier Engine`).
+  * **Phase 1: Atomic Query Decomposition**: Falsifiable 5–8 sub-question decomposition across 5 architectural axes.
+  * **Phase 2: Multi-Tier Parallel Sweeps**: Search breadth across primary official registers, academic citation networks, and empirical engineering benchmarks.
+  * **Phase 3: Contradiction & Correlation Matrix**: Mandatory Markdown matrix mapping consensus claims against dissenting/field evidence with root cause analysis.
+  * **Phase 4: Gap Identification & Retraction Audit**: Explicit tracking of missing parameters, unverified empirical claims, and literature omissions.
+  * **Phase 5: 4-Critic Adversarial Panel**: Internal audit checks across Dialectic, Depth, Width, and Instruction/Citation rigor.
+  * **Phase 6: Mandatory Dossier File Generation**: Enforced programmatic trigger of `create_formatted_document` to write `[Topic]_HyperResearch_Dossier.pdf` or `.docx` directly to disk and register it in LibreChat with a 1-click download link.
+- `librechat.yaml`: Injected Deep Research & Hyperresearch Dossier execution protocol into shared `modelSpecs` (`Pro`, `Work`, `Chat`), ensuring full awareness and proactive invocation of `create_formatted_document` upon research completion.
+- Restarted LibreChat under PM2 (PID 43240); HTTP 200 OK verified on `http://127.0.0.1:3080/`.
+
+---
+
+## 2026-11-11 — Bulk chat deletion: checkbox multi-select in the sidebar
+
+Operator request: pick chats with checkboxes and delete them together. Shipped:
+
+- `client/src/components/Conversations/bulkSelection.ts` — feature-owned Jotai state
+  (`bulkSelectModeAtom`, `selectedConvoIdsAtom` as `atomWithReset`, toggle/set/exit writers).
+- `client/src/components/Conversations/BulkSelectBar.tsx` — the toolbar under the Chats header:
+  selection count, Select all (loaded chats), Delete selected (confirm dialog, destructive), Cancel.
+  Deletion loops the EXISTING per-conversation delete mutation at concurrency 4, so every
+  server-side cleanup path (checkpointer, live-agent fence, shared links) runs exactly as a single
+  delete; per-chat progress is shown, and a partial failure reports `deleted/total` and keeps the
+  rest retryable. If the open chat is among the deleted, the client navigates to `/c/new`.
+- `Convo.tsx` — in selection mode each row shows a checkbox, row clicks toggle instead of
+  navigating, drag is disabled, and picked rows highlight.
+- `Conversations.tsx` — ListChecks toggle beside the Chats header; leaving selection mode (or
+  re-scoping via search/archive switch) clears the picks; on scope CHANGE only (mount does not
+  wipe a pre-set selection).
+- i18n: 9 new English keys (`com_ui_bulk_*`, `com_ui_select_chat`, `com_ui_clear_selection`,
+  `com_ui_delete_selected`, `com_ui_chats_selected`).
+
+Evidence: `__tests__/bulkSelection.test.tsx` (4 tests: atom semantics, bar visibility, select-all,
+confirm → one delete call per id → mode exit) + full Conversations suites 142/142; client build
+green; PM2 restarted, served bundle contains "Select chats".
+
+---
+
+## 2026-11-11 — Duplicate hallucinated conversation titles: blank-message guard + user-line-only title template
+
+Observed: six conversations titled near-identically ("Context7 documentation lookup tool",
+"Library documentation lookup tool", …). Root cause: their first user messages were EMPTY
+strings (text: "") — the title model received `User: ""` and hallucinated titles from
+model-list descriptions; a seventh conversation echoed the assistant's reply as the title.
+
+Fixes (both live after PM2 restart, readiness passing 2026-11-11 00:24 IST):
+1. `api/server/services/Endpoints/agents/title.js` — `addTitle` returns early when the first
+   message text is blank, so the title model is never called with an empty conversation and the
+   conversation keeps its default title.
+2. `librechat.yaml` (both Satchida-Gateway blocks) — `titlePromptTemplate: 'User: {input}'`
+   replaces the SDK default `User: {input}
+AI: {output}`, so the completion-method title model
+   only ever sees the user's line; its instruction "based ONLY on what the user asked" is now
+   enforceable and cannot be answered by echoing the assistant's text.
+
+Evidence: Mongo dump of the affected conversations (first message text `""`, assistant reply
+"I'm ready to help…"); title logs show `inputTextLen=0` for empty runs; yaml validated with
+js-yaml (2 custom blocks carry the template).
+
+---
+
+## 2026-11-10 — Never-drop-quality run guarantees: context guards, final-answer backstop, tool scratchpad, tool-name healing
+
+Operator directive: heavy tool-use turns must never end without an answer and must never lose
+pulled data. Four mechanisms landed in the agents pipeline (all in `packages/api`, DB contract in
+`packages/data-schemas`):
+
+1. **`contextGuard`** (`src/agents/contextGuard.ts`) — run-scoped `PostToolBatch` hook that tallies
+   successful tool-result volume against the run's effective context budget and injects
+   converge (`0.5`) / final-answer (`0.72`) notices between rounds. Nothing is truncated or
+   summarized — the model converges while every result is still verbatim in context.
+2. **`finalAnswerGuard`** (`src/agents/finalAnswerGuard.ts`) — `Stop` hook: a run that reaches its
+   terminal state on a tool result (the observed silent-no-answer failure, e.g. the 2026-11-10
+   16:04–16:16 UTC runs) is kept warm for exactly one more turn with an explicit
+   write-your-final-answer instruction. Guarded by `stopHookActive`/continuation budget so it
+   cannot loop.
+3. **`toolResultScratchpad`** (`src/agents/toolResultScratchpad.ts` + data-schemas
+   `toolresults_scratchpads` collection) — every tool output ≥1500 chars is captured fire-and-forget
+   as it finishes, full text + digest, TTL 7 days, upsert per (messageId, toolId). Capture happens
+   BEFORE compaction/fading can shorten what the model sees; it never replaces the live output.
+4. **`toolNameHealing`** (`src/agents/toolNameHealing.ts`, wired in `initializeAgent`) — prompts
+   name MCP tools by their bare upstream name while the runtime binds `<tool>_mcp_<server>` keys;
+   the 2026-11-10 23:18 IST Work run failed `create_formatted_document` with "Tool … not found" for
+   exactly this reason. Unambiguous bare references in `instructions`, `toolContextMap` and
+   `dynamicToolContextMap` are rewritten to the bound name; ambiguous (cross-server collision or
+   built-in clash) names stay untouched.
+
+Endpoint levers (all default ON, settable in `librechat.yaml` under the agents endpoint):
+`finalAnswerGuard.enabled/maxContinuations`, `contextGuard.enabled/convergeAtRatio/finalizeAtRatio`,
+`toolResultScratchpad.enabled/minChars/ttlDays` (data-provider `config.ts`).
+
+Evidence: `packages/api/src/agents/{finalAnswerGuard,contextGuard,toolResultScratchpad,toolNameHealing}.spec.ts`
+(31 tests) + `packages/data-schemas/src/methods/toolResultScratchpad.spec.ts` (4, mongodb-memory-server);
+full `src/agents` suite 4620 passed / 0 failed; `tsc --noEmit` clean in data-provider, data-schemas, api;
+data-schemas + api rebuilt, PM2 `librechat` restarted, readiness passing at 2026-11-11 00:03 IST.
+
+---
+
 
 Investigated and recorded; not implemented because the operator's one-api working tree is
 mid-WIP in exactly this area (analytics routes, VK rotation in `router/api.go`). The
@@ -1701,3 +1918,93 @@ Changes:
 Verification: jest `artifacts.test.ts` 224/224; client `npx tsc --noEmit` = the known 37-error Admin baseline, zero artifacts-related errors; production build succeeds; served bundle contains the local path and zero `cdn.tailwindcss.com` fetch references (the vendored runtime itself carries internal version strings — expected); live probes on :3080 after restart: `/assets/vendor/tailwind-3.4.17.js` → 200 `application/javascript` 407279 B, `/decks/*` HTML+fonts → 200 (re-synced after the build wipe).
 
 Note: `SANDPACK_BUNDLER_URL` / `SANDPACK_STATIC_BUNDLER_URL` remain unset — the preview iframe itself still loads sandpack's hosted bundler from codesandbox.io (upstream architecture, env-configurable). Self-hosting the bundler is the remaining third-party runtime dependency, deferred as a larger task. Also outstanding on the same principle: `marked@15.0.12` loaded from jsdelivr inside the markdown preview iframe (`client/src/utils/markdown.ts:252`, SRI-pinned).
+
+## 2026-11-10 — Self-hosted sandpack runtimes: marked (jsdelivr) and the bundler (codesandbox.io)
+
+Continuation of the zero-third-party pass (fonts → Tailwind → these). Two remaining external script loads removed from the artifact pipeline.
+
+Changes:
+1. **marked@15.0.12 self-hosted** — downloaded from jsdelivr and verified byte-exact against the app's pinned SRI (`sha384-948ahk4…` computed = pinned). `client/src/utils/markdown.ts`: `MARKED_CDN` → `MARKED_RUNTIME_URL = ${window.location.origin}/assets/vendor/marked-15.0.12.min.js`; the `integrity` + `crossorigin` attributes stay (tamper guard still applies same-origin). markdown.test.ts updated to encode the new contract (same-origin path, no `cdn.jsdelivr.net`, full SRI pin) — 62/62.
+2. **Sandpack runtime bundler vendored** — the React/node template compiler at `https://2-19-8-sandpack.codesandbox.io/` (default baked into the installed sandpack-client 2.19.x) mirrored into `client/public/assets/vendor/sandpack-runtime/` (11 files, ~1.7 MB incl. lazy chunks `4.a87895b63`/`5.029c574e1` discovered from the webpack runtime map) with PROVENANCE.md. Patches: 3 Google-Fonts `<link>` tags stripped from the bundler's raw-loader loading-screen templates (cosmetic screens fall back to system fonts); webpack publicPath `/` → `/assets/vendor/sandpack-runtime/` (single-occurrence assert-then-replace) so lazy chunks resolve under the prefix; index.html asset URLs rewritten. Inert on this origin: the bundler's devtools bridges are gated behind `host.endsWith("csb.app"/"csb.dev")`; its codesandbox.io portal/auth strings are unused; one residual `fonts.googleapis` string sits in the bundler's own external-resource classifier and never fetches (documented in PROVENANCE). `artifacts.ts`: non-static templates default to `LOCAL_RUNTIME_BUNDLER_URL`, env startup-config still overrides.
+3. **Static preview relay (static-browser-server) made self-hostable** — the static (HTML/markdown/SVG) template preview uses codesandbox's wildcard-subdomain relay (`preview.sandpack-static-server.codesandbox.io`): the client builds a hidden relay iframe at `<sessionId>-<baseUrl host>/__csb_relay/`, that page registers a service worker (`scope: "/"`), and artifact content is relayed parent→SW→preview over MessageChannel. Vendored the relay/preview/SW files (verbatim from `node_modules/static-browser-server`, the package the installed client uses) into `assets/vendor/sandpack-static-preview/`, and added `createStaticPreviewRelayMiddleware` (`packages/api/src/artifacts/staticPreview.ts`, exported via `@librechat/api`, wired in `api/server/index.js`): for hostnames matching `<hexid>-<base host of SANDPACK_STATIC_BUNDLER_URL>` it serves exactly the four relay paths (discovered filenames, `no-cache`, strict allowlist, GET/HEAD only); every other host passes through. Spec: 8/8 (express + node:http — undici fetch strips the Host header, which is the routing key).
+4. **Deployment state** — cloudflared config gained `hostname: "*.satchida.com" → http://localhost:3080` as the last rule before the 404 catch-all (config validated, tunnel restarted, `ai.satchida.com` re-verified 302; backup `config.yml.bak-20261110`). The rule is dormant until DNS exists: **the zone has no `*.satchida.com` record** (verified NXDOMAIN for `<id>-ai.satchida.com`), so `SANDPACK_STATIC_BUNDLER_URL` is left commented in `.env` (line ~202) and static previews continue on the codesandbox default. Enablement = add the DNS record (`*.satchida.com` CNAME `19a905bb-f580-4584-96b1-c39688168357.cfargotunnel.com`, proxied), uncomment the env, `PORT=3080 pm2 restart librechat --update-env`.
+
+Verification: packages/api jest 8/8 + `tsc --noEmit` clean; client artifacts 224/224 + markdown 62/62 + tsc = 37-error Admin baseline; live probes after restart: runtime bundler index/sandbox/lazy chunks 200, patched publicPath served (`.p="/assets/vendor/sandpack-runtime/"`), relay root `<title>Preview</title>` + `/__csb_relay/` + SW all 200 via `Host: 1a2b3c-ai.satchida.com`, marked/tailwind/decks 200. Incident during rollout: PM2 restart-looped (228→245) because `@librechat/api`'s built dist predates the new export — rebuilding packages/api fixed it; remember to rebuild packages/api whenever its exports change before restarting the server.
+
+## 2026-11-10 — cloudflared security upgrade 2026.3.0→2026.10.7 + wildcard DNS + static preview activation
+
+Cloudflare notified of compromised eMudhra/emSign intermediates trusted by cloudflared <2026.10.2. Operator delegated full execution.
+
+Ops findings that reshaped the plan:
+1. **Two tunnels, two instances**: a Windows service `cloudflared` (token-based, dashboard-managed tunnel `satchida-hub`, serves `ai.satchida.com` — behind Cloudflare Access) AND the PM2 process (`satchida-infra`, local config.yml). A stop-test proved `ai.satchida.com` is served by the service tunnel, not the PM2 one — so the config.yml wildcard rule only matters once `*.satchida.com` DNS points at `satchida-infra`. Both instances ran the vulnerable 2026.3.0. Neither origin is HTTPS (loopback HTTP), so the eMudhra origin-CA issue does not apply; `noTLSVerify` keys are inert for http origins.
+2. **Upgrade path (zero-downtime, replica pattern)**: downloaded 2026.10.7 to `.cloudflared/cloudflared-new.exe`; for each tunnel started a new-binary temp replica via PM2, then swapped the main instance, then removed the temp. The Windows service binary was replaced in place via an elevated (`net stop` / copy / `net start`) step — operator approved the UAC prompt. Verified: both tunnels re-registered 4 connections; `cloudflared --version` 2026.10.7 for the service path; `ai.satchida.com` healthy throughout. PM2 dump saved; `ecosystem.config.js` repointed to the new binary so reboots use it (old exe kept in Program Files for the service).
+3. **Wildcard DNS** — `cloudflared tunnel route dns --overwrite-dns <satchida-infra-id> "*.satchida.com"` created the proxied CNAME; resolution verified within seconds via 1.1.1.1. Note: session hosts are `<hexid>-ai.satchida.com` (single label — covered by the Universal SSL `*.satchida.com` cert). Cloudflare Access does not intercept them (verified: direct 200, no Access redirect). The earlier `aaa123test-` probe used non-hex letters and correctly fell through the session-host regex — hex-only ids by design.
+4. **Static preview live**: `SANDPACK_STATIC_BUNDLER_URL=https://ai.satchida.com` uncommented, server restarted. End-to-end through the real tunnel: `https://aaa1234-ai.satchida.com/` → vendored preview page (`<title>Preview</title>`), `/__csb_relay/*` and `/__csb_sw.<hash>.js` → 200 `text/javascript`. The artifact pipeline is now 100% origin-served: fonts, Tailwind, marked, the React/node compile bundler, and the static-preview relay.
+5. **Ops incident — orphan EADDRINUSE storm**: during rapid `pm2 restart` cycles, Windows tree-kill left orphan `node api/server/index.js` processes holding `0.0.0.0:3080`; each new tracked child died EADDRINUSE while an orphan kept serving (masking the crash). Fix: `pm2 stop` + kill every process whose CommandLine matches `api\server\index.js` + single clean `pm2 start`; verified listener PID == PM2 PID and long-window stability (PID unchanged 2m+, restart count frozen). Lesson: after any rapid restart series on Windows, check `netstat -ano | findstr :3080` against the PM2 pid file before trusting `online` status; a 200 from an orphan looks identical to health.
+
+Note: Cloudflare edge cached a transient 404 for the SW path during a restart window (negative caching on `.js`, `max-age=14400`); self-healed within minutes. Content-hashed SW filename makes stale-edge caching harmless. If it recurs after a restart, wait out the negative TTL or purge via dashboard.
+
+## 2026-11-10 — ai.satchida.com repointed to LibreChat; gateway moved to gateway.satchida.com
+
+Operator reported that after passing the Access gate, `ai.satchida.com` loaded the one-api gateway web UI instead of LibreChat. Root cause: the `satchida-infra` config.yml mapped `ai.satchida.com → http://localhost:4000` (gateway) — an original-setup mapping, and the earlier stop-test that suggested the service tunnel (`satchida-hub`) served this host was invalid: Cloudflare Access answers unauthenticated requests at the EDGE before any tunnel lookup, so a 302 proves nothing about the origin. `cloudflared tunnel route dns` confirmed the CNAME for ai.satchida.com already targeted `satchida-infra` — only the ingress mapping was wrong.
+
+Fix: config.yml `ai.satchida.com → http://localhost:3080` (LibreChat, keeping the 600s SSE keep-alive tuning which chat streaming also benefits from; the unknown `noChunkedEncoding` key removed), and the gateway UI preserved under a new dedicated name `gateway.satchida.com → http://localhost:4000` (same exposure level as before, behind the same Access gate; CNAME added via `tunnel route dns`). Config validated, tunnel restarted, 4+ connections registered.
+
+Verification: local Host-header probes — `ai.satchida.com` on :3080 returns the LibreChat shell, `gateway.satchida.com` on :4000 returns 200; session hosts (`<id>-ai.satchida.com`) still 200 through the tunnel. Operator to confirm LibreChat renders after Access login.
+
+## 2026-11-10 — gateway.satchida.com excluded from the internet (operator decision)
+
+Operator judged the one-api gateway admin UI unfit for any external exposure. The ingress rule added earlier in the day was removed and replaced with an explicit kill rule placed ABOVE the wildcard (`gateway.satchida.com → http_status:404`) — without it the `*.satchida.com` wildcard would have fallen the name through to the LibreChat shell. Verified: the name now returns 404 with no app content; `ai.satchida.com` (Access gate → LibreChat) and the artifact session hosts are unaffected; the gateway remains fully usable locally at 127.0.0.1:4000. Optional follow-up: delete the leftover `gateway.satchida.com` CNAME in the Cloudflare dashboard (inert either way).
+
+## 2026-11-10 — Demo seat mode enablement (dcode/dchat) + deep_research diagnosis
+
+Operator requested: Work + Privacy + Vibecoding for `dcode`; Study for `dchat`.
+
+Mechanism traced end-to-end: the mode picker (`client/src/components/Chat/Input/SatchiModeSelector.tsx`) derives allowed modes from `accountTypeModes(user.accountType)` (packages/data-provider/src/tenant-entitlement.ts ACCOUNT_TYPE_MODES: basic/standard→Chat, family→Chat+Study, pro/pro_family→Chat+Study+Work, enterprise/privacy→+Privacy); Vibe Coder additionally requires `tenantSeatCapabilities` non-empty on a pro/privacy seat; Privacy mode is additionally fail-closed server-side (privacy assertion + local runtime). Server-side seat-policy enforcement only engages for seats carrying `seatToken` (demo seats have none).
+
+Changes (DB): `dcode` → `accountType: 'privacy'` + `tenantSeatCapabilities: ['work_tools','mcp','agents','code_execution']` (privacy allocation on satchida-master has localPrivacyEnabled: true; llama fleet running); `dchat` → `accountType: 'family'` (Chat + Study only, exactly as asked). LibreChat restarted to flush the auth user-document cache; orphan-port sweep repeated (known Windows restart race — 57272 killed), single clean start verified (listener PID == PM2 PID, stable, pm2 saved).
+
+deep_research_web_search diagnosis (Chat mode): the vault MCP server registers all 20 tools including it, and Chat's spec allowlist includes `satchida-knowledge-vault`, but per-USER connections for this account only ever establish for web-fetch/accessibility-tools/openfda-drugs/devops-security — the vault (and time-server/work-suite/health/panchang/web-search-server) never connect per-user; the model then calls the prompt-named tool → "Tool not found". Unresolved root cause: per-user connection failures log only "[MCP] Connection failed" without cause (packages/api/src/mcp/connection.ts connect()); the search itself completed via satchida-web-search (web_search/fetch_page ran). AnythingLLM sidecar (:3012) is UP, so the vault's own bridge is healthy. Follow-up: instrument the per-user connect error path or capture the thrown cause; not blocking the operator's demo since satchida-web-search covers search.
+
+## 2026-11-10 — Tool-not-found errors eliminated from mode prompts (full audit + resilience contract)
+
+Operator reported recurring "Tool X not found" UI errors (deep_research_web_search, then news_search) in Chat mode. Full audit built (scratch script `audit-prompt-tools.mjs`): every modelSpec's prompt-mentioned tool names vs the actually registered MCP tool catalog (parsed from `[MCP][server] Tools:` lines).
+
+Root cause chain: (1) the Chat and Work prompts named exact tool IDs (`deep_research_web_search`, `search_web_images`); (2) per-user MCP tool binding is flaky — at 21:44 the agent bound exactly one tool (native `web_search`), at other times satchida-web-search tools bound fine; when binding misses, the model still calls the prompt-named IDs → the agents framework answers "Tool X not found" (handlers.ts ON_TOOL_EXECUTE). The MCP servers themselves are constant and healthy (satchida-web-search: 4 tools all day; vault: 20 tools; standalone spawn probe of the vault with the SDK-minimal env connects in 2.1s with all 20 tools).
+
+Fix applied (librechat.yaml, hot at next boot): (1) Chat and Work prompts no longer name exact tool IDs — capability language instead ("your available search tools (web search, news search, or deep research when offered)"); (2) a new TOOL AVAILABILITY CONTRACT added to all 7 modelSpecs: call ONLY tools actually offered this turn; on a missing capability fall back to the available web search tool; never display a tool error to the user. yaml re-parsed OK (7/7 specs carry the contract; zero leftover exact IDs); server restarted cleanly (orphan sweep caught a recurrence of the port race; single owner verified).
+
+Verification: API reproduction as dcode (login 200 → POST /api/agents/chat → generation stream) completes with `final: true`; zero ON_TOOL_EXECUTE warnings in the log since the restart (last ones 21:44, pre-fix).
+
+KNOWN RESIDUAL (engineering follow-up, recorded for the next session): per-user MCP binding is flaky — for demo user 6ac7435…, per-user connections establish only for web-fetch/accessibility-tools/openfda-drugs/devops-security; the Python-heavy servers (knowledge-vault, web-search-server, time-server, work-suite, health-wellness, panchang-vedic) fail per-user with an unlogged cause ("[MCP] Connection failed" at packages/api/src/mcp/connection.ts:2252 swallows the thrown error's message). Evidence trail: per-user "Establishing/established" lines per server; ON_TOOL_EXECUTE Available snapshots; standalone spawn probe success. Next step: log the thrown cause in that catch, then fix (suspect per-user spawn env/concurrency on Windows). With the resilience contract in place, binding misses now degrade to fallback search instead of user-visible errors.
+
+## 2026-11-10 — Per-user MCP failure instrumentation deployed; steady state healthy
+
+Continuing the tool-binding follow-up: `packages/api/src/mcp/connection.ts` connect() catch now logs the thrown cause ("Connection failed: <message>") — per-user spawn failures can never again stonewall triage (Bugs.md B-new first step done). packages/api rebuilt (tsc clean), LibreChat restarted (port-owner sweep verified).
+
+Post-instrumentation steady state for the demo seat: per-user connections established (web-fetch, accessibility-tools, openfda-drugs, devops-security) and PERSISTENTLY REUSED across generations (no re-spawn on subsequent requests — zero new "Establishing" lines in the follow-up generation); app-level connections carry the full catalogs (satchida-knowledge-vault 20 tools incl. deep_research_web_search; satchida-web-search 4); a streamed generation as dcode completed `final: true` with zero tool errors; **zero** "Connection failed:" lines since the instrumented restart. The earlier failures (19:51/21:44) predate the restart and are consistent with spawn flakiness during the crash-loop/under-load era plus the 12h per-user tool-cache TTL (packages/api/src/mcp/catalog/store.ts); healthy per-user connections now persist and mask that path. The cause-logging will surface any recurrence directly in the log.
+
+Operator verification pending: UI re-test of dcode Chat (news query → search runs, no red tool errors) and the newly enabled modes (Work/Privacy/Vibe Coder for dcode; Study for dchat).
+
+## 2026-11-11 — Conversation auto-titling fixed (config + missing title source) ; VSCode WS diagnosed
+
+Operator: every conversation stays "New Chat". Root-cause chain (all gates found by instrumented reproduction):
+1. `endpoints.custom[*].titleConvo: false` on both Satchida endpoints (titles disabled) → true (Satchida's titleModel also moved Privacy→Chat: the Privacy route is fail-closed and unusable for titles).
+2. `endpoints.agents.titleConvo: false` — the PUBLIC agents endpoint config (which gateway-routed chats actually run through) overrode everything → true.
+3. With titling enabled, the generated title was garbage ("Context7 documentation lookup tool") because the fork's chat body carries `messages` (not the legacy `text` field) and addTitle read only `text` → empty title source → the title model invented titles from its injected context. Fix: new `deriveTitleSourceText(text, messages)` (packages/api/src/agents/titleSource.ts, exported via @librechat/api) resolves the last user message's text; wired at both addTitle call sites in request.js.
+4. Custom titlePrompt initially omitted the `{convo}` template variable the completion-title chain requires → model saw no conversation → constant hallucinated title; corrected to append "Conversation:\n{convo}". Also set `titleMethod: completion` on both endpoints (raw completion, no tool machinery).
+Verified end-to-end as dcode: a fresh generation now titles "Lowering Home Electricity Costs" for an electricity-bill question; `[titleConvo]` diagnostic logs (provider/model/method/inputText) and `[addTitle]` generated/persisted logs added permanently for future triage.
+Backfill: the 104 "New Chat" conversations are empty or failed-error generations with no titleable content (user messages store no content in this fork; assistant sides are errors) — 1 attempted backfill produced an assistant-greeting title and was reverted; deletion is the right cleanup and awaits operator approval (destructive).
+VSCode Server (VibeStudio IDE) WebSocket close 1006 over the tunnel: local WS upgrade through the LibreChat proxy verified working (101); synthetic WS upgrade through the tunnel from this host is rejected by cloudflared itself (400, no cf-ray) and variation requests hang — host-side synthetic testing is unreliable here (known Windows socket quirks). The user's 1006 is plausibly collateral from today's repeated tunnel restarts/upgrades. Action: operator re-tests the IDE in the browser now that the tunnel is stable; if 1006 recurs, capture the browser's WS handshake (DevTools → Network → WS) and revisit cloudflared WS handling.
+
+## 2026-11-11 — VibeStudio IDE (code-server) broken in-browser: CSP no-op bug fixed
+
+Operator's DevTools capture: `script-src-elem` blocks the `webWorkerExtensionHost` blob worker → the extension host never starts ("Error received from starting extension host (Kind: Remote)") → workbench WS cycles to 1006 → bare light-theme shell with no extensions (the user-visible "extensions/dark mode missing" symptom — the profile itself was always intact: Dark Modern theme + python/eslint/gitlens/prettier/continue verified in code-server's user-data-dir).
+
+Root cause: the `/api/ide` proxy's CSP rewriter (api/server/routes/ide.js) called `.replace()` WITHOUT assigning the result — the entire CSP "fix" was a no-op, so code-server's own strict CSP passed through untouched, and the rewriter never handled `script-src-elem` anyway.
+
+Fix: proxyRes rewriter rewritten — assigns the result and broadens script-src, script-src-elem, script-src-attr, worker-src, child-src on every proxied IDE document (adds 'unsafe-eval'/'unsafe-inline'/blob: where missing; frame-ancestors still stripped). Verified on a live proxied response: `script-src-elem 'unsafe-eval' 'unsafe-inline' blob:` now present; worker-src/script-src carry blob:.
+
+Also found during triage (fix-list): the `/api/ide` WS upgrade path in api/server/index.js forwards to code-server WITHOUT authentication — unauthenticated WebSocket reach to the IDE instance. To be closed with a JWT check in the upgrade handler.
+
+Operator action: hard-refresh the IDE (Ctrl+F5) — the extension host, installed extensions and Dark Modern theme should now load; extensions additionally need "Trust this folder" if Restricted Mode shows.

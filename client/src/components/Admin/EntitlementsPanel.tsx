@@ -28,7 +28,10 @@ interface DraftEntitlement {
   accountTypes: Record<string, AllocationDraft>;
 }
 
-function draftFrom(tenantId: string, source?: TenantEntitlementUpdate & { activeSeats?: number }): DraftEntitlement {
+function draftFrom(
+  tenantId: string,
+  source?: TenantEntitlementUpdate & { activeSeats?: number },
+): DraftEntitlement {
   const accountTypes: Record<string, AllocationDraft> = {};
   for (const [accountType, allocation] of Object.entries(source?.accountTypes ?? {})) {
     accountTypes[accountType] = {
@@ -133,10 +136,10 @@ export default function EntitlementsPanel() {
     : 0;
 
   return (
-    <div className="flex h-full flex-col overflow-auto p-6 md:p-8 bg-surface-primary text-text-primary max-w-7xl mx-auto w-full">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="mx-auto flex h-full w-full max-w-7xl flex-col overflow-auto bg-surface-primary p-6 text-text-primary md:p-8">
+      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <ShieldCheck className="h-6 w-6" />
             {localize('com_admin_entitlements_title')}
           </h1>
@@ -322,8 +325,7 @@ export default function EntitlementsPanel() {
               totalAllocated > editing.seatLimit ? 'text-red-500' : 'text-text-secondary'
             }`}
           >
-            {localize('com_admin_entitlements_allocated')}:{' '}
-            {totalAllocated} / {editing.seatLimit}
+            {localize('com_admin_entitlements_allocated')}: {totalAllocated} / {editing.seatLimit}
           </p>
 
           <div className="mt-6">
@@ -438,9 +440,7 @@ export default function EntitlementsPanel() {
       )}
 
       {!editing && entitlementsQuery.isError && (
-        <p className="text-sm text-red-500">
-          {(entitlementsQuery.error as Error).message}
-        </p>
+        <p className="text-sm text-red-500">{(entitlementsQuery.error as Error).message}</p>
       )}
     </div>
   );

@@ -1,5 +1,7 @@
 import React, { memo, useCallback, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
+import { Tools } from 'librechat-data-provider';
+import { Constants } from 'librechat-data-provider';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -15,6 +17,7 @@ import {
   BrainCircuit,
   Wand2,
   Sparkles,
+  FlaskConical,
   Image as ImageIcon,
   HelpCircle,
   Layers,
@@ -29,6 +32,8 @@ import {
   FileText,
   Presentation,
   Table2,
+  SlidersHorizontal,
+  Film,
 } from 'lucide-react';
 import {
   satchiModeAtom,
@@ -43,12 +48,10 @@ import {
   generateVibeCodingPrompt,
   generateMermaidDiagramPrompt,
 } from '~/store/satchiStore';
-import { Tools } from 'librechat-data-provider';
-import { useLocalize, useAuthContext } from '~/hooks';
 import { useBadgeRowContext, useChatContext } from '~/Providers';
-import { mcpValuesAtomFamily } from '~/store/mcp';
-import { Constants } from 'librechat-data-provider';
+import { useLocalize, useAuthContext } from '~/hooks';
 import SatchiUpgradeModal from './SatchiUpgradeModal';
+import { mcpValuesAtomFamily } from '~/store/mcp';
 import { cn } from '~/utils';
 
 interface SatchiToolbarProps {
@@ -97,16 +100,22 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
       }
       // Also sync MCP server selection for web search & fetch so model doesn't invoke search when toggled off
       if (!next) {
-        setMCPValues((current = []) => current.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'));
+        setMCPValues((current = []) =>
+          current.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'),
+        );
         if (badgeContext?.mcpServerManager?.setMCPValues) {
           const curr = badgeContext.mcpServerManager.mcpValues ?? [];
-          badgeContext.mcpServerManager.setMCPValues(curr.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'));
+          badgeContext.mcpServerManager.setMCPValues(
+            curr.filter((s) => s !== 'satchida-web-search' && s !== 'web-fetch'),
+          );
         }
       } else {
         setMCPValues((current = []) => Array.from(new Set([...current, 'satchida-web-search'])));
         if (badgeContext?.mcpServerManager?.setMCPValues) {
           const curr = badgeContext.mcpServerManager.mcpValues ?? [];
-          badgeContext.mcpServerManager.setMCPValues(Array.from(new Set([...curr, 'satchida-web-search'])));
+          badgeContext.mcpServerManager.setMCPValues(
+            Array.from(new Set([...curr, 'satchida-web-search'])),
+          );
         }
       }
       return next;
@@ -124,8 +133,67 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
       setUpgradeModal({ open: true, feature: 'research' });
       return;
     }
-    setResearch((prev) => !prev);
-  }, [disabled, isPro, setResearch]);
+    setResearch((prev) => {
+      const next = !prev;
+      if (next) {
+        // Auto-enable web search and inject necessary MCP servers for research & file generation
+        setWebSearch(true);
+        if (badgeContext?.webSearch?.debouncedChange) {
+          badgeContext.webSearch.debouncedChange({ value: true });
+        }
+        setMCPValues((current = []) =>
+          Array.from(
+            new Set([
+              ...current,
+              'satchida-web-search',
+              'satchida-knowledge-vault',
+              'academic-search',
+              'arxiv-search',
+            ]),
+          ),
+        );
+        if (badgeContext?.mcpServerManager?.setMCPValues) {
+          const curr = badgeContext.mcpServerManager.mcpValues ?? [];
+          badgeContext.mcpServerManager.setMCPValues(
+            Array.from(
+              new Set([
+                ...curr,
+                'satchida-web-search',
+                'satchida-knowledge-vault',
+                'academic-search',
+                'arxiv-search',
+              ]),
+            ),
+          );
+        }
+        showToast({
+          message:
+            '🔬 HyperResearch Active: 6-phase deep sweep, contradiction matrix & PDF dossier enabled!',
+          status: 'info',
+        });
+      } else {
+        showToast({
+          message: 'Deep Research deactivated.',
+          status: 'info',
+        });
+      }
+      return next;
+    });
+  }, [disabled, isPro, setResearch, setWebSearch, badgeContext, setMCPValues, showToast]);
+
+  const handleApplyPersonaPrompt = useCallback(
+    (prefix: string, label: string) => {
+      if (disabled || !getText || !setText) return;
+      const current = getText();
+      const combined = current.trim() ? `${prefix}\n\nUser Task: ${current}` : prefix;
+      setText(combined);
+      showToast({
+        message: `Applied ${label} specification!`,
+        status: 'info',
+      });
+    },
+    [disabled, getText, setText, showToast],
+  );
 
   const toggleImageGen = useCallback(() => {
     if (disabled) return;
@@ -174,7 +242,9 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
   const handleVaultSearch = useCallback(() => {
     if (disabled || !getText || !setText) return;
     const current = getText();
-    setText(`Query my AnythingLLM private knowledge vault using semantic RAG for: "${current || 'latest uploaded reports and documentation'}" and synthesize the answer with exact source citations.`);
+    setText(
+      `Query my AnythingLLM private knowledge vault using semantic RAG for: "${current || 'latest uploaded reports and documentation'}" and synthesize the answer with exact source citations.`,
+    );
     showToast({
       message: 'Configured Knowledge Vault RAG query!',
       status: 'info',
@@ -242,7 +312,10 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
       <div
         role="toolbar"
         aria-label="Satchida AI Assistant Controls"
-        className={cn('flex items-center gap-1 shrink-0', disabled && 'pointer-events-none opacity-50')}
+        className={cn(
+          'flex shrink-0 items-center gap-1',
+          disabled && 'pointer-events-none opacity-50',
+        )}
       >
         {/* 🌐 Web Search */}
         <TooltipAnchor
@@ -260,7 +333,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
               disabled={disabled}
               onClick={toggleWebSearch}
               className={cn(
-                'relative inline-flex h-8 w-8 items-center justify-center rounded-full border p-0 transition-all shadow-xs shrink-0',
+                'shadow-xs relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border p-0 transition-all',
                 webSearch
                   ? 'border-sky-500/60 bg-sky-950/40 text-sky-400 ring-1 ring-sky-500/50'
                   : 'border-border-light bg-surface-secondary/70 text-text-secondary hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary',
@@ -287,14 +360,14 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
               disabled={disabled}
               onClick={toggleThinking}
               className={cn(
-                'relative inline-flex h-8 w-8 items-center justify-center rounded-full border p-0 transition-all shadow-xs shrink-0',
+                'shadow-xs relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border p-0 transition-all',
                 isThinkingActive
                   ? 'border-amber-500/60 bg-amber-950/40 text-amber-300 ring-1 ring-amber-500/50'
                   : 'border-border-light bg-surface-secondary/70 text-text-secondary hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary',
               )}
             >
               {isThinkingActive ? (
-                <BrainCircuit className="h-4 w-4 text-amber-400 animate-pulse" />
+                <BrainCircuit className="h-4 w-4 animate-pulse text-amber-400" />
               ) : (
                 <Brain className="h-4 w-4" />
               )}
@@ -302,21 +375,62 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
           }
         />
 
-        {/* 🎨 Creative Tools Dropdown (Magic Prompt Enhancer, Deep Research, Image Gen) */}
+        {/* 🔬 Sovereign HyperResearch Toggle Button */}
+        <TooltipAnchor
+          description={
+            research
+              ? 'HyperResearch Active (Exhaustive 6-Phase Investigation, Contradiction Analysis & PDF Dossier) — Click to disable'
+              : 'Deep Research / HyperResearch — Click to enable autonomous deep investigation & PDF dossier creation'
+          }
+          side="top"
+          render={
+            <button
+              type="button"
+              aria-pressed={research}
+              aria-label="Toggle Deep Research / HyperResearch"
+              disabled={disabled}
+              onClick={toggleResearch}
+              className={cn(
+                'shadow-xs relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-all',
+                research
+                  ? 'border-indigo-500/70 bg-indigo-950/40 text-indigo-300 shadow-indigo-500/20 ring-1 ring-indigo-500/50'
+                  : 'border-border-light bg-surface-secondary/70 text-text-secondary hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary',
+              )}
+            >
+              <div className="relative flex items-center">
+                <FlaskConical
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    research ? 'text-indigo-400' : 'text-text-secondary',
+                  )}
+                />
+                {!isPro && (
+                  <Lock className="absolute -right-2 -top-1.5 h-2.5 w-2.5 text-amber-500" />
+                )}
+              </div>
+              <span className="hidden sm:inline">Research</span>
+              {research && (
+                <span className="flex h-1.5 w-1.5 animate-ping rounded-full bg-indigo-400" />
+              )}
+            </button>
+          }
+        />
+
+        {/* 🎨 Prompt Enhancement & Creative Tools Dropdown */}
         <DropdownMenu>
           <TooltipAnchor
-            description="Assistant Capabilities (Enhance Prompt, Deep Research, Image Gen)"
+            description="Prompt Enhancer & Creative Tools (Auto-Structure, Code Blueprint, Image Gen)"
             side="top"
             render={
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   disabled={disabled}
-                  aria-label="Assistant Capabilities"
+                  aria-label="Prompt Enhancer & Creative Tools"
                   className={cn(
-                    'inline-flex h-8 items-center gap-1 rounded-full border border-border-light bg-surface-secondary/70 px-2 text-xs font-medium text-text-secondary shadow-xs transition-all',
-                    'hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
-                    (research || imageGen) && 'border-violet-500/50 bg-violet-950/20 text-violet-400',
+                    'shadow-xs inline-flex h-8 items-center gap-1 rounded-full border border-border-light bg-surface-secondary/70 px-2 text-xs font-medium text-text-secondary transition-all',
+                    'focus-visible:outline-hidden focus-visible:ring-ring hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary focus-visible:ring-1',
+                    imageGen && 'border-emerald-500/50 bg-emerald-950/20 text-emerald-400',
                   )}
                 >
                   <Wand2 className="h-3.5 w-3.5" />
@@ -328,56 +442,109 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
           <DropdownMenuContent
             align="start"
             side="top"
-            className="w-60 rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl"
+            className="w-68 select-none rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl"
           >
-            {/* ✨ Magic Prompt Enhancer */}
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Prompt Enhancement
+            </div>
+
+            {/* ✨ Magic Auto-Enhance */}
             <DropdownMenuItem
               onClick={handleEnhancePrompt}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <Wand2 className="h-4 w-4 text-violet-400 shrink-0" />
+              <Wand2 className="h-4 w-4 shrink-0 text-violet-400" />
               <div>
-                <div className="font-semibold text-text-primary">Enhance Prompt</div>
-                <div className="text-[11px] text-text-secondary leading-tight">Expand draft to expert specification</div>
+                <div className="font-semibold text-text-primary">Auto-Enhance Draft</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Deconstruct into executive specification
+                </div>
               </div>
             </DropdownMenuItem>
 
-            {/* 🔬 Deep Research */}
+            {/* 🏗️ Architecture & Blueprint Formatter */}
             <DropdownMenuItem
-              onClick={toggleResearch}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              onClick={() =>
+                handleApplyPersonaPrompt(
+                  'Act as a Principal Staff Architect. Deconstruct the requirements from first principles into: (1) System Architecture & Component Diagram (```mermaid), (2) Failure Modes & Edge-Case Bottlenecks, (3) Data Flow & Concurrency Trade-Offs, and (4) Production Implementation Checklist.',
+                  'Staff Architect Blueprint',
+                )
+              }
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <div className="relative shrink-0">
-                <Sparkles className="h-4 w-4 text-indigo-400" />
-                {!isPro && <Lock className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" />}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-text-primary">Deep Research</span>
-                  {research && <span className="text-[10px] text-indigo-400 font-medium">ON</span>}
+              <SlidersHorizontal className="h-4 w-4 shrink-0 text-sky-400" />
+              <div>
+                <div className="font-semibold text-text-primary">Architectural Blueprint</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  First-principles system & trade-off spec
                 </div>
-                <div className="text-[11px] text-text-secondary leading-tight">Exhaustive multi-angle intelligence dossier</div>
               </div>
             </DropdownMenuItem>
+
+            {/* 🔍 Critical Review & Edge-Case Auditor */}
+            <DropdownMenuItem
+              onClick={() =>
+                handleApplyPersonaPrompt(
+                  'Perform an exhaustive, adversarial peer-review of the following proposal/code: (1) Identify top 3 fatal assumptions or race conditions, (2) Benchmark performance regressions, (3) Security vulnerabilities & data leak vectors, and (4) Concrete refactored recommendations.',
+                  'Adversarial Reviewer',
+                )
+              }
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <div className="font-semibold text-text-primary">Adversarial Reviewer</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Stress-test for fatal bugs & security holes
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="my-1 bg-border-light/60" />
+
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Creative Tools
+            </div>
 
             {/* 🖼️ Image Generation */}
             <DropdownMenuItem
               onClick={toggleImageGen}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <ImageIcon className="h-4 w-4 text-emerald-400 shrink-0" />
+              <ImageIcon className="h-4 w-4 shrink-0 text-emerald-400" />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-text-primary">Image Generation</span>
-                  {imageGen && <span className="text-[10px] text-emerald-400 font-medium">ON</span>}
+                  {imageGen && <span className="text-[10px] font-medium text-emerald-400">ON</span>}
                 </div>
-                <div className="text-[11px] text-text-secondary leading-tight">Photorealistic visual synthesis</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Photorealistic visual synthesis mode
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 🎬 Satchida Motion Animation */}
+            <DropdownMenuItem
+              onClick={() =>
+                handleApplyPersonaPrompt(
+                  'Act as an elite Motion Graphics Director. Transform the following report, document, or concept into a cinema-grade, single-file HTML motion graphic artifact using Satchida-Motion (HTML5, GSAP 3, fluid camera moves, kinetic typography, window.__TIMELINE__, and bottom playback scrubber). Never output static presentation slides or bullet points.',
+                  'Satchida Motion Studio',
+                )
+              }
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Film className="h-4 w-4 shrink-0 text-violet-400" />
+              <div>
+                <div className="font-semibold text-text-primary">Satchida Motion Animation</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Interactive GSAP kinetic presentation & explainer
+                </div>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-                {/* 🏛️ Satchida Knowledge Vault (AnythingLLM MCP Trigger) */}
+        {/* 🏛️ Satchida Knowledge Vault (AnythingLLM MCP Trigger) */}
         <DropdownMenu>
           <TooltipAnchor
             description="Knowledge Vault (AnythingLLM Vector Search & Multi-Format Document Generation)"
@@ -389,8 +556,8 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   disabled={disabled}
                   aria-label="Knowledge Vault & Document Generation"
                   className={cn(
-                    'inline-flex h-8 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 text-xs font-medium text-purple-400 shadow-xs transition-all',
-                    'hover:border-purple-500 hover:bg-purple-950/40 hover:text-purple-300 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+                    'shadow-xs inline-flex h-8 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 text-xs font-medium text-purple-400 transition-all',
+                    'focus-visible:outline-hidden focus-visible:ring-ring hover:border-purple-500 hover:bg-purple-950/40 hover:text-purple-300 focus-visible:ring-1',
                   )}
                 >
                   <FolderLock className="h-3.5 w-3.5 text-purple-400" />
@@ -403,7 +570,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
           <DropdownMenuContent
             align="start"
             side="top"
-            className="w-68 rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl select-none"
+            className="w-68 select-none rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl"
           >
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
               AnythingLLM Sovereign Vault
@@ -412,12 +579,14 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             {/* 🔍 Query Vault RAG */}
             <DropdownMenuItem
               onClick={handleVaultSearch}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <FolderLock className="h-4 w-4 text-purple-400 shrink-0" />
+              <FolderLock className="h-4 w-4 shrink-0 text-purple-400" />
               <div>
                 <div className="font-semibold text-text-primary">Search Knowledge Vault</div>
-                <div className="text-[11px] text-text-secondary leading-tight">Semantic RAG & verified source citations</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Semantic RAG & verified source citations
+                </div>
               </div>
             </DropdownMenuItem>
 
@@ -430,48 +599,56 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             {/* 📄 PDF Report */}
             <DropdownMenuItem
               onClick={() => handleDocSynthesis('pdf')}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <FileText className="h-4 w-4 text-rose-400 shrink-0" />
+              <FileText className="h-4 w-4 shrink-0 text-rose-400" />
               <div>
                 <div className="font-semibold text-text-primary">Generate PDF Report</div>
-                <div className="text-[11px] text-text-secondary leading-tight">ReportLab typographical layout</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  ReportLab typographical layout
+                </div>
               </div>
             </DropdownMenuItem>
 
             {/* 📊 PPTX Slides */}
             <DropdownMenuItem
               onClick={() => handleDocSynthesis('pptx')}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <Presentation className="h-4 w-4 text-amber-400 shrink-0" />
+              <Presentation className="h-4 w-4 shrink-0 text-amber-400" />
               <div>
                 <div className="font-semibold text-text-primary">Generate PPTX Deck</div>
-                <div className="text-[11px] text-text-secondary leading-tight">Multi-slide presentation deck</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Multi-slide presentation deck
+                </div>
               </div>
             </DropdownMenuItem>
 
             {/* 📈 Excel Spreadsheet */}
             <DropdownMenuItem
               onClick={() => handleDocSynthesis('xlsx')}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <Table2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <Table2 className="h-4 w-4 shrink-0 text-emerald-400" />
               <div>
                 <div className="font-semibold text-text-primary">Generate Excel (.xlsx)</div>
-                <div className="text-[11px] text-text-secondary leading-tight">Formatted data rows & formulas</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Formatted data rows & formulas
+                </div>
               </div>
             </DropdownMenuItem>
 
             {/* 📝 Word Document */}
             <DropdownMenuItem
               onClick={() => handleDocSynthesis('docx')}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
-              <FileText className="h-4 w-4 text-blue-400 shrink-0" />
+              <FileText className="h-4 w-4 shrink-0 text-blue-400" />
               <div>
                 <div className="font-semibold text-text-primary">Generate Word (.docx)</div>
-                <div className="text-[11px] text-text-secondary leading-tight">Styled Microsoft Word document</div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Styled Microsoft Word document
+                </div>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -481,7 +658,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
         {(mode === 'Study' || mode === 'Work') && (
           <DropdownMenu>
             <TooltipAnchor
-              description={mode === 'Study' ? 'Study Studio Tools (Quiz, Flashcards, Formulas)' : 'Work Studio Tools (Vibe-Coding, Architecture)'}
+              description={
+                mode === 'Study'
+                  ? 'Study Studio Tools (Quiz, Flashcards, Formulas)'
+                  : 'Work Studio Tools (Vibe-Coding, Architecture)'
+              }
               side="top"
               render={
                 <DropdownMenuTrigger asChild>
@@ -490,13 +671,17 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                     disabled={disabled}
                     aria-label={`${mode} Studio Tools`}
                     className={cn(
-                      'inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium shadow-xs transition-all',
+                      'shadow-xs inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all',
                       mode === 'Study'
                         ? 'border-sky-500/40 bg-sky-950/20 text-sky-400 hover:border-sky-500 hover:bg-sky-950/40'
                         : 'border-teal-500/40 bg-teal-950/20 text-teal-400 hover:border-teal-500 hover:bg-teal-950/40',
                     )}
                   >
-                    {mode === 'Study' ? <BookOpen className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
+                    {mode === 'Study' ? (
+                      <BookOpen className="h-3.5 w-3.5" />
+                    ) : (
+                      <Wrench className="h-3.5 w-3.5" />
+                    )}
                     <span>{mode === 'Study' ? 'Study Studio' : 'Work Studio'}</span>
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </button>
@@ -513,48 +698,56 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   {/* Quiz Generator */}
                   <DropdownMenuItem
                     onClick={handleCreateQuiz}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
-                    <HelpCircle className="h-4 w-4 text-sky-400 shrink-0" />
+                    <HelpCircle className="h-4 w-4 shrink-0 text-sky-400" />
                     <div>
                       <div className="font-semibold text-text-primary">Create Socratic Quiz</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">5-question quiz with spoiler answers</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        5-question quiz with spoiler answers
+                      </div>
                     </div>
                   </DropdownMenuItem>
 
                   {/* Flashcards */}
                   <DropdownMenuItem
                     onClick={handleCreateFlashcards}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
-                    <Layers className="h-4 w-4 text-purple-400 shrink-0" />
+                    <Layers className="h-4 w-4 shrink-0 text-purple-400" />
                     <div>
                       <div className="font-semibold text-text-primary">Generate Flashcards</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">8 spaced-repetition active recall cards</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        8 spaced-repetition active recall cards
+                      </div>
                     </div>
                   </DropdownMenuItem>
 
                   {/* Concept Diagram */}
                   <DropdownMenuItem
                     onClick={handleCreateDiagram}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
-                    <Network className="h-4 w-4 text-teal-400 shrink-0" />
+                    <Network className="h-4 w-4 shrink-0 text-teal-400" />
                     <div>
                       <div className="font-semibold text-text-primary">Concept Diagram</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">Syntactically valid Mermaid flowchart</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Syntactically valid Mermaid flowchart
+                      </div>
                     </div>
                   </DropdownMenuItem>
 
                   {/* KaTeX Math / Physics Ribbon */}
                   <DropdownMenuItem
                     onClick={handleCreateMathRibbon}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
-                    <Sigma className="h-4 w-4 text-rose-400 shrink-0" />
+                    <Sigma className="h-4 w-4 shrink-0 text-rose-400" />
                     <div>
                       <div className="font-semibold text-text-primary">Formula & TeX Ribbon</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">Rigorous KaTeX mathematical derivations</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Rigorous KaTeX mathematical derivations
+                      </div>
                     </div>
                   </DropdownMenuItem>
                 </>
@@ -565,27 +758,33 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   {/* Architecture Diagram */}
                   <DropdownMenuItem
                     onClick={handleCreateDiagram}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
-                    <Network className="h-4 w-4 text-teal-400 shrink-0" />
+                    <Network className="h-4 w-4 shrink-0 text-teal-400" />
                     <div>
                       <div className="font-semibold text-text-primary">Architecture Diagram</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">System architecture Mermaid diagram</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        System architecture Mermaid diagram
+                      </div>
                     </div>
                   </DropdownMenuItem>
 
                   {/* Vibe-Coding */}
                   <DropdownMenuItem
                     onClick={handleVibeCoding}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover outline-hidden"
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
                   >
                     <div className="relative shrink-0">
                       <Code2 className="h-4 w-4 text-emerald-400" />
-                      {!isPro && <Lock className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" />}
+                      {!isPro && (
+                        <Lock className="absolute -right-1 -top-1 h-2.5 w-2.5 text-amber-500" />
+                      )}
                     </div>
                     <div>
                       <div className="font-semibold text-text-primary">Vibe-Coding</div>
-                      <div className="text-[11px] text-text-secondary leading-tight">Staff engineer full-stack scaffolding</div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Staff engineer full-stack scaffolding
+                      </div>
                     </div>
                   </DropdownMenuItem>
                 </>

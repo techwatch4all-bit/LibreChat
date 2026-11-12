@@ -197,7 +197,7 @@ export function tenantSeatCanUseCapability(
 
 export function normalizeSemanticMode(mode: string): SemanticMode | undefined {
   const normalized = mode.trim().toLowerCase();
-  if (normalized === 'vibecoder' || normalized === 'vibe_coding') return 'Work';
+  if (normalized === 'vibecoder' || normalized === 'vibe_coding' || normalized === 'motion') return 'Work';
   return SEMANTIC_MODES.find((candidate) => candidate.toLowerCase() === normalized);
 }
 

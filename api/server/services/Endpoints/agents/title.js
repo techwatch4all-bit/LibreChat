@@ -49,21 +49,34 @@ const addTitle = async (
 ) => {
   const { TITLE_CONVO = true } = process.env ?? {};
   if (!isEnabled(TITLE_CONVO)) {
+    logger.info('[addTitle] skipped: TITLE_CONVO env disabled');
     return;
   }
 
   if (client.options.titleConvo === false) {
+    logger.info('[addTitle] skipped: endpoint titleConvo=false');
     return;
   }
 
   // Skip title generation for temporary conversations
   if (req?.body?.isTemporary) {
+    logger.info('[addTitle] skipped: temporary conversation');
     return;
   }
 
   const convoId = conversationId ?? response?.conversationId;
   if (!convoId) {
     logger.warn('[addTitle] Missing conversationId; skipping title generation');
+    return;
+  }
+
+  /** A blank first message gives the title model nothing to summarize: it
+   *  hallucinates arbitrary titles (observed: model-list descriptions like
+   *  "Context7 documentation lookup tool" repeated across empty sends). Skip
+   *  the model entirely and keep the conversation's default title; the user
+   *  can rename it, and the next real message does not regenerate. */
+  if (typeof text === 'string' && text.trim() === '') {
+    logger.info('[addTitle] blank first message; keeping default title');
     return;
   }
 
@@ -119,10 +132,13 @@ const addTitle = async (
       return;
     }
 
+    logger.info(`[addTitle] generated title for ${convoId}: ${JSON.stringify(generatedTitle)}`);
+
     const title = resolveConversationTitle(req, generatedTitle);
     if (title == null) {
       return;
     }
+    logger.info(`[addTitle] persisting title for ${convoId}: ${JSON.stringify(title)}`);
 
     await titleCache.set(key, title, 120000);
 

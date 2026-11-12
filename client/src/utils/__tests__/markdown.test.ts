@@ -119,7 +119,7 @@ describe('markdown artifacts', () => {
       const files = getMarkdownFiles(markdown);
 
       expect(files['index.html']).toContain('<!DOCTYPE html>');
-      expect(files['index.html']).toContain('marked.min.js');
+      expect(files['index.html']).toContain('/assets/vendor/marked-15.0.12.min.js');
       expect(files['index.html']).toContain('marked.parse');
       expect(files['index.html']).toContain('# Test');
     });
@@ -320,17 +320,18 @@ describe('markdown artifacts', () => {
       expect(html).toContain('<!DOCTYPE html>');
       expect(html).toContain('<html lang="en">');
       expect(html).toContain('<title>Markdown Preview</title>');
-      expect(html).toContain('marked.min.js');
+      expect(html).toContain('/assets/vendor/marked-15.0.12.min.js');
       expect(html).toContain('marked.use(');
       expect(html).toContain('marked.parse(');
     });
 
-    it('should pin the CDN script to an exact version with SRI', () => {
+    it('should load the self-hosted marked runtime from the app origin with SRI', () => {
       const files = getMarkdownFiles('# Test');
       const html = files['index.html'];
 
-      expect(html).toMatch(/marked@\d+\.\d+\.\d+/);
-      expect(html).toContain('integrity="sha384-');
+      expect(html).not.toContain('cdn.jsdelivr.net');
+      expect(html).toContain('/assets/vendor/marked-15.0.12.min.js"');
+      expect(html).toContain('integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+"');
       expect(html).toContain('crossorigin="anonymous"');
     });
 

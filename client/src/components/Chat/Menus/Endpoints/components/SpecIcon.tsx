@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { ProviderIcon } from '@librechat/client';
+import { MessageSquare, Sparkles, Terminal, GraduationCap, ShieldCheck, Film } from 'lucide-react';
 import type { TModelSpec, TEndpointsConfig } from 'librechat-data-provider';
 import { EntityEndpointMark, isEntityEndpoint } from '~/components/Endpoints/EntityEndpointMark';
 import { URLIcon } from '~/components/Endpoints/URLIcon';
@@ -11,9 +12,29 @@ interface SpecIconProps {
   endpointsConfig: TEndpointsConfig;
   /** Avatar of the agent this spec targets, used when the spec defines no icon of its own. */
   agentAvatarURL?: string;
+  size?: number;
 }
 
-const SpecIcon: React.FC<SpecIconProps> = ({ currentSpec, endpointsConfig, agentAvatarURL }) => {
+const SPEC_ICONS: Record<
+  string,
+  { icon: React.ComponentType<{ size?: number; className?: string }>; color: string }
+> = {
+  chat: { icon: MessageSquare, color: 'text-sky-400' },
+  work: { icon: Sparkles, color: 'text-indigo-400' },
+  vibecoding: { icon: Terminal, color: 'text-emerald-400' },
+  vibecoder: { icon: Terminal, color: 'text-emerald-400' },
+  study: { icon: GraduationCap, color: 'text-teal-400' },
+  'study-local': { icon: GraduationCap, color: 'text-teal-400' },
+  privacy: { icon: ShieldCheck, color: 'text-amber-400' },
+  motion: { icon: Film, color: 'text-fuchsia-400' },
+};
+
+const SpecIcon: React.FC<SpecIconProps> = ({
+  currentSpec,
+  endpointsConfig,
+  agentAvatarURL,
+  size = 18,
+}) => {
   const iconURL = getModelSpecIconURL(currentSpec, agentAvatarURL);
   const endpoint = currentSpec.preset?.endpoint;
   const { provider, imageURL } = useProviderIcon({ endpoint, endpointsConfig, iconURL });
@@ -24,7 +45,7 @@ const SpecIcon: React.FC<SpecIconProps> = ({ currentSpec, endpointsConfig, agent
       <URLIcon
         iconURL={imageURL}
         altName={currentSpec.name}
-        containerStyle={{ width: 20, height: 20 }}
+        containerStyle={{ width: size, height: size }}
         className="icon-md shrink-0 overflow-hidden rounded-full"
         provider={fallbackProvider}
       />
@@ -35,11 +56,18 @@ const SpecIcon: React.FC<SpecIconProps> = ({ currentSpec, endpointsConfig, agent
     return <EntityEndpointMark endpoint={iconURL || endpoint} />;
   }
 
+  const specKey = currentSpec.name?.toLowerCase?.() ?? '';
+  const specMatch = SPEC_ICONS[specKey];
+  if (specMatch) {
+    const IconComponent = specMatch.icon;
+    return <IconComponent size={size} className={`${specMatch.color} shrink-0`} />;
+  }
+
   return (
     <ProviderIcon
       provider={provider}
       model={currentSpec.preset?.model}
-      size={20}
+      size={size}
       className="icon-md shrink-0"
     />
   );

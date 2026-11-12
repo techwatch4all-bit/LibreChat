@@ -348,10 +348,10 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     starters: [
       {
         prompt:
-          'Multi-Turn Deep Research Dossier: Conduct an exhaustive, citation-backed technical investigation on: [Emerging Technology / Scientific Topic]. Sourcing floor: at least 8 distinct domains, primary sources preferred, an explicit contradiction log where sources disagree, an annotated bibliography, and an "as of" date — cite only items actually retrieved, never an invented reference.',
+          'HyperResearch Dossier: Conduct a full 6-phase sovereign deep research investigation on: [Emerging Technology / Scientific Topic / Policy]. Execute — (1) Atomic decomposition into 5–8 falsifiable sub-questions, (2) Multi-tier parallel sweeps across official registers, academic citations, and empirical benchmarks, (3) Build a Contradiction & Correlation Matrix for conflicting claims, (4) Identify unresolved empirical gaps and retracted literature, (5) Run a 4-critic adversarial self-audit (Dialectic / Depth / Width / Citation), then (6) Generate and save a downloadable PDF dossier using create_formatted_document and provide a 1-click download link.',
         badge: 'Deep Research',
         badgeKey: 'starters_badge_deep_research',
-        mcpServers: ['satchida-web-search', 'academic-search'],
+        mcpServers: ['satchida-web-search', 'satchida-knowledge-vault', 'academic-search', 'arxiv-search'],
       },
       {
         prompt:

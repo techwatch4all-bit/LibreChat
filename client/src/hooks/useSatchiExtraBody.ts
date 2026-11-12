@@ -7,6 +7,7 @@ import {
   satchiResearchAtom,
   satchiImageGenAtom,
   STYLE_PROMPTS,
+  HYPERRESEARCH_PROMPT_PREFIX,
   type SatchiStyle,
   type SatchiMode,
   type SatchiThinkLevel,
@@ -43,7 +44,14 @@ export function useSatchiExtraBody(): {
     satchida_imagegen: imageGen,
   };
 
-  const stylePromptPrefix = STYLE_PROMPTS[style] || '';
+  const prefixes: string[] = [];
+  if (STYLE_PROMPTS[style]) {
+    prefixes.push(STYLE_PROMPTS[style]);
+  }
+  if (research) {
+    prefixes.push(HYPERRESEARCH_PROMPT_PREFIX);
+  }
+  const stylePromptPrefix = prefixes.join('\n\n');
 
   return {
     extraBody,

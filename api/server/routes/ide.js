@@ -26,12 +26,48 @@ const vscoderProxy = createProxyMiddleware({
       // so it can render seamlessly inside LibreChat's same-origin <iframe>
       delete proxyRes.headers['x-frame-options'];
       if (proxyRes.headers['content-security-policy']) {
-        proxyRes.headers['content-security-policy'] = proxyRes.headers['content-security-policy']
+        let csp = proxyRes.headers['content-security-policy']
           .replace(/frame-ancestors\s+[^;]+;?/gi, '')
           .replace(
             /default-src\s+([^;]+)/i,
             "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval'",
           );
+        /** code-server serves several documents (workbench HTML, the extension-host
+         *  worker iframe) each with their own CSP; the worker iframe's policy blocks
+         *  its blob: web worker (script-src-elem), which kills the extension host and
+         *  cascades into workbench WS 1006. Broaden every script/worker directive on
+         *  every proxied document: this is an authenticated internal IDE surface. */
+        const ensureTokens = (directive, tokens) => {
+          const re = new RegExp(directive + '\\s+([^;]+)', 'i');
+          if (re.test(csp)) {
+            csp = csp.replace(re, (_m, sources) => {
+              const additions = tokens.filter(
+                (t) => !sources.toLowerCase().includes(t.toLowerCase()),
+              );
+              return additions.length
+                ? `${directive} ${sources} ${additions.join(' ')}`
+                : _m;
+            });
+          } else {
+            csp += ` ${directive} ${tokens.join(' ')};`;
+          }
+        };
+        const scriptTokens = ["'unsafe-eval'", "'unsafe-inline'", 'blob:'];
+        ensureTokens('script-src', scriptTokens);
+        /** Amend script-src-elem/attr ONLY when the upstream response already
+         *  carries them (the worker-iframe document). Injecting them fresh onto
+         *  the nonce-protected workbench document would strip nonce protection:
+         *  script-src-elem takes precedence, and 'unsafe-inline' is ignored
+         *  policy-wide once nonces exist, killing the workbench's own scripts. */
+        if (/script-src-elem\s+/i.test(csp)) {
+          ensureTokens('script-src-elem', scriptTokens);
+        }
+        if (/script-src-attr\s+/i.test(csp)) {
+          ensureTokens('script-src-attr', ["'unsafe-inline'"]);
+        }
+        ensureTokens('worker-src', ["'self'", 'data:', 'blob:']);
+        ensureTokens('child-src', ["'self'", 'data:', 'blob:']);
+        proxyRes.headers['content-security-policy'] = csp;
       }
       proxyRes.headers['cross-origin-resource-policy'] = 'cross-origin';
     },

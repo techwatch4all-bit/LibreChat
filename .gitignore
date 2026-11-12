@@ -216,3 +216,13 @@ __pycache__/
 .zcodeignore
 
 satchida/router/roster-state.json
+
+# Tool caches and scratch directories
+.mimosa/
+**/.mimosa/
+client/client/
+scratch/
+client/public/motion/*.mp4
+client/public/motion/*.png
+!client/public/motion/.gitkeep
+

@@ -354,13 +354,24 @@ export function getProps(type: string): Partial<SandpackProviderProps> {
   };
 }
 
-/** Fragment hint lets Sandpack's static-template regex detect `.js` from the URL;
- * without it, the versioned CDN path (`/3.4.17`) has no recognised extension and
- * `injectExternalResources` throws "Unable to determine file type". */
-const TAILWIND_CDN = 'https://cdn.tailwindcss.com/3.4.17#tailwind.js';
+/** Tailwind's Play CDN runtime, self-hosted from the app's own static assets
+ * (client/public/assets/vendor/) so artifact previews make no third-party request.
+ * The path ends in `.js`, so Sandpack's static-template regex detects the type
+ * without a fragment hint; absolute URL because the preview iframe's origin
+ * (hosted bundler) differs from the app's. */
+export const TAILWIND_RUNTIME_URL = `${window.location.origin}/assets/vendor/tailwind-3.4.17.js`;
+export const GSAP_RUNTIME_URL = `${window.location.origin}/assets/vendor/gsap/gsap.min.js`;
+
+/** React/node template previews compile in sandpack's runtime bundler, vendored
+ * from the version-locked hosted build (see assets/vendor/sandpack-runtime/
+ * PROVENANCE.md) so artifact previews make no third-party request. Override via
+ * the SANDPACK_BUNDLER_URL startup config; static templates are served by the
+ * static-browser-server relay (SANDPACK_STATIC_BUNDLER_URL, wildcard session
+ * hosts) and keep the library default when the env is unset. */
+export const LOCAL_RUNTIME_BUNDLER_URL = `${window.location.origin}/assets/vendor/sandpack-runtime/index.html`;
 
 export const sharedOptions: SandpackProviderProps['options'] = {
-  externalResources: [TAILWIND_CDN],
+  externalResources: [TAILWIND_RUNTIME_URL, GSAP_RUNTIME_URL],
 };
 
 export type SandpackStartupConfig = Pick<
@@ -378,7 +389,10 @@ export function buildSandpackOptions(
 
   return {
     ...sharedOptions,
-    bundlerURL: template === 'static' ? startupConfig.staticBundlerURL : startupConfig.bundlerURL,
+    bundlerURL:
+      template === 'static'
+        ? startupConfig.staticBundlerURL
+        : (startupConfig.bundlerURL ?? LOCAL_RUNTIME_BUNDLER_URL),
   };
 }
 
@@ -575,7 +589,10 @@ export function parseProjectManifest(content: string | undefined | null): Record
      * first real line isn't a blank, and strip trailing blank lines that
      * the author (or our slice) left at the boundary. Inner content is
      * preserved verbatim — leading indentation matters for code. */
-    body = body.replace(/^\n/, '').replace(/[\t ]+$/gm, '').replace(/\n+$/, '');
+    body = body
+      .replace(/^\n/, '')
+      .replace(/[\t ]+$/gm, '')
+      .replace(/\n+$/, '');
     let path = m[1].trim();
     if (path.length === 0) {
       continue;
@@ -1387,7 +1404,7 @@ export const sharedFiles = {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Document</title>
-        <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+        <script src="${TAILWIND_RUNTIME_URL}"></script>
         <style>
           ::-webkit-scrollbar{height:.1em;width:.5rem}
           ::-webkit-scrollbar-thumb{background-color:rgba(0,0,0,.1);border-radius:9999px}

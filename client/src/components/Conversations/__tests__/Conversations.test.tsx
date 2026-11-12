@@ -1,6 +1,7 @@
 import React, { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { RecoilRoot } from 'recoil';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -82,7 +83,8 @@ jest.mock('@librechat/client', () => ({
 
 jest.mock('~/data-provider', () => ({
   useActiveJobs: () => ({ data: { activeJobIds: mockActiveJobIds } }),
-  useAssignConversationToProjectMutation: () => ({ mutate: jest.fn() }),
+  useDeleteConversationMutation: () => ({ mutate: jest.fn(), mutateAsync: jest.fn().mockResolvedValue({}) }),
+  useAssignConversationToProjectMutation: () => ({ mutate: jest.fn(), mutateAsync: jest.fn() }),
   usePinConversationMutation: () => ({ mutate: jest.fn() }),
 }));
 
@@ -129,7 +131,8 @@ describe('Conversations: live running order', () => {
   it('promotes and restores a chat without changing its paged input', () => {
     const conversations = [newer, running];
     const renderList = () => (
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
         <DndProvider backend={HTML5Backend}>
           <RecoilRoot>
             <Conversations
@@ -148,6 +151,7 @@ describe('Conversations: live running order', () => {
           </RecoilRoot>
         </DndProvider>
       </QueryClientProvider>
+      </MemoryRouter>
     );
     const rowOrder = () => screen.getAllByTestId('convo').map((row) => row.textContent);
 
@@ -183,7 +187,8 @@ describe('Conversations: pinned chats live in PinnedSection', () => {
 
   const renderConversations = (conversations: TConversation[], searchQuery = '') =>
     render(
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
         <DndProvider backend={HTML5Backend}>
           <RecoilRoot
             initializeState={({ set }) => {
@@ -211,7 +216,8 @@ describe('Conversations: pinned chats live in PinnedSection', () => {
             />
           </RecoilRoot>
         </DndProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
+      </MemoryRouter>,
     );
 
   it('does not render a pinned header inside the chats list', () => {
@@ -280,7 +286,8 @@ describe('Conversations: all-pin pages still paginate', () => {
     hasNextPage?: boolean;
   }) =>
     render(
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
         <DndProvider backend={HTML5Backend}>
           <RecoilRoot>
             <Conversations
@@ -301,7 +308,8 @@ describe('Conversations: all-pin pages still paginate', () => {
             />
           </RecoilRoot>
         </DndProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
+      </MemoryRouter>,
     );
   it('renders a retryable load error instead of the empty state', () => {
     const onRetry = jest.fn();
@@ -361,7 +369,8 @@ describe('Conversations: all-pin pages still paginate', () => {
     expect(loadMoreConversations).toHaveBeenCalledTimes(1);
 
     rerender(
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
         <DndProvider backend={HTML5Backend}>
           <RecoilRoot>
             <Conversations
@@ -379,10 +388,12 @@ describe('Conversations: all-pin pages still paginate', () => {
             />
           </RecoilRoot>
         </DndProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
+      </MemoryRouter>,
     );
     rerender(
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
         <DndProvider backend={HTML5Backend}>
           <RecoilRoot>
             <Conversations
@@ -400,7 +411,8 @@ describe('Conversations: all-pin pages still paginate', () => {
             />
           </RecoilRoot>
         </DndProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
+      </MemoryRouter>,
     );
 
     expect(loadMoreConversations).toHaveBeenCalledTimes(1);

@@ -18,17 +18,73 @@ export const STYLE_PROMPTS: Record<SatchiStyle, string> = {
 };
 
 /**
- * Heuristic contextual prompt enhancer that expands drafts into expert instructions.
- * Ported from Satchida Unified Suite reference implementation.
+ * Sovereign HyperResearch 6-Phase Protocol injected when Deep Research is activated.
+ */
+export const HYPERRESEARCH_PROMPT_PREFIX = `[SOVEREIGN HYPERRESEARCH DIRECTIVE ACTIVE]
+You MUST execute the full 6-phase HyperResearch protocol for this inquiry:
+Phase 1: Atomic Query Decomposition into 5–8 falsifiable sub-questions.
+Phase 2: Multi-Tier Parallel Sweeps across primary government/official records, academic citation graphs, and empirical benchmarks.
+Phase 3: Construct a dedicated Markdown "⚔️ Cross-Domain Contradiction & Correlation Matrix" comparing consensus claims vs. dissenting/field evidence with root cause analysis.
+Phase 4: Explicitly identify Unresolved Empirical Gaps, omitted parameters, and retracted literature.
+Phase 5: 4-Critic Adversarial Audit (Dialectic, Depth, Width, Instruction/Citation rigor).
+Phase 6: MANDATORY DOSSIER FILE GENERATION: At the conclusion of your research, you MUST call create_formatted_document(filename="[Topic_Slug]_HyperResearch_Dossier.pdf", content=full_report_content, doc_type="pdf") and output the direct 1-click download link: "[📥 Download Full Research Dossier (.PDF)](/generated/[Filename].pdf)". Never say you cannot generate files.`;
+
+/**
+ * Gold-standard contextual prompt enhancer.
+ * Applies the industry-standard RSCIT framework (Role, Situation, Constraints, Instructions, Template)
+ * along with Chain-of-Thought (CoT), few-shot guidance, and domain heuristics to turn brief, vague,
+ * or raw user queries into comprehensive, executive-grade prompts.
  */
 export function heuristicEnhance(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) {
-    return 'Provide an executive briefing on today\'s top priorities, actionable milestones, and strategic recommendations.';
+    return `### 🎯 Objective & Strategic Directive
+Provide an exhaustive, executive-level intelligence briefing on today's highest-priority developments, emerging risks, and actionable milestones.
+
+### 📐 Execution Framework (RSCIT Standard)
+1. **Role & Perspective**: Senior Strategic Intelligence Officer & Sovereign AI Advisor.
+2. **Situation Context**: Real-time cross-domain horizon scanning across technology, markets, policy, and national infrastructure.
+3. **Core Tasks**:
+   - Deconstruct critical breakthroughs and emerging threats from first principles.
+   - Contrast status-quo consensus against empirical dissenting signals.
+   - Synthesize quantitative performance metrics, unit economics, and operational run-rates.
+4. **Output Architecture**:
+   - **Executive Takeaways**: 3–5 bulleted high-signal directives.
+   - **Empirical Matrix**: Markdown comparison table with verified metrics.
+   - **Risk & Failure Modes**: Edge-case vulnerabilities, regulatory compliance barriers, and mitigation playbooks.
+   - **Actionable Roadmap**: Phased milestones (Immediate, Mid-Term, Long-Term).
+   - **Verified Citations**: Clickable primary source links [Source Name](URL) with timestamps.`;
   }
+
   const lower = trimmed.toLowerCase();
 
-  // 1. SHTF / OSINT / Disaster / Crisis Dossier
+  // 1. Coding, Software Architecture & Debugging
+  if (
+    /code|bug|function|react|typescript|python|api|sql|database|docker|backend|frontend|architect|class|interface|refactor|optimize/i.test(
+      lower,
+    )
+  ) {
+    return `### 🧑‍💻 Persona & Engineering Role
+You are a Principal Staff Software Architect and Security Auditor specializing in robust, production-grade systems engineering.
+
+### 🎯 Task & Scope
+Implement an exhaustive, production-ready solution for the following requirement:
+> "${trimmed}"
+
+### 🛡️ Non-Functional Requirements & Constraints
+1. **Language & Standards**: Idiomatic, modern TypeScript / Python with strict static types, zero \`any\`, and exhaustive error handling.
+2. **Defensive Architecture**: Protect against race conditions, memory leaks, unhandled async rejection, and boundary exceptions.
+3. **Performance & Scalability**: Detail computational complexity (Time & Space in Big-O notation), database query plan impact (indexes/locks), and memory footprint.
+4. **Zero Pseudo-Code Directive**: Provide complete, copy-paste runnable implementation files with no truncated lines, no \`// TODO\`, and no placeholder ellipses.
+
+### 📋 Deliverable Structure
+1. **Architectural Blueprint & Data Flow**: Concise summary of design decisions, component contracts, and Mermaid sequence/architecture diagram (\`\`\`mermaid).
+2. **Complete Source Code**: Fully documented, modular, and typed production code.
+3. **Verification & Edge-Case Unit Tests**: Jest/PyTest test suites covering happy paths, boundary failures, and invalid payloads.
+4. **Deployment & Operational Verification**: Step-by-step local execution commands and verification checklist.`;
+  }
+
+  // 2. SHTF / OSINT / Disaster / Crisis Operations
   if (/shtf|situational awareness|crisis operations|disaster.*bulletin|natural threat/i.test(lower)) {
     return `Provide an exhaustive, real-time SHTF / OSINT Situational Awareness Dossier for India (National, Metros & Sensitive Frontier States) covering today's latest ground reality across all 6 critical survival domains:
 
@@ -61,7 +117,7 @@ Output Requirements:
 - Provide actionable off-grid emergency survival recommendations for affected civilians.`;
   }
 
-  // 2. RBI / Banking / Master Directions / Consumer Loan Impact
+  // 3. RBI / Banking / Financial Policy / Consumer Loans
   if (/rbi|banking|repo rate|master direction|mclr|lending|nbfc|cbdc/i.test(lower)) {
     return `Perform a comprehensive, real-time regulatory compliance and citizen financial impact audit on RBI policy directives and banking operations:
 
@@ -85,29 +141,35 @@ Output Requirements:
 - Deliver structured comparison tables, exact circular references, and verified RBI portal citations.`;
   }
 
-  // 3. Supreme Court & Gazette Legal Counsel
-  if (/supreme court|judiciary|gazette|legal|bns|bnss|dpdp/i.test(lower)) {
-    return `Provide an exhaustive legal intelligence briefing on the latest landmark Supreme Court rulings, High Court orders, Gazette of India notifications, and central ministry directives impacting citizen rights and institutional governance:
+  // 4. Supreme Court & Gazette Legal Counsel
+  if (/supreme court|judiciary|gazette|legal|law|bns|bnss|dpdp|statute|contract/i.test(lower)) {
+    return `Provide an exhaustive legal intelligence briefing on the latest landmark Supreme Court rulings, High Court orders, Gazette of India notifications, and central ministry directives:
 
-1. 🏛️ Supreme Court Landmark Judgments:
-   - Recent constitutional bench rulings, review petitions, and significant practice directions affecting citizen rights and public interest.
+Subject Inquiry:
+> "${trimmed}"
 
-2. 🎓 Education Directives & Admission Mandates:
-   - Judicial orders on private school fee hikes, state fee regulatory committees, quota/reservation implementation, and NEET UG/PG admission norms.
+1. 🏛️ Jurisprudential & Statutory Grounding:
+   - Applicable constitutional provisions, statutory acts (including BNS, BNSS, BSA, DPDP), and authoritative judicial precedents (AIR/SCC citations).
 
-3. 🩺 Healthcare Directives & Hospital Price Caps:
-   - Enforcement of Article 21 Right to Health, mandatory emergency hospital admissions, capping of ICU/hospital procedure charges, and medical negligence precedents.
+2. ⚖️ Core Legal Issues & Divergent Interpretations:
+   - Structured analysis of legal rights, statutory obligations, procedural mandates, and judicial tests established by the courts.
 
-4. 📜 Gazette Notifications, DPDP Act & Criminal Laws:
-   - Official central notifications in The Gazette of India, rules notified under the Digital Personal Data Protection (DPDP) Act, and procedural enforcement under Bharatiya Nyaya Sanhita (BNS/BNSS/BSA).
+3. 💼 Practical Institutional & Citizen Impact:
+   - Direct compliance burdens, contractual risk exposures, and evidentiary admissibility standards.
+
+4. 🛡️ Risk Mitigation & Strategic Counsel:
+   - Actionable legal safeguards, statutory filing procedures, and protective notices.
 
 Output Requirements:
-- Provide statutory case citations (e.g. AIR/SCC references), Gazette notification numbers, and hyperlinked official portal sources.`;
+- Formal, precise legal terminology with full section references and hyperlinked official portal citations. Include standard non-advocate legal informational disclaimer.`;
   }
 
-  // 4. Frontier AI & Local SLMs
-  if (/frontier ai|local.*llm|slm|gguf|ollama|gpu|vram|llama\.cpp/i.test(lower)) {
+  // 5. Frontier AI & Local SLMs
+  if (/frontier ai|local.*llm|slm|gguf|ollama|gpu|vram|llama\.cpp|quantiz/i.test(lower)) {
     return `Provide a comprehensive technical analysis and architectural guide for Frontier AI models, open-weight LLMs, and local on-device Small Language Models (SLMs):
+
+Target Scope:
+> "${trimmed}"
 
 1. 💻 Top Open-Weight Local LLMs & SLMs for Consumer Hardware:
    - Compare the latest open-weight architectures (DeepSeek-R1/V3 distilled, Qwen 2.5/3 7B/14B/32B, Phi-4, Llama 3.3, Mistral NeMo) for 100% private, sovereign execution.
@@ -124,9 +186,12 @@ Output Requirements:
 - Include a VRAM & Model Quantization Sizing Table (Model | Quant Level | Context Length | Min VRAM | Tokens/sec Target).`;
   }
 
-  // 5. Precious Metals, Markets & Crypto Volatility
+  // 6. Precious Metals, Markets & Crypto Volatility
   if (/gold|silver|sona|chandi|bullion|nifty|sensex|crypto|bitcoin|fear.*greed/i.test(lower)) {
     return `Provide a comprehensive real-time financial market, precious metals, and crypto risk intelligence dossier:
+
+Inquiry Focus:
+> "${trimmed}"
 
 1. 🌟 Live Bullion Spot & Retail Price Breakdown:
    - Gold Spot (XAU/USD in $/oz and $/g) and Silver Spot (XAG/USD in $/oz and $/g).
@@ -146,42 +211,45 @@ Output Requirements:
 - Format with structured data tables, verified exchange telemetry, and clickable primary source links.`;
   }
 
-  // 6. Fuel, Petrol, Diesel & LPG Gas
-  if (/fuel|petrol|diesel|lpg|gas cylinder/i.test(lower)) {
-    return 'What are the current official retail prices of Petrol (E20), XP95, Diesel, and Domestic 14.2kg / Commercial 19kg LPG cylinders across Delhi, Mumbai, Kolkata, Lucknow, and Patna today? Detail recent price revisions and state VAT differences.';
+  // 7. Medical, Health, Pharmacology & Skincare
+  if (/health|medicine|drug|treatment|symptom|skincare|disease|clinical|therapy|dose|niacinamide|kojic/i.test(lower)) {
+    return `### 🩺 Clinical Intelligence & Evidence-Based Synthesis Protocol
+
+Investigative Subject:
+> "${trimmed}"
+
+### 🔬 Multi-Dimensional Medical & Biochemical Framework
+1. **Biochemical Mechanism of Action**: Exact molecular pathways, cellular receptors, enzymes inhibited/activated, and pharmacokinetics/absorption mechanics.
+2. **Clinical Evidence & Peer-Reviewed Efficacy**: Published clinical trial outcomes, randomized controlled trials (RCTs), meta-analyses, and standard effective therapeutic concentration/dosage ranges.
+3. **Safety Profile & Adverse Interaction Matrix**:
+   - Contraindications, synergistic combinations, and antagonistic pairings.
+   - High-friction/sensitive zone application rules and photosensitivity warnings.
+4. **Commercial Market Formulations (With Clickable Links)**:
+   - 3–4 verified commercially available products in India/Global markets with exact active concentrations and pricing.
+   - Illustrative merchant search links: \`[Brand - Product Name](https://www.amazon.in/s?k=Brand+Product+Name)\`.
+   - Mandatory commercial independence disclaimer.
+5. **Standard Medical Disclaimer**: Mandatory disclaimer callout block stating information is for educational purposes and advising consultation with a board-certified specialist.
+6. **Suggested Next Questions**: End with '### 🔄 Suggested Next Questions' containing 3–4 concrete, numbered follow-up questions ready for 1-click execution.`;
   }
 
-  // 7. Earth, Climate, Marine & Geological Science
-  if (/sea level|ocean|marine|climate|geolog|earthquake|volcano|rebound|glacier|coastal/i.test(lower)) {
-    return `Conduct a comprehensive, data-backed scientific and geopolitical investigation into the following question:
-"${trimmed}"
+  // 8. General Complex Inquiries (RSCIT Full Expansion)
+  return `### 🎯 Strategic Context & Objective
+Deconstruct and thoroughly analyze the following topic from first principles:
+> "${trimmed}"
 
-Structure your response with:
-1. 🌍 Geographic Breakdown: Exact countries, coastlines, and tectonic basins affected.
-2. 📏 Quantitative Measurements & Rate: Empirical measurements (mm/year, meters total) and timeline (since which epoch/year).
-3. 🔬 Underlying Geophysical & Climate Mechanisms: Post-glacial isostatic rebound, tectonic uplift, groundwater extraction, or local oceanographic currents.
-4. ⚠️ Hazard & Risk Assessment: What geophysical risks (tsunami vulnerability, seismic fault loading, maritime navigation hazards, ecological disruption) this signifies.
-5. 📚 Scientific Sources & Citations: Reference empirical monitoring bodies (NOAA, PSMSL, Copernicus, USGS).`;
-  }
-
-  // 8. General Structured Multi-point Prompts
-  if (trimmed.length > 60 || trimmed.includes('\n') || trimmed.includes('1.')) {
-    const refined = trimmed
-      .replace(/\[Country\/State\]/gi, 'India (National, Metros & Sensitive Frontier States)')
-      .replace(/\[Region[^\]]*\]/gi, 'India & Neighboring Geopolitical Theaters')
-      .replace(/\[State\/City\]/gi, 'Major Indian Metros (Delhi, Mumbai, Kolkata, Bengaluru)')
-      .replace(/\[Industry \/ Entity\]/gi, 'Indian Banking & Fintech Infrastructure')
-      .replace(/\[NBFC Layer\]/gi, 'Middle/Upper Layer NBFCs')
-      .replace(/\[Specific Banking Operation\]/gi, 'Digital Lending and Cloud Outsourcing Operations')
-      .replace(/\[Specific Legal Matter\]/gi, 'Cognizable Offenses and Electronic Evidence Admissibility')
-      .replace(/\[Specific Domain\]/gi, 'Cloud Infrastructure and Identity Access Management')
-      .replace(/\[Frontline City\/District\]/gi, 'Eastern Ladakh LAC & Frontier Border Districts');
-
-    return `${refined}\n\nDeliver an exhaustive, structured intelligence report with verified facts, tabular comparisons, exact statutory/agency citations, and actionable strategic takeaways.`;
-  }
-
-  // General short prompt enhancement
-  return `Analyze the following topic in depth with verified facts, structured domain breakdowns, actionable takeaways, and clickable source citations:\n"${trimmed}"\n\nEnsure comprehensive coverage of background context, direct citizen impact, key metrics, and strategic recommendations.`;
+### 🧠 Analytical Directives (RSCIT Standard)
+1. **Multi-Pillar Deconstruction**:
+   - **Theoretical Foundation**: Core mechanisms, historical context, and fundamental governing principles.
+   - **Empirical Reality & Metrics**: Real-world quantitative data, measured performance, benchmarks, and commercial economics.
+   - **Contradiction & Trade-Off Matrix**: Compare competing viewpoints, conflicting claims, and hidden trade-offs in a structured Markdown table.
+   - **Edge Cases & Failure Modes**: Vulnerabilities, security risks, common misconceptions, and mitigation strategies.
+2. **Quality & Citation Floor**:
+   - Base all volatile claims strictly on primary, verified sources.
+   - Format all references as clickable Markdown links [Publisher / Document](URL).
+3. **Actionable Deliverables**:
+   - Executive Summary with bolded high-signal takeaways.
+   - Concrete, step-by-step implementation or decision roadmap.
+   - 3–4 Standalone follow-up questions tailored to this analysis.`;
 }
 
 /**

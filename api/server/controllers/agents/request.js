@@ -52,6 +52,7 @@ const {
   resolvePersistableCodeEnvironmentDecision,
   getFailedTurnTraceFields,
   resolveFailedTurnContent,
+  deriveTitleSourceText,
 } = require('@librechat/api');
 const { disposeClient } = require('~/server/cleanup');
 const {
@@ -2233,6 +2234,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       }
       const titleEligible =
         addTitle && parentMessageId === Constants.NO_PARENT && isNewConvo && !req.body?.isTemporary;
+      logger.info(
+        `[addTitle] eligible=${titleEligible} hasAddTitle=${Boolean(addTitle)} parentIsRoot=${parentMessageId === Constants.NO_PARENT} isNewConvo=${isNewConvo} temporary=${Boolean(req.body?.isTemporary)} titleTiming=${titleTiming}`,
+      );
       const emitTitleEvent = ({ conversationId: titleConversationId, title }) => {
         titleEventPromise = (async () => {
           if (!acceptsTitleEvents || titleAbortController.signal.aborted) {
@@ -2658,7 +2662,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
         if (titleEligible && titleTiming === 'immediate') {
           immediateTitlePromise = addTitle(req, {
-            text: text || getAttachmentTitleText(req.body.files),
+            text: deriveTitleSourceText(text, req.body?.messages) || getAttachmentTitleText(req.body.files),
             conversationId,
             client,
             immediate: true,
@@ -3183,7 +3187,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           }
         } else if (shouldGenerateTitle) {
           trailingWritePromise = addTitle(req, {
-            text: text || getAttachmentTitleText(req.body.files),
+            text: deriveTitleSourceText(text, req.body?.messages) || getAttachmentTitleText(req.body.files),
             response: { ...response },
             client,
           })

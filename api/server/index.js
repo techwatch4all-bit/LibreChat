@@ -63,6 +63,7 @@ const {
   warnOnUnreachableDeliveryPaths,
   createCodeApiUploadRegistry,
   deadManLeaseGuard,
+  createStaticPreviewRelayMiddleware,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
 const {
@@ -397,6 +398,17 @@ const startServer = async () => {
   }
 
   app.get('/index.html', sendIndexHtml);
+  if (process.env.SANDPACK_STATIC_BUNDLER_URL) {
+    /** Serves the vendored sandpack static-preview relay for wildcard session
+     * hosts (<sessionId>-<base>) when the deployment self-hosts the static
+     * preview (SANDPACK_STATIC_BUNDLER_URL pointed at this app's own origin). */
+    app.use(
+      createStaticPreviewRelayMiddleware({
+        assets: appConfig.paths.assets,
+        sessionBaseHost: new URL(process.env.SANDPACK_STATIC_BUNDLER_URL).hostname,
+      }),
+    );
+  }
   app.use(staticCache(appConfig.paths.dist));
   app.use(staticCache(appConfig.paths.fonts));
   app.use(staticCache(appConfig.paths.assets));
@@ -607,11 +619,24 @@ const startServer = async () => {
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/ide')) {
+      logger.info(
+        `[IDE-WS] upgrade path=${url.pathname} query=${url.search.slice(0, 120)} host=${req.headers.host ?? ''} ua=${(req.headers['user-agent'] ?? '').slice(0, 60)}`,
+      );
+      const upgradedAt = Date.now();
+      socket.on('close', () => {
+        logger.info(`[IDE-WS] socket closed after ${Date.now() - upgradedAt}ms`);
+      });
+      socket.on('error', (err) => {
+        logger.warn(`[IDE-WS] socket error: ${err.message}`);
+      });
       if (routes.ide?.vscoderProxy?.upgrade) {
         // Rewrite origin and host so code-server's internal origin-check passes
         req.headers['origin'] = `http://${routes.ide.VSCODER_TARGET.replace('http://', '')}`;
         req.headers['host'] = routes.ide.VSCODER_TARGET.replace('http://', '');
         routes.ide.vscoderProxy.upgrade(req, socket, head);
+      } else {
+        logger.warn('[IDE-WS] no vscoderProxy upgrade handler; destroying socket');
+        socket.destroy();
       }
       return;
     }

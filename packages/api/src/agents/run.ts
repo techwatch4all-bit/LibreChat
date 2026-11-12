@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
 import { logger } from '@librechat/data-schemas';
 import { ensureHandler } from '@langchain/core/callbacks/manager';
+import { createToolResultScratchpadMethods } from '@librechat/data-schemas';
 import { Run, Providers, Constants, HookRegistry } from '@librechat/agents';
 import {
   KnownEndpoints,
@@ -115,10 +117,13 @@ import { extractDefaultParams, resolveReasoningParams } from '~/endpoints/openai
 import { getLLMConfig as getAnthropicLLMConfig } from '~/endpoints/anthropic/llm';
 import { CREATE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME } from '~/agents/tools';
 import { buildAgentInitialToolSessions } from '~/agents/codeFilesSession';
+import { createToolScratchpadHook } from '~/agents/toolResultScratchpad';
 import { getDirectDispatcher, getProxyDispatcher } from '~/utils/proxy';
 import { getAzureCredentials, constructAzureURL } from '~/utils/azure';
+import { createFinalAnswerGuardHook } from '~/agents/finalAnswerGuard';
 import { getBuiltInBaseURL } from '~/endpoints/openai/initialize';
 import { getProviderConfig } from '~/endpoints/config/providers';
+import { createContextGuardHook } from '~/agents/contextGuard';
 import { buildToolApprovalHooks } from '~/agents/hitl/hooks';
 import { getAgentCheckpointer } from '~/agents/checkpointer';
 import { getPluginHookSource } from '~/agents/hooks/source';
@@ -2878,6 +2883,84 @@ export async function createRun({
     ],
     internal: true,
   });
+  /**
+   * Context-pressure and final-answer guarantees for heavy tool-use turns.
+   * All three read the endpoint levers (`finalAnswerGuard`, `contextGuard`,
+   * `toolResultScratchpad`) and are on by default: a turn that searched eleven
+   * times must end in an answer, never in a silent action list.
+   *
+   * - `contextGuard` (PostToolBatch) injects converge/finish notices while
+   *   every gathered result stays verbatim in context.
+   * - `finalAnswerGuard` (Stop) backstops the wall itself: a run ending on a
+   *   tool result is kept warm for one more turn that writes the answer.
+   * - `toolScratchpad` (PostToolUse) durably captures full tool results before
+   *   compaction or fading can shorten them.
+   */
+  const primaryAgentForGuards = agents[0];
+  const guardSummarization = primaryAgentForGuards?.summarization ?? summarizationConfig;
+  const guardContextBudgetTokens = computeEffectiveMaxContextTokens(
+    guardSummarization?.reserveRatio,
+    primaryAgentForGuards?.baseContextTokens,
+    primaryAgentForGuards?.maxContextTokens,
+  );
+  const guardEndpointConfig = agentsEndpointConfig as
+    | (typeof agentsEndpointConfig & {
+        finalAnswerGuard?: { enabled?: boolean; maxContinuations?: number };
+        contextGuard?: { enabled?: boolean; convergeAtRatio?: number; finalizeAtRatio?: number };
+        toolResultScratchpad?: { enabled?: boolean; minChars?: number; ttlDays?: number };
+      })
+    | undefined;
+  if (guardEndpointConfig?.contextGuard?.enabled !== false) {
+    hooks.register('PostToolBatch', {
+      hooks: [
+        createContextGuardHook({
+          contextBudgetTokens: guardContextBudgetTokens,
+          ...(guardEndpointConfig?.contextGuard?.convergeAtRatio != null
+            ? { convergeAtRatio: guardEndpointConfig.contextGuard.convergeAtRatio }
+            : {}),
+          ...(guardEndpointConfig?.contextGuard?.finalizeAtRatio != null
+            ? { finalizeAtRatio: guardEndpointConfig.contextGuard.finalizeAtRatio }
+            : {}),
+        }),
+      ],
+      internal: true,
+    });
+  }
+  if (guardEndpointConfig?.finalAnswerGuard?.enabled !== false) {
+    hooks.register('Stop', {
+      hooks: [
+        createFinalAnswerGuardHook({
+          ...(guardEndpointConfig?.finalAnswerGuard?.maxContinuations != null
+            ? { maxContinuations: guardEndpointConfig.finalAnswerGuard.maxContinuations }
+            : {}),
+        }),
+      ],
+      internal: true,
+    });
+  }
+  if (
+    guardEndpointConfig?.toolResultScratchpad?.enabled !== false &&
+    user?.id != null
+  ) {
+    const scratchpadMethods = createToolResultScratchpadMethods(mongoose);
+    hooks.register('PostToolUse', {
+      hooks: [
+        createToolScratchpadHook({
+          userId: user.id,
+          ...(conversationId != null ? { conversationId } : {}),
+          ...(tenantId != null ? { tenantId } : {}),
+          captureToolResult: (input) => scratchpadMethods.captureToolResult(input),
+          ...(guardEndpointConfig?.toolResultScratchpad?.minChars != null
+            ? { minChars: guardEndpointConfig.toolResultScratchpad.minChars }
+            : {}),
+          ...(guardEndpointConfig?.toolResultScratchpad?.ttlDays != null
+            ? { ttlDays: guardEndpointConfig.toolResultScratchpad.ttlDays }
+            : {}),
+        }),
+      ],
+      internal: true,
+    });
+  }
   /**
    * Deployment-plugin hooks (Agent Plugins `ai.librechat/hooks/hooks.json`)
    * register last so internal policy hooks (HITL, labels, steering) keep

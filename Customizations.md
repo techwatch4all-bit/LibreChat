@@ -25,6 +25,7 @@ These are deliberate, each with its upstream counterpart and reason. See `Change
 | D7  | `GET /api/admin/verify` returns `isOperator` and `tenantId`                                                    | Returned `{ user }` only                                                                                | The panel inferred authority from `role === 'ADMIN' && tenantId in (undefined,'satchida-master')` — which mis-classifies every tenant admin (their role is also `ADMIN`).                                |
 | D8  | `admin/` vanilla-JS panel is served at `/admin` by the API process                                             | Upstream expects the **AGPL-3.0** `LibreChat-AI/admin-panel` via `ADMIN_PANEL_URL`                       | Licensing: the AGPL panel cannot ship in a paid service (see C1). `admin/` is the clean replacement; upstream's `AdminPanel.tsx` link is retained.                                                      |
 | D9  | `TENANT_SEAT_CAPABILITIES` includes `'vscode_server'` for developer suite gating                               | Absent (capabilities were unformalized or absent)                                                       | Gates access to the bare-metal VS Code Server Web workspace for Pro and Pro Family developer tiers.                                                                                                       |
+| D10 | ModelSelector groups curated Satchida modes at top, hides internal gateway duplicates, and segregates My Agents & Cloud BYOK | Uncurated flat list with raw custom endpoints mixed with model specs | Enhances executive UX, eliminates duplicate submenus, preserves direct access to Agents and personal API keys. |
 
 **Not changed:** `audit.js` remains operator-only — `AuditLog` is deliberately outside tenant
 isolation (`chainKey`-scoped), so exposing it per-tenant needs that read path verified first.
@@ -560,3 +561,30 @@ LibreChat contains none of the following.
    URL to `http://localhost:3098` (off the live pm2 port), and `e2e/setup/start-server.js`
    drops a `SATCHIDA_OPERATOR_USER_ID` that leaked in from the production `.env` (unless the
    caller sets it explicitly), so plain `npm run lighthouse` runs the lane on this box.
+7. **Self-hosted deck fonts** — the sales decks load Source Serif 4 / Inter / IBM Plex Mono from
+   `client/public/decks/fonts/` (23 local woff2 + `fonts.css`; css2 `@font-face` set mirrored
+   verbatim, unicode-ranges preserved) instead of fonts.googleapis.com / fonts.gstatic.com. Upstream
+   LibreChat carries no Google Fonts references of its own; this divergence covers the fork's deck
+   layer (Changes.md 2026-11-10 "Self-hosted deck fonts"). Standing directive: every repo we build
+   self-hosts its fonts.
+
+
+## C28. Product recommendations, universal legal disclaimers & click-and-go suggested questions (2026-11-10)
+
+1. **Product Recommendations & Commercial Disclaimer**: In librechat.yaml and satchida/personas/personas.ts (LIVE_DATA_ENGAGEMENT_RULES), whenever queries touch active formulations, skincare, supplements, or commercial items, the assistant provides 3–4 concrete market products with search links (e.g. Amazon.in) accompanied by an explicit commercial disclaimer clarifying independence and non-endorsement.
+2. **Universal Legal Protection Disclaimers**: Added domain-specific mandatory legal disclaimers across all 7 personas (health/skincare, finance/tax/bullion, statutory/legal, general/technical) before suggested questions for liability protection.
+3. **Click-and-Go Suggested Questions**: Enhanced client/src/components/Chat/Messages/Content/Markdown.tsx and introduced SuggestedQuestions.tsx to parse suggested next questions and render interactive click-and-go cards with one-click submitMessage execution instead of plain static markdown text.
+8. **Self-hosted Tailwind runtime for artifact previews** — sandpack previews and the React-template
+   sandbox load Tailwind 3.4.17 from `client/public/assets/vendor/tailwind-3.4.17.js` (vendored Play
+   CDN build, auto-copied to dist by the publicDir-copy plugin) via `TAILWIND_RUNTIME_URL` in
+   `client/src/utils/artifacts.ts`, instead of cdn.tailwindcss.com (Changes.md 2026-11-10
+   "Self-hosted Tailwind runtime"). Same zero-third-party principle as item 7; the sandpack bundler
+   itself (codesandbox.io, env-overridable) and the marked jsdelivr script remain external.
+9. **Self-hosted sandpack runtimes** — artifact previews load their toolchain from the repo:
+   marked (SRI-verified byte-exact copy) at `assets/vendor/marked-15.0.12.min.js`, the React/node
+   compile bundler mirrored (and patched: font links stripped, publicPath re-prefixed) at
+   `assets/vendor/sandpack-runtime/`, and the static-template relay served by
+   `createStaticPreviewRelayMiddleware` for `<sessionId>-<base>` wildcard hosts
+   (`assets/vendor/sandpack-static-preview/`). Upstream ships these from jsdelivr and
+   codesandbox.io. Static-preview self-hosting is gated on a `*.satchida.com` DNS record +
+   `SANDPACK_STATIC_BUNDLER_URL` (Changes.md 2026-11-10 "Self-hosted sandpack runtimes").

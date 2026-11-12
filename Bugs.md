@@ -1321,3 +1321,23 @@ is killed mid-flight and reports spurious failures — run it per directory, not
 - **Verification:**
   1. Re-queried `logs.db` customer grouping: `satchida-master` (1,125 requests), `satchida-system-upkeep` (945 requests), `Unassigned` (0 requests).
   2. Confirmed Bifrost "Top Customers" dashboard now displays 100% clean attribution with 0 unassigned requests. Status: **Resolved (2026-11-10)**.
+
+### A28 — Suggested Questions Regex Rigidity & ModelSpec Prioritization Fallback
+
+- **Severity:** Medium (UX interactive component regression)
+- **Evidence:** Assistant responses containing follow-up questions formatted as `🔲 Suggested Next Questions` or `**Suggested Next Questions**` rendered as plain static markdown lists (`<ol><li>...</li></ol>`) instead of interactive click-and-go buttons. In addition, when `modelSpecs.prioritize: false` was set, new chats could default to raw custom endpoints missing the comprehensive `promptPrefix` (which enforces commercial product search links and domain-specific legal disclaimers).
+- **Root Cause:**
+  1. `SUGGESTED_QUESTIONS_REGEX` in `client/src/components/Chat/Messages/Content/Markdown.tsx` strictly required `#{2,4}\s*` markdown heading hashes. LLM outputs using bolding (`**`), miscellaneous square/emoji markers (`🔲`), or preceding dividers (`---`) failed the regex match and fell through to standard markdown block rendering.
+  2. `librechat.yaml` had `modelSpecs.prioritize: false`, allowing conversations to bypass model specs and miss the prompt prefix containing commercial recommendation and legal disclaimer rules.
+- **Remediation:**
+  1. Broadened `SUGGESTED_QUESTIONS_REGEX` in `Markdown.tsx` to match optional markdown headings (`#{1,4}`), optional bold tags, flexible emojis/unicode characters, and preceding divider lines.
+  2. Enhanced question parsing in `Markdown.tsx` to clean numbering, bullets, enclosing brackets, and bold asterisks, and stripped dangling horizontal rules from the main markdown block.
+  3. Changed `modelSpecs.prioritize: true` in `librechat.yaml` so the default `Chat` model specification is prioritized for all new conversations.
+  4. Updated `heuristicEnhance` in `client/src/store/satchiStore.ts` to explicitly inject commercial product recommendations with Amazon.in links, legal disclaimers, and suggested next questions.
+- **Verification:**
+  1. Unit tests in node across all 6 headline variations (including the screenshot's exact text) confirmed clean regex matching and question extraction.
+  2. Client bundle recompiled cleanly with `npm run build` (`vite build`: 9,767 modules, 8.47s).
+  3. Service restarted under PM2 (`pm2 restart librechat`), returning HTTP 200 OK. Status: **Resolved (2026-11-11)**.
+
+## B-new (2026-11-10): Per-user MCP connection failures are cause-less and flaky
+Per-user MCP connections (UserConnectionManager → MCPConnectionFactory.connect) fail for a changing subset of stdio servers; the catch at packages/api/src/mcp/connection.ts:2252 logs "[MCP] Connection failed" and rethrows WITHOUT the error message, so the cause is invisible in logs. Standalone spawn of the same command with the SDK default environment succeeds in ~2s with the full tool list, so the server code is healthy. Suspects: per-user spawn environment/concurrency on Windows. Interim mitigation shipped: TOOL AVAILABILITY CONTRACT in all mode prompts (fallback to web_search, never surface tool errors). UPDATE 2026-11-10 (step 1 done): the catch now logs the cause (connection.ts "Connection failed: <message>"); packages/api rebuilt and deployed. Post-restart steady state: 0 failures, per-user connections persist and are reused across generations, app-level catalogs carry all tools. If the failure recurs, the log will now name the cause directly — then address the spawn path.

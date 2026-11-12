@@ -72,6 +72,10 @@ import { createActionMethods, type ActionMethods } from './action';
 import { createAssistantMethods, type AssistantMethods } from './assistant';
 import { createBannerMethods, type BannerMethods } from './banner';
 import { createToolCallMethods, type ToolCallMethods } from './toolCall';
+import {
+  createToolResultScratchpadMethods,
+  type ToolResultScratchpadMethods,
+} from './toolResultScratchpad';
 import { createCategoriesMethods, type CategoriesMethods } from './categories';
 import { createPresetMethods, type PresetMethods } from './preset';
 /* Tier 2 — Moderate (service deps injected) */
@@ -262,6 +266,7 @@ export type AllMethods = UserMethods &
   AssistantMethods &
   BannerMethods &
   ToolCallMethods &
+  ToolResultScratchpadMethods &
   CategoriesMethods &
   PresetMethods &
   ConversationTagMethods &
@@ -505,6 +510,7 @@ export function createMethods(
     ...createAssistantMethods(mongoose),
     ...createBannerMethods(mongoose),
     ...createToolCallMethods(mongoose),
+    ...createToolResultScratchpadMethods(mongoose),
     ...createCategoriesMethods(mongoose),
     ...createPresetMethods(mongoose),
     /* Tier 2 */
@@ -564,6 +570,7 @@ export type {
   AssistantMethods,
   BannerMethods,
   ToolCallMethods,
+  ToolResultScratchpadMethods,
   CategoriesMethods,
   PresetMethods,
   ConversationTagMethods,
@@ -619,3 +626,4 @@ export type {
 };
 
 export { recordAgentEventActorReceiptMetric, setAgentEventActorReceiptMetricObserver };
+export { createToolResultScratchpadMethods } from './toolResultScratchpad';

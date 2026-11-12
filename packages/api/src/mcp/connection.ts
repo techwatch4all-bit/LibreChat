@@ -2249,7 +2249,11 @@ export class MCPConnection extends EventEmitter {
         throw new Error('Connection not established');
       }
     } catch (error) {
-      logger.error(`${this.getLogPrefix()} Connection failed`);
+      /** The thrown cause is the only way to diagnose per-user stdio spawn
+       *  failures — without it the log line alone has stonewalled triage
+       *  (see Bugs.md: per-user MCP connection failures are cause-less). */
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`${this.getLogPrefix()} Connection failed: ${message}`);
       throw error;
     }
   }

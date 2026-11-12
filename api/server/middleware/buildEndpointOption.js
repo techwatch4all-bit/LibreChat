@@ -62,8 +62,10 @@ const SPEC_TO_MODE = {
   Chat: 'Chat',
   Work: 'Work',
   VibeCoder: 'Work',
+  Vibecoding: 'Work',
   Study: 'Study',
   Privacy: 'Privacy',
+  Motion: 'Work',
 };
 
 /** Cached lookup: is the current user a member of the "Demo" group? */
@@ -119,8 +121,23 @@ async function buildEndpointOption(req, res, next) {
     return res.status(500).json({ error: 'Unable to authorize model selection' });
   }
 
-  const allowedSpecs = ['Chat', 'Work', 'VibeCoder', 'Study', 'Privacy'];
-  if (!isOperator) {
+  const allowedSpecs = [
+    'Chat',
+    'Work',
+    'VibeCoder',
+    'Vibecoding',
+    'Study',
+    'Study-Local',
+    'Privacy',
+    'Motion',
+  ];
+  const isByokOrAgent =
+    req.body.endpoint === 'openAI' ||
+    req.body.endpoint === 'anthropic' ||
+    req.body.endpoint === 'agents' ||
+    Boolean(req.body.agent_id);
+
+  if (!isOperator && !isByokOrAgent) {
     const requestedSpec = typeof req.body.spec === 'string' ? req.body.spec : undefined;
     const requestedModel = typeof req.body.model === 'string' ? req.body.model : undefined;
     const spec =
@@ -128,7 +145,9 @@ async function buildEndpointOption(req, res, next) {
     if (!spec || !allowedSpecs.includes(spec)) {
       return res
         .status(403)
-        .json({ error: 'A Satchida mode (Chat, Work, VibeCoder, Study, or Privacy) is required' });
+        .json({
+          error: 'A Satchida mode (Chat, Work, VibeCoder, Study, Privacy, or Motion) is required',
+        });
     }
     const configuredSpec = req.config?.modelSpecs?.list?.find((item) => item.name === spec);
     if (!configuredSpec?.preset) {

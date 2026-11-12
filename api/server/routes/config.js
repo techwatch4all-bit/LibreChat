@@ -307,12 +307,33 @@ router.get('/', async function (req, res) {
       idOnTheSource: req.user.idOnTheSource ?? null,
     });
     const fullModelSpecs = sanitizeModelSpecs(excludeHiddenModelSpecs(appConfig?.modelSpecs));
+    const DESIRED_MODES = ['Chat', 'Work', 'Vibecoding', 'VibeCoder', 'Study', 'Privacy', 'Motion'];
     const semanticModelSpecs = fullModelSpecs
       ? {
           ...fullModelSpecs,
-          list: (fullModelSpecs.list ?? []).filter((spec) =>
-            ['Chat', 'Work', 'VibeCoder', 'Study', 'Privacy'].includes(spec.name),
-          ),
+          list: (fullModelSpecs.list ?? [])
+            .filter((spec) => DESIRED_MODES.includes(spec.name))
+            .sort((a, b) => {
+              const orderA = [
+                'Chat',
+                'Work',
+                'Vibecoding',
+                'VibeCoder',
+                'Study',
+                'Privacy',
+                'Motion',
+              ].indexOf(a.name);
+              const orderB = [
+                'Chat',
+                'Work',
+                'Vibecoding',
+                'VibeCoder',
+                'Study',
+                'Privacy',
+                'Motion',
+              ].indexOf(b.name);
+              return orderA - orderB;
+            }),
         }
       : undefined;
     const userInterface = { ...appConfig?.interfaceConfig, modelSelect: true, presets: false };

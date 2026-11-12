@@ -115,6 +115,7 @@ import { registerMemoryTools, memoryToolUsageGuard } from './memory';
 import { applyIntentLabels, sanitizeIntentLabels } from './intent';
 import { ContentFilterError } from '../middleware/contentFilter';
 import { resolveToolRoleGrants } from '~/tools/rolePermissions';
+import { healAgentToolNameReferences } from './toolNameHealing';
 import { createRequestAgentExecutionContext } from './runtime';
 import { resolveTurnDeliveryRouting } from './files/delivery';
 import { filterFilesByEndpointRuntimeConfig } from '~/files';
@@ -2490,8 +2491,22 @@ export async function initializeAgent(
       .map((toolDefinition) => toolDefinition.name),
   );
 
+  /** Prompts name MCP tools by their bare upstream name; the runtime binds the
+   *  suffixed catalog key. Heal every unambiguous bare reference in the
+   *  instruction surfaces so the model never emits a name the ToolNode cannot
+   *  resolve (the "Tool … not found" failure on tool-heavy personas). */
+  const healedToolReferences = healAgentToolNameReferences(
+    agent.instructions ?? undefined,
+    toolContextMap,
+    dynamicToolContextMap,
+    toolDefinitions,
+  );
+
   const initializedAgent: InitializedAgent = {
     ...agent,
+    ...(healedToolReferences.instructions != null
+      ? { instructions: healedToolReferences.instructions }
+      : {}),
     azureOptions: options.azureOptions,
     resendFiles,
     imageDetail,
@@ -2531,8 +2546,9 @@ export async function initializeAgent(
     currentRequestAttachments,
     agentContextAttachments,
     fileConsumers,
-    toolContextMap: toolContextMap ?? {},
-    dynamicToolContextMap: dynamicToolContextMap ?? {},
+    toolContextMap: healedToolReferences.toolContextMap ?? toolContextMap ?? {},
+    dynamicToolContextMap:
+      healedToolReferences.dynamicToolContextMap ?? dynamicToolContextMap ?? {},
     useLegacyContent: !!options.useLegacyContent,
     tools: (tools ?? []) as GenericTool[] & string[],
     maxToolResultChars: maxToolResultCharsResolved,

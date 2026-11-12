@@ -29,6 +29,7 @@ function ModelSelectorContent() {
     modelSpecs,
     mappedEndpoints,
     endpointsConfig,
+    isEnforced,
     // State
     searchValue,
     searchResults,
@@ -103,6 +104,20 @@ function ModelSelectorContent() {
         comboboxLabel={localize('com_endpoint_search_models')}
         trigger={trigger}
       >
+        <div className="mb-1.5 flex items-center justify-between border-b border-border-light/60 px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-xs font-semibold tracking-wide text-text-primary">
+              Satchida Intelligence
+            </span>
+          </div>
+          <span className="rounded-full border border-border-light/60 bg-surface-tertiary px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+            Sovereign Modes
+          </span>
+        </div>
         {searchResults ? (
           renderSearchResults(searchResults, localize, searchValue)
         ) : (
@@ -112,12 +127,29 @@ function ModelSelectorContent() {
               modelSpecs?.filter((spec) => !spec.group) || [],
               selectedValues.modelSpec || '',
             )}
-            {/* Render endpoints (will include grouped specs matching endpoint names) */}
-            {renderEndpoints(mappedEndpoints ?? [])}
+            {/* Render endpoints (OpenAI, My Agents, Anthropic) */}
+            {mappedEndpoints && mappedEndpoints.length > 0 && (
+              <>
+                <div className="my-2.5 flex items-center justify-between border-t border-border-light/60 px-3 pt-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
+                    Agents & Cloud BYOK
+                  </span>
+                  <span className="rounded-full border border-border-light/40 bg-surface-tertiary px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                    Custom Keys
+                  </span>
+                </div>
+                {renderEndpoints(mappedEndpoints)}
+              </>
+            )}
             {/* Render custom groups (specs with group field not matching any endpoint) */}
             {renderCustomGroups(modelSpecs || [], mappedEndpoints ?? [])}
           </>
         )}
+        <div className="mt-2 border-t border-border-light/40 px-3 py-2 text-center">
+          <span className="text-[11px] text-text-tertiary">
+            🔒 Sovereign Edge AI · Zero Cloud Telemetry · Enterprise Grade
+          </span>
+        </div>
       </Menu>
       <DialogManager
         keyDialogOpen={keyDialogOpen}

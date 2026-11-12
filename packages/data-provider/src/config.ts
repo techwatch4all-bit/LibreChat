@@ -1369,6 +1369,42 @@ export const agentsEndpointSchema = baseEndpointSchema
         .default(DEFAULT_AGENT_MODEL_RESPONSE_HEADERS_TIMEOUT_MS),
       recursionLimit: z.number().optional(),
       disableBuilder: z.boolean().optional().default(false),
+      /** Guards that keep heavy tool-use turns from ending without an answer.
+       * `finalAnswerGuard`: if a run reaches its terminal state right after a
+       * tool call, admit one more model turn so the user gets the answer the
+       * turn already paid for. On by default. */
+      finalAnswerGuard: z
+        .object({
+          enabled: z.boolean().optional().default(true),
+          /** Maximum forced continuations per run; 1 is the safe contract. */
+          maxContinuations: z.number().int().min(1).max(3).optional().default(1),
+        })
+        .optional(),
+      /** Context-pressure notices injected between tool rounds while every
+       * gathered result stays verbatim in context — the guard converges the
+       * model onto writing instead of searching before the window fills. */
+      contextGuard: z
+        .object({
+          enabled: z.boolean().optional().default(true),
+          /** Fraction of the context budget tool results alone may fill before
+           * the converge notice. Must be below `finalizeAtRatio`. */
+          convergeAtRatio: z.number().min(0.1).max(1).optional().default(0.5),
+          /** Fraction at which the guard demands the final answer. */
+          finalizeAtRatio: z.number().min(0.2).max(1).optional().default(0.72),
+        })
+        .optional(),
+      /** Durable capture of full tool results to the `toolresults_scratchpads`
+       * collection as they finish, before any compaction can shorten what the
+       * model sees. Retention is bounded by a TTL index. */
+      toolResultScratchpad: z
+        .object({
+          enabled: z.boolean().optional().default(true),
+          /** Tool outputs at or above this size are captured. */
+          minChars: z.number().int().min(0).optional().default(1500),
+          /** Scratchpad row retention in days. */
+          ttlDays: z.number().int().min(1).max(90).optional().default(7),
+        })
+        .optional(),
       /** Optional workspace guidance acquisition budget, separate from command execution. */
       repositoryInstructions: z
         .object({

@@ -249,7 +249,10 @@ function escapeForTemplateLiteral(content: string): string {
     .replace(/<\/script/gi, '<\\/script');
 }
 
-const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js';
+/** marked, self-hosted from the app's own static assets (client/public/assets/vendor/)
+ * so the markdown preview makes no third-party request. Absolute URL because the
+ * preview iframe's origin differs from the app's; the pinned SRI still guards tampering. */
+const MARKED_RUNTIME_URL = `${window.location.origin}/assets/vendor/marked-15.0.12.min.js`;
 const MARKED_SRI = 'sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+';
 
 /**
@@ -325,7 +328,7 @@ function generateMarkdownHtml(content: string, contrastCSS = ''): string {
 </head>
 <body>
 <div class="markdown-body" id="content" style="padding:2rem;margin:1rem;min-height:100vh"></div>
-<script src="${MARKED_CDN}" integrity="${MARKED_SRI}" crossorigin="anonymous"></script>
+<script src="${MARKED_RUNTIME_URL}" integrity="${MARKED_SRI}" crossorigin="anonymous"></script>
 <script>
 if (typeof marked === 'undefined') {
   document.getElementById('content').innerHTML =

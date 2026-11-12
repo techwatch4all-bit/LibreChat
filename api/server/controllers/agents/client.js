@@ -6113,6 +6113,9 @@ class AgentClient extends BaseClient {
     });
 
     try {
+      logger.info(
+        `[titleConvo] provider=${provider} model=${clientOptions.model} titleMethod=${endpointConfig?.titleMethod ?? '(default)'} hasTitlePrompt=${Boolean(endpointConfig?.titlePrompt)} inputTextLen=${(text ?? '').length} inputTextHead=${JSON.stringify((text ?? '').slice(0, 120))} contentParts=${immediate ? 0 : (this.contentParts ?? []).length}`,
+      );
       const titleResult = await this.run.generateTitle({
         provider,
         clientOptions,

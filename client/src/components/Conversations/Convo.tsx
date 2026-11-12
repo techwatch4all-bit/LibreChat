@@ -2,7 +2,9 @@ import React, { memo, useState, useEffect, useRef, useMemo, useCallback } from '
 import { useDrag } from 'react-dnd';
 import { Link2 } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
+import { atom, useAtomValue, useSetAtom } from 'jotai';
 import { useParams } from 'react-router-dom';
+import { CheckSquare, Square } from 'lucide-react';
 import { Constants } from 'librechat-data-provider';
 import { Spinner, useToastContext, useMediaQuery } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
@@ -23,6 +25,7 @@ import ConvoActions from './ConvoActions';
 import UnpinButton from './UnpinButton';
 import RenameForm from './RenameForm';
 import ConvoLink from './ConvoLink';
+import { bulkSelectModeAtom, selectedConvoIdsAtom, toggleSelectedConvoAtom } from './bulkSelection';
 import store from '~/store';
 
 interface ConversationProps {
@@ -77,6 +80,23 @@ function Conversation({
   const previousTitle = useRef(title);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  /* Bulk selection: while the mode is on, the row's click toggles its pick and
+   * navigation is suppressed — the checkbox and the row body are one target. */
+  const bulkSelectMode = useAtomValue(bulkSelectModeAtom);
+  const isSelected = useAtomValue(
+    useMemo(
+      () =>
+        atom((get) => {
+          if (!bulkSelectMode || !conversationId) {
+            return false;
+          }
+          return get(selectedConvoIdsAtom).has(conversationId);
+        }),
+      [bulkSelectMode, conversationId],
+    ),
+  );
+  const toggleSelected = useSetAtom(toggleSelectedConvoAtom);
+
   const onRenamingChangeRef = useRef(onRenamingChange);
   onRenamingChangeRef.current = onRenamingChange;
 
@@ -110,7 +130,7 @@ function Conversation({
       pinned: conversation.pinned === true,
     }),
   });
-  dragConnector(draggable && canHoverPointer && !renaming ? containerRef : null);
+  dragConnector(draggable && canHoverPointer && !renaming && !bulkSelectMode ? containerRef : null);
 
   useEffect(() => {
     if (title !== previousTitle.current) {
@@ -308,13 +328,16 @@ function Conversation({
     actionContent = <ConvoActions {...convoOptionsProps} hasInteracted={hasInteracted} />;
   }
 
+  const activeRowStyle =
+    'bg-surface-active-alt before:absolute before:bottom-1 before:left-0 before:top-1 before:w-0.5 before:rounded-full before:bg-text-primary';
+
   return (
     <div
       ref={containerRef}
       className={cn(
         'group relative flex h-12 w-full items-center rounded-lg outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-text-primary md:h-9',
-        isActiveConvo || isPopoverActive
-          ? 'bg-surface-active-alt before:absolute before:bottom-1 before:left-0 before:top-1 before:w-0.5 before:rounded-full before:bg-text-primary'
+        (bulkSelectMode && isSelected) || isActiveConvo || isPopoverActive
+          ? activeRowStyle
           : 'hover:bg-surface-active-alt',
       )}
       onPointerEnter={(event) => {
@@ -330,6 +353,12 @@ function Conversation({
         if (renaming) {
           return;
         }
+        if (bulkSelectMode && !renaming) {
+          if (conversationId) {
+            toggleSelected(conversationId);
+          }
+          return;
+        }
         if (e.button === 0) {
           handleNavigation(e.ctrlKey || e.metaKey);
         }
@@ -337,6 +366,29 @@ function Conversation({
       style={{ cursor: renaming ? 'default' : 'pointer' }}
       data-testid="convo-item"
     >
+      {bulkSelectMode && !renaming && (
+        <button
+          type="button"
+          className="mr-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (conversationId) {
+              toggleSelected(conversationId);
+            }
+          }}
+          aria-pressed={isSelected}
+          aria-label={
+            isSelected ? localize('com_ui_clear_selection') : localize('com_ui_select_chat')
+          }
+          data-testid="convo-select-checkbox"
+        >
+          {isSelected ? (
+            <CheckSquare className="h-4 w-4 text-text-primary" aria-hidden="true" />
+          ) : (
+            <Square className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
+      )}
       {renaming ? (
         <RenameForm
           titleInput={titleInput}

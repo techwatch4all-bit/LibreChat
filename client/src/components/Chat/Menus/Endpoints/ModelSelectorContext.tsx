@@ -33,6 +33,7 @@ type ModelSelectorContextType = {
   agentsMap: t.TAgentsMap | undefined;
   assistantsMap: t.TAssistantsMap | undefined;
   endpointsConfig: t.TEndpointsConfig;
+  isEnforced: boolean;
 
   // Functions
   endpointRequiresUserKey: (endpoint: string) => boolean;
@@ -118,6 +119,12 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
     endpointsConfig,
   });
 
+  const filteredEndpoints = useMemo(() => {
+    return (mappedEndpoints ?? []).filter(
+      (ep) => ep.value !== 'Satchida' && ep.value !== 'Satchida-Gateway',
+    );
+  }, [mappedEndpoints]);
+
   const getModelDisplayName = useCallback(
     (endpoint: Endpoint, model: string): string => {
       if (isAgentsEndpoint(endpoint.value)) {
@@ -182,9 +189,9 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
     if (!searchValue) {
       return null;
     }
-    const allItems = [...modelSpecs, ...mappedEndpoints];
+    const allItems = [...modelSpecs, ...filteredEndpoints];
     return filterItems(allItems, searchValue, agentsMap, assistantsMap || {}, localize);
-  }, [searchValue, modelSpecs, mappedEndpoints, agentsMap, assistantsMap, localize]);
+  }, [searchValue, modelSpecs, filteredEndpoints, agentsMap, assistantsMap, localize]);
 
   const setDebouncedSearchValue = useMemo(
     () =>
@@ -264,6 +271,14 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
     [agentsMap, announcePolite, assistantsMap, getModelDisplayName, localize, onSelectEndpoint],
   );
 
+  const isEnforced = useMemo(
+    () =>
+      Boolean(
+        startupConfig?.modelSpecs?.enforce && (startupConfig?.modelSpecs?.list?.length ?? 0) > 0,
+      ),
+    [startupConfig?.modelSpecs?.enforce, startupConfig?.modelSpecs?.list?.length],
+  );
+
   const value = useMemo(
     () => ({
       searchValue,
@@ -273,8 +288,9 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
       agentsMap,
       modelSpecs,
       assistantsMap,
-      mappedEndpoints,
+      mappedEndpoints: filteredEndpoints,
       endpointsConfig,
+      isEnforced,
       handleSelectSpec,
       handleSelectModel,
       setSelectedValues,
@@ -292,8 +308,9 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
       agentsMap,
       modelSpecs,
       assistantsMap,
-      mappedEndpoints,
+      filteredEndpoints,
       endpointsConfig,
+      isEnforced,
       handleSelectSpec,
       handleSelectModel,
       setSelectedValues,

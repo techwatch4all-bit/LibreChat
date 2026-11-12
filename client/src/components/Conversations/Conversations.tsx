@@ -2,7 +2,7 @@ import { useMemo, memo, type FC, useCallback, useEffect, useRef } from 'react';
 import { useDrop } from 'react-dnd';
 import throttle from 'lodash/throttle';
 import { useRecoilValue } from 'recoil';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ListChecks } from 'lucide-react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { List, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import { Spinner, useMediaQuery, buttonVariants } from '@librechat/client';
@@ -29,6 +29,8 @@ import { groupConversationsWithRunning, RUNNING_CHATS_GROUP } from './running';
 import { groupConversations, cn } from '~/utils';
 import { useActiveJobs } from '~/data-provider';
 import Convo from './Convo';
+import BulkSelectBar from './BulkSelectBar';
+import { bulkSelectModeAtom, exitBulkSelectModeAtom } from './bulkSelection';
 import store from '~/store';
 
 export type CellPosition = {
@@ -208,6 +210,24 @@ const Conversations: FC<ConversationsProps> = ({
   const activeFilterCount = useAtomValue(chatFilterCountAtom);
   const filterTags = useAtomValue(chatFilterTagsAtom);
   const resetFilters = useSetAtom(resetChatFiltersAtom);
+  /* Bulk selection mode + its toggle button in the Chats header. Leaving the
+   * mode clears the picks; a search that re-scopes the list does too, since a
+   * selection made across a different result set is meaningless afterwards. */
+  const bulkSelectMode = useAtomValue(bulkSelectModeAtom);
+  const setBulkSelectMode = useSetAtom(bulkSelectModeAtom);
+  const exitBulkSelectMode = useSetAtom(exitBulkSelectModeAtom);
+  /** A search that re-scopes the list invalidates the picks — a selection made
+   *  across a different result set is meaningless afterwards. Runs on change
+   *  only: the first render must not wipe a selection a caller set before the
+   *  list mounted. */
+  const prevScopeRef = useRef({ query: search.query, archived: isArchivedView });
+  useEffect(() => {
+    const prev = prevScopeRef.current;
+    if (prev.query !== search.query || prev.archived !== isArchivedView) {
+      prevScopeRef.current = { query: search.query, archived: isArchivedView };
+      exitBulkSelectMode();
+    }
+  }, [search.query, isArchivedView, exitBulkSelectMode]);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   /* Dropping a chat on the Chats section makes it an ordinary chat: out of its
    * project, and unpinned. A root-list chat that is not pinned already is one,
@@ -604,6 +624,14 @@ const Conversations: FC<ConversationsProps> = ({
     );
   }
 
+  const bulkSelectVisibleIds = useMemo(
+    () =>
+      filteredConversations
+        .map((convo) => convo.conversationId)
+        .filter((id): id is string => typeof id === 'string'),
+    [filteredConversations],
+  );
+
   return (
     <div
       ref={chatsRegionRef}
@@ -613,10 +641,29 @@ const Conversations: FC<ConversationsProps> = ({
         <ChatsHeader
           isExpanded={isChatsExpanded}
           onToggle={() => setIsChatsExpanded(!isChatsExpanded)}
-          trailing={chatsHeaderTrailing}
+          trailing={
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className={cn(
+                  buttonVariants({ variant: 'ghost' }),
+                  'h-7 w-7 rounded-lg p-0 text-text-secondary hover:text-text-primary',
+                )}
+                onClick={() => setBulkSelectMode(!bulkSelectMode)}
+                aria-pressed={bulkSelectMode}
+                aria-label={localize('com_ui_bulk_select_chats')}
+                title={localize('com_ui_bulk_select_chats')}
+                data-testid="bulk-select-toggle"
+              >
+                <ListChecks className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {chatsHeaderTrailing}
+            </div>
+          }
           highlight={isDropOver && canDrop}
         />
       </div>
+      <BulkSelectBar visibleIds={bulkSelectVisibleIds} />
       {body}
     </div>
   );

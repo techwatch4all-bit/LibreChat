@@ -466,7 +466,7 @@ def get_motion_template(style: str = "executive") -> str:
     };
 
   </script>
-  <script src="/assets/vendor/satchida/cad-studio.js"></script>
+  <script src="/assets/vendor/satchida/cad-studio.js?v=3"></script>
 </body>
 </html>""",
         )

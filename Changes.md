@@ -8,6 +8,46 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-12 — SceneMosaic & Motion Studio Gold-Standard Overhaul (Astryx Theming, Intelligent Layout Zoning, Smooth Camera Easing & Clinical Anatomy Cross-Section)
+
+Operator reports:
+1. "The architecture blueprint 3D still shows block furniture, not the real furniture, the wall and whole 3D lighting effect is also looking like cartoonish, fake, it needs to look more photorealistic. Need further improvement"
+2. "SceneMosaic needs serious improvements... 2D floor plan very bad, TV/console stacked/overlapping, sofa and desk placement crowded together, strange stacked-sphere green snowman planters."
+3. "The Type-2 Diabetes — Insulin Resistance Cross-Section animation is a joke! How can it be this bad? What kind of review process has been established?"
+4. "Evalute meta/astryx and see what you can extract and add to improve our 2D, 3D design system so it becomes more photo realistic, more natural, better animation."
+
+Diagnosed & Shipped:
+1. **Intelligent Architectural Layout Zoning & Multi-Pass Collision Relaxation (`skill/satchida-scenemosaic-server.py`)**:
+   - Diagnosed root cause of crowded 3D and overlapping 2D: duplicate TV and TV Console objects were competing for the same coordinates, pushing sofas back-to-back into desk chairs.
+   - Built media unit consolidator: automatically unifies TV and Console objects into a single grounded media station.
+   - Enforced Opposite-Wall Living Zone Law: TV and Sofa are placed on opposite walls (7.5ft-9.5ft viewing distance) with the sofa facing into the room towards the TV.
+   - Relocated Work/Study desk to East/West perpendicular walls with chair pulled into the room facing the desk.
+   - Protected West entry door swing corridor.
+   - Implemented 6-pass iterative AABB relaxation guaranteeing 0 collisions.
+2. **Meta Astryx Design Tokens & Smooth Camera Easing (`client/public/assets/vendor/satchida/scenemosaic-studio.js`)**:
+   - Extracted Astryx design system tokens for HUD chrome, inspect pill, and variant controls.
+   - Added cubic-bezier damped camera tweening (`tweenCameraTo`) across `Iso`, `Eye`, `Top`, and `2D Map` presets, replacing jarring instant camera snapping with smooth cinematics.
+   - High-DPI retina canvas for 2D floor map with dimension lines & end ticks, architectural wall contours, triple-line glazed windows, 90deg dashed door swing arc, and vector furniture symbols.
+   - Replaced stacked green sphere planters with realistic architectural indoor plants (ceramic fluted cylinder pot, brass rim, dark potting soil, central bamboo cane, and multi-tier broad leaves).
+   - Tuned warm directional sunlight (5000K, soft PCF shadows, shadow bias -0.00015) + cool sky hemisphere fill + baseboard moldings.
+3. **Clinical Anatomy & Organ Perfusion Gold-Standard Simulation (`skill/satchida-motion-server.py`)**:
+   - Diagnosed root cause of simplistic diabetes diagram: `get_motion_template` previously redirected medical prompts to `mechanism_cutaway` (a car engine piston!), forcing the LLM to generate rudimentary div rectangles.
+   - Built dedicated `clinical_anatomy` template featuring a publication-quality SVG/GSAP interactive simulation of Type-2 Diabetes Insulin Resistance.
+   - Dual-panel comparative view: Healthy Normal Reference (Baseline Control) vs Stage-Responsive Dynamic Pathophysiological Cross-Section.
+   - 4-Stage Progression Scrubber: 1 · Healthy Euglycemia, 2 · Compensated Insulin Resistance, 3 · Impaired Glucose Tolerance (Pre-T2D), 4 · Severe T2D & Beta-Cell Failure.
+   - Dynamic cellular pathophysiology: Capillary lumen with animated RBCs, glucose molecules, insulin monomers, Tyrosine Kinase receptors with serine phosphorylation, trapped GLUT4 vesicles, and pancreatic islet beta-cell secretory stress/amyloidosis.
+   - Live clinical telemetry dials (Fasting Blood Glucose mg/dL, HbA1c %, Serum Insulin, Microvascular Perfusion %) and objective educational footer.
+
+Evidence:
+- Python verification: `_evolve_variants` verified with 0 collisions, facing alignment, and door clearance.
+- Playwright headless Chromium E2E verification:
+  - `test_sm_2d.png`: crisp 2D CAD floor plan with dimension lines, 0 overlapping footprints, zoned sofa/TV/desk.
+  - `test_sm_iso.png`: photorealistic 3D room with warm sunlight, natural furniture placement, baseboards, and architectural plant.
+  - `test_clinical_stage1.png` & `test_clinical_stage3.png`: dual-panel clinical cross-section, dynamic telemetry updates, and stage progression.
+- Pre-commit hooks (`lint-staged`, `package.json` validation) passed clean on commit `06560ad0f`.
+
+---
+
 ## 2026-11-12 — Motion Studio Live Artifact Preview, Cross-Origin Isolation & CAD Blueprint Rendering Fix
 
 Operator reports:
@@ -2120,3 +2160,17 @@ Shipped:
 Correction: Cline (saoudrizwan.claude-dev@4.1.26) IS installed in code-server — the earlier extensions-dir listing was truncated at 10 entries. Full inventory (13 extensions): Cline, Continue, GitLens, Python+debugpy+envs, ESLint, Prettier, Code Runner, Error Lens, spell-checker, material icons, markdown preview. Nothing needs installing; the extension host simply cannot start until the WebSocket path works.
 
 Deployed state: origin-side JWT enforcement on /api/ide WS verified (anonymous→401, cookie→101 authenticated); CSP per-document fix live; [IDE-WS]/[titleConvo]/[addTitle] diagnostics live. Pending: operator adds the Access Bypass application for path ai.satchida.com/api/ide (dashboard-only), then hard-refreshes the IDE. After that: WS reaches origin authenticated → extension host starts → dark theme + all 13 extensions (incl. Cline) activate.
+
+## 2026-11-12 — Personas never auto-execute; CBSE/IGCSE + Textbook Navigator + Python-from-Zero starter categories
+
+1. **Every starter now stages for editing (never auto-executes)** (`client/src/components/Chat/Input/ConversationStarters.tsx`):
+   - Removed the template-gate that auto-submitted bracket-less starters (`submitMessage({ text })` call and the `isTemplate` check). Clicking any persona card now always stages the prompt into the textarea for the user to edit/customize before sending; the `[...]` slot-highlight + Tab-cycle behavior is unchanged.
+   - Removed the now-unused `useSubmitMessage` import.
+2. **Three new student-facing categories** (`client/src/common/starters.ts`, 17 new starters, all Study/Study-Local (Python also Vibecoding)):
+   - `school_boards` "🎒 CBSE & IGCSE STEM": CBSE chapter tutor, IGCSE/Checkpoint tutor, board-pattern exam drill with marking-scheme grading, NCERT book-back exercise solver, doubt clinic, formula flashcards, chapter diagnostic with gap report. Tutors are instructed to teach one step at a time, quiz, and WAIT for answers.
+   - `textbook_navigator` "📖 Textbook Navigator": student types subject/book name + chapter + page/paragraph/exercise and gets that exact section explained, Socratic homework help, chapter summary/mind map, and a full exercise answer bank with a hard "don't guess the edition's wording — ask for the page" rule.
+3. **English keys** added to `client/src/locales/en/translation.json` (3 category keys + 17 badge keys).
+4. **librechat.yaml Study mode** `conversation_starters`: appended 3 suggested prompts (CBSE/IGCSE tutor, textbook navigator, Python lesson 1) mirroring the new categories.
+5. **Tests** (`ConversationStarters.spec.tsx`): replaced the auto-submit assertion with an always-stage assertion (bracket-less starters land in the textarea, cursor at end, no `submitMessage` call). Focused suite: 12/12 pass. `tsc --noEmit` in `client`: no new errors (45 all pre-existing Admin/SpecIcon baseline).
+
+Feasibility note: answers-to-book-back-exercises are generated by the model (verified step-by-step with the stem-study tool where bound), not downloaded from a bank — there is no licensed per-book answer dataset wired in; the prompts handle edition uncertainty by asking the student to paste/photograph the question. The Python-from-Zero course fits chat via a turn-locked lesson contract in the starter prompt (one concept per turn, exercise, stop-and-wait, resume by lesson number); a persistent progress store is a future backend feature, not required for v1.

@@ -620,3 +620,19 @@ Upstream LibreChat includes no motion-graphics studio mode, grouped persona navi
 3. **Sovereign Motion MCP Renderer & Skill (`skill/satchida-motion-server.py`, `skill/satchida-motion/SKILL.md`, `.gitignore`'d `librechat.yaml`)**:
    - Added `window.__SEEK_FRAME__` deterministic frame-seeking, SwiftShader WebGL Chromium flags (`--use-gl=angle --use-angle=swiftshader --enable-webgl --ignore-gpu-blocklist`) fixing headless `CONTEXT_LOST_WEBGL`, local `/assets/vendor/three/` & `/assets/vendor/gsap/` `file:///` URI rewriting, 4 interactive reference archetypes (`cad_blueprint`, `interactive_3d`, `mechanism_cutaway`, `accessible_guide`), and expanded `validate_motion_html()`.
    - Updated the `Motion` model spec allowlist in `librechat.yaml` to bind 8 MCP servers (`satchida-motion`, `satchida-maker-engineering`, `satchida-stem-study`, `satchida-health-wellness`, `satchida-ai-engineer`, `satchida-work-suite`, `satchida-web-search`, `time-server`).
+
+## C31. Always-stage starters + student STEM categories (2026-11-12)
+
+Divergence from upstream LibreChat conversation-starters behavior:
+
+1. **Upstream auto-submits plain starters; Satchida always stages.** `ConversationStarters.tsx`
+   no longer calls `submitMessage` on card click — every persona card stages its prompt into the
+   textarea for editing/customization first. This is a product decision for student personas: a
+   click must never execute without the user's further input. Upstream merge will conflict here
+   by design; keep the always-stage side.
+2. **Three Satchida-only starter categories** in `client/src/common/starters.ts` (not upstream):
+   `school_boards` (CBSE/IGCSE STEM), `textbook_navigator` (subject/book/chapter/page/paragraph
+   navigation with anti-hallucination edition rules), `python_from_zero` (turn-locked lesson
+   contract: one concept per turn, exercise, stop-and-wait, resume by lesson number). All copy
+   localized via `starters_*` English keys; mirrored 3 suggestions into the Study mode
+   `conversation_starters` in `librechat.yaml`.

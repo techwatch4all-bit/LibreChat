@@ -866,10 +866,20 @@
     document.head.appendChild(style);
 
     var ver = opts.verification || { status: 'VERIFIED', items: (opts.variants[0] && opts.variants[0].objects ? opts.variants[0].objects.length : 0), collisions: 0 };
+    var verChips = '<div class="sm-ver">✓ ' + ver.status + ' · ' + ver.items + ' items · ' + ver.collisions + ' collisions</div>';
+    if (ver.daylight) {
+      var dl = ver.daylight.glazingRatio != null ? '☀ Daylight ' + Math.round(ver.daylight.glazingRatio * 100) + '% · ' + (ver.daylight.verdict || '') : '☀ ' + (ver.daylight.verdict || '');
+      verChips += '<div class="sm-ver" style="color:#fbbf24;background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3)">' + dl + '</div>';
+    }
+    if (ver.walkway && ver.walkway.minGap != null) {
+      var ww = '↔ Min walkway ' + ver.walkway.minGap + ' ft · ' + ver.walkway.status;
+      var warn = ver.walkway.status !== 'clear';
+      verChips += '<div class="sm-ver" style="' + (warn ? 'color:#fbbf24;background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3)' : '') + '">' + ww + '</div>';
+    }
     document.body.innerHTML =
       '<div id="sm-stage"></div>' +
       '<canvas id="sm-2d"></canvas>' +
-      '<div id="sm-badge"><h1>' + (opts.title || 'SceneMosaic 3D') + '</h1><p>' + (opts.stylePreset || '') + ' · ' + opts.roomW + "' × " + opts.roomD + "'</p><div class=\"sm-ver\">✓ " + ver.status + ' · ' + ver.items + ' items · ' + ver.collisions + ' collisions</div></div>' +
+      '<div id="sm-badge"><h1>' + (opts.title || 'SceneMosaic 3D') + '</h1><p>' + (opts.stylePreset || '') + ' · ' + opts.roomW + "' × " + opts.roomD + "'</p>" + verChips + '</div>' +
       '<div id="sm-inspect"></div>' +
       '<div id="sm-hud"><h3>Layout Variants</h3><div id="sm-vars" style="display:flex;flex-direction:column;gap:5px"></div>' +
       '<h3>View &amp; Camera</h3><div class="sm-row" id="sm-cams">' +

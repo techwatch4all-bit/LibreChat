@@ -34,6 +34,7 @@ VENDOR_ASSET_MAP = {
     "/assets/vendor/three/OrbitControls.js": os.path.join(VENDOR_DIR, "three", "OrbitControls.js"),
     "/assets/vendor/three/GLTFExporter.js": os.path.join(VENDOR_DIR, "three", "GLTFExporter.js"),
     "/assets/vendor/satchida/cad-studio.js": os.path.join(VENDOR_DIR, "satchida", "cad-studio.js"),
+    "/assets/vendor/satchida/anatomy-studio.js": os.path.join(VENDOR_DIR, "satchida", "anatomy-studio.js"),
     "/assets/vendor/satchida/scenemosaic-studio.js": os.path.join(VENDOR_DIR, "satchida", "scenemosaic-studio.js"),
     "/assets/vendor/tailwind-3.4.17.js": os.path.join(VENDOR_DIR, "tailwind-3.4.17.js"),
 }
@@ -66,6 +67,35 @@ def _wrap_template_artifact(style: str, title: str, html: str) -> str:
         if slug == "cad-blueprint"
         else ""
     )
+    if slug == "clinical-anatomy":
+        extra += (
+            "\nORGAN RENDERING CONTRACT (non-negotiable): all organs come from the vendored anatomy library — "
+            "keep `<script src=\"/assets/vendor/satchida/anatomy-studio.js\"></script>` verbatim and NEVER "
+            "hand-draw organ shapes. Each organ slot is populated ONLY by a `SatchidaAnatomy.mount(...)` call "
+            "with a catalog name (liver, liver-healthy, liver-fibrotic, liver-cirrhotic, pancreas-islet, kidney, "
+            "lung, heart, brain, stomach, muscle-fiber, muscle-myofibril, adipocyte, skin, vein, vein-healthy, "
+            "vein-varicose, capillary, erythrocyte). Keep the organ slots, mount calls and the ORGAN_STATE table "
+            "structure verbatim; per condition, swap WHICH catalog organ each slot mounts (SatchidaAnatomy.list() "
+            "and SatchidaAnatomy.variants() enumerate what exists) and adjust STAGES telemetry, narratives and "
+            "annotations. NEVER replace mounted organs with hand-drawn SVG shapes, plain <rect>/<div> boxes, "
+            "cards or emojis — that is a defect, not a simplification. Keep the Servier credit line in the "
+            "footer verbatim.\n"
+            "\nLAY DESCRIPTION → ANATOMY INFERENCE (required first step): when the user describes a symptom, "
+            "pain location, injury or procedure in everyday language (\"shooting pain below the neck\", \"IV in "
+            "the arm\", \"blood transfusion\"), FIRST state which anatomical region and structures are involved "
+            "(e.g. cervical nerve root and trapezius; antecubital fossa — cephalic/basilic vein, skin layers, "
+            "subcutaneous fat; venous access and circulation), THEN render that region at clinical fidelity. "
+            "The visualization must look like a medical atlas illustration, NOT cartoonish, NOT a sketch, NOT "
+            "flat icons.\n"
+            "\nBODY-REGION VIEWS: for procedures or surface-near anatomy (IV placement, injections, wounds, "
+            "joint pain), render the full layered depth of the region: skin (epidermis/dermis with texture), "
+            "subcutaneous fat, fascia, muscle with striations, vessels (named where clinically relevant, e.g. "
+            "cephalic vein), nerves, and bone — each as anatomically shaped SVG with its own texture, not "
+            "nested rectangles.\n"
+            "\nCONDITION DATA: when the user's question differs from Type-2 Diabetes, rewrite the STAGES array, "
+            "telemetry labels/values and narratives for that condition — the stage scrubber machinery stays, "
+            "the clinical content must match the user's actual question.\n"
+        )
     return (
         f"Customize the HTML below and deliver your final response wrapped identically inside "
         f"`:::artifact{{...}}` + ````html ... ```` + `:::`:\n{extra}\n"
@@ -334,10 +364,43 @@ def get_motion_template(style: str = "executive") -> str:
       'cad_blueprint' (2D-to-3D architectural floor plan with sun/layer controls),
       'interactive_3d' (offline Three.js WebGL scene with deterministic window.__SEEK_FRAME__),
       'mechanism_cutaway' (How Things Work SVG cutaway with RPM/throttle slider & live gauges),
+      'clinical_anatomy' (organ-level anatomical cross-section with stage progression,
+        e.g. Type-2 Diabetes insulin resistance: liver, muscle, adipose, pancreas),
       'accessible_guide' (WCAG AAA high-contrast large-print senior/patient step-by-step guide).
+
+      ROUTING RULE: use 'clinical_anatomy' for ANY question that touches the human body —
+      internal organs, muscles, bones, joints, skin, hair, blood, vessels, nerves, cells —
+      INCLUDING layperson phrasing without medical vocabulary: symptom reports ("pain on the
+      right side near the elbow", "shooting pain below the neck"), procedures ("how is an IV
+      given", "how is blood transferred/transfused", "where does an injection go"), injuries
+      ("sprained wrist", "burn on the forearm"), and region questions ("parts of the body",
+      "what is under the skin on the arm"). For those, first infer the implicated anatomical
+      region and structures, then request this template — the anatomy contract below will
+      govern rendering fidelity. Only non-human subjects (engines, buildings, finance)
+      belong to other archetypes.
     """
     style = style.lower().strip()
-    if any(k in style for k in ("medical", "anatomy", "clinical", "organ", "diabetes", "insulin", "perfusion", "pathology")):
+    if any(re.search(rf"\b{re.escape(k)}s?\b", style) for k in (
+        "medical", "anatomy", "anatomical", "clinical", "organ", "diabetes", "insulin", "perfusion",
+        "pathology", "pathophysiology", "heart", "cardio", "artery", "arterial", "vein", "vascular",
+        "blood", "cell", "cellular", "tissue", "histolog", "muscle", "neuro", "brain", "neuron",
+        "lung", "pulmonary", "respiratory", "kidney", "renal", "nephron", "liver", "hepatic",
+        "pancrea", "stomach", "gut", "digestive", "immune", "lymph", "skin", "derma", "epidermis",
+        "hair", "follicle", "bone", "skeletal", "joint", "endocrine", "hormone", "dna", "genome",
+        "virus", "bacteria", "immune response", "wound", "inflammation",
+        # layperson vocabulary: symptoms, procedures, body regions
+        "iv", "intravenous", "injection", "inject", "cannula", "catheter", "syringe", "needle",
+        "transfusion", "transfuse", "donation", "donate", "vaccine", "vaccination", "first aid",
+        "pain", "ache", "aching", "hurt", "hurts", "sore", "burn", "sting", "cramp", "numb",
+        "tingling", "swelling", "sprain", "fracture", "injury", "injured", "bruise", "bleed",
+        "symptom", "disease", "infection", "syndrome", "disorder", "healing", "recovery",
+        "body", "human body", "anatomy of", "inside the", "under the skin",
+        "arm", "elbow", "wrist", "hand", "finger", "thumb", "shoulder", "armpit",
+        "neck", "spine", "spinal", "back", "lumbar", "cervical", "chest", "rib", "thorax",
+        "abdomen", "belly", "stomach ache", "pelvis", "hip", "groin", "leg", "thigh", "knee",
+        "calf", "shin", "ankle", "foot", "heel", "toe", "head", "skull", "face", "jaw",
+        "throat", "ear", "eye", "nose", "mouth", "tongue", "tooth", "teeth", "gum",
+    )):
         style = "clinical_anatomy"
     elif any(k in style for k in ("engine", "piston", "rpm", "mechanism", "cutaway")):
         style = "mechanism_cutaway"
@@ -351,6 +414,7 @@ def get_motion_template(style: str = "executive") -> str:
 <head>
   <meta charset="UTF-8">
   <title>Clinical Anatomical Cross-Section — Type-2 Diabetes & Organ Perfusion</title>
+  <script src="/assets/vendor/satchida/anatomy-studio.js"></script>
   <script src="/assets/vendor/gsap/gsap.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js';"></script>
   <style>
     :root {
@@ -449,6 +513,17 @@ def get_motion_template(style: str = "executive") -> str:
     .badge-pathology { background: rgba(249, 115, 22, 0.18); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
     .svg-container { flex: 1; width: 100%; min-height: 270px; display: flex; align-items: center; justify-content: center; }
     svg { width: 100%; height: 100%; max-height: 310px; }
+    .organ-board { display: flex; flex-direction: column; gap: 10px; flex: 1; width: 100%; }
+    .cap-wrap { position: relative; }
+    .cap-svg { width: 100%; height: 46px; display: block; }
+    .cap-sub { font-size: 8.5px; color: #94a3b8; letter-spacing: 0.05em; margin-top: 2px; }
+    .organ-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1; }
+    .sa-cell { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+    .sa-slot { flex: 1; min-height: 150px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.18); border-radius: 12px; overflow: hidden; padding: 4px; }
+    .sa-cap { font-size: 8.5px; font-weight: 700; color: #94a3b8; text-align: center; letter-spacing: 0.04em; min-height: 11px; }
+    .zoom-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .sa-cell-sm { display: flex; flex-direction: column; gap: 4px; }
+    .sa-slot-sm { height: 84px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.14); border-radius: 10px; overflow: hidden; padding: 3px; }
     .telemetry-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -542,75 +617,35 @@ def get_motion_template(style: str = "executive") -> str:
         <span class="badge badge-normal">Baseline Control</span>
       </div>
       <div class="svg-container">
-        <svg viewBox="0 0 460 300">
-          <defs>
-            <linearGradient id="capGradNorm" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#ef4444" stop-opacity="0.8"/>
-              <stop offset="100%" stop-color="#dc2626" stop-opacity="0.9"/>
-            </linearGradient>
-            <linearGradient id="cellGradNorm" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#1e293b"/>
-              <stop offset="100%" stop-color="#0f172a"/>
-            </linearGradient>
-          </defs>
-          <!-- Capillary vessel -->
-          <rect x="20" y="24" width="420" height="48" rx="24" fill="url(#capGradNorm)" opacity="0.32" stroke="#ef4444" stroke-width="2"/>
-          <text x="35" y="44" fill="#fca5a5" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 100%)</text>
-          <!-- Normal RBCs & Glucose -->
-          <circle cx="90" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
-          <circle cx="150" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
-          <circle cx="210" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
-          <circle cx="270" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
-          <circle cx="330" cy="48" r="9" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
-          <!-- Insulin Monomers (Cyan) -->
-          <polygon points="120,40 126,48 120,56 114,48" fill="#06b6d4"/>
-          <polygon points="240,40 246,48 240,56 234,48" fill="#06b6d4"/>
-          <polygon points="360,40 366,48 360,56 354,48" fill="#06b6d4"/>
-          <!-- Glucose (Amber) -->
-          <circle cx="178" cy="48" r="5" fill="#f59e0b"/>
-          <circle cx="295" cy="48" r="5" fill="#f59e0b"/>
-
-          <!-- Interstitial Space -->
-          <line x1="20" y1="88" x2="440" y2="88" stroke="#334155" stroke-dasharray="4 4" stroke-width="1"/>
-          <text x="35" y="84" fill="#94a3b8" font-size="9">INTERSTITIUM · DIFFUSION GRADIENT</text>
-
-          <!-- Skeletal Muscle / Hepatocyte Membrane -->
-          <rect x="20" y="100" width="420" height="180" rx="16" fill="url(#cellGradNorm)" stroke="#38bdf8" stroke-width="2"/>
-          <text x="35" y="122" fill="#7dd3fc" font-size="11" font-weight="700">MYOCYTE / HEPATOCYTE CYTOPLASM</text>
-
-          <!-- Insulin Receptor (Active) -->
-          <path d="M 80 100 L 80 82 M 72 82 L 80 92 L 88 82" stroke="#06b6d4" stroke-width="3" fill="none" stroke-linecap="round"/>
-          <polygon points="80,72 85,79 80,86 75,79" fill="#06b6d4"/>
-          <text x="96" y="90" fill="#38bdf8" font-size="9" font-weight="600">Active IR (Tyrosine Kinase)</text>
-
-          <!-- Second Insulin Receptor -->
-          <path d="M 280 100 L 280 82 M 272 82 L 280 92 L 288 82" stroke="#06b6d4" stroke-width="3" fill="none" stroke-linecap="round"/>
-          <polygon points="280,72 285,79 280,86 275,79" fill="#06b6d4"/>
-
-          <!-- Open GLUT4 Transporter Channels -->
-          <rect x="170" y="96" width="34" height="12" rx="4" fill="#10b981" stroke="#34d399" stroke-width="2"/>
-          <path d="M 187 88 L 187 116 M 181 110 L 187 116 L 193 110" stroke="#f59e0b" stroke-width="2.5" fill="none"/>
-          <text x="145" y="132" fill="#34d399" font-size="9" font-weight="700">OPEN GLUT4 PORE</text>
-
-          <rect x="370" y="96" width="34" height="12" rx="4" fill="#10b981" stroke="#34d399" stroke-width="2"/>
-          <path d="M 387 88 L 387 116 M 381 110 L 387 116 L 393 110" stroke="#f59e0b" stroke-width="2.5" fill="none"/>
-
-          <!-- Intracellular Glucose Uptake & Glycogen Synthesis -->
-          <circle cx="187" cy="154" r="6" fill="#f59e0b"/>
-          <circle cx="210" cy="180" r="6" fill="#f59e0b"/>
-          <circle cx="387" cy="154" r="6" fill="#f59e0b"/>
-          <rect x="250" y="160" width="130" height="45" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.2"/>
-          <text x="262" y="180" fill="#34d399" font-size="10" font-weight="700">GLYCOGEN SYNTHESIS</text>
-          <text x="262" y="194" fill="#a7f3d0" font-size="9">Hexokinase · Normal ATP yield</text>
-
-          <!-- Pancreatic Islet Inset -->
-          <circle cx="80" cy="210" r="38" fill="rgba(6,182,212,0.12)" stroke="#06b6d4" stroke-width="1.5"/>
-          <text x="80" y="200" fill="#7dd3fc" font-size="8.5" font-weight="700" text-anchor="middle">PANCREATIC ISLET</text>
-          <circle cx="68" cy="218" r="5" fill="#06b6d4"/>
-          <circle cx="82" cy="216" r="6" fill="#06b6d4"/>
-          <circle cx="94" cy="222" r="5" fill="#06b6d4"/>
-          <text x="80" y="235" fill="#cbd5e1" font-size="7.5" text-anchor="middle">Normal β-cell Mass</text>
-        </svg>
+        <div class="organ-board">
+          <div class="cap-wrap">
+            <svg viewBox="0 0 440 46" class="cap-svg">
+              <rect x="10" y="6" width="420" height="34" rx="17" fill="rgba(239,68,68,0.30)" stroke="#ef4444" stroke-width="2"/>
+              <text x="24" y="27" fill="#fca5a5" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 100%)</text>
+              <circle cx="80" cy="23" r="7" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+              <circle cx="142" cy="23" r="7" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+              <circle cx="204" cy="23" r="7" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+              <circle cx="266" cy="23" r="7" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+              <circle cx="328" cy="23" r="7" fill="#b91c1c" stroke="#f87171" stroke-width="1.5"/>
+              <polygon points="111,18 115,23 111,28 107,23" fill="#06b6d4"/>
+              <polygon points="235,18 239,23 235,28 231,23" fill="#06b6d4"/>
+              <circle cx="173" cy="23" r="4" fill="#f59e0b"/>
+              <circle cx="297" cy="23" r="4" fill="#f59e0b"/>
+            </svg>
+            <div class="cap-sub">ENDOTHELIUM · INTACT GLYCOCALYX · NORMAL DIFFUSION GRADIENT</div>
+          </div>
+          <div class="organ-grid">
+            <div class="sa-cell"><div class="sa-slot" id="h-liver"></div><div class="sa-cap">LIVER · NORMAL ARCHITECTURE</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="h-pancreas"></div><div class="sa-cap">ISLET OF LANGERHANS · NORMAL β-CELL MASS</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="h-muscle"></div><div class="sa-cap">SKELETAL MUSCLE FIBER</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="h-adipose"></div><div class="sa-cap">ADIPOCYTE · CONTROLLED LIPID</div></div>
+          </div>
+          <div class="zoom-row">
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="h-myofibril"></div><div class="sa-cap">MYOFIBRIL (ZOOM)</div></div>
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="h-vein"></div><div class="sa-cap">VEIN · HEALTHY WALL</div></div>
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="h-rbc"></div><div class="sa-cap">ERYTHROCYTE</div></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -621,56 +656,27 @@ def get_motion_template(style: str = "executive") -> str:
         <span class="badge badge-pathology" id="path-badge">Stage 2</span>
       </div>
       <div class="svg-container">
-        <svg viewBox="0 0 460 300" id="path-svg">
-          <defs>
-            <linearGradient id="capGradPath" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop id="cap-stop1" offset="0%" stop-color="#f97316" stop-opacity="0.32"/>
-              <stop id="cap-stop2" offset="100%" stop-color="#dc2626" stop-opacity="0.45"/>
-            </linearGradient>
-            <linearGradient id="cellGradPath" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#1e1b2e"/>
-              <stop offset="100%" stop-color="#0f111a"/>
-            </linearGradient>
-          </defs>
-          <!-- Capillary vessel (Constricts in later stages) -->
-          <rect id="path-capillary" x="20" y="24" width="420" height="48" rx="24" fill="url(#capGradPath)" stroke="#f97316" stroke-width="2"/>
-          <text id="path-cap-text" x="35" y="44" fill="#fdba74" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 94%)</text>
-          <!-- Circulating Particles Group (Populated via JS) -->
-          <g id="path-particles"></g>
-
-          <!-- Interstitial Barrier with lipid accumulation -->
-          <line x1="20" y1="88" x2="440" y2="88" stroke="#f59e0b" stroke-dasharray="3 3" stroke-width="1.2" id="path-interstitium"/>
-          <text x="35" y="84" fill="#fbbf24" font-size="9" id="path-inter-text">DIACYLGLYCEROL &amp; CERAMIDE ACCUMULATION</text>
-
-          <!-- Muscle Membrane -->
-          <rect id="path-membrane" x="20" y="100" width="420" height="180" rx="16" fill="url(#cellGradPath)" stroke="#f97316" stroke-width="2"/>
-          <text id="path-cyto-text" x="35" y="122" fill="#fdba74" font-size="11" font-weight="700">DESENSITIZED RECEPTOR CYTOPLASM</text>
-
-          <!-- Receptors -->
-          <path id="path-receptor" d="M 80 100 L 80 82 M 72 82 L 80 92 L 88 82" stroke="#f97316" stroke-width="3" fill="none" stroke-linecap="round"/>
-          <circle id="path-ir-phos" cx="80" cy="92" r="5" fill="#ef4444" opacity="0.8"/>
-          <text id="path-ir-status" x="96" y="90" fill="#fca5a5" font-size="9" font-weight="600">Serine Phosphorylated (Blunted)</text>
-
-          <!-- GLUT4 Transporters (Trapped inside vesicles in Stage 3/4) -->
-          <rect id="path-glut4-gate1" x="170" y="96" width="34" height="12" rx="4" fill="#eab308" stroke="#ca8a04" stroke-width="2"/>
-          <circle id="path-glut4-vesicle1" cx="187" cy="140" r="14" fill="rgba(234,179,8,0.2)" stroke="#eab308" stroke-dasharray="2 2" stroke-width="1.5"/>
-          <text id="path-glut4-label" x="140" y="168" fill="#eab308" font-size="8.5" font-weight="700">GLUT4 VESICLE RETENTION</text>
-
-          <!-- Intracellular Pathology -->
-          <rect id="path-glyco-box" x="250" y="160" width="150" height="50" rx="8" fill="rgba(249,115,22,0.12)" stroke="#f97316" stroke-width="1.2"/>
-          <text id="path-meta-title" x="262" y="180" fill="#fdba74" font-size="10" font-weight="700">COMPENSATORY WORKLOAD</text>
-          <text id="path-meta-sub" x="262" y="196" fill="#fed7aa" font-size="8.5">Mitochondrial ROS · Fatty Acid Spillover</text>
-
-          <!-- Pancreatic Islet Stress Inset -->
-          <circle id="path-islet" cx="80" cy="210" r="38" fill="rgba(249,115,22,0.15)" stroke="#f97316" stroke-width="1.5"/>
-          <text x="80" y="198" fill="#fed7aa" font-size="8.5" font-weight="700" text-anchor="middle">PANCREATIC ISLET</text>
-          <g id="path-beta-cells">
-            <circle cx="68" cy="214" r="7" fill="#f97316"/>
-            <circle cx="84" cy="212" r="8" fill="#f97316"/>
-            <circle cx="96" cy="220" r="7" fill="#f97316"/>
-          </g>
-          <text id="path-islet-sub" x="80" y="236" fill="#cbd5e1" font-size="7.5" text-anchor="middle">Hyperinsulinemic Secretion</text>
-        </svg>
+        <div class="organ-board">
+          <div class="cap-wrap">
+            <svg viewBox="0 0 440 46" class="cap-svg">
+              <rect id="path-capillary" x="10" y="6" width="420" height="34" rx="17" fill="rgba(249,115,22,0.32)" stroke="#f97316" stroke-width="2"/>
+              <text id="path-cap-text" x="24" y="27" fill="#fdba74" font-size="10" font-weight="700">CAPILLARY LUMEN (PERFUSION 94%)</text>
+              <g id="path-particles"></g>
+            </svg>
+            <div class="cap-sub" id="path-inter-text">DIACYLGLYCEROL &amp; CERAMIDE ACCUMULATION AT THE ENDOTHELIAL BARRIER</div>
+          </div>
+          <div class="organ-grid">
+            <div class="sa-cell"><div class="sa-slot" id="p-liver"></div><div class="sa-cap" id="p-liver-cap">HEPATIC ARCHITECTURE</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="p-pancreas"></div><div class="sa-cap" id="p-pancreas-cap">ISLET · β-CELL STATUS</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="p-muscle"></div><div class="sa-cap" id="p-muscle-cap">MUSCLE FIBER · PERFUSION</div></div>
+            <div class="sa-cell"><div class="sa-slot" id="p-adipose"></div><div class="sa-cap" id="p-adipose-cap">ADIPOCYTE · LIPID LOAD</div></div>
+          </div>
+          <div class="zoom-row">
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="p-myofibril"></div><div class="sa-cap">MYOFIBRIL (ZOOM)</div></div>
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="p-vein"></div><div class="sa-cap" id="p-vein-cap">VENOUS WALL</div></div>
+            <div class="sa-cell-sm"><div class="sa-slot-sm" id="p-rbc"></div><div class="sa-cap">ERYTHROCYTE</div></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -718,6 +724,7 @@ def get_motion_template(style: str = "executive") -> str:
 
   <footer>
     Educational &amp; Pathophysiological Visualization — Not Medical Advice. Generated for clinical training, academic reference &amp; patient comprehension.
+    <br>Organ illustrations: Servier Medical Art (smart.servier.com), CC-BY 3.0 · Heart &amp; liver progression series: CC0.
   </footer>
 
   <script>
@@ -878,37 +885,38 @@ def get_motion_template(style: str = "executive") -> str:
       document.getElementById("narrative-box").innerHTML = s.narrative;
       document.getElementById("stage-display").textContent = "Stage " + (currentStage + 1);
 
-      // SVG Updates
+      // Organ state — real anatomical artwork swapped per stage via the protected library
+      const o = ORGAN_STATE[currentStage];
+      R.liver.setVariant(o.liverOrgan);
+      R.liver.setFilter(o.liverFilter);
+      R.liver.glow(o.liverGlow);
+      R.pancreas.setFilter(o.pancreasFilter);
+      R.pancreas.glow(o.pancreasGlow);
+      R.muscle.setFilter(o.muscleFilter);
+      R.adipose.setFilter(o.adiposeFilter);
+      R.vein.setVariant(o.veinOrgan);
+      document.getElementById("p-liver-cap").textContent = o.liverCaption;
+      document.getElementById("p-pancreas-cap").textContent = o.pancreasCaption;
+      document.getElementById("p-muscle-cap").textContent = o.muscleCaption;
+      document.getElementById("p-adipose-cap").textContent = o.adiposeCaption;
+      document.getElementById("p-vein-cap").textContent = o.veinCaption;
+
+      // Capillary tube state
       const cap = document.getElementById("path-capillary");
       cap.setAttribute("stroke", s.capColor);
       document.getElementById("path-cap-text").textContent = s.capText;
-      document.getElementById("path-ir-status").textContent = s.irText;
-      document.getElementById("path-ir-status").setAttribute("fill", s.irColor);
-      document.getElementById("path-receptor").setAttribute("stroke", s.irColor);
-      document.getElementById("path-ir-phos").setAttribute("opacity", s.phosOpacity);
 
-      const gGate = document.getElementById("path-glut4-gate1");
-      gGate.setAttribute("fill", s.glut4Color);
-      gGate.setAttribute("y", s.glut4Y);
-
-      document.getElementById("path-meta-title").textContent = s.metaTitle;
-      document.getElementById("path-meta-sub").textContent = s.metaSub;
-      document.getElementById("path-glyco-box").setAttribute("stroke", s.metaBorder);
-
-      document.getElementById("path-islet").setAttribute("stroke", s.isletBorder);
-      document.getElementById("path-islet-sub").textContent = s.isletText;
-
-      // Regenerate particles
+      // Regenerate particles (capillary strip geometry)
       const pGroup = document.getElementById("path-particles");
       pGroup.innerHTML = "";
       // RBCs
       for (let i = 0; i < 5; i++) {
-        const cx = 90 + i * 60;
-        const cy = 48 + Math.sin(i + currentStage) * 3;
+        const cx = 80 + i * 62;
+        const cy = 23 + Math.sin(i + currentStage) * 4;
         const rbc = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         rbc.setAttribute("cx", cx);
         rbc.setAttribute("cy", cy);
-        rbc.setAttribute("r", 9 - currentStage * 0.5);
+        rbc.setAttribute("r", 7 - currentStage * 0.5);
         rbc.setAttribute("fill", currentStage > 2 ? "#7f1d1d" : "#b91c1c");
         rbc.setAttribute("stroke", currentStage > 2 ? "#b91c1c" : "#f87171");
         rbc.setAttribute("stroke-width", "1.5");
@@ -918,11 +926,11 @@ def get_motion_template(style: str = "executive") -> str:
       const gCount = currentStage === 0 ? 3 : currentStage === 1 ? 5 : currentStage === 2 ? 14 : 26;
       for (let i = 0; i < gCount; i++) {
         const gx = 40 + ((i * 37) % 360);
-        const gy = 32 + ((i * 19) % 30);
+        const gy = 14 + ((i * 19) % 18);
         const gDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         gDot.setAttribute("cx", gx);
         gDot.setAttribute("cy", gy);
-        gDot.setAttribute("r", "4.5");
+        gDot.setAttribute("r", "4");
         gDot.setAttribute("fill", "#f59e0b");
         pGroup.appendChild(gDot);
       }
@@ -930,13 +938,69 @@ def get_motion_template(style: str = "executive") -> str:
       const insCount = currentStage === 0 ? 3 : currentStage === 1 ? 9 : currentStage === 2 ? 6 : 1;
       for (let i = 0; i < insCount; i++) {
         const ix = 60 + ((i * 49) % 340);
-        const iy = 35 + ((i * 23) % 24);
+        const iy = 16 + ((i * 23) % 14);
         const ins = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-        ins.setAttribute("points", `${ix},${iy-6} ${ix+5},${iy} ${ix},${iy+6} ${ix-5},${iy}`);
+        ins.setAttribute("points", `${ix},${iy-5} ${ix+4},${iy} ${ix},${iy+5} ${ix-4},${iy}`);
         ins.setAttribute("fill", "#06b6d4");
         pGroup.appendChild(ins);
       }
     }
+
+    // Per-stage organ state (real artwork variants + clinical filters)
+    const ORGAN_STATE = [
+      { liverOrgan: "liver-healthy", liverFilter: "none", liverGlow: "#34d399",
+        pancreasFilter: "none", pancreasGlow: "#22d3ee",
+        muscleFilter: "none", adiposeFilter: "none", veinOrgan: "vein-healthy",
+        liverCaption: "NORMAL HEPATIC ARCHITECTURE",
+        pancreasCaption: "ISLET · NORMAL β-CELL MASS",
+        muscleCaption: "MUSCLE FIBER · INSULIN SENSITIVE",
+        adiposeCaption: "ADIPOCYTE · CONTROLLED LIPID",
+        veinCaption: "VENOUS WALL · HEALTHY" },
+      { liverOrgan: "liver", liverFilter: "sepia(0.5) saturate(1.8) brightness(0.95)", liverGlow: "#f59e0b",
+        pancreasFilter: "sepia(0.3) saturate(1.4)", pancreasGlow: "#f97316",
+        muscleFilter: "sepia(0.35) saturate(1.3)", adiposeFilter: "saturate(1.4) brightness(0.95)", veinOrgan: "vein",
+        liverCaption: "EARLY STEATOSIS · LOBULAR STRAIN",
+        pancreasCaption: "ISLET · HYPERINSULINEMIC COMPENSATION",
+        muscleCaption: "MUSCLE FIBER · INTRAMYOCELLULAR LIPID",
+        adiposeCaption: "ADIPOCYTE · LIPID ACCUMULATION",
+        veinCaption: "VENOUS WALL · ENDOTHELIAL STRESS" },
+      { liverOrgan: "liver-fibrotic", liverFilter: "none", liverGlow: "#f97316",
+        pancreasFilter: "saturate(0.9) brightness(0.9)", pancreasGlow: "#fb923c",
+        muscleFilter: "sepia(0.5) saturate(1.4) brightness(0.9)", adiposeFilter: "saturate(1.7) brightness(0.9)", veinOrgan: "vein",
+        liverCaption: "FIBROTIC REMODELING · PORTAL STRAIN",
+        pancreasCaption: "ISLET · SECRETORY FATIGUE",
+        muscleCaption: "MUSCLE FIBER · GLUCOTOXIC STRAIN",
+        adiposeCaption: "ADIPOCYTE · HYPERTROPHY",
+        veinCaption: "VENOUS WALL · VALVE STRESS" },
+      { liverOrgan: "liver-cirrhotic", liverFilter: "none", liverGlow: "#ef4444",
+        pancreasFilter: "saturate(0.7) brightness(0.85)", pancreasGlow: "#ef4444",
+        muscleFilter: "grayscale(0.4) brightness(0.85)", adiposeFilter: "saturate(2) brightness(0.85)", veinOrgan: "vein-varicose",
+        liverCaption: "CIRRHOTIC ARCHITECTURE · ADVANCED FIBROSIS",
+        pancreasCaption: "ISLET · β-CELL EXHAUSTION",
+        muscleCaption: "MUSCLE FIBER · ATROPHIC CHANGE",
+        adiposeCaption: "ADIPOCYTE · PATHOLOGIC EXPANSION",
+        veinCaption: "VENOUS WALL · VARICOSE REMODELING" }
+    ];
+
+    // Mount the left (healthy reference) panel — static real anatomy
+    SatchidaAnatomy.mount("liver-healthy", "h-liver");
+    SatchidaAnatomy.mount("pancreas-islet", "h-pancreas");
+    SatchidaAnatomy.mount("muscle-fiber", "h-muscle");
+    SatchidaAnatomy.mount("adipocyte", "h-adipose");
+    SatchidaAnatomy.mount("muscle-myofibril", "h-myofibril");
+    SatchidaAnatomy.mount("vein-healthy", "h-vein");
+    SatchidaAnatomy.mount("erythrocyte", "h-rbc");
+
+    // Mount the right (affected) panel — variants driven by the stage scrubber
+    const R = {
+      liver: SatchidaAnatomy.mount("liver-healthy", "p-liver"),
+      pancreas: SatchidaAnatomy.mount("pancreas-islet", "p-pancreas"),
+      muscle: SatchidaAnatomy.mount("muscle-fiber", "p-muscle"),
+      adipose: SatchidaAnatomy.mount("adipocyte", "p-adipose"),
+      vein: SatchidaAnatomy.mount("vein-healthy", "p-vein")
+    };
+    SatchidaAnatomy.mount("muscle-myofibril", "p-myofibril");
+    SatchidaAnatomy.mount("erythrocyte", "p-rbc");
 
     renderStage(0);
 
@@ -1468,6 +1532,81 @@ def _auto_walls_from_rooms(rooms: list[dict], width: float, depth: float) -> lis
             else:
                 walls.append({"x1": start, "z1": pos, "x2": end, "z2": pos, "t": 0.4, "kind": "int", "openings": opening})
     return walls
+
+
+M_TO_FT = 3.28084
+
+
+@mcp.tool()
+def architect_plan_to_cad_plan(plan_json: str, floor_index: int = 0) -> str:
+    """
+    Convert a Satchida Architect Studio plan (skill/satchida-architect-server.py output shape,
+    all units METRES, rooms as rect [x0,z0,x1,z1] or polygon points) into the CAD plan JSON that
+    build_cad_floorplan consumes (feet, rooms as {id, name, x, z, w, d}).
+    - plan_json: the same JSON you would pass to the architect's build_architect_plan.
+    - floor_index: which floor to render (default 0 = ground). Multi-floor buildings render one
+      floor per CAD artifact; call again with a higher index for upper levels.
+    Returns JSON: {"title", "width", "depth", "rooms_json": "<pass as build_cad_floorplan rooms_json>",
+    "walls_json": "[]", "furniture_json": "[]"} — walls/furniture are auto-generated by
+    build_cad_floorplan when empty.
+    """
+    try:
+        plan = json.loads(plan_json)
+        floors = plan.get("floors") or []
+        if not floors or floor_index >= len(floors):
+            return "ERROR: plan_json must contain floors; floor_index out of range."
+        floor = floors[floor_index]
+    except json.JSONDecodeError as exc:
+        return f"ERROR: plan_json is not valid JSON: {exc}"
+
+    rooms_out = []
+    xs_all, zs_all = [], []
+    for i, raw in enumerate(floor.get("rooms", [])):
+        pts = raw.get("points")
+        rect = raw.get("rect")
+        if not pts and rect:
+            x0, z0, x1, z1 = (float(c) for c in rect)
+            pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]
+        if not pts or len(pts) < 3:
+            continue
+        pts_ft = [[p[0] * M_TO_FT, p[1] * M_TO_FT] for p in pts]
+        xs = [p[0] for p in pts_ft]
+        zs = [p[1] for p in pts_ft]
+        xs_all.extend(xs)
+        zs_all.extend(zs)
+        name = str(raw.get("name", f"Room {i + 1}"))
+        rooms_out.append({
+            "id": re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or f"room-{i + 1}",
+            "name": name.upper(),
+            "x": round(min(xs), 2),
+            "z": round(min(zs), 2),
+            "w": round(max(xs) - min(xs), 2),
+            "d": round(max(zs) - min(zs), 2),
+        })
+    if not rooms_out:
+        return "ERROR: floor has no usable rooms (rect or polygon points required)."
+
+    width = round(max(xs_all) - min(xs_all), 2)
+    depth = round(max(zs_all) - min(zs_all), 2)
+    # Re-anchor rooms to the bounding-box origin so the CAD canvas starts at 0.
+    x_off, z_off = min(xs_all), min(zs_all)
+    for r in rooms_out:
+        r["x"] = round(r["x"] - x_off, 2)
+        r["z"] = round(r["z"] - z_off, 2)
+
+    title = str(plan.get("title") or floor.get("name") or "Architect Plan (Motion CAD)")
+    if len(floors) > 1:
+        title = f"{title} — {floor.get('name', f'Floor {floor_index + 1}')}"
+    sqft = sum(r["w"] * r["d"] for r in rooms_out)
+    return json.dumps({
+        "title": f"{title} ({width:.0f}' × {depth:.0f}', {sqft:.0f} sq ft)",
+        "width": width,
+        "depth": depth,
+        "rooms_json": json.dumps(rooms_out),
+        "walls_json": "[]",
+        "furniture_json": "[]",
+        "usage": "Pass title, width, depth, and rooms_json to build_cad_floorplan verbatim.",
+    })
 
 
 @mcp.tool()

@@ -2810,3 +2810,95 @@ The Satchida Knowledge Vault includes high-fidelity programmatic document genera
   - Connects directly to the Satchida Knowledge Vault (AnythingLLM MCP) pre-indexed with approved NCERT, CBSE, ICSE, and Cambridge syllabi.
   - Every academic explanation includes verified citations referencing the exact textbook, chapter title, and page number.
 
+
+
+---
+
+## 28. Zero-Cost Multi-Provider Routing Architecture & Multi-Tier Fallback
+
+### 28.1 Overview & COGS Baseline
+To ensure high availability, zero telemetry leakage, and strict adherence to the hard COGS ceiling ($\text{Input} \le \$0.10/\text{1M}$, $\text{Output} \le \$0.30/\text{1M}$), the Satchida AI Harness implements a **Free-First Tri-Provider Fallback Architecture**.
+
+Standard conversational, educational, and creative modes (`Chat`, `Study`, `Work`, `Vibecoding`, `SceneMosaic`, `Motion Studio`) are served exclusively through zero-cost free and preview model pools across independent accounts. Real paid credits on **NousResearch**, **CheapInference**, **DeepInfra**, and **TokenHarbor** are strictly reserved for `Pro` and `Privacy` accounts, or as an absolute final emergency circuit breaker.
+
+### 28.2 Multi-Provider Redundancy Matrix
+
+```
+[ User Request from LibreChat UI / Agent Persona ]
+                       │
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│ TIER 1: PRIMARY FREE PROVIDER POOL ($0.00 Cost)        │
+│ • Mode Work / SceneMosaic:  OpenRouter Nemotron 3.5    │
+│   Super-VL (1M ctx, PBR/CAD/Spatial Vision)            │
+│ • Mode Vibecoding / Motion: OpenRouter Super-VL &       │
+│   Nemotron-3-Nano-Omni (Reasoning/Three.js shaders)    │
+│ • Mode Chat / Study:        NousResearch Longcat 2.5   │
+│   (3-Account Load-Balanced Rotation)                   │
+└────────────────────────────────────────────────────────┘
+                       │ (On HTTP 429 / Rate Saturation / Quota)
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│ TIER 2: SECONDARY FREE PROVIDER POOL ($0.00 Cost)      │
+│ • CommandCode CLI Pool: DeepSeek-V4-Flash & GLM-5.3    │
+│   (Sub-second JSON tool calling & CAD vector output)   │
+│ • OpenRouter Lightning & Gemma 4 26B Community Pool    │
+└────────────────────────────────────────────────────────┘
+                       │ (On Concurrency Saturation)
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│ TIER 3: TERTIARY FREE PROVIDER POOL ($0.00 Cost)       │
+│ • OpenRouter Dots3-Note Preview (512k ctx)             │
+│ • NousResearch DeepSeek-V4-Flash (3 Rotating Keys)     │
+│ • Baidu Ernie 5.5 Flash Preview / ThinkingMachines     │
+└────────────────────────────────────────────────────────┘
+                       │ (Emergency Circuit Breaker Only)
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│ TIER 4: GUARANTEED ULTRA-LOW-COST PAID FALLBACK        │
+│ (< $0.10 in / < $0.30 out)                             │
+│ • CheapInference:  DeepSeek-V4-Flash ($0.040 / $0.280) │
+│ • CheapInference:  GLM-5.3-Flash     ($0.035 / $0.140) │
+│ • DeepInfra:       DeepSeek-V4-Flash ($0.043 / $0.300) │
+│ • TokenHarbor:     DeepSeek-V4-Flash (Final Safeguard) │
+└────────────────────────────────────────────────────────┘
+```
+
+### 28.3 Archetype Routing Breakdown
+
+1. **Work & SceneMosaic (`satchida/work-quality`)**:
+   - **Primary**: `openrouter/nvidia/nemotron-3.5-super-vl:free` (rotated across Account 1 `Generic` and Account 2 `Privacy`). Evaluates multimodal photos, floor plans, and generates beveled 3D bounding boxes.
+   - **Secondary**: `commandcode/deepseek-v4-flash` & `commandcode/glm-5.3-flash`.
+   - **Tertiary**: `openrouter/nvidia/nemotron-3.5-lightning:free` & `openrouter/dots-studio/dots-3-note-preview:free`.
+   - **Final Paid Fallback**: `CheapInference/deepseek-ai/DeepSeek-V4-Flash-0731` & `deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731`.
+
+2. **Vibecoding & Motion Studio (`satchida/vibecoding`)**:
+   - **Primary**: `openrouter/nvidia/nemotron-3.5-super-vl:free` & `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`. Delivers high-density Three.js procedural shaders, kinematic trajectories, and SVG animation code without truncation.
+   - **Secondary**: `commandcode/deepseek-v4-flash`.
+   - **Tertiary**: `nousresearch/deepseek/deepseek-v4-flash` (3-account rotation).
+   - **Final Paid Fallback**: `CheapInference/deepseek-ai/DeepSeek-V4-Flash-0731` & `deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731`.
+
+3. **Chat & Study (`satchida/chat-study`)**:
+   - **Primary**: `nousresearch/meituan/longcat-2.5:free` load-balanced across the 3 independent accounts (`Ankur-Nous`, `TechwatchNous`, `Pracs-AnkurKey`).
+   - **Secondary**: `openrouter/nvidia/nemotron-3.5-lightning:free` & `openrouter/google/gemma-4-26b-a4b-it:free`.
+   - **Tertiary**: `commandcode/glm-5.3-flash`.
+   - **Final Paid Fallback**: `CheapInference/glm-5.3-flash` & `deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731`.
+
+4. **Pro & Privacy (`satchida/pro`)**:
+   - Dedicated paid route using CheapInference, DeepInfra, and TokenHarbor balances for premium subscribers requiring guaranteed SLAs and priority queueing.
+
+
+### 28.4 Model Promotion & Cutover Invariant Protocol
+To ensure that older/inferior models (such as `dots-3-note-preview:free`) can **never** accidentally intercept traffic when newer models (such as `nvidia/nemotron-3.5-super-vl:free`) are designated as the active model, any model replacement **must execute atomically across all 3 configuration layers**:
+
+1. **Layer 1: Bifrost CostRouter Allowlist (`Bifrost/data/free-models/allowlist.json`)**:
+   - The new model must be inserted as index `0` of the `"free"` array so that the `costrouter` plugin prioritizes it first.
+2. **Layer 2: Bifrost Routing Targets & Fallback Chain (`Bifrost/data/config.db`)**:
+   - `routing_targets` must have its `model` column updated to the new slug.
+   - `routing_rules.fallbacks` JSON array must place the new model as the first entry across all authorized account keys.
+3. **Layer 3: One-API Channel Model Mappings (`one-api/one-api.db`)**:
+   - Channels `1`, `4`, and `5` must have their `model_mapping` JSON updated to point directly to the full target model slug (e.g. `openrouter/nvidia/nemotron-3.5-super-vl:free`).
+4. **Mandatory Live Verification Gate**:
+   - A live test prompt (`POST http://127.0.0.1:4000/v1/chat/completions`) must be executed immediately following any cutover.
+   - The test must confirm that `extra_fields.resolved_model_used` exactly matches the intended new model.
+   - **Automated Tooling**: The script `D:\LAN-AI-Infra\ops-scripts\promote-model.py` enforces this 4-step atomic cutover with automated verification.

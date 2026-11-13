@@ -1,0 +1,31 @@
+# Satchida TENANT edge-node librechat.yaml overlay — endpoints section example.
+# Purpose: on a tenant PC (self-contained LibreChat copy), the model endpoint points
+# at the Central HQ one-api gateway over the Cloudflare Zero Trust Named Tunnel using
+# Machine-to-Machine Service Tokens. The HQ operator's own librechat.yaml keeps its
+# local 127.0.0.1:4099 gateway — DO NOT copy this endpoint section onto the HQ node.
+#
+# The tenant yaml otherwise mirrors the HQ librechat.yaml (mcpServers, personas, etc.).
+# Required env vars in the tenant .env (provisioned by provision-client-tunnel.ps1):
+#   SATCHIDA_GATEWAY_KEY=<per-tenant one-api token>
+#   CF_ACCESS_CLIENT_ID=<Cloudflare service token id>
+#   CF_ACCESS_CLIENT_SECRET=<Cloudflare service token secret>
+
+endpoints:
+  custom:
+  - name: Satchida Central Gateway
+    apiKey: ${SATCHIDA_GATEWAY_KEY}
+    baseURL: https://gateway.satchida.com/v1
+    models:
+      default:
+      - deepseek-chat
+      - claude-3-5-sonnet
+      - gpt-4o
+      fetch: false
+    headers:
+      CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}
+      CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}
+    maxToolResultChars: 12000
+    titleConvo: true
+    titleModel: deepseek-chat
+    titleMethod: completion
+    modelDisplayLabel: Satchida AI

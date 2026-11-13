@@ -656,3 +656,22 @@ Divergence from upstream LibreChat conversation-starters behavior:
    contract: one concept per turn, exercise, stop-and-wait, resume by lesson number). All copy
    localized via `starters_*` English keys; mirrored 3 suggestions into the Study mode
    `conversation_starters` in `librechat.yaml`.
+
+## C32. Vendored Axonometra engine + Architect Studio (2026-11-13)
+
+Not upstream. Three pieces:
+
+1. **Vendored engine bundles** — `client/public/assets/vendor/axonometra/` (+ mirrored into
+   `client/dist/assets/vendor/axonometra/`; the live server serves vendor assets from `dist`)
+   carries the MIT Axonometra planner (`@axonometra/editor@0.8.0`, zero runtime npm deps; a
+   maintained fork of NeonPlan 3D — credit preserved in the shipped NOTICE). See PROVENANCE.md
+   in that directory.
+2. **`skill/satchida-architect-server.py`** — Satchida-only MCP server (`satchida-architect` in
+   `librechat.yaml`) that validates whole-building plan JSON (rooms/walls/doors/windows/stairs/
+   roof/multi-floor, with door-swing, walkway and daylight checks) and emits an artifact that
+   mounts the planner via `memoryStore({building})`. Users can walk through and keep editing the
+   generated plan in the artifact.
+3. **Scoped CORS middleware in `api/server/index.js`** — `Access-Control-Allow-Origin: *` for
+   `/assets/vendor/axonometra` only. Needed because artifact iframes are sandboxed without
+   `allow-same-origin`, and ES-module imports (unlike the classic script tags the other studios
+   use) require CORS. Serves public MIT assets only; discloses nothing.

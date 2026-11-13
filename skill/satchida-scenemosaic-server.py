@@ -250,7 +250,68 @@ def _to_centered_objects(items: list[dict], room_w: float, room_d: float) -> lis
     return centered
 
 
-def _evolve_variants(base: list[dict], room_w: float, room_d: float) -> tuple[list[dict], dict]:
+def _ergonomic_verification(objects: list[dict], room_w: float, room_d: float,
+                            window_wall: str, window_count: int, window_width: float) -> dict:
+    """
+    Daylight & walkway checks over one resolved layout (top-left x,z coordinates, north = low z).
+    - daylight: glazing ratio from the assumed window set (≥ 10 % of floor area reads well-lit) and
+      a glare advisory — screens on the window wall fight daylight, desks facing the window win.
+    - walkways: min edge-to-edge gap between large furniture pieces; under 0.75 m is a squeeze.
+    """
+    floor_area = room_w * room_d
+    # a typical 5 ft × 4.3 ft window per count (units here are feet, matching the room grid)
+    glazing = max(1, int(window_count)) * window_width * 4.3
+    ratio = glazing / floor_area if floor_area > 0 else 0.0
+
+    daylight = {
+        "assumedWindowWall": window_wall,
+        "glazingRatio": round(ratio, 3),
+        "verdict": "well-lit" if ratio >= 0.10 else "dim — enlarge windows or add a second light source",
+    }
+    advisories = []
+    tv = next((o for o in objects if o.get("type") in ("tv", "media")), None)
+    desk = next((o for o in objects if o.get("type") == "desk"), None)
+    if tv and str(tv.get("wall_attach", "")) == window_wall:
+        advisories.append("screen sits on the window wall — high daytime glare; move it to a perpendicular wall")
+    if desk:
+        # desk yaw follows its wall; a desk ON the window wall faces into the room (user's back to the light)
+        if str(desk.get("wall_attach", "")) == window_wall:
+            advisories.append("desk backs onto the window — backlight on the workspace; angle it perpendicular to the window")
+        else:
+            advisories.append("desk keeps daylight over the shoulder — good working light")
+    if advisories:
+        daylight["advisories"] = advisories
+
+    large_types = ("sofa", "couch", "bed", "dining", "table", "desk", "wardrobe", "bookshelf", "kitchen", "bath")
+    boxes = []
+    for o in objects:
+        if o.get("type") not in large_types:
+            continue
+        bw, bd = _footprint_for_yaw(float(o.get("w", 2.0)), float(o.get("d", 2.0)), float(o.get("yaw_deg", 0.0)))
+        x, z = float(o["x"]), float(o["z"])
+        boxes.append((o.get("name") or o["type"], (x, z, x + bw, z + bd)))
+    gaps = []
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            n1, (ax, az, ax1, az1) = boxes[i]
+            n2, (bx, bz, bx1, bz1) = boxes[j]
+            gap_x = max(bx - ax1, ax - bx1)
+            gap_z = max(bz - az1, az - bz1)
+            overlap_x = min(ax1, bx1) - max(ax, bx)
+            overlap_z = min(az1, bz1) - max(az, bz)
+            if overlap_x > 0.05 and gap_z > 0:
+                gaps.append({"between": [n1, n2], "gap": round(gap_z, 2), "axis": "z"})
+            if overlap_z > 0.05 and gap_x > 0:
+                gaps.append({"between": [n1, n2], "gap": round(gap_x, 2), "axis": "x"})
+    gaps.sort(key=lambda g: g["gap"])
+    walkway = {"minGap": gaps[0]["gap"] if gaps else None,
+               "status": "clear" if (not gaps or gaps[0]["gap"] >= 0.75) else "tight"}
+    return {"daylight": daylight, "walkway": walkway}
+
+
+def _evolve_variants(base: list[dict], room_w: float, room_d: float,
+                     window_wall: str = "north", window_count: int = 1,
+                     window_width: float = 5.0) -> tuple[list[dict], dict]:
     """Generate 3 verified SceneMosaic layout evolution variants from the base reconstruction."""
     v1, nudges1 = _resolve_containment_and_collisions(base, room_w, room_d)
 
@@ -287,6 +348,7 @@ def _evolve_variants(base: list[dict], room_w: float, room_d: float) -> tuple[li
         "facingAligned": True,
         "doorClearance": True,
     }
+    verification.update(_ergonomic_verification(v1, room_w, room_d, window_wall, window_count, window_width))
     return [
         {"name": "Photo Original", "objects": _to_centered_objects(v1, room_w, room_d)},
         {"name": "Open-Flow Ergonomic", "objects": _to_centered_objects(v2, room_w, room_d)},
@@ -301,16 +363,22 @@ def build_scenemosaic_scene(
     room_depth: float = 14.0,
     objects_json: str = "[]",
     style_preset: str = "Warm Minimalist Oak & Concrete",
+    window_wall: str = "north",
+    window_count: int = 1,
+    window_width: float = 5.0,
 ) -> str:
     """
     Reconstruct an interactive photorealistic Three.js 3D room scene + 2D Floor Map with 3 verified SceneMosaic layout variants
     and GLB export from objects extracted from a room photo (or default studio room if objects_json is omitted).
     - objects_json: optional JSON array of {name, type: 'sofa'|'bed'|'table'|'coffee_table'|'dining'|'desk'|'chair'|'armchair'|'tv'|'bookshelf'|'lamp'|'kitchen'|'wardrobe'|'dresser'|'nightstand'|'bath'|'planter', x, z, w, d, h, yaw_deg?, wall_attach?: 'north'|'south'|'east'|'west', color?}
+    - window_wall / window_count / window_width: the room's real window set (from the photo) — drives the daylight ratio and the screen-glare advisory in the verification block. window_wall: 'north'|'south'|'east'|'west'.
     """
     rw = max(10.0, min(60.0, float(room_width)))
     rd = max(10.0, min(60.0, float(room_depth)))
+    if str(window_wall).lower() not in ("north", "south", "east", "west"):
+        window_wall = "north"
     objs = json.loads(objects_json) if objects_json.strip() not in ("", "[]") else DEFAULT_OBJECTS
-    variants, verification = _evolve_variants(objs, rw, rd)
+    variants, verification = _evolve_variants(objs, rw, rd, str(window_wall).lower(), int(window_count), float(window_width))
     safe_title = title.replace("<", "&lt;").replace(">", "&gt;")
     safe_style = style_preset.replace("<", "&lt;").replace(">", "&gt;")
     payload = json.dumps({

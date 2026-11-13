@@ -226,3 +226,7 @@ client/public/motion/*.mp4
 client/public/motion/*.png
 !client/public/motion/.gitkeep
 
+
+# local backups & one-off ops scripts
+*.bak-*
+skill/*.bak

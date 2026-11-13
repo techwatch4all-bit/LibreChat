@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architectural Floor Plan - 40' x 60' South Facing</title>
+  <!-- Vendored GSAP with CDN Fallback -->
+  <script src="/assets/vendor/gsap/gsap.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js';"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #0B0F19;
+      color: #E2E8F0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px 10px 100px;
+    }
+
+    /* Container Card */
+    .viewport-card {
+      position: relative;
+      background: #FFFFFF;
+      border-radius: 12px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+      width: 100%;
+      max-width: 680px;
+      padding: 20px 24px 24px;
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Interactive Parameter Controls Overlay */
+    .param-hud {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11px;
+      color: #F8FAFC;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      z-index: 10;
+    }
+    .param-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .param-row span {
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .btn-toggle {
+      background: #3B82F6;
+      border: none;
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Floating Playback Bar */
+    #satchida-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 40px;
+      padding: 10px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      z-index: 999;
+      font-size: 12px;
+    }
+    .ctrl-btn {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #F8FAFC;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .ctrl-btn:hover {
+      background: #334155;
+      border-color: #64748B;
+    }
+    .ctrl-btn.active {
+      background: #2563EB;
+      border-color: #3B82F6;
+    }
+    #timeline-scrubber {
+      width: 180px;
+      accent-color: #3B82F6;
+      cursor: pointer;
+    }
+    #time-readout {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #94A3B8;
+      min-width: 65px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulation & Motion Canvas -->
+  <div class="viewport-card" id="plan-card">
+
+    <!-- Interactive Layer Toggles HUD -->
+    <div class="param-hud">
+      <div class="param-row">
+        <span>FURNITURE</span>
+        <button class="btn-toggle" id="toggle-furn" onclick="toggleLayer('furniture')">ON</button>
+      </div>
+      <div class="param-row">
+        <span>DIMENSIONS</span>
+        <button class="btn-toggle" id="toggle-dims" onclick="toggleLayer('dimensions')">ON</button>
+      </div>
+      <div class="param-row">
+        <span>2.5D SHADOW</span>
+        <button class="btn-toggle" id="toggle-shadow" onclick="toggleLayer('shadow')">ON</button>
+      </div>
+    </div>
+
+    <!-- Master 2.5D Orthographic SVG -->
+    <svg viewBox="0 0 600 900" id="floorplan-svg">
+      <defs>
+        <!-- 2.5D Ambient Drop Shadow for Walls -->
+        <filter id="wallShadow" x="-15%" y="-15%" width="130%" height="130%">
+          <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.45" />
+        </filter>
+
+        <!-- Soft Drop Shadow for Furniture -->
+        <filter id="furnShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#0F172A" flood-opacity="0.25" />
+        </filter>
+
+        <!-- Seamless Italian Marble Floor Pattern -->
+        <pattern id="marbleTile" width="100" height="100" patternUnits="userSpaceOnUse">
+          <rect width="100" height="100" fill="#F8FAFC" stroke="#EEF2F6" stroke-width="0.8" />
+          <path d="M 10 25 Q 45 75 80 35 T 120 85" fill="none" stroke="#E2E8F0" stroke-width="0.8" opacity="0.6" />
+        </pattern>
+
+        <!-- Anti-Skid Wet Area / Toilet Floor -->
+        <pattern id="wetAreaTile" width="20" height="20" patternUnits="userSpaceOnUse">
+          <rect width="20" height="20" fill="#E2E8F0" stroke="#CBD5E1" stroke-width="0.75" />
+        </pattern>
+
+        <!-- Paver Herringbone / Lawn Driveway Pattern -->
+        <pattern id="paverPattern" width="24" height="24" patternUnits="userSpaceOnUse">
+          <rect width="24" height="24" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="0.6" />
+          <rect x="3" y="3" width="18" height="18" rx="2" fill="#E2E8F0" />
+        </pattern>
+      </defs>
+
+      <!-- STAGE 1: DIMENSION LEADERS & PLOT BOUNDARY -->
+      <g id="layer-boundary">
+        <!-- Plot Box 40' x 60' -->
+        <rect id="plot-boundary" x="50" y="55" width="500" height="660" fill="#FFFFFF" stroke="#0F172A" stroke-width="3.5" />
+
+        <!-- Dimension Lines -->
+        <g id="dimension-lines" stroke="#0F172A" stroke-width="1.2">
+          <!-- Width 40'-0" -->
+          <line x1="50" y1="35" x2="550" y2="35" />
+          <line x1="50" y1="28" x2="50" y2="42" stroke-width="1.5" />
+          <line x1="550" y1="28" x2="550" y2="42" stroke-width="1.5" />
+          <text x="300" y="27" text-anchor="middle" font-size="14" font-weight="800" fill="#0F172A" letter-spacing="0.05em">40'-0"</text>
+
+          <!-- Length 60'-0" -->
+          <line x1="25" y1="55" x2="25" y2="715" />
+          <line x1="18" y1="55" x2="32" y2="55" stroke-width="1.5" />
+          <line x1="18" y1="715" x2="32" y2="715" stroke-width="1.5" />
+          <text x="20" y="385" text-anchor="middle" font-size="14" font-weight="800" fill="#0F172A" transform="rotate(-90 20 385)" letter-spacing="0.05em">60'-0"</text>
+        </g>
+      </g>
+
+      <!-- STAGE 2: EXTERIOR PAVING & LAWN SETBACKS -->
+      <g id="layer-ground">
+        <!-- Driveway / Car Parking Paved Floor -->
+        <rect x="55" y="475" width="220" height="235" fill="url(#paverPattern)" />
+
+        <!-- Front Lawn / Verandah Paved Floor -->
+        <rect x="290" y="505" width="255" height="95" fill="url(#paverPattern)" />
+
+        <!-- Greenery / Planter Accents -->
+        <!-- Front right boundary planter -->
+        <rect x="420" y="60" width="125" height="55" fill="#DCFCE7" stroke="#86EFAC" rx="4" />
+        <g fill="#15803D" opacity="0.85">
+          <circle cx="440" cy="88" r="16" />
+          <circle cx="470" cy="85" r="19" />
+          <circle cx="505" cy="88" r="17" />
+          <circle cx="530" cy="92" r="12" />
+        </g>
+
+        <!-- Left setback boundary planter -->
+        <rect x="55" y="220" width="30" height="110" fill="#DCFCE7" stroke="#86EFAC" rx="3" />
+        <g fill="#15803D" opacity="0.85">
+          <circle cx="70" cy="245" r="12" />
+          <circle cx="70" cy="275" r="13" />
+          <circle cx="70" cy="305" r="12" />
+        </g>
+      </g>
+
+      <!-- STAGE 3: INTERIOR FLOORING -->
+      <g id="layer-flooring">
+        <!-- Main Living, Dining & Bed Marble Infill -->
+        <!-- Master Bed -->
+        <rect x="85" y="90" width="180" height="120" fill="url(#marbleTile)" />
+        <!-- Bed 2 -->
+        <rect x="370" y="140" width="130" height="110" fill="url(#marbleTile)" />
+        <!-- Central Dining/Living Hall -->
+        <rect x="180" y="215" width="200" height="125" fill="url(#marbleTile)" />
+        <!-- Drawing Hall -->
+        <rect x="330" y="340" width="170" height="150" fill="url(#marbleTile)" />
+
+        <!-- Toilets (Wet Area Tiles) -->
+        <!-- Toilet 1 (Master) -->
+        <rect x="275" y="95" width="75" height="75" fill="url(#wetAreaTile)" />
+        <!-- Toilet 2 (Common) -->
+        <rect x="415" y="295" width="85" height="50" fill="url(#wetAreaTile)" />
+
+        <!-- Kitchen Tile -->
+        <rect x="90" y="340" width="130" height="120" fill="url(#marbleTile)" />
+        <!-- Puja Room -->
+        <rect x="230" y="345" width="85" height="90" fill="url(#marbleTile)" />
+      </g>
+
+      <!-- STAGE 4: WALLS WITH DARK POCHÉ & SHADOW (2.5D CUT) -->
+      <g id="layer-walls" filter="url(#wallShadow)">
+        <path d="
+          /* Outer Building Shell Envelope */
+          M 85 90 H 270 V 60 H 355 V 95 H 365 V 135 H 505 V 255 H 490 V 290 H 505 V 500 H 330 V 440 H 320 V 470 H 85 V 335 H 140 V 215 H 85 Z
+        " fill="none" stroke="#2B303A" stroke-width="12" stroke-linejoin="round" />
+
+        <!-- Master Bed & Toilet Dividers -->
+        <line x1="270" y1="90" x2="270" y2="210" stroke="#2B303A" stroke-width="10" />
+        <line x1="270" y1="170" x2="355" y2="170" stroke="#2B303A" stroke-width="8" />
+
+        <!-- Bed 2 & Staircase Dividers -->
+        <line x1="365" y1="250" x2="505" y2="250" stroke="#2B303A" stroke-width="10" />
+        <line x1="365" y1="345" x2="505" y2="345" stroke="#2B303A" stroke-width="10" />
+
+        <!-- Kitchen & Puja Dividers -->
+        <line x1="90" y1="340" x2="320" y2="340" stroke="#2B303A" stroke-width="10" />
+        <line x1="225" y1="340" x2="225" y2="465" stroke="#2B303A" stroke-width="10" />
+        <line x1="320" y1="340" x2="320" y2="440" stroke="#2B303A" stroke-width="10" />
+
+        <!-- Internal Wall Returns & Partitions -->
+        <line x1="180" y1="210" x2="250" y2="210" stroke="#2B303A" stroke-width="8" />
+        <line x1="410" y1="290" x2="410" y2="345" stroke="#2B303A" stroke-width="8" />
+      </g>
+
+      <!-- STAGE 5: WINDOWS & DOORS -->
+      <g id="layer-openings">
+        <!-- Windows (Triple Line Cyan/White Slots) -->
+        <!-- W1 (Master Bed Top) -->
+        <rect x="140" y="85" width="60" height="10" fill="#E0F2FE" stroke="#38BDF8" stroke-width="1.5" />
+        <text x="170" y="80" text-anchor="middle" font-size="9" font-weight="800" fill="#0F172A">W1</text>
+
+        <!-- W1 (Bed 2 Top) -->
+        <rect x="420" y="130" width="50" height="10" fill="#E0F2FE" stroke="#38BDF8" stroke-width="1.5" />
+        <text x="445" y="125" text-anchor="middle" font-size="9" font-weight="800" fill="#0F172A">W1</text>
+
+        <!-- W2 (Kitchen Left) -->
+        <rect x="80" y="380" width="10" height="50" fill="#E0F2FE" stroke="#38BDF8" stroke-width="1.5" />
+        <text x="70" y="410" text-anchor="middle" font-size="9" font-weight="800" fill="#0F172A">W2</text>
+
+        <!-- Ventilator (Toilet Top) -->
+        <rect x="295" y="90" width="30" height="10" fill="#E0F2FE" stroke="#38BDF8" stroke-width="1.5" />
+        <text x="310" y="85" text-anchor="middle" font-size="9" font-weight="800" fill="#0F172A">V</text>
+
+        <!-- Door Swings (Dashed Arcs) -->
+        <!-- Master Bed Door -->
+        <path d="M 170 215 A 35 35 0 0 1 205 180" fill="none" stroke="#94A3B8" stroke-width="1.2" stroke-dasharray="3,2" />
+        <line x1="170" y1="215" x2="170" y2="180" stroke="#64748B" stroke-width="2" />
+        <text x="155" y="200" font-size="9" font-weight="800" fill="#475569">D</text>
+
+        <!-- Main Entrance Door (MD) -->
+        <path d="M 335 470 A 45 45 0 0 0 380 515" fill="none" stroke="#94A3B8" stroke-width="1.2" stroke-dasharray="3,2" />
+        <line x1="335" y1="470" x2="380" y2="470" stroke="#0F172A" stroke-width="2.5" />
+        <text x="320" y="490" font-size="10" font-weight="800" fill="#DC2626">MD</text>
+        <!-- Red Directional Entrance Arrow -->
+        <path d="M 355 530 L 355 505 M 350 512 L 355 505 L 360 512" fill="none" stroke="#DC2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+
+      <!-- STAGE 6: FURNITURE & FIXTURES (2.5D ORTHOGRAPHIC) -->
+      <g id="layer-furniture" filter="url(#furnShadow)">
+        <!-- MASTER BEDROOM -->
+        <!-- Double Bed with Headboard & Linens -->
+        <g id="master-bed" transform="translate(100, 110)">
+          <rect width="68" height="75" rx="3" fill="#D6CEBE" stroke="#8C7A6B" stroke-width="1" />
+          <rect x="0" y="0" width="68" height="15" fill="#5A4738" rx="2" />
+          <!-- Pillows -->
+          <rect x="6" y="18" width="24" height="14" rx="3" fill="#FFFFFF" stroke="#CBD5E1" />
+          <rect x="38" y="18" width="24" height="14" rx="3" fill="#FFFFFF" stroke="#CBD5E1" />
+          <!-- Folded Duvet -->
+          <rect x="4" y="36" width="60" height="35" rx="2" fill="#EBE7DE" stroke="#C2B8A3" />
+          <!-- Side Tables -->
+          <rect x="-14" y="5" width="12" height="12" fill="#8C7A6B" rx="2" />
+          <rect x="70" y="5" width="12" height="12" fill="#8C7A6B" rx="2" />
+        </g>
+
+        <!-- BEDROOM 2 -->
+        <g id="bed-2" transform="translate(420, 155)">
+          <rect width="68" height="75" rx="3" fill="#D6CEBE" stroke="#8C7A6B" stroke-width="1" />
+          <rect x="0" y="0" width="68" height="15" fill="#5A4738" rx="2" />
+          <rect x="6" y="18" width="24" height="14" rx="3" fill="#FFFFFF" stroke="#CBD5E1" />
+          <rect x="38" y="18" width="24" height="14" rx="3" fill="#FFFFFF" stroke="#CBD5E1" />
+          <rect x="4" y="36" width="60" height="35" rx="2" fill="#EBE7DE" stroke="#C2B8A3" />
+        </g>
+
+        <!-- DINING AREA -->
+        <g id="dining-set" transform="translate(200, 245)">
+          <!-- Glass/Wood Dining Table -->
+          <rect width="90" height="45" rx="4" fill="#C2A378" stroke="#8B5A2B" stroke-width="1.5" />
+          <!-- 6 Upholstered Chairs -->
+          <rect x="10" y="-12" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+          <rect x="36" y="-12" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+          <rect x="62" y="-12" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+          <rect x="10" y="47" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+          <rect x="36" y="47" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+          <rect x="62" y="47" width="18" height="10" rx="2" fill="#E2E8F0" stroke="#64748B" />
+        </g>
+
+        <!-- DRAWING / LIVING SECTIONAL COUCH -->
+        <g id="living-couch" transform="translate(370, 360)">
+          <!-- L-Shaped Premium Beige Sofa -->
+          <path d="M 0 0 H 105 V 100 H 75 V 30 H 0 Z" fill="#E8E2D5" stroke="#B8A99A" stroke-width="1.2" />
+          <!-- Cushions Segments -->
+          <rect x="5" y="5" width="28" height="20" fill="#DFD7C7" stroke="#CBD5E1" />
+          <rect x="37" y="5" width="28" height="20" fill="#DFD7C7" stroke="#CBD5E1" />
+          <rect x="69" y="5" width="30" height="20" fill="#DFD7C7" stroke="#CBD5E1" />
+          <rect x="79" y="32" width="22" height="28" fill="#DFD7C7" stroke="#CBD5E1" />
+          <rect x="79" y="65" width="22" height="30" fill="#DFD7C7" stroke="#CBD5E1" />
+          <!-- Coffee Table -->
+          <rect x="25" y="45" width="40" height="24" rx="3" fill="#FFFFFF" stroke="#94A3B8" />
+          <circle cx="45" cy="57" r="4" fill="#15803D" />
+        </g>
+
+        <!-- KITCHEN COUNTER & FIXTURES -->
+        <g id="kitchen-fixtures" transform="translate(95, 345)">
+          <!-- C-Shaped Granite Countertop -->
+          <path d="M 0 0 H 115 V 30 H 30 V 85 H 115 V 110 H 0 Z" fill="#334155" />
+          <!-- Twin Ceramic Sink Basins -->
+          <rect x="45" y="6" width="36" height="18" rx="2" fill="#FFFFFF" stroke="#94A3B8" />
+          <line x1="63" y1="6" x2="63" y2="24" stroke="#94A3B8" />
+          <!-- 3-Burner Induction / Gas Hob -->
+          <rect x="6" y="45" width="18" height="35" rx="2" fill="#0F172A" />
+          <circle cx="15" cy="53" r="4" fill="#94A3B8" />
+          <circle cx="15" cy="72" r="4" fill="#94A3B8" />
+        </g>
+
+        <!-- TWO MODERN SEDANS IN PARKING PORCH -->
+        <g id="cars" transform="translate(85, 500)">
+          <!-- Car 1 (White Sedan) -->
+          <g transform="translate(10, 0)">
+            <rect width="70" height="135" rx="16" fill="#F8FAFC" stroke="#94A3B8" stroke-width="1.5" />
+            <!-- Windshield Front -->
+            <path d="M 8 35 Q 35 25 62 35 L 56 50 Q 35 44 14 50 Z" fill="#334155" />
+            <!-- Rear Glass -->
+            <path d="M 12 105 Q 35 112 58 105 L 54 95 Q 35 100 16 95 Z" fill="#334155" />
+            <!-- Roof Sunroof -->
+            <rect x="20" y="56" width="30" height="32" rx="3" fill="#E2E8F0" />
+            <!-- Side Mirrors -->
+            <rect x="-4" y="38" width="5" height="10" rx="2" fill="#64748B" />
+            <rect x="69" y="38" width="5" height="10" rx="2" fill="#64748B" />
+          </g>
+
+          <!-- Car 2 (White Sedan) -->
+          <g transform="translate(105, 0)">
+            <rect width="70" height="135" rx="16" fill="#F8FAFC" stroke="#94A3B8" stroke-width="1.5" />
+            <path d="M 8 35 Q 35 25 62 35 L 56 50 Q 35 44 14 50 Z" fill="#334155" />
+            <path d="M 12 105 Q 35 112 58 105 L 54 95 Q 35 100 16 95 Z" fill="#334155" />
+            <rect x="20" y="56" width="30" height="32" rx="3" fill="#E2E8F0" />
+            <rect x="-4" y="38" width="5" height="10" rx="2" fill="#64748B" />
+            <rect x="69" y="38" width="5" height="10" rx="2" fill="#64748B" />
+          </g>
+        </g>
+      </g>
+
+      <!-- STAGE 7: ROOM LABELS & DIMENSION CALLOUTS -->
+      <g id="layer-labels">
+        <!-- Master Bedroom -->
+        <g transform="translate(200, 140)">
+          <text text-anchor="middle" font-size="11" font-weight="800" fill="#0F172A" letter-spacing="0.04em">M. BED ROOM</text>
+          <text y="14" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">14'-9"x11'-3"</text>
+        </g>
+
+        <!-- Bedroom 2 -->
+        <g transform="translate(425, 200)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A" letter-spacing="0.04em">BED ROOM</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">10'-1"x11'-7"</text>
+        </g>
+
+        <!-- Central Dining/Living -->
+        <g transform="translate(245, 305)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A" letter-spacing="0.04em">DINING / LIVING</text>
+          <text y="12" text-anchor="middle" font-size="8" font-weight="700" fill="#64748B">DOUBLE HEIGHTED</text>
+          <text y="24" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">18'-0"x15'-6"</text>
+        </g>
+
+        <!-- Drawing Hall -->
+        <g transform="translate(390, 440)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A" letter-spacing="0.04em">DRG. / HALL</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">14'-4"x15'-9"</text>
+        </g>
+
+        <!-- Kitchen -->
+        <g transform="translate(150, 420)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A" letter-spacing="0.04em">KITCHEN</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">10'-0"x11'-7"</text>
+        </g>
+
+        <!-- Puja Room -->
+        <g transform="translate(272, 395)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A" letter-spacing="0.04em">PUJA</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">6'-6"x6'-10"</text>
+        </g>
+
+        <!-- Car Parking Callout -->
+        <g transform="translate(170, 665)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A">CAR PARKING</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">14'-6"x12'-4"</text>
+        </g>
+
+        <!-- Lawn Callout -->
+        <g transform="translate(420, 665)">
+          <text text-anchor="middle" font-size="10" font-weight="800" fill="#0F172A">LAWN</text>
+          <text y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">18'-1"x9'-3"</text>
+        </g>
+      </g>
+
+      <!-- STAGE 8: EDITORIAL HEADER & METADATA BADGES -->
+      <g id="layer-editorial" transform="translate(0, 740)">
+        <!-- Main Headline -->
+        <text x="300" y="32" text-anchor="middle" font-size="21" font-weight="900" fill="#0F172A" letter-spacing="0.05em">
+          40' X 60' SOUTH FACING HOUSE PLAN
+        </text>
+        <text x="300" y="52" text-anchor="middle" font-size="13" font-weight="800" fill="#64748B" letter-spacing="0.08em">
+          GROUND FLOOR PLAN
+        </text>
+
+        <!-- Feature Pill Badges -->
+        <g transform="translate(40, 70)">
+          <rect width="520" height="34" rx="6" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1" />
+          <text x="50" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🛏️ 2 BEDS</text>
+          <text x="135" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🚿 2 TOILETS</text>
+          <text x="225" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🛋️ LIVING/DRG</text>
+          <text x="315" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🍳 KITCHEN</text>
+          <text x="400" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🕉️ PUJA</text>
+          <text x="475" y="22" text-anchor="middle" font-size="9.5" font-weight="800" fill="#1E293B">🚗 2 CARS</text>
+        </g>
+
+        <!-- Compass Rose Badge -->
+        <g transform="translate(300, 135)">
+          <circle r="14" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.2" />
+          <text y="-4" text-anchor="middle" font-size="9" font-weight="900" fill="#DC2626">S</text>
+          <text y="11" text-anchor="middle" font-size="7.5" font-weight="700" fill="#64748B">N</text>
+          <line x1="0" y1="-12" x2="0" y2="12" stroke="#DC2626" stroke-width="1" />
+          <line x1="-12" y1="0" x2="12" y2="0" stroke="#94A3B8" stroke-width="1" />
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Satchida-Motion Global Playback Bar -->
+  <div id="satchida-controls">
+    <button class="ctrl-btn active" id="btn-play" onclick="togglePlay()">⏸ Pause</button>
+    <button class="ctrl-btn" onclick="restartAnimation()">↺ Replay</button>
+    <input type="range" id="timeline-scrubber" min="0" max="1" step="0.001" value="0" />
+    <span id="time-readout">00:00 / 00:10</span>
+  </div>
+
+  <!-- Satchida-Motion GSAP Deterministic Timeline -->
+  <script>
+    // 1. Establish Master Timeline
+    const tl = gsap.timeline({
+      id: "main",
+      paused: false,
+      defaults: { ease: "power3.out" },
+      onUpdate: updateScrubber
+    });
+    window.__TIMELINE__ = tl;
+
+    // 2. Deterministic Seek Contract
+    window.__SEEK_FRAME__ = function(timeSeconds, progress) {
+      if (window.__TIMELINE__) {
+        window.__TIMELINE__.seek(timeSeconds);
+      }
+    };
+
+    // 3. Construct 6-Stage Cinema Reveal
+    function buildTimeline() {
+      tl.clear();
+
+      // Stage 1: Dimension leaders and boundary draw
+      tl.from("#plot-boundary", {
+        duration: 1.4,
+        scale: 0.95,
+        opacity: 0,
+        transformOrigin: "center center",
+        ease: "power2.out"
+      })
+      .from("#dimension-lines", {
+        duration: 1.0,
+        opacity: 0,
+        y: -10,
+        stagger: 0.2
+      }, "-=0.8")
+
+      // Stage 2: Ground pavement and landscape planters
+      .from("#layer-ground", {
+        duration: 1.2,
+        opacity: 0,
+        ease: "power2.inOut"
+      }, "-=0.4")
+
+      // Stage 3: Interior flooring marble textures
+      .from("#layer-flooring", {
+        duration: 1.2,
+        opacity: 0,
+        ease: "power2.out"
+      }, "-=0.6")
+
+      // Stage 4: 2.5D Cut Walls Extrusion
+      .from("#layer-walls", {
+        duration: 1.5,
+        scale: 0.98,
+        opacity: 0,
+        transformOrigin: "center center",
+        ease: "back.out(1.4)"
+      }, "-=0.5")
+
+      // Stage 5: Door openings and windows
+      .from("#layer-openings", {
+        duration: 0.8,
+        opacity: 0,
+        stagger: 0.1
+      }, "-=0.7")
+
+      // Stage 6: Furniture Drop-in with subtle bounce
+      .from("#master-bed, #bed-2, #dining-set, #living-couch, #kitchen-fixtures, #cars", {
+        duration: 1.2,
+        scale: 0.7,
+        opacity: 0,
+        transformOrigin: "center center",
+        stagger: 0.12,
+        ease: "back.out(1.5)"
+      }, "-=0.4")
+
+      // Stage 7: Typography & Dimensions
+      .from("#layer-labels g", {
+        duration: 0.8,
+        opacity: 0,
+        y: 6,
+        stagger: 0.05,
+        ease: "power2.out"
+      }, "-=0.6")
+
+      // Stage 8: Editorial Bottom Banner & Badges
+      .from("#layer-editorial", {
+        duration: 1.0,
+        opacity: 0,
+        y: 20,
+        ease: "power3.out"
+      }, "-=0.4");
+    }
+
+    buildTimeline();
+
+    // Playback Controls
+    const scrubber = document.getElementById('timeline-scrubber');
+    const playBtn = document.getElementById('btn-play');
+    const timeReadout = document.getElementById('time-readout');
+
+    function updateScrubber() {
+      const prog = tl.progress();
+      scrubber.value = prog;
+      const cur = tl.time().toFixed(1);
+      const total = tl.duration().toFixed(1);
+      timeReadout.innerText = `00:${cur.padStart(4, '0')} / 00:${total.padStart(4, '0')}`;
+    }
+
+    scrubber.addEventListener('input', (e) => {
+      tl.pause();
+      playBtn.innerText = "▶ Play";
+      playBtn.classList.remove('active');
+      tl.progress(parseFloat(e.target.value));
+    });
+
+    function togglePlay() {
+      if (tl.paused()) {
+        tl.play();
+        playBtn.innerText = "⏸ Pause";
+        playBtn.classList.add('active');
+      } else {
+        tl.pause();
+        playBtn.innerText = "▶ Play";
+        playBtn.classList.remove('active');
+      }
+    }
+
+    function restartAnimation() {
+      tl.restart();
+      playBtn.innerText = "⏸ Pause";
+      playBtn.classList.add('active');
+    }
+
+    // Parametric Layer Toggles
+    const layerStates = {
+      furniture: true,
+      dimensions: true,
+      shadow: true
+    };
+
+    function toggleLayer(layerKey) {
+      layerStates[layerKey] = !layerStates[layerKey];
+      const btn = document.getElementById(`toggle-${layerKey}`);
+      btn.innerText = layerStates[layerKey] ? "ON" : "OFF";
+      btn.style.background = layerStates[layerKey] ? "#3B82F6" : "#64748B";
+
+      if (layerKey === 'furniture') {
+        gsap.to("#layer-furniture", { opacity: layerStates.furniture ? 1 : 0, duration: 0.3 });
+      } else if (layerKey === 'dimensions') {
+        gsap.to("#dimension-lines, #layer-labels", { opacity: layerStates.dimensions ? 1 : 0, duration: 0.3 });
+      } else if (layerKey === 'shadow') {
+        const walls = document.getElementById('layer-walls');
+        walls.setAttribute('filter', layerStates.shadow ? 'url(#wallShadow)' : 'none');
+      }
+    }
+  </script>
+</body>
+</html>

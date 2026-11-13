@@ -29,7 +29,6 @@ function ModelSelectorContent() {
     modelSpecs,
     mappedEndpoints,
     endpointsConfig,
-    isEnforced,
     // State
     searchValue,
     searchResults,
@@ -111,20 +110,26 @@ function ModelSelectorContent() {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
             <span className="text-xs font-semibold tracking-wide text-text-primary">
-              Satchida Intelligence
+              {localize('com_satchida_intelligence')}
             </span>
           </div>
           <span className="rounded-full border border-border-light/60 bg-surface-tertiary px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-            Sovereign Modes
+            {localize('com_satchida_sovereign_tools')}
           </span>
         </div>
         {searchResults ? (
           renderSearchResults(searchResults, localize, searchValue)
         ) : (
           <>
-            {/* Render ungrouped modelSpecs (no group field) */}
+            {/* Render ungrouped modelSpecs (studios and specialized tools only, excluding basic chat modes already in chatbox selector) */}
             {renderModelSpecs(
-              modelSpecs?.filter((spec) => !spec.group) || [],
+              modelSpecs?.filter(
+                (spec) =>
+                  !spec.group &&
+                  !['Chat', 'Work', 'Study', 'Study-Local', 'Vibecoding', 'Privacy'].includes(
+                    spec.name,
+                  ),
+              ) || [],
               selectedValues.modelSpec || '',
             )}
             {/* Render endpoints (OpenAI, My Agents, Anthropic) */}
@@ -132,10 +137,10 @@ function ModelSelectorContent() {
               <>
                 <div className="my-2.5 flex items-center justify-between border-t border-border-light/60 px-3 pt-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
-                    Agents & Cloud BYOK
+                    {localize('com_satchida_agents_byok')}
                   </span>
                   <span className="rounded-full border border-border-light/40 bg-surface-tertiary px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-                    Custom Keys
+                    {localize('com_satchida_custom_keys')}
                   </span>
                 </div>
                 {renderEndpoints(mappedEndpoints)}
@@ -146,9 +151,7 @@ function ModelSelectorContent() {
           </>
         )}
         <div className="mt-2 border-t border-border-light/40 px-3 py-2 text-center">
-          <span className="text-[11px] text-text-tertiary">
-            🔒 Sovereign Edge AI · Zero Cloud Telemetry · Enterprise Grade
-          </span>
+          <span className="text-[11px] text-text-tertiary">{localize('com_satchida_footer')}</span>
         </div>
       </Menu>
       <DialogManager

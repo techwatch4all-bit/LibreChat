@@ -631,6 +631,19 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         mcpServers: ['satchida-stem-study'],
       }),
       starter({
+        title: 'Academic Literature Preview',
+        icon: '📄',
+        description: 'Targeted survey of foundational concepts with citations.',
+        inputs: ['topic or query', 'focus area'],
+        deliver:
+          'a targeted preview summary of foundational academic concepts, key terminology, and landmark papers from the knowledge base, highlighting where deeper multi-tier sweeps and dossier synthesis are unlocked in Pro.',
+        contract:
+          'ground all explanations strictly in verified academic references without speculation.',
+        badge: 'Academic Lit Preview',
+        badgeKey: 'starters_badge_lit_preview',
+        mcpServers: ['satchida-knowledge-vault'],
+      }),
+      starter({
         title: 'Algorithm Comparison',
         icon: '🧠',
         description: 'Dijkstra vs A*, complexity table and verified code.',
@@ -646,7 +659,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
   },
   {
     id: 'school_boards',
-    label: '🎒 CBSE & IGCSE STEM',
+    label: '🎒 CBSE, IGCSE & IB STEM',
     labelKey: 'starters_cat_school_boards',
     modes: ['Study', 'Study-Local'],
     starters: [
@@ -676,6 +689,30 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'finish with 3 practice questions at my tier and wait for my answers before marking them.',
         badge: 'IGCSE Tutor',
         badgeKey: 'starters_badge_igcse_tutor',
+      }),
+      starter({
+        title: 'IB DP Science & Math Coach',
+        description: 'IB criteria A/B/C/D breakdown, command terms and inquiry.',
+        inputs: ['level — SL or HL', 'subject — Physics/Chem/Bio/Math AA/AI', 'topic or question'],
+        deliver:
+          'the concept mapped directly to the IB syllabus guide, unpacking the specific command terms (analyze, deduce, evaluate), with one worked standard-level and one higher-level exemplar.',
+        contract:
+          'prompt with an IB-style inquiry question and wait for my approach before showing the mark-scheme scoring breakdown.',
+        badge: 'IB DP Coach',
+        badgeKey: 'starters_badge_ib_dp_coach',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
+        title: 'Chemistry Equation & Stoichiometry Lab',
+        description: 'Balance redox/reactions, mole ratios and limiting reagent math.',
+        inputs: ['chemical reaction or reactants', 'known masses or molarities', 'target output'],
+        deliver:
+          'the balanced molecular and net ionic equation, step-by-step oxidation state tracking, mole ratio calculations, limiting reagent deduction, and theoretical yield.',
+        contract:
+          'compute all molar masses and stoichiometric conversions using verified arithmetic line-by-line; verify conservation of mass.',
+        badge: 'Chemistry / Stoichiometry',
+        badgeKey: 'starters_badge_chem_balancer',
+        mcpServers: ['satchida-stem-study'],
       }),
       starter({
         title: 'Board Exam Drill',
@@ -862,9 +899,9 @@ export const ALL_CATEGORIES: StarterCategory[] = [
   },
   {
     id: 'ai_research_books',
-    label: '🔬 Deep Research & E-Books',
+    label: '🔬 Deep Research, PhD & Thesis',
     labelKey: 'starters_cat_ai_research_books',
-    modes: ['Study', 'Study-Local', 'Work', 'Pro'],
+    modes: ['Work', 'Pro'],
     starters: [
       starter({
         title: 'Deep Research Dossier',
@@ -881,6 +918,52 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'academic-search',
           'arxiv-search',
         ],
+      }),
+      starter({
+        title: 'PhD Thesis & Defense Synthesizer',
+        description: 'Methodology validation, literature matrix, and oral defense critique.',
+        inputs: [
+          'research domain',
+          'thesis statement / methodology',
+          'target journal or university',
+        ],
+        deliver:
+          'an exhaustive doctoral-level literature synthesis matrix, methodological boundary analysis, statistical validity critique, and a simulated defense panel interrogation addressing underlying assumptions and falsifiability.',
+        contract:
+          'rigorous academic citation standards with verified DOIs or arXiv identifiers; evaluate conflicting peer-reviewed literature with explicit methodological critique.',
+        badge: 'PhD Thesis & Defense',
+        badgeKey: 'starters_badge_phd_thesis',
+        mcpServers: ['arxiv-search', 'academic-search', 'satchida-web-search'],
+      }),
+      starter({
+        title: 'Advanced Theoretical Physics & Math Lab',
+        description:
+          'Hamiltonians, quantum state vectors, differential geometry and tensor proofs.',
+        inputs: ['physical system or equation', 'gauge or coordinate basis', 'boundary conditions'],
+        deliver:
+          'the complete analytical derivation with every tensor index and coordinate transformation explicit, differential geometric properties, conserved currents via Noether theorem, and dimensional consistency checks.',
+        contract:
+          'compute through the symbolic math environment and verify index symmetries and boundary regularity explicitly.',
+        badge: 'Advanced Math & Physics',
+        badgeKey: 'starters_badge_advanced_math_physics',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
+        title: 'Robotics Kinematics & Embedded Hardware Lab',
+        description:
+          'Forward/inverse kinematics, Denavit-Hartenberg matrices, and PCB signal timings.',
+        inputs: [
+          'robot architecture (DOF) or circuit',
+          'link lengths / sensor bus (SPI/I2C/CAN)',
+          'dynamic constraints',
+        ],
+        deliver:
+          'the closed-form or numerical DH-parameter transformation matrices, Jacobian calculation for singularity detection, trajectory planning polynomial, and embedded hardware bus latency analysis.',
+        contract:
+          'validate singularity angles and ensure circuit electrical parameters (impedance, rise-time, current budget) are rigorously verified.',
+        badge: 'Robotics & Embedded',
+        badgeKey: 'starters_badge_robotics_hardware',
+        mcpServers: ['satchida-stem-study', 'satchida-ai-engineer'],
       }),
       starter({
         title: 'E-Book Blueprint',

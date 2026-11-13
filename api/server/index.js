@@ -103,7 +103,16 @@ configureMessageFilterRegexValidator();
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
 // Allow PORT=0 to be used for automatic free port assignment
-const port = isNaN(Number(PORT)) ? 3080 : Number(PORT);
+// HARD INVARIANT: LibreChat production ingress is permanently pinned to port 3080.
+// Any stale environment variable (e.g. PORT=5274) from parent shells or legacy pins must NEVER divert LibreChat off 3080.
+const resolvedPort = Number(PORT);
+const port =
+  !isNaN(resolvedPort) && (resolvedPort === 3080 || resolvedPort === 0) ? resolvedPort : 3080;
+if (!isNaN(resolvedPort) && resolvedPort !== 3080 && resolvedPort !== 0) {
+  logger.warn(
+    `[PORT-GUARD] Disregarding invalid/stale PORT=${resolvedPort}. Enforcing production port 3080.`,
+  );
+}
 const host = HOST || 'localhost';
 const trusted_proxy = Number(TRUST_PROXY) || 1; /* trust first proxy by default */
 
@@ -413,6 +422,13 @@ const startServer = async () => {
   }
   app.use('/assets/vendor', (_req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
+  /* Artifact iframes are sandboxed WITHOUT allow-same-origin (opaque origin), so ES-module
+   * imports of the vendored Axonometra engine need CORS; classic script tags do not. These
+   * bundles are public MIT assets, so a wildcard allow-origin discloses nothing. */
+  app.use('/assets/vendor/axonometra', (_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     next();
   });
   app.use(staticCache(appConfig.paths.dist));

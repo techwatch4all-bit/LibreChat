@@ -454,6 +454,7 @@ export default defineConfig(({ command }) => ({
       '~': path.join(import.meta.dirname, 'src/'),
       $fonts: path.resolve(import.meta.dirname, 'public/fonts'),
       'micromark-extension-math': 'micromark-extension-llm-math',
+      '@react-spring/web': path.resolve(import.meta.dirname, 'node_modules/@react-spring/web'),
     },
   },
 }));

@@ -1,6 +1,5 @@
 import React, { memo, useCallback, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
-import { Tools } from 'librechat-data-provider';
 import { Constants } from 'librechat-data-provider';
 import {
   DropdownMenu,
@@ -80,7 +79,13 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
   const isPro = Boolean(
     user?.role === 'ADMIN' ||
       ['pro', 'pro_family', 'enterprise'].includes(
-        ((user as any)?.plan || (user as any)?.subscription || user?.role || '').toLowerCase(),
+        (
+          (user as any)?.plan ||
+          (user as any)?.accountType ||
+          (user as any)?.subscription ||
+          user?.role ||
+          ''
+        ).toLowerCase(),
       ),
   );
 
@@ -408,7 +413,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   <Lock className="absolute -right-2 -top-1.5 h-2.5 w-2.5 text-amber-500" />
                 )}
               </div>
-              <span className="hidden sm:inline">Research</span>
+              <span className="hidden sm:inline">{localize('com_satchida_research')}</span>
               {research && (
                 <span className="flex h-1.5 w-1.5 animate-ping rounded-full bg-indigo-400" />
               )}
@@ -445,7 +450,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             className="w-68 select-none rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl"
           >
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Prompt Enhancement
+              {localize('com_satchida_section_prompt_enhancement')}
             </div>
 
             {/* ✨ Magic Auto-Enhance */}
@@ -455,9 +460,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <Wand2 className="h-4 w-4 shrink-0 text-violet-400" />
               <div>
-                <div className="font-semibold text-text-primary">Auto-Enhance Draft</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_auto_enhance')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Deconstruct into executive specification
+                  {localize('com_satchida_auto_enhance_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -474,9 +481,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <SlidersHorizontal className="h-4 w-4 shrink-0 text-sky-400" />
               <div>
-                <div className="font-semibold text-text-primary">Architectural Blueprint</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_blueprint')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  First-principles system & trade-off spec
+                  {localize('com_satchida_blueprint_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -493,9 +502,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
               <div>
-                <div className="font-semibold text-text-primary">Adversarial Reviewer</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_adversarial')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Stress-test for fatal bugs & security holes
+                  {localize('com_satchida_adversarial_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -503,7 +514,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             <DropdownMenuSeparator className="my-1 bg-border-light/60" />
 
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Creative Tools
+              {localize('com_satchida_section_creative')}
             </div>
 
             {/* 🖼️ Image Generation */}
@@ -514,11 +525,13 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
               <ImageIcon className="h-4 w-4 shrink-0 text-emerald-400" />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-text-primary">Image Generation</span>
+                  <span className="font-semibold text-text-primary">
+                    {localize('com_satchida_image_gen')}
+                  </span>
                   {imageGen && <span className="text-[10px] font-medium text-emerald-400">ON</span>}
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Photorealistic visual synthesis mode
+                  {localize('com_satchida_image_gen_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -535,9 +548,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <Film className="h-4 w-4 shrink-0 text-violet-400" />
               <div>
-                <div className="font-semibold text-text-primary">Satchida Motion Animation</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_motion')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Interactive GSAP kinetic presentation & explainer
+                  {localize('com_satchida_motion_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -561,7 +576,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   )}
                 >
                   <FolderLock className="h-3.5 w-3.5 text-purple-400" />
-                  <span className="font-semibold">Vault</span>
+                  <span className="font-semibold">{localize('com_satchida_vault')}</span>
                   <ChevronDown className="h-3 w-3 text-purple-400/70" />
                 </button>
               </DropdownMenuTrigger>
@@ -573,7 +588,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             className="w-68 select-none rounded-xl border border-border-light bg-surface-primary p-1.5 shadow-xl"
           >
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              AnythingLLM Sovereign Vault
+              {localize('com_satchida_section_vault')}
             </div>
 
             {/* 🔍 Query Vault RAG */}
@@ -583,9 +598,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <FolderLock className="h-4 w-4 shrink-0 text-purple-400" />
               <div>
-                <div className="font-semibold text-text-primary">Search Knowledge Vault</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_vault_search')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Semantic RAG & verified source citations
+                  {localize('com_satchida_vault_search_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -593,7 +610,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             <DropdownMenuSeparator className="my-1 bg-border-light/60" />
 
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Generate Formatted Document
+              {localize('com_satchida_section_documents')}
             </div>
 
             {/* 📄 PDF Report */}
@@ -603,9 +620,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <FileText className="h-4 w-4 shrink-0 text-rose-400" />
               <div>
-                <div className="font-semibold text-text-primary">Generate PDF Report</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_doc_pdf')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  ReportLab typographical layout
+                  {localize('com_satchida_doc_pdf_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -617,9 +636,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <Presentation className="h-4 w-4 shrink-0 text-amber-400" />
               <div>
-                <div className="font-semibold text-text-primary">Generate PPTX Deck</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_doc_pptx')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Multi-slide presentation deck
+                  {localize('com_satchida_doc_pptx_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -631,9 +652,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <Table2 className="h-4 w-4 shrink-0 text-emerald-400" />
               <div>
-                <div className="font-semibold text-text-primary">Generate Excel (.xlsx)</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_doc_xlsx')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Formatted data rows & formulas
+                  {localize('com_satchida_doc_xlsx_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -645,9 +668,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             >
               <FileText className="h-4 w-4 shrink-0 text-blue-400" />
               <div>
-                <div className="font-semibold text-text-primary">Generate Word (.docx)</div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_doc_docx')}
+                </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  Styled Microsoft Word document
+                  {localize('com_satchida_doc_docx_desc')}
                 </div>
               </div>
             </DropdownMenuItem>
@@ -682,7 +707,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                     ) : (
                       <Wrench className="h-3.5 w-3.5" />
                     )}
-                    <span>{mode === 'Study' ? 'Study Studio' : 'Work Studio'}</span>
+                    <span>
+                      {mode === 'Study'
+                        ? localize('com_satchida_study_studio')
+                        : localize('com_satchida_work_studio')}
+                    </span>
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
@@ -702,9 +731,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   >
                     <HelpCircle className="h-4 w-4 shrink-0 text-sky-400" />
                     <div>
-                      <div className="font-semibold text-text-primary">Create Socratic Quiz</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_quiz')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        5-question quiz with spoiler answers
+                        {localize('com_satchida_quiz_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -716,9 +747,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   >
                     <Layers className="h-4 w-4 shrink-0 text-purple-400" />
                     <div>
-                      <div className="font-semibold text-text-primary">Generate Flashcards</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_flashcards')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        8 spaced-repetition active recall cards
+                        {localize('com_satchida_flashcards_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -730,9 +763,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   >
                     <Network className="h-4 w-4 shrink-0 text-teal-400" />
                     <div>
-                      <div className="font-semibold text-text-primary">Concept Diagram</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_concept_diagram')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        Syntactically valid Mermaid flowchart
+                        {localize('com_satchida_concept_diagram_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -744,9 +779,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   >
                     <Sigma className="h-4 w-4 shrink-0 text-rose-400" />
                     <div>
-                      <div className="font-semibold text-text-primary">Formula & TeX Ribbon</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_formula')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        Rigorous KaTeX mathematical derivations
+                        {localize('com_satchida_formula_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -762,9 +799,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                   >
                     <Network className="h-4 w-4 shrink-0 text-teal-400" />
                     <div>
-                      <div className="font-semibold text-text-primary">Architecture Diagram</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_arch_diagram')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        System architecture Mermaid diagram
+                        {localize('com_satchida_arch_diagram_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -781,9 +820,11 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                       )}
                     </div>
                     <div>
-                      <div className="font-semibold text-text-primary">Vibe-Coding</div>
+                      <div className="font-semibold text-text-primary">
+                        {localize('com_satchida_vibe')}
+                      </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
-                        Staff engineer full-stack scaffolding
+                        {localize('com_satchida_vibe_desc')}
                       </div>
                     </div>
                   </DropdownMenuItem>

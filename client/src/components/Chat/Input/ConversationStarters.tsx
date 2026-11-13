@@ -15,12 +15,12 @@ import {
   useGetEndpointsQuery,
   useGetStartupConfig,
 } from '~/data-provider';
+import { ALL_CATEGORIES, MOTION_GROUPS, findStarterSlots } from '~/common/starters';
 import { getIconEndpoint, getEntity, getModelSpec, cn } from '~/utils';
-import { ALL_CATEGORIES, MOTION_GROUPS } from '~/common/starters';
-import { useSubmitMessage, useLocalize } from '~/hooks';
 import { mcpValuesAtomFamily } from '~/store/mcp';
 import { forceResize } from '~/utils/textarea';
 import { mainTextareaId } from '~/common';
+import { useLocalize } from '~/hooks';
 
 /**
  * Active Tab-cycling handler for the staged textarea. Exactly one at a time:
@@ -126,8 +126,6 @@ const ConversationStarters = () => {
     return documentsMap.get(entity?.id ?? '')?.conversation_starters ?? [];
   }, [documentsMap, isAgent, entity, modelSpec]);
 
-  const { submitMessage } = useSubmitMessage();
-
   const handleStarterClick = useCallback(
     (starter: StarterItem | string) => {
       const text = typeof starter === 'string' ? starter : starter.prompt;
@@ -142,79 +140,49 @@ const ConversationStarters = () => {
         }
       }
 
-      // Requires context? Any [...] placeholder, a <...> slot, or a deictic
-      // reference to content the user has not pasted yet ("this code", "this
-      // plan", ...) stages the prompt instead of submitting an empty turn.
-      // In Motion Studio, always stage the prompt for user input & customization.
-      const isTemplate =
-        activeMode === 'Motion' ||
-        /\[|<|this (message|code|query|plan|dataset|documents?|snippet|requirement|pdf|image)\b/i.test(
-          text,
-        );
-
-      if (isTemplate) {
-        const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
-        if (textarea) {
-          textarea.value = text;
-          if (methods?.setValue) {
-            methods.setValue('text', text, { shouldDirty: true, shouldValidate: true });
-          }
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          forceResize(textarea);
-          textarea.focus();
-
-          // Highlight the first real parameter. A leading label-bracket like
-          // [CBSE/ICSE Class 12] is a tag, not an input — skip past it so the
-          // user overwrites the slot they actually need to fill.
-          let openBracket = text.indexOf('[');
-          if (openBracket === 0) {
-            const labelClose = text.indexOf(']', 1);
-            const next = labelClose === -1 ? -1 : text.indexOf('[', labelClose + 1);
-            if (next !== -1) {
-              openBracket = next;
-            }
-          }
-          const closeBracket = text.indexOf(']', openBracket);
-          if (openBracket !== -1 && closeBracket !== -1) {
-            textarea.setSelectionRange(openBracket, closeBracket + 1);
-          } else {
-            textarea.setSelectionRange(text.length, text.length);
-          }
-
-          // Tab / Shift+Tab cycle through the remaining [...] parameters, then
-          // release focus once every slot has been visited.
-          if (stagedTabHandler) {
-            textarea.removeEventListener('keydown', stagedTabHandler);
-          }
-          stagedTabHandler = (ev: KeyboardEvent) => {
-            if (ev.key !== 'Tab') return;
-            const dir = ev.shiftKey ? -1 : 1;
-            const curOpen = text[textarea.selectionStart] === '[' ? textarea.selectionStart : -1;
-            let target =
-              dir > 0
-                ? text.indexOf('[', textarea.selectionEnd)
-                : text.lastIndexOf('[', Math.max(textarea.selectionStart - 1, 0));
-            if (target === -1) {
-              target = dir > 0 ? text.indexOf('[') : text.lastIndexOf('[');
-            }
-            if (target === -1 || target === curOpen) return; // all slots visited — let Tab move focus
-            const targetClose = text.indexOf(']', target);
-            if (targetClose === -1) return;
-            ev.preventDefault();
-            textarea.setSelectionRange(target, targetClose + 1);
-          };
-          textarea.addEventListener('keydown', stagedTabHandler);
+      // Every persona starter stages into the textarea for the user to edit and
+      // customize before sending — clicking a card never auto-executes. The
+      // first real input slot is highlighted so it can be overwritten at once,
+      // and Tab cycles forward through the remaining slots.
+      const slots = findStarterSlots(text);
+      const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
+      if (textarea) {
+        textarea.value = text;
+        if (methods?.setValue) {
+          methods.setValue('text', text, { shouldDirty: true, shouldValidate: true });
         }
-        if (hasGroupedNavigation) {
-          setStagedHint(true);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        forceResize(textarea);
+        textarea.focus();
+
+        const firstSlot = slots[0];
+        if (firstSlot) {
+          textarea.setSelectionRange(firstSlot.start, firstSlot.end);
+        } else {
+          textarea.setSelectionRange(text.length, text.length);
         }
-        return;
+
+        // Tab / Shift+Tab move between slots; at either end focus is released so
+        // the composer never becomes a keyboard trap.
+        if (stagedTabHandler) {
+          textarea.removeEventListener('keydown', stagedTabHandler);
+        }
+        stagedTabHandler = (ev: KeyboardEvent) => {
+          if (ev.key !== 'Tab' || slots.length === 0) return;
+          const current = slots.findIndex(
+            (slot) => textarea.selectionStart >= slot.start && textarea.selectionStart < slot.end,
+          );
+          if (current === -1) return;
+          const next = current + (ev.shiftKey ? -1 : 1);
+          if (next < 0 || next >= slots.length) return;
+          ev.preventDefault();
+          textarea.setSelectionRange(slots[next].start, slots[next].end);
+        };
+        textarea.addEventListener('keydown', stagedTabHandler);
       }
-
-      // Standalone queries can execute immediately
-      submitMessage({ text });
+      setStagedHint(true);
     },
-    [submitMessage, setMCPValues, badgeContext, methods, activeMode, hasGroupedNavigation],
+    [setMCPValues, badgeContext, methods],
   );
 
   const displayedStarters = useMemo(() => {
@@ -476,13 +444,18 @@ const ConversationStarters = () => {
 
             if (!title || !description) {
               const promptText = item.prompt;
-              const colonIndex = promptText.indexOf(':');
-              if (colonIndex > 0 && colonIndex < 70) {
-                title = title ?? promptText.slice(0, colonIndex).trim();
-                description = description ?? promptText.slice(colonIndex + 1).trim();
+              const firstLine = promptText.split('\n')[0].trim();
+              const dashIndex = firstLine.indexOf(' — ');
+              const colonIndex = firstLine.indexOf(':');
+              if (dashIndex > 0) {
+                title = title ?? firstLine.slice(0, dashIndex).trim();
+                description = description ?? firstLine.slice(dashIndex + 3).trim();
+              } else if (colonIndex > 0 && colonIndex < 70) {
+                title = title ?? firstLine.slice(0, colonIndex).trim();
+                description = description ?? firstLine.slice(colonIndex + 1).trim();
               } else {
-                title = title ?? (item.badge ? `${item.badge} Directive` : promptText.slice(0, 36));
-                description = description ?? promptText;
+                title = title ?? item.badge ?? firstLine.slice(0, 36);
+                description = description ?? firstLine;
               }
             }
 
@@ -571,7 +544,7 @@ const ConversationStarters = () => {
               <button
                 key={`${item.badgeKey ?? item.badge ?? index}-${title ?? index}`}
                 type="button"
-                aria-label={item.prompt}
+                aria-label={title && description ? `${title}. ${description}` : item.prompt}
                 onClick={() => handleStarterClick(item)}
                 style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
                 className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
@@ -593,7 +566,7 @@ const ConversationStarters = () => {
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-[11px] leading-normal text-text-secondary group-hover:text-text-primary/90">
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-normal text-text-secondary group-hover:text-text-primary/90">
                   {description}
                 </p>
               </button>
@@ -602,8 +575,8 @@ const ConversationStarters = () => {
         </div>
       )}
 
-      {/* Staged Prompt Coach Strip (Motion Studio) */}
-      {hasGroupedNavigation && stagedHint && (
+      {/* Staged prompt coach strip — every mode, so the review step is visible */}
+      {stagedHint && (
         <div
           role="status"
           className="flex w-full items-center justify-between gap-2 rounded-lg border border-border-medium/70 bg-surface-secondary/90 px-3 py-1.5 text-[11px] text-text-secondary"

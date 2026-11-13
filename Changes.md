@@ -8,6 +8,57 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-13 — Brief-first persona contract: no card, persona or mode executes on the first turn
+
+**Problem.** Starter clicks already staged into the composer, but the prompts themselves still
+read as commands. 60 of 133 cards had no `title`/`description`, 11 fired with no input at all,
+the "hint" strip only appeared in Motion, and two cards had a markdown link (`[Source](URL)`) as
+their first bracket, so the highlighter jumped there instead of the real slot. All 34 persona
+system prompts contained no clarification language, and 45 "immediately / Always invoke / execute"
+instructions sat in the yaml mode `promptPrefix` blocks — 0 clarification contracts.
+
+**Shipped.**
+
+1. **Card builder** (`client/src/common/starters.ts`): `starter()` assembles every card from
+   `title`, `description`, `inputs`, `deliver` and an optional domain `contract`, then appends the
+   shared `STARTER_GATE` and `STARTER_TAIL`. Shared contracts (`LIVE`, `SOURCED`, `DOC`, `CODE`,
+   `CLINICAL`, `LEGAL`, `TEACH`, `MOTION`) are reused instead of retyped. All 133 cards now carry
+   a title, a description, at least one real input slot, an approval gate before the deliverable
+   and a `My additions: [ ]` tail. The 70 Motion cards keep their authored render specs verbatim
+   as `deliver`, with the filled-brief-is-approval variant of the gate.
+2. **Slot scanning** (`findStarterSlots()`): markdown links are skipped, so `[Source](URL)` is an
+   output-format token and never a Tab stop. Tab moves forward through slots and releases focus at
+   the end instead of wrapping (no keyboard trap).
+3. **Coach strip in every mode**: the staged-brief hint is no longer Motion-only. Copy broadened to
+   mention `My additions` and that nothing runs until Send.
+4. **Card accessibility**: `aria-label` is now `"<title>. <description>"`; derivation for plain
+   string starters splits on ` — ` first, then `:`. New categories gained icons.
+5. **Persona library** (`satchida/personas/personas.ts`): `BRIEF_FIRST_CONTRACT` appended to all 34
+   system prompts and `stageStarter()` wraps all 124 starter prompts with the gate and tail, applied
+   at module scope so origin content stays diff-able. Two "execute immediately" phrases reworded.
+6. **Mode prompts** (`librechat.yaml`): `BRIEF-FIRST CONTRACT` added to all 9 `promptPrefix` blocks
+   (Motion and SceneMosaic get the filled-brief variant). "Always invoke `create_formatted_document`
+   immediately" now reads "as soon as the brief is approved" in Chat and Work. All 46
+   `conversation_starters` rewritten to the six-part template as `|-` block scalars.
+7. **Docs**: `specification.md` rewritten (staging protocol, card contract, 34-category inventory,
+   verification), `README.md` counts and checklist updated.
+
+**Evidence.**
+- `cd client && npx jest src/components/Chat/Input/__tests__/ConversationStarters.spec.tsx`
+  — 17/17 pass, including the new `starter catalog contract` block (title/description/slot
+  coverage, pill-length budget, gate-before-deliverable, markdown-link exclusion, unique titles).
+- `cd client && npx tsc --noEmit` — no errors in `starters.ts` / `ConversationStarters.tsx`
+  (45 pre-existing errors remain in `components/Admin/*`, untouched).
+- `js-yaml` parse of `librechat.yaml`: 9 specs, 9/9 `promptPrefix` carry the contract, 46 starters,
+  46 gated, non-starter config byte-identical to before the rewrite.
+- Personas transpiled and executed: 34 personas, 34/34 system prompts carry the contract, 124/124
+  starter prompts carry the gate and the tail.
+
+**Backups.** `librechat.yaml` (gitignored, live on :3080) was backed up to
+`%TEMP%\opencode\librechat.yaml.bak` before rewriting; `starters.ts` to `starters.ts.bak`.
+
+---
+
 ## 2026-11-12 — SceneMosaic & Motion Studio Gold-Standard Overhaul (Astryx Theming, Intelligent Layout Zoning, Smooth Camera Easing & Clinical Anatomy Cross-Section)
 
 Operator reports:

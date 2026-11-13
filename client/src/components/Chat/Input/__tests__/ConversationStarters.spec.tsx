@@ -1,6 +1,6 @@
 import React from 'react';
+import { ALL_CATEGORIES, MOTION_GROUPS, findStarterSlots } from '~/common/starters';
 import { fireEvent, render, screen } from 'test/layout-test-utils';
-import { ALL_CATEGORIES, MOTION_GROUPS } from '~/common/starters';
 import ConversationStarters from '../ConversationStarters';
 
 const mockSubmitMessage = jest.fn();
@@ -62,9 +62,72 @@ const motionElderlyCat = ALL_CATEGORIES.find((c) => c.id === 'motion_elderly')!;
 
 const motionCategories = ALL_CATEGORIES.filter((c) => c.modes?.includes('Motion'));
 
+type Card = (typeof marketCat.starters)[number];
+
+/** Mirrors the accessor the component exposes to assistive tech. */
+const cardName = (item: Card): string =>
+  item.title && item.description ? `${item.title}. ${item.description}` : item.prompt;
+
 const setMode = (spec: string) => {
   mockConversation = { spec, conversationId: 'convo-starters-test', endpoint: 'custom' };
 };
+
+describe('starter catalog contract', () => {
+  it('gives every card a title, a description and at least one real input slot', () => {
+    for (const category of ALL_CATEGORIES) {
+      for (const card of category.starters) {
+        expect(typeof card.title).toBe('string');
+        expect(card.title!.length).toBeGreaterThan(2);
+        expect(card.description!.length).toBeGreaterThan(10);
+        expect(findStarterSlots(card.prompt).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps card copy short enough to read on a pill', () => {
+    const failures: string[] = [];
+    for (const category of ALL_CATEGORIES) {
+      for (const card of category.starters) {
+        const bare = card.title!.replace(/^[^\p{L}\p{N}]+/u, '');
+        if (bare.length > 44) {
+          failures.push(`title ${bare.length}: ${bare}`);
+        }
+        if (card.description!.length > 140) {
+          failures.push(`description ${card.description!.length}: ${card.description}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('gates every card behind an approval step and leaves room for the user', () => {
+    for (const category of ALL_CATEGORIES) {
+      for (const card of category.starters) {
+        expect(card.prompt).toContain('My additions:');
+        expect(card.prompt).toContain('On GO, deliver:');
+        const gateIndex = card.prompt.search(/Before you start:|a filled brief is the approval/);
+        expect(gateIndex).toBeGreaterThan(0);
+        expect(gateIndex).toBeLessThan(card.prompt.indexOf('On GO, deliver:'));
+      }
+    }
+  });
+
+  it('ignores markdown links when scanning for input slots', () => {
+    const text = 'Output contract: cite every figure with [Source](URL). Inputs: [city] · [date]';
+    const slots = findStarterSlots(text);
+    expect(slots).toHaveLength(2);
+    expect(text.slice(slots[0].start, slots[0].end)).toBe('[city]');
+    expect(text.slice(slots[1].start, slots[1].end)).toBe('[date]');
+    expect(findStarterSlots('no slots here at all')).toEqual([]);
+  });
+
+  it('never repeats a title inside one category', () => {
+    for (const category of ALL_CATEGORIES) {
+      const titles = category.starters.map((card) => card.title);
+      expect(new Set(titles).size).toBe(titles.length);
+    }
+  });
+});
 
 describe('ConversationStarters', () => {
   let textarea: HTMLTextAreaElement;
@@ -109,7 +172,7 @@ describe('ConversationStarters', () => {
     const featured = motionCategories.flatMap((c) => c.starters.filter((s) => s.featured));
     expect(featured).toHaveLength(8);
     for (const item of featured) {
-      expect(screen.getByLabelText(item.prompt)).toBeInTheDocument();
+      expect(screen.getByLabelText(cardName(item))).toBeInTheDocument();
     }
   });
 
@@ -126,7 +189,7 @@ describe('ConversationStarters', () => {
 
     fireEvent.click(screen.getByText(motionHowCat.label));
     for (const starter of motionHowCat.starters) {
-      expect(screen.getByLabelText(starter.prompt)).toBeInTheDocument();
+      expect(screen.getByLabelText(cardName(starter))).toBeInTheDocument();
     }
   });
 
@@ -140,14 +203,14 @@ describe('ConversationStarters', () => {
     fireEvent.change(searchBox, { target: { value: 'chemistry orbital' } });
 
     const chemStarter = motionEducationCat.starters.find((s) => s.title?.includes('Chemistry'))!;
-    expect(screen.getByLabelText(chemStarter.prompt)).toBeInTheDocument();
-    expect(screen.queryByLabelText(motionExecCat.starters[0].prompt)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(cardName(chemStarter))).toBeInTheDocument();
+    expect(screen.queryByLabelText(cardName(motionExecCat.starters[0]))).not.toBeInTheDocument();
 
     fireEvent.change(searchBox, { target: { value: 'zzzznonexistent999' } });
     expect(screen.getByText('com_ui_motion_no_matches')).toBeInTheDocument();
   });
 
-  it('always stages motion starters into textarea without submitting, shows hint, and binds MCPs', () => {
+  it('always stages motion starters into the textarea without submitting, and binds MCPs', () => {
     setMode('Motion');
     render(<ConversationStarters />);
 
@@ -156,33 +219,35 @@ describe('ConversationStarters', () => {
     fireEvent.click(screen.getByText(motionDronesCat.label));
 
     const droneStarter = motionDronesCat.starters[0];
-    fireEvent.click(screen.getByLabelText(droneStarter.prompt));
+    fireEvent.click(screen.getByLabelText(cardName(droneStarter)));
 
     expect(mockSubmitMessage).not.toHaveBeenCalled();
     expect(textarea.value).toBe(droneStarter.prompt);
     expect(textarea.selectionStart).toBe(droneStarter.prompt.indexOf('['));
     expect(textarea.selectionEnd).toBe(droneStarter.prompt.indexOf(']') + 1);
     expect(mockSetBadgeMCP).toHaveBeenCalledWith(droneStarter.mcpServers);
+  });
 
-    const statusBanner = screen.getByRole('status');
-    expect(statusBanner).toBeInTheDocument();
+  it('shows the staging hint in every mode, and dismisses it', () => {
+    render(<ConversationStarters />);
+    fireEvent.click(screen.getByLabelText(cardName(marketCat.starters[0])));
+    expect(screen.getByRole('status')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('com_ui_motion_dismiss_hint'));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('ensures every Motion persona contains staging slots and none lead with [ at index 0', () => {
+  it('ensures every Motion persona leads with a real input slot, not a markdown link', () => {
     expect(motionCategories).toHaveLength(20);
     const allMotionStarters = motionCategories.flatMap((c) => c.starters);
     expect(allMotionStarters.length).toBeGreaterThanOrEqual(65);
 
     for (const starter of allMotionStarters) {
-      const firstOpen = starter.prompt.indexOf('[');
-      const firstClose = starter.prompt.indexOf(']', firstOpen);
-      expect(firstOpen).toBeGreaterThan(0);
-      expect(firstClose).toBeGreaterThan(firstOpen);
+      const slots = findStarterSlots(starter.prompt);
+      expect(slots.length).toBeGreaterThan(0);
+      expect(slots[0].start).toBeGreaterThan(0);
+      expect(starter.prompt[slots[0].end]).not.toBe('(');
     }
 
-    // Also verify Spotlight domains span Arch, Drones, Robotics, How, STEM, Medical, Executive, Home
     expect(motionArchCat.starters[0].featured).toBe(true);
     expect(motionDronesCat.starters[0].featured).toBe(true);
     expect(motionRoboticsCat.starters[0].featured).toBe(true);
@@ -195,14 +260,15 @@ describe('ConversationStarters', () => {
   });
 
   it('stages template starters into the textarea without submitting', () => {
-    const starter = marketCat.starters.find((s) => s.prompt.includes('[Source](URL)'))!;
+    const starter = marketCat.starters[0];
     render(<ConversationStarters />);
-    fireEvent.click(screen.getByLabelText(starter.prompt));
+    fireEvent.click(screen.getByLabelText(cardName(starter)));
     expect(mockSubmitMessage).not.toHaveBeenCalled();
     expect(textarea.value).toBe(starter.prompt);
-    // the first parameter bracket is highlighted
-    expect(textarea.selectionStart).toBe(starter.prompt.indexOf('['));
-    expect(textarea.selectionEnd).toBe(starter.prompt.indexOf(']') + 1);
+    // the first real input slot is highlighted, not the [Source](URL) link
+    const [firstSlot] = findStarterSlots(starter.prompt);
+    expect(textarea.selectionStart).toBe(firstSlot.start);
+    expect(textarea.selectionEnd).toBe(firstSlot.end);
     // and the react-hook-form mirror is kept in sync
     expect(mockSetValue).toHaveBeenCalledWith('text', starter.prompt, {
       shouldDirty: true,
@@ -210,61 +276,37 @@ describe('ConversationStarters', () => {
     });
   });
 
-  it('submits instant starters immediately without touching the textarea', () => {
-    // same gate the component uses: any [...], <...>, or unpasted deictic stages
-    const isTemplate =
-      /\[|<|this (message|code|query|plan|dataset|documents?|snippet|requirement|pdf|image)\b/i;
-    const instant = citizenCat.starters.find((s) => !isTemplate.test(s.prompt))!;
-    render(<ConversationStarters />);
-    fireEvent.click(screen.getByLabelText(instant.prompt));
-    expect(mockSubmitMessage).toHaveBeenCalledWith({ text: instant.prompt });
-    expect(textarea.value).toBe('');
-  });
-
   it('pre-selects the bound MCP servers on click', () => {
     const bound = marketCat.starters.find((s) => (s.mcpServers ?? []).length > 0)!;
     render(<ConversationStarters />);
-    fireEvent.click(screen.getByLabelText(bound.prompt));
+    fireEvent.click(screen.getByLabelText(cardName(bound)));
     expect(mockSetBadgeMCP).toHaveBeenCalledWith(bound.mcpServers);
   });
 
-  it('Tab cycles between multiple [...] parameters of a staged starter', () => {
-    const twoParam = marketCat.starters.find((s) => {
-      const first = s.prompt.indexOf('[');
-      const firstClose = s.prompt.indexOf(']', first);
-      return first > 0 && firstClose > first && s.prompt.indexOf('[', firstClose + 1) > firstClose;
-    })!;
+  it('moves Tab through the slots and releases focus at the end', () => {
+    const twoParam = marketCat.starters.find((s) => findStarterSlots(s.prompt).length >= 2)!;
     render(<ConversationStarters />);
-    // switch to the full category so all its pills render
     fireEvent.click(screen.getByText(marketCat.label));
-    fireEvent.click(screen.getByLabelText(twoParam.prompt));
+    fireEvent.click(screen.getByLabelText(cardName(twoParam)));
     expect(textarea.value).toBe(twoParam.prompt);
 
-    const first = twoParam.prompt.indexOf('[');
-    const firstClose = twoParam.prompt.indexOf(']', first);
-    const second = twoParam.prompt.indexOf('[', firstClose + 1);
-    const secondClose = twoParam.prompt.indexOf(']', second);
-    expect(textarea.selectionStart).toBe(first);
+    const [first, second] = findStarterSlots(twoParam.prompt);
+    expect(textarea.selectionStart).toBe(first.start);
 
-    // first Tab moves the highlight to the second parameter (default prevented)
+    // first Tab moves the highlight to the second slot (default prevented)
     expect(fireEvent.keyDown(textarea, { key: 'Tab' })).toBe(false);
-    expect(textarea.selectionStart).toBe(second);
-    expect(textarea.selectionEnd).toBe(secondClose + 1);
-
-    // a second Tab wraps back to the first parameter (still cycling)
-    expect(fireEvent.keyDown(textarea, { key: 'Tab' })).toBe(false);
-    expect(textarea.selectionStart).toBe(first);
+    expect(textarea.selectionStart).toBe(second.start);
+    expect(textarea.selectionEnd).toBe(second.end);
   });
 
-  it('releases Tab (no preventDefault) when a starter has a single parameter', () => {
-    const oneParam = marketCat.starters.find(
-      (s) =>
-        s.prompt.includes('[Source](URL)') &&
-        s.prompt.indexOf(']', s.prompt.indexOf('[')) === s.prompt.lastIndexOf(']'),
-    )!;
+  it('releases Tab (no preventDefault) once the last slot is reached', () => {
     render(<ConversationStarters />);
-    fireEvent.click(screen.getByLabelText(oneParam.prompt));
-    // Tab is not swallowed: the handler lets focus move on
+    fireEvent.click(screen.getByLabelText(cardName(citizenCat.starters[0])));
+
+    const slots = findStarterSlots(citizenCat.starters[0].prompt);
+    const last = slots[slots.length - 1];
+    textarea.setSelectionRange(last.start, last.end);
+
     expect(fireEvent.keyDown(textarea, { key: 'Tab' })).toBe(true);
   });
 });

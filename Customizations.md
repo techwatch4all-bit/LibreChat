@@ -9,6 +9,26 @@ auditable as it accumulates.
 
 ---
 
+## E. Brief-first persona contract (2026-11-13)
+
+Upstream treats a conversation starter as a prompt shortcut: `ConversationStarters` may submit the
+prompt immediately, and card prompts are written as commands. This fork treats a starter as a
+*staged brief* the user approves, because most of our personas need a place, date, ticker, class or
+document before they can answer honestly.
+
+| #   | Divergence                                                                                                  | Upstream behaviour                                                         | Reason                                                                                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | A click always stages into the composer, selects the first real slot, and never submits                     | Template starters stage; self-contained starters can submit directly       | The product rule is that a persona never executes on the user's behalf from one click. Staging also gives the user a place to add their own constraints.                                            |
+| E2  | Cards are built by `starter()` and always end with an approval gate plus `My additions: [ ]`                | Prompt strings are authored per card with no shared envelope               | One definition of the gate and the customization tail; 133 cards cannot drift apart. The gate must appear before the deliverable, which the test suite enforces.                                     |
+| E3  | `findStarterSlots()` skips markdown links so `[Source](URL)` is never a slot                                 | Bracket heuristics treat the first `[` as an input                          | Citation links are part of the output contract, not user input. Without this the highlighter and Tab order landed on `[Source]`.                                                                    |
+| E4  | The staged-brief hint renders in every mode                                                                  | The coach strip was Motion-only                                             | The behaviour is identical in all modes; hiding the hint made Chat/Work/Study look like they behaved differently.                                                                                   |
+| E5  | `BRIEF_FIRST_CONTRACT` is appended to all 34 persona system prompts and every mode `promptPrefix`            | Mode prompts carry execution instructions only                              | The contract has to survive whichever entry point the user picks (card, persona library, ✨ tab, typed prompt). Safety screening is carved out so red-flag triage still comes before the gate.       |
+| E6  | Motion and SceneMosaic use the filled-brief-is-approval variant                                              | n/a                                                                         | After approval the motion tool call must be the first step; a generic "wait for GO" would contradict the mode's own workflow.                                                                       |
+| E7  | Card prompts are catalogued in `client/src/common/starters.ts` with `title` / `description` / `inputs`      | Prompt strings only, with the UI deriving a label from the text             | The card pill needs stable copy; deriving a title from the prompt produced truncated 36-character labels on 40 cards and none at all on 60.                                                         |
+| E8  | Verified by `starter catalog contract` Jest block                                                           | No catalog-level tests upstream                                             | The failure mode here is silent data drift across hundreds of strings, which only a data-integrity test catches.                                                                                    |
+
+---
+
 ## D. Divergences introduced by the tenant-scoped admin panel (2026-10-16)
 
 These are deliberate, each with its upstream counterpart and reason. See `Changes.md`

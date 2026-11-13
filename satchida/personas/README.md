@@ -8,8 +8,8 @@ the persona layer lives in this directory.
 
 | File | What it is | Origin |
 |---|---|---|
-| `personas.ts` | The 34-persona master library (`AGENT_PERSONAS`) plus the four accuracy rule blocks, exported | Verbatim copy of `satchida-ai-unified-suite/src/lib/constants/personas.constants.ts` (2026-11-09) |
-| `specification.md` | Architecture + full 11-category / 44-starter specification (codebase map, staging protocol, ModelSpec overrides) | Copy of the operator spec artifact `SATCHIDA-AI-PERSONAS-SPECIFICATION.md` |
+| `personas.ts` | The 34-persona master library (`AGENT_PERSONAS`) plus the accuracy rule blocks, exported | Verbatim copy of `satchida-ai-unified-suite/src/lib/constants/personas.constants.ts` (2026-11-09) |
+| `specification.md` | Architecture + the card/persona contract (codebase map, staging protocol, catalog inventory, ModeSpec overrides) | Copy of the operator spec artifact `SATCHIDA-AI-PERSONAS-SPECIFICATION.md`, rewritten 2026-11-13 |
 | `README.md` | This file: provenance, wiring map, stale-data audit, shipping checklist | — |
 
 ## How personas actually run in LibreChat
@@ -18,17 +18,18 @@ A persona in the running product is assembled from three places — none of them
 imports this directory yet (tracked as a P2 todo: single-source refactor):
 
 1. **Mode system prompt** — `librechat.yaml` → `modelSpecs.list[].preset.promptPrefix`
-   (one per mode: Chat / Work / Pro / Study / Study-Local / Vibecoding / Privacy).
-2. **Starter prompt strings** — `client/src/common/starters.ts` (`ALL_CATEGORIES`,
-   extracted from `ConversationStarters.tsx` in P2; 11 categories, labels and
-   badges keyed for `useLocalize`) and the per-mode `conversation_starters`
-   arrays in `librechat.yaml` (the ✨ Suggested tab).
+   (one per mode: Chat / Work / Pro / Study / Study-Local / Vibecoding / Privacy /
+   Motion / SceneMosaic — 9 specs).
+2. **Starter prompt strings** — `client/src/common/starters.ts` (`ALL_CATEGORIES`:
+   34 categories, 133 cards, built by `starter()`; labels and badges keyed for
+   `useLocalize`) and the per-mode `conversation_starters` arrays in
+   `librechat.yaml` (46 entries, the ✨ Suggested tab).
 3. **Tool bindings** — each starter's `mcpServers` (component) + each mode's
    `mcpServers` allowlist (yaml). Servers are unioned at request time
    (`packages/api/src/agents/added.ts`).
 
 **Wired (P0, 2026-11-09):** the four accuracy rule blocks below are appended to
-every mode `promptPrefix` in `librechat.yaml` — 7/7 modes verified by marker
+every mode `promptPrefix` in `librechat.yaml` — 9/9 modes verified by marker
 scan (SATCHIDA ACCURACY / No live intelligence context / BANNED ESCAPE
 HATCHES / FINANCIAL + NEWS format blocks). Three adaptations were made for the
 LibreChat fleet and are recorded as deltas vs origin below: identity
@@ -36,6 +37,13 @@ LibreChat fleet and are recorded as deltas vs origin below: identity
 `fleet/test/chat.mjs`), refusal wording **"click Force Pull Fresh Data" →
 "enable Web Search (or the web-search tool) and resend"** (LibreChat has no
 Force Pull control), and the BCD/GST zero-old-data rewording.
+
+**Brief-first (2026-11-13):** no persona executes on the first turn. Every card
+stages an editable brief and asks for approval; every persona system prompt
+carries `BRIEF_FIRST_CONTRACT`; every mode `promptPrefix` carries the same block
+(Motion and SceneMosaic use the filled-brief-is-approval variant, because the
+motion tool call must still be the first step once parameters are set). Details
+in `specification.md` §2 and §6.
 
 ## The four accuracy rule blocks (zero-hallucination design)
 
@@ -53,9 +61,15 @@ Force Pull control), and the BCD/GST zero-old-data rewording.
 2. Provenance header added at the top (now also documenting delta 3).
 3. Zero-old-data pass (2026-11-09): hardcoded SCSS/PPF/SSY rates, model-era
    names in `frontier_ai_hardware`, and both 6% BCD / 3% GST figures replaced
-   with verify-then-state instructions (6 content edits; mirrored into all 7
+   with verify-then-state instructions (6 content edits; mirrored into the
    yaml promptPrefixes for the BCD/GST line).
-4. Line endings: this copy preserves the origin's CRLF.
+4. Line endings: this copy is LF in this repo (the origin file is CRLF).
+5. Brief-first pass (2026-11-13): `BRIEF_FIRST_CONTRACT` exported and appended
+   to all 34 system prompts, and `stageStarter()` wraps all 124 starter prompts
+   with the approval gate and the `My additions:` tail. Two in-prompt phrases
+   that told the model to execute immediately were reworded to "as soon as the
+   brief is approved" / "once the brief is approved". Applied at module scope,
+   so the content strings themselves stay diff-able against origin.
 
 Verify at any time:
 
@@ -91,10 +105,14 @@ refactor, this copy becomes the import source for the client build.
 
 - [x] Stale-data audit above cleared (P1) — remaining: `recommended-mcp.ts`
   gemini tier note re-verified at ship time
-- [x] Rule blocks wired into mode `promptPrefix` (P0) — 7/7 modes marker-verified
-- [x] `ALL_CATEGORIES` extracted to `client/src/common/starters.ts` and
-  localized via `useLocalize` (P2); personas cross-import deferred (outside
-  client tsconfig root) — keep prompt copy aligned manually
-- [x] `diff` against origin accounts for header + exports + delta-3 edits only
-- [ ] Specification's staging-protocol behavior verified on the target build
+- [x] Rule blocks wired into mode `promptPrefix` — 9/9 modes marker-verified
+- [x] Brief-first contract wired into all 34 persona system prompts, all 124
+  persona starter prompts, all 133 client cards and all 46 yaml starters
+- [x] `ALL_CATEGORIES` extracted to `client/src/common/starters.ts`, built by
+  `starter()` so the gate and the customization tail cannot drift, and
+  localized via `useLocalize`; personas cross-import deferred (outside client
+  tsconfig root) — keep prompt copy aligned manually
+- [x] `diff` against origin accounts for header + exports + deltas 3 and 5 only
+- [x] Specification's staging-protocol behaviour covered by
+  `ConversationStarters.spec.tsx` (`starter catalog contract` block)
 - [ ] Companion manifest reviewed: `satchida/mcp/README.md` (tool bindings exist client-side)

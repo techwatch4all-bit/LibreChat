@@ -174,10 +174,34 @@ At the conclusion of EVERY substantive response (immediately before the Suggeste
 2. [Clear, standalone question]
 3. [Clear, standalone question]
 4. [Clear, standalone question]
-Keep each question concrete, standalone, and ready to be clicked and executed immediately by the user as a click-and-go prompt. Skip this section only for purely conversational exchanges (greetings, identity, small talk).
+Keep each question concrete, standalone, and ready to be clicked and used as a starting brief the user can edit before sending. Skip this section only for purely conversational exchanges (greetings, identity, small talk).
 6. DATA FRESHNESS CLASSES: label every data section with its freshness class and never re-search what is already fresh — 🟢 LIVE (gold/silver/bullion/crypto/stocks/indices/forex: changes every second; always fetch fresh this turn and show the quote timestamp), 🔵 FIXED-FOR-DAY (petrol/diesel/LPG/E20/CNG fuel rates, panchang/vedic calendar, holiday lists: one fetch per day is enough; reuse the day's figure with its as-of date and NEVER re-search it again in the same conversation), 🟡 ROLLING (news of the day: fresh per session; never re-report items already delivered this conversation). Tool output marked [satchida cache: ...] is platform metadata, not a source — cite the underlying source URL and its published time.`;
 
-export const AGENT_PERSONAS: AgentPersona[] = [
+/**
+ * Appended to every persona system prompt and to every starter prompt. A persona
+ * stages a reviewable brief instead of firing a command: the user names the
+ * gaps, adds their own constraints, and only then releases the work.
+ */
+export const BRIEF_FIRST_CONTRACT = `
+
+BRIEF-FIRST CONTRACT (applies to every task in this persona):
+- Safety first: if the message suggests a medical emergency, self-harm, or immediate danger, give the emergency action and the helpline before anything else. That screening overrides the gate below.
+- Do not start substantive work on the first turn. Restate the request in one line, name any assumption you are making, then ask "GO?" and stop.
+- If a required detail is missing (place, date, ticker, class, book, file, code, budget, audience, constraint), ask at most 3 short numbered questions in that same message instead of guessing, and wait.
+- A single unambiguous fact needs no restatement: answer it directly.
+- Never fill a missing detail with a plausible invention — name the missing detail instead.
+- The user's own words always win over every default in this prompt.
+- After GO, finish the work in one pass without asking again.`;
+
+const STARTER_GATE =
+  'Before you start: restate this brief in one line, name any detail you had to assume, and ask "GO?" — if a required detail is missing, ask at most 3 short questions instead and stop. Do not search, calculate or write anything until I reply.';
+
+const STARTER_TAIL =
+  'My additions: [ ]   ← type your own constraints here: audience, budget, tone, must-include, must-avoid';
+
+const stageStarter = (prompt: string): string => `${STARTER_GATE}\n\n${prompt}\n\n${STARTER_TAIL}`;
+
+const RAW_PERSONAS: AgentPersona[] = [
   // ==========================================
   // 1. FAMILY SURVIVAL & DAILY LIFE ESSENTIALS
   // ==========================================
@@ -1199,7 +1223,7 @@ HYPERRESEARCH 6-PHASE RIGOROUS RESEARCH PROTOCOL (MANDATORY IN EVERY RUN):
 ═══════════════════════════════════════════════════════════════════════
 
 PHASE 1: ATOMIC QUERY DECOMPOSITION & TAXONOMY
-- Upon receiving a research topic or question, immediately deconstruct it into 5–8 atomic, falsifiable sub-questions across distinct investigative axes:
+- Upon receiving a research topic or question, once the brief is approved, deconstruct it into 5–8 atomic, falsifiable sub-questions across distinct investigative axes:
   * Axis A: Historical origin, legislative/regulatory intent, and baseline architecture.
   * Axis B: Current empirical benchmarks, quantitative performance metrics, and economic costs.
   * Axis C: Hidden failure modes, security vulnerabilities, edge-case bottlenecks, and supply chain constraints.
@@ -1394,3 +1418,17 @@ ${MANDATORY_CITATION_RULES}${FINANCIAL_OUTPUT_FORMAT}${UNIVERSAL_QUERY_RULES}${L
     ],
   },
 ];
+
+/**
+ * Every persona ships the brief-first contract, and every starter prompt ships
+ * the same gate plus a place for the user's own words. Applying it here rather
+ * than in 146 hand-written strings keeps the behaviour from drifting apart.
+ */
+export const AGENT_PERSONAS: AgentPersona[] = RAW_PERSONAS.map((persona) => ({
+  ...persona,
+  systemPrompt: `${persona.systemPrompt}${BRIEF_FIRST_CONTRACT}`,
+  starterPrompts: persona.starterPrompts?.map((starter) => ({
+    ...starter,
+    prompt: stageStarter(starter.prompt),
+  })),
+}));

@@ -8,6 +8,18 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-13 — Routing upgrade: Qwen3.7-Flash for Vision/3D and DeepSeek-V4-Flash for Code/Shaders under hard cost ceiling
+
+**Problem.** `google/gemini-2.5-flash-lite` was obsolete and expensive ($0.10/$0.40) while `glm-5.3-flash` under Vibecoding was slow and stalled streams. The user required a hard cost ceiling of $\le \$0.10$ input and $\le \$0.50$ output per 1M tokens with high build quality.
+
+**Shipped.**
+- **Spatial 3D & Vision**: Configured `qwen/qwen3.7-flash` on OpenRouter ($0.03 input / $0.13 output per 1M tokens) as the primary Work and Spatial engine. Tested tool invocation latency: **1.02s**.
+- **Full-Stack Vibecoding, Complex Math, Three.js Shaders & Physics**: Configured `deepseek/deepseek-v4-flash-0731` on OpenRouter ($0.043 input / $0.30 output per 1M tokens) for code-heavy generation. Verified generation of complete 14,000+ character Cook-Torrance PBR shader code.
+- **Gateway Model Mappings**: Updated One-API channel mappings on `http://127.0.0.1:4000/v1` so `Work` routes to `openrouter/qwen/qwen3.7-flash` and `Vibecoding` routes to `openrouter/deepseek/deepseek-v4-flash-0731`.
+- **Evidence**: Verified end-to-end via Gateway API with live prompt completions and tool calling.
+
+---
+
 ## 2026-11-13 — Brief-first persona contract: no card, persona or mode executes on the first turn
 
 **Problem.** Starter clicks already staged into the composer, but the prompts themselves still

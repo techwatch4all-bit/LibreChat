@@ -25,9 +25,14 @@ in sync with this PC afterwards.
 | Everything else | — | identical (MCP servers, personas, vendored assets, scripts, node_modules) |
 
 The tenant endpoint block already exists as a ready-made template:
-**`librechat.tenant.example.yaml`** in this folder. It is an overlay, not a replacement —
-a tenant yaml is this repo's `librechat.yaml` with the `endpoints.custom` section swapped
-for the template's section. Nothing else in the yaml changes.
+**`librechat.tenant-endpoint.example.yaml`** in this folder, whose authoritative source is
+**`docs/TENANT_GATEWAY_CONNECTIVITY_RUNBOOK.md`** (the full connectivity runbook — read it
+before packaging). It is an overlay, not a replacement — a tenant yaml is this repo's
+`librechat.yaml` with the `endpoints.custom` Satchida-Gateway block swapped for the
+template's section (baseURL → `https://gateway.satchida.com/v1` + CF-Access service-token
+headers). Only those two things change; the Bifrost virtual modes (`Chat`, `Work`, `Study`,
+`Vibecoding`, `Pro`), the per-user `X-Seat-Alias`/`X-User-Id` headers and everything else in
+the yaml stay identical. No upstream provider model names are ever hardcoded anywhere.
 
 ## 3. Preparing a NEW tenant PC (the "first copy" procedure)
 
@@ -41,7 +46,7 @@ Do all steps from this PC. Never run anything on the tenant PC except the final 
    - Exclude only junk: `\.git\`, `\.pm2\`, `*.log`, `client\dist\.vite\`, `_scratch\`.
 2. **Apply the one tenant difference:**
    - In the staged copy's `librechat.yaml`, replace the `endpoints.custom` section with the
-     block from `librechat.tenant.example.yaml`.
+     block from `librechat.tenant-endpoint.example.yaml` (per the runbook).
    - In the staged copy's `.env`, add the three tenant variables (values from the operator's
      secret store — never paste them into chat or commit them):
      `SATCHIDA_GATEWAY_KEY`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`.

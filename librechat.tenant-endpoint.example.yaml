@@ -1,31 +1,57 @@
 # Satchida TENANT edge-node librechat.yaml overlay — endpoints section example.
-# Purpose: on a tenant PC (self-contained LibreChat copy), the model endpoint points
-# at the Central HQ one-api gateway over the Cloudflare Zero Trust Named Tunnel using
-# Machine-to-Machine Service Tokens. The HQ operator's own librechat.yaml keeps its
-# local 127.0.0.1:4099 gateway — DO NOT copy this endpoint section onto the HQ node.
+# AUTHORITY: docs/TENANT_GATEWAY_CONNECTIVITY_RUNBOOK.md (this file mirrors its §3 block).
 #
-# The tenant yaml otherwise mirrors the HQ librechat.yaml (mcpServers, personas, etc.).
-# Required env vars in the tenant .env (provisioned by provision-client-tunnel.ps1):
-#   SATCHIDA_GATEWAY_KEY=<per-tenant one-api token>
-#   CF_ACCESS_CLIENT_ID=<Cloudflare service token id>
-#   CF_ACCESS_CLIENT_SECRET=<Cloudflare service token secret>
+# On a tenant PC, the model endpoint points at the Central HQ gateway over the
+# Cloudflare Zero Trust Named Tunnel using Machine-to-Machine Service Tokens.
+# The HQ operator's own librechat.yaml keeps baseURL http://127.0.0.1:4000/v1 —
+# ONLY the baseURL line and the CF-Access headers differ on a tenant.
+#
+# Zero hardcoded provider model names: all routing goes through Bifrost's virtual
+# abstract modes (Chat / Work / Study / Vibecoding / Pro). Bifrost binds each mode
+# to the actual local or upstream model in-flight, based on the tenant's seat tier
+# and role, identified via the X-Seat-Alias / X-User-Id headers.
+#
+# Required env vars on the tenant .env (provisioned per runbook §4):
+#   SATCHIDA_GATEWAY_VK=<tenant-scoped virtual key from central one-api>
+#   CF_ACCESS_CLIENT_ID=<Cloudflare Access service token id>
+#   CF_ACCESS_CLIENT_SECRET=<Cloudflare Access service token secret>
 
 endpoints:
   custom:
-  - name: Satchida Central Gateway
-    apiKey: ${SATCHIDA_GATEWAY_KEY}
+  - name: Satchida-Gateway
+    apiKey: ${SATCHIDA_GATEWAY_VK}
     baseURL: https://gateway.satchida.com/v1
     models:
       default:
-      - deepseek-chat
-      - claude-3-5-sonnet
-      - gpt-4o
+      - Chat
+      - Work
+      - Study
+      - Vibecoding
+      - Pro
       fetch: false
+    titleConvo: true
+    titleModel: Chat
+    titleMethod: completion
+    titlePrompt: 'Invent a short 3-6 word title for this conversation, based ONLY on what the user asked. Reply with the title text only: no quotes, no emojis, no trailing punctuation, no tool names, no explanations.
+
+User message:
+{convo}'
+    titlePromptTemplate: 'User: {input}'
+    summarize: false
+    summaryModel: Chat
+    forcePrompt: false
+    modelDisplayLabel: Satchida AI
+    maxToolResultChars: 50000
     headers:
+      X-Bifrost-Mode: chat
+      X-Seat-Alias: '{{LIBRECHAT_USER_ID}}'
+      X-User-Id: '{{LIBRECHAT_USER_ID}}'
+      X-User-Name: '{{LIBRECHAT_USER_USERNAME}}'
       CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}
       CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}
-    maxToolResultChars: 12000
-    titleConvo: true
-    titleModel: deepseek-chat
-    titleMethod: completion
-    modelDisplayLabel: Satchida AI
+    dropParams:
+    - user
+    addParams:
+      stream: true
+      chat_template_kwargs:
+        enable_thinking: false

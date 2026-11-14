@@ -186,7 +186,9 @@ export function parseSuggestedQuestions(content: string): ParsedSuggestedQuestio
   }
 
   const lines = content.split('\n');
-  const headingIndex = findSectionHeading(lines);
+  // Cheap guard: every heading variant contains "question", so a streaming
+  // message is not rescanned line by line until that word arrives.
+  const headingIndex = /question/i.test(content) ? findSectionHeading(lines) : -1;
   if (headingIndex === -1) {
     return { mainContent: stripDetailsBlocks(content), questions: [] };
   }

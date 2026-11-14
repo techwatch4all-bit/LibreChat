@@ -246,6 +246,11 @@ async function assignSeatTokenHandler(req, res) {
       allowed_models: policy.models.split(','),
     });
 
+    // Disable the alias's previous token BEFORE minting: both share the
+    // seat_alias, so disabling after creation would kill the new key too.
+    if (user.satchidaSeatAlias) {
+      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+    }
     const created = await oneApi('POST', `/api/tenant/${ONEAPI_TENANT}/token`, {
       group: accountType,
       seat_alias: aliasId,
@@ -257,11 +262,6 @@ async function assignSeatTokenHandler(req, res) {
     if (!key) {
       throw new Error('One-API did not return the seat token key');
     }
-    // The old key stops working the moment the new one is stored.
-    if (user.satchidaSeatAlias) {
-      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
-    }
-
     await db.updateUser(id, {
       seatToken: key,
       satchidaSeatAlias: aliasId,

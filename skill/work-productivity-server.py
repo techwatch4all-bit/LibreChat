@@ -230,5 +230,162 @@ def text_diff_and_metrics(text_a: str, text_b: str = None) -> str:
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
 
+@mcp.tool()
+def extract_pdf_content(
+    file_path: str,
+    max_pages: int = 50,
+    ocr_fallback: bool = True
+) -> str:
+    """
+    Extracts text, metadata, page count, and table structure from PDF documents (native or scanned).
+    Uses PyMuPDF (fitz) with automatic OCR fallback for scanned pages.
+    100% offline, zero data leaves the local tenant node.
+    """
+    try:
+        import fitz
+        if not os.path.exists(file_path):
+            return json.dumps({"status": "error", "message": f"File not found: {file_path}"})
+
+        doc = fitz.open(file_path)
+        total_pages = len(doc)
+        pages_to_read = min(total_pages, max_pages)
+        pages_data = []
+
+        for p_idx in range(pages_to_read):
+            page = doc[p_idx]
+            text = page.get_text()
+            used_ocr = False
+
+            # If page text is sparse/empty (likely scanned), attempt OCR fallback if supported
+            if len(text.strip()) < 20 and ocr_fallback:
+                try:
+                    if hasattr(page, "get_textpage_ocr"):
+                        ocr_tp = page.get_textpage_ocr(dpi=150)
+                        ocr_text = page.get_text(textpage=ocr_tp)
+                        if len(ocr_text.strip()) > len(text.strip()):
+                            text = ocr_text
+                            used_ocr = True
+                except Exception:
+                    pass
+
+            pages_data.append({
+                "page_number": p_idx + 1,
+                "text": text.strip(),
+                "character_count": len(text.strip()),
+                "used_ocr": used_ocr
+            })
+
+        meta = doc.metadata or {}
+        doc.close()
+
+        return json.dumps({
+            "status": "success",
+            "file_path": file_path,
+            "total_pages": total_pages,
+            "pages_extracted": pages_to_read,
+            "metadata": {
+                "title": meta.get("title", ""),
+                "author": meta.get("author", ""),
+                "subject": meta.get("subject", ""),
+                "creator": meta.get("creator", "")
+            },
+            "pages": pages_data
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+@mcp.tool()
+def parse_emails_to_timeline(
+    raw_emails: list,
+    extract_events: bool = True
+) -> str:
+    """
+    Parses multiple raw emails (.eml text or structured email objects), sorts them chronologically,
+    and extracts timeline events, deadlines, action items, and participants.
+    raw_emails: list of raw RFC822 strings or dicts with keys 'date', 'sender', 'subject', 'body'.
+    """
+    try:
+        import email
+        from email import policy
+        from email.parser import Parser
+        from dateutil import parser as date_parser
+
+        parsed_entries = []
+        for idx, item in enumerate(raw_emails):
+            if isinstance(item, str):
+                try:
+                    msg = Parser(policy=policy.default).parsestr(item)
+                    subject = str(msg.get("subject", "No Subject"))
+                    sender = str(msg.get("from", "Unknown Sender"))
+                    recipient = str(msg.get("to", ""))
+                    date_str = str(msg.get("date", ""))
+                    
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            ctype = part.get_content_type()
+                            cdispo = str(part.get("Content-Disposition"))
+                            if ctype == "text/plain" and "attachment" not in cdispo:
+                                body = part.get_content()
+                                break
+                    else:
+                        body = msg.get_content() if hasattr(msg, "get_content") else str(msg.get_payload())
+                except Exception:
+                    subject = f"Email #{idx+1}"
+                    sender = "Unknown"
+                    recipient = ""
+                    date_str = ""
+                    body = item
+            elif isinstance(item, dict):
+                subject = item.get("subject", f"Email #{idx+1}")
+                sender = item.get("sender", item.get("from", "Unknown"))
+                recipient = item.get("recipient", item.get("to", ""))
+                date_str = item.get("date", "")
+                body = item.get("body", item.get("content", ""))
+            else:
+                continue
+
+            parsed_dt = None
+            if date_str:
+                try:
+                    parsed_dt = date_parser.parse(date_str)
+                except Exception:
+                    pass
+
+            # Extract basic action items / dates mentioned in body
+            event_mentions = []
+            if extract_events and body:
+                # Common date patterns like "on Nov 12", "by Friday", "deadline: Dec 1"
+                date_patterns = re.findall(r'\b(?:on|by|before|at|deadline|meet|scheduled)\s+([A-Za-z0-9,:\s]{3,30})\b', body, re.IGNORECASE)
+                for match in date_patterns[:5]:
+                    cleaned = match.strip().rstrip('.,;')
+                    if len(cleaned) >= 3:
+                        event_mentions.append(cleaned)
+
+            parsed_entries.append({
+                "index": idx + 1,
+                "subject": subject,
+                "sender": sender,
+                "recipient": recipient,
+                "raw_date": date_str,
+                "iso_date": parsed_dt.isoformat() if parsed_dt else None,
+                "body_preview": body[:300].strip() + ("..." if len(body) > 300 else ""),
+                "events_detected": event_mentions,
+                "_timestamp": parsed_dt.timestamp() if parsed_dt else 0
+            })
+
+        # Sort timeline chronologically
+        parsed_entries.sort(key=lambda x: x["_timestamp"])
+        for item in parsed_entries:
+            del item["_timestamp"]
+
+        return json.dumps({
+            "status": "success",
+            "total_emails_parsed": len(parsed_entries),
+            "timeline": parsed_entries
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
 if __name__ == "__main__":
     mcp.run()

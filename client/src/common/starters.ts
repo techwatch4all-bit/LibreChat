@@ -165,6 +165,158 @@ export const findStarterSlots = (text: string): StarterSlot[] => {
 
 export const ALL_CATEGORIES: StarterCategory[] = [
   {
+    id: 'office_sheets',
+    label: '📊 Family & Business Sheets',
+    labelKey: 'starters_cat_office_sheets',
+    modes: ['Office-Suite', 'Work', 'Pro'],
+    starters: [
+      starter({
+        title: '📊 Family & Home Budget Tracker',
+        icon: '📊',
+        description: 'Keep monthly household expenses, groceries, electricity, and savings organized.',
+        inputs: [
+          'Monthly Budget: e.g. ₹40,000 or $3,500',
+          'Major Expenses: Rent, Groceries, Electricity, School Fees, Medicine, Savings',
+        ],
+        deliver:
+          'Open an interactive Univer Spreadsheet with a color-coded Monthly Budget tab: Itemized rows, Category totals, automated SUM formulas, Remaining Savings highlight, and clear money-saving advice in simple language for [Monthly Budget: e.g. ₹40,000 or $3,500] and [Major Expenses: Rent, Groceries, Electricity, School Fees, Medicine, Savings].',
+        contract: DOC_CONTRACT,
+        badge: 'Family Budget',
+        badgeKey: 'starters_badge_family_budget',
+        engineTag: 'Univer · Sheets',
+        keywords: ['budget', 'family', 'homemaker', 'expenses', 'groceries', 'savings', 'home'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+      starter({
+        title: '🛒 Weekly Grocery & Kitchen Inventory',
+        icon: '🛒',
+        description: 'Organize grocery checklist by pantry aisle, quantities, estimated price, and checkboxes.',
+        inputs: [
+          'Family Size: e.g. 4 Members',
+          'Shopping Focus: Fresh Vegetables, Dairy, Grains, Cleaning, Snacks',
+        ],
+        deliver:
+          'Create a categorized Univer Sheet with sections (Vegetables & Fruits, Dairy, Pantry Grains, Household) containing Quantity, Est Price, checkbox status, and auto-sum Grand Total for [Family Size: e.g. 4 Members] focusing on [Shopping Focus: Fresh Vegetables, Dairy, Grains, Cleaning, Snacks].',
+        contract: DOC_CONTRACT,
+        badge: 'Kitchen & Pantry',
+        badgeKey: 'starters_badge_kitchen_grocery',
+        engineTag: 'Univer · Sheets',
+        keywords: ['grocery', 'shopping', 'kitchen', 'pantry', 'homemaker', 'checklist', 'food'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+      starter({
+        title: '📈 Small Business Revenue & Expense Sheet',
+        icon: '📈',
+        description: 'Track sales, vendor invoices, operational expenses, and calculate net profit margin.',
+        inputs: [
+          'Business Activity: e.g. Bakery, Tuition Center, Retail Shop, or Freelancing',
+          'Period & Currency: e.g. Monthly / INR (₹) or USD ($)',
+        ],
+        deliver:
+          'Build a professional Univer financial ledger with Date, Description, Income, Expense, Running Balance columns, and summary KPI cards for Total Revenue, Total Cost, Net Profit, and Margin % for [Business Activity: e.g. Bakery, Tuition Center, Retail Shop, or Freelancing] for [Period & Currency: e.g. Monthly / INR (₹) or USD ($)].',
+        contract: DOC_CONTRACT,
+        badge: 'Business P&L',
+        badgeKey: 'starters_badge_business_pnl',
+        engineTag: 'Univer · Sheets',
+        keywords: ['business', 'pnl', 'profit', 'revenue', 'expense', 'accounting', 'shop'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+      starter({
+        title: '📅 Student Study Timetable & Grade Tracker',
+        icon: '📅',
+        description: 'Weekly study timetable with subject time slots, exam dates, and assignment progress.',
+        inputs: [
+          'Student Grade / Exam: e.g. Class 10 CBSE Board or College Semester',
+          'Key Subjects: Math, Science, English, Social Science',
+        ],
+        deliver:
+          'Produce an interactive weekly study schedule and grade tracker in Univer Sheets with Day/Time matrix, priority flags, study goal checkboxes, and test mark calculations for [Student Grade / Exam: e.g. Class 10 CBSE Board or College Semester] covering [Key Subjects: Math, Science, English, Social Science].',
+        contract: DOC_CONTRACT,
+        badge: 'Student Schedule',
+        badgeKey: 'starters_badge_school_grades',
+        engineTag: 'Univer · Sheets',
+        keywords: ['student', 'timetable', 'exam', 'school', 'study', 'grades', 'homework'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+    ],
+  },
+  {
+    id: 'office_docs',
+    label: '📄 Letters & Official Documents',
+    labelKey: 'starters_cat_office_docs',
+    modes: ['Office-Suite', 'Work', 'Pro'],
+    starters: [
+      starter({
+        title: '✉️ Formal Letter & Application Writer',
+        icon: '✉️',
+        description: 'Polished school leave application, formal complaint, bank letter, or official request.',
+        inputs: [
+          'Letter Purpose: e.g. Leave Application for child illness, or Request to Bank Manager for Cheque Book',
+          'Sender & Recipient Details: e.g. Parent name, School Principal name, Dates',
+        ],
+        deliver:
+          'Draft a respectful, impeccably formatted formal letter in Univer Docs ready for print or signature, including Sender Header, Recipient Address, Subject line, polite Body paragraphs, and closing signature block for [Letter Purpose: e.g. Leave Application for child illness, or Request to Bank Manager for Cheque Book] with [Sender & Recipient Details: e.g. Parent name, School Principal name, Dates].',
+        contract: DOC_CONTRACT,
+        badge: 'Official Letter',
+        badgeKey: 'starters_badge_formal_letter',
+        engineTag: 'Univer · Docs',
+        keywords: ['letter', 'application', 'school', 'leave', 'formal', 'request', 'senior'],
+        mcpServers: ['satchida-office-suite', 'filesystem-shared'],
+      }),
+      starter({
+        title: '🏢 Residential Society Notice & Maintenance Receipt',
+        icon: '🏢',
+        description: 'Resident meeting notice, maintenance invoice summary, or building rules circular.',
+        inputs: [
+          'Notice Subject: e.g. Lift Maintenance Schedule, Water Tank Cleaning, or Annual AGM Notice',
+          'Society Name & Date: e.g. Shanti Niketan Apartments, 20th Nov',
+        ],
+        deliver:
+          'Create a clear, community-friendly official society notice in Univer Docs with prominent Agenda points, contact numbers, and clear instructions for [Notice Subject: e.g. Lift Maintenance Schedule, Water Tank Cleaning, or Annual AGM Notice] for [Society Name & Date: e.g. Shanti Niketan Apartments, 20th Nov].',
+        contract: DOC_CONTRACT,
+        badge: 'Notice & Bill',
+        badgeKey: 'starters_badge_society_notice',
+        engineTag: 'Univer · Docs',
+        keywords: ['society', 'notice', 'building', 'maintenance', 'meeting', 'apartment'],
+        mcpServers: ['satchida-office-suite', 'filesystem-shared'],
+      }),
+      starter({
+        title: '🏦 Bank Account Transfer & KYC Update Request',
+        icon: '🏦',
+        description: 'Official bank letter to update address, phone number, transfer branch, or update KYC.',
+        inputs: [
+          'Bank Name & Branch: e.g. SBI MG Road Branch',
+          'Request Type: e.g. Address Change with attached Aadhaar copy or Account Branch Transfer',
+        ],
+        deliver:
+          'Draft an authoritative, standard banking letter in Univer Docs specifying Account Number placeholder, KYC document enclosure list, and formal acknowledgement slip for [Bank Name & Branch: e.g. SBI MG Road Branch] regarding [Request Type: e.g. Address Change with attached Aadhaar copy or Account Branch Transfer].',
+        contract: DOC_CONTRACT,
+        badge: 'Banking Request',
+        badgeKey: 'starters_badge_bank_request',
+        engineTag: 'Univer · Docs',
+        keywords: ['bank', 'kyc', 'account', 'transfer', 'branch', 'senior', 'address'],
+        mcpServers: ['satchida-office-suite', 'filesystem-shared'],
+      }),
+      starter({
+        title: '📑 Standard House Rental Agreement Draft',
+        icon: '📑',
+        description: 'Standard 11-month residential tenancy agreement with rent, security deposit, and terms.',
+        inputs: [
+          'Landlord & Tenant Names: [Owner Name] and [Tenant Name]',
+          'Property & Rent: e.g. Flat 302, Green Acres, Rent ₹18,000/mo, Deposit ₹50,000, 11 Months',
+        ],
+        deliver:
+          'Draft a legally structured residential tenancy agreement in Univer Docs with numbered clauses (Rent, Deposit, Maintenance, Notice Period, Termination, Fixtures) for [Landlord & Tenant Names: [Owner Name] and [Tenant Name]] covering [Property & Rent: e.g. Flat 302, Green Acres, Rent ₹18,000/mo, Deposit ₹50,000, 11 Months].',
+        contract: LEGAL_CONTRACT,
+        badge: 'Rental Draft',
+        badgeKey: 'starters_badge_rental_agreement',
+        engineTag: 'Univer · Docs',
+        keywords: ['rental', 'agreement', 'lease', 'tenant', 'landlord', 'deposit', 'flat'],
+        mcpServers: ['satchida-office-suite', 'filesystem-shared'],
+      }),
+    ],
+  },
+  {
     id: 'markets_finance',
     label: '📊 Markets & Bullion',
     labelKey: 'starters_cat_markets_finance',

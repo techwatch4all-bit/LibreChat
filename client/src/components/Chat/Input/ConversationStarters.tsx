@@ -66,23 +66,40 @@ const ConversationStarters = () => {
     return modeCategories.filter((cat) => cat.group === selectedGroup);
   }, [hasGroupedNavigation, modeCategories, selectedGroup]);
 
-  // Reset navigation state whenever the user switches mode/spec
+  const convoKey = conversation?.conversationId ?? Constants.NEW_CONVO;
+  const [, setMCPValues] = useAtom(mcpValuesAtomFamily(convoKey));
+
+  const modelSpec = useMemo(
+    () => getModelSpec({ specName: conversation?.spec, startupConfig }),
+    [conversation?.spec, startupConfig],
+  );
+
+  // Reset navigation state and sync MCP servers whenever the user switches mode/spec
   useEffect(() => {
     setSelectedCategory('all');
     setSelectedGroup('spotlight');
     setIsSearchOpen(false);
     setSearchQuery('');
     setStagedHint(false);
-  }, [activeMode]);
+
+    // Auto-select MCP servers defined on the model spec upon switching
+    const specServers = modelSpec?.mcpServers;
+    if (Array.isArray(specServers) && specServers.length > 0) {
+      setMCPValues((prev = []) => Array.from(new Set([...prev, ...specServers])));
+      if (badgeContext?.mcpServerManager?.setMCPValues) {
+        const curr = badgeContext.mcpServerManager.mcpValues ?? [];
+        badgeContext.mcpServerManager.setMCPValues(
+          Array.from(new Set([...curr, ...specServers])),
+        );
+      }
+    }
+  }, [activeMode, modelSpec, setMCPValues, badgeContext]);
 
   useEffect(() => {
     if (isSearchOpen) {
       searchInputRef.current?.focus();
     }
   }, [isSearchOpen]);
-
-  const convoKey = conversation?.conversationId ?? Constants.NEW_CONVO;
-  const [, setMCPValues] = useAtom(mcpValuesAtomFamily(convoKey));
 
   const endpointType = useMemo(() => {
     let ep = conversation?.endpoint ?? '';
@@ -107,11 +124,6 @@ const ConversationStarters = () => {
     agent_id: conversation?.agent_id,
     assistant_id: conversation?.assistant_id,
   });
-
-  const modelSpec = useMemo(
-    () => getModelSpec({ specName: conversation?.spec, startupConfig }),
-    [conversation?.spec, startupConfig],
-  );
 
   const customStarters = useMemo(() => {
     if (entity?.conversation_starters?.length) {

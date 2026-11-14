@@ -7,6 +7,7 @@ import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
 import { MermaidRenderer } from '~/components/Messages/Content/Mermaid/Mermaid';
 import { MERMAID_ARTIFACT_TYPE, type Artifact } from '~/common/artifacts';
 import { PROJECT_ARTIFACT_TYPE } from '~/utils/artifacts';
+import { isUniverArtifact, UniverOffice } from './Univer';
 import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useCodeState } from '~/Providers/EditorContext';
 import { useLocalize } from '~/hooks';
@@ -104,6 +105,10 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
         onMermaidExportReady={props.onMermaidExportReady}
       />
     );
+  }
+
+  if (isUniverArtifact(props.artifact.type)) {
+    return <UniverOffice artifact={props.artifact} />;
   }
 
   /* Multi-file project artifacts get their own IDE renderer (file tree +

@@ -118,9 +118,11 @@ export default defineConfig(({ command }) => ({
           'assets/rum.*.js',
           'assets/locale-*.js',
           'assets/query-devtools*.js',
+          'assets/univer*.js',
+          'assets/vendor*.js',
           'assets/study/sims/**/*',
         ],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
         /**
          * vite-plugin-pwa defaults this to `/^assets\//`, which is only true for the
          * hashed bundle output: the icons live in `assets/` under stable filenames, so the
@@ -256,6 +258,10 @@ export default defineConfig(({ command }) => ({
                     normalizedId.includes('lodash-es')
                   ) {
                     return 'mermaid';
+                  }
+
+                  if (normalizedId.includes('@univerjs/')) {
+                    return 'univer';
                   }
 
                   if (normalizedId.includes('@codesandbox/sandpack')) {

@@ -40,6 +40,10 @@ const artifactFilename = {
   'application/vnd.librechat.docx-preview': 'index.html',
   'application/vnd.librechat.spreadsheet-preview': 'index.html',
   'application/vnd.librechat.presentation-preview': 'index.html',
+  'application/vnd.univer-sheet': 'spreadsheet.json',
+  'application/vnd.univer-doc': 'document.json',
+  'application/vnd.librechat.univer-sheet': 'spreadsheet.json',
+  'application/vnd.librechat.univer-doc': 'document.json',
   /* SVG artifacts are a bare `<svg>` document. The Sandpack `static`
    * template always loads `index.html`, so `getSvgFiles` ships a
    * companion HTML shell; the editor/download file stays `index.svg`. */
@@ -85,6 +89,10 @@ const artifactTemplate: Record<
   'application/vnd.librechat.docx-preview': 'static',
   'application/vnd.librechat.spreadsheet-preview': 'static',
   'application/vnd.librechat.presentation-preview': 'static',
+  'application/vnd.univer-sheet': 'static',
+  'application/vnd.univer-doc': 'static',
+  'application/vnd.librechat.univer-sheet': 'static',
+  'application/vnd.librechat.univer-doc': 'static',
   'image/svg+xml': 'static',
   'image/svg': 'static',
   /* Project template is resolved per-manifest in `parseProjectManifest`;
@@ -329,6 +337,10 @@ const dependenciesMap: Record<
   'application/vnd.librechat.docx-preview': {},
   'application/vnd.librechat.spreadsheet-preview': {},
   'application/vnd.librechat.presentation-preview': {},
+  'application/vnd.univer-sheet': {},
+  'application/vnd.univer-doc': {},
+  'application/vnd.librechat.univer-sheet': {},
+  'application/vnd.librechat.univer-doc': {},
   /* SVG preview is a static HTML shell + the source file; no npm deps. */
   'image/svg+xml': {},
   'image/svg': {},

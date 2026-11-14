@@ -25,9 +25,11 @@ import {
   useCreateGroupMutation,
   useDeleteGroupMutation,
   useRemoveGroupMemberMutation,
+  useAddGroupMemberMutation,
   GROUP_ACCOUNT_TYPES,
   type AdminGroup,
 } from '~/data-provider/admin/groups';
+import { useSearchUsersQuery } from '~/data-provider/admin/users';
 
 const ACCOUNT_TYPES = GROUP_ACCOUNT_TYPES;
 const MODES = ['Chat', 'Study', 'Work', 'Privacy'] as const;
@@ -281,13 +283,28 @@ export default function GroupsPanel({
 function GroupMembersModal({ group, onClose }: { group: AdminGroup; onClose: () => void }) {
   const membersQuery = useGroupMembersQuery(group.name);
   const removeMutation = useRemoveGroupMemberMutation();
+  const addMutation = useAddGroupMemberMutation(group._id);
+  const searchQuery = useSearchUsersQuery(searchText);
   const members = membersQuery.data?.members ?? [];
+  const memberIds = new Set(members.map((m) => m.id));
+  const candidates = (searchQuery.data?.users ?? []).filter((u) => !memberIds.has(u.id));
+
+  const handleAdd = async (userId: string) => {
+    try {
+      await addMutation.mutateAsync(userId);
+      membersQuery.refetch();
+    } catch (err) {
+      alert(`Failed to add user: ${(err as Error).message}`);
+    }
+  };
 
   const handleRemove = async (userId: string) => {
     if (!confirm('Remove user from this policy group?')) return;
     await removeMutation.mutateAsync({ groupName: group.name, userId });
     membersQuery.refetch();
   };
+
+  const [searchText, setSearchText] = useState('');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -305,6 +322,46 @@ function GroupMembersModal({ group, onClose }: { group: AdminGroup; onClose: () 
           <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
             <X size={18} />
           </button>
+        </div>
+
+        {/* Add-user picker: search the tenant's users and add them to this
+            licence group. Candidate list excludes existing members. */}
+        <div className="my-3 rounded-xl border border-border-light bg-surface-secondary p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary mb-2">
+            Add a user to this group
+          </div>
+          <input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search users by email or name…"
+            className="w-full rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
+          />
+          {searchText.trim().length > 0 && (
+            <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
+              {searchQuery.isLoading ? (
+                <div className="py-2 text-center"><Spinner /></div>
+              ) : candidates.length === 0 ? (
+                <div className="py-2 text-center text-[11px] text-text-secondary">No matching users found.</div>
+              ) : (
+                candidates.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => handleAdd(u.id)}
+                    disabled={addMutation.isPending}
+                    className="flex w-full items-center justify-between rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-left text-xs hover:border-primary transition-colors"
+                  >
+                    <span>
+                      <span className="font-semibold text-text-primary">{u.email}</span>
+                      {u.accountType ? (
+                        <span className="ml-2 text-[10px] text-text-secondary capitalize">{u.accountType}</span>
+                      ) : null}
+                    </span>
+                    <span className="text-[11px] font-medium text-primary">Add</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         <div className="my-4 max-h-80 overflow-y-auto space-y-2">

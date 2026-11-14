@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
+import { GROUPS_QUERY_KEY } from './groups';
 
 export const USERS_QUERY_KEY = ['admin', 'users'] as const;
 
@@ -245,6 +246,70 @@ export function useDeleteUserMutation(): UseMutationResult<{ message: string }, 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY }),
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// Seat tokens (R1): per-user One-API tenant credential
+// ---------------------------------------------------------------------------
+
+export type AssignSeatPayload = {
+  accountType: string;
+  /** Operator instances may target any tenant; tenant admins are bound to
+   *  their own tenant server-side, so this is ignored there. */
+  tenantId?: string;
+};
+
+export async function assignSeatToken(
+  userId: string,
+  payload: AssignSeatPayload,
+): Promise<{ accountType: string; seatAlias: string; oneapiTenant?: string; seatTokenHint: string }> {
+  const response = await fetch(`/api/admin/users/${userId}/seat-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function revokeSeatToken(userId: string): Promise<{ revoked: boolean }> {
+  const response = await fetch(`/api/admin/users/${userId}/seat-token`, { method: 'DELETE' });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export function useAssignSeatTokenMutation(): UseMutationResult<
+  { accountType: string; seatAlias: string; oneapiTenant?: string; seatTokenHint: string },
+  Error,
+  { userId: string; payload: AssignSeatPayload }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, payload }) => assignSeatToken(userId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: GROUPS_QUERY_KEY });
+    },
+  });
+}
+
+export function useRevokeSeatTokenMutation(): UseMutationResult<
+  { revoked: boolean },
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeSeatToken,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY }),
   });
 }

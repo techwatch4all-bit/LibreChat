@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import { Zap, Ban } from 'lucide-react';
+import { useAssignSeatTokenMutation, useRevokeSeatTokenMutation } from '~/data-provider/admin/users';
 import { Spinner } from '@librechat/client';
 import {
   Search,
@@ -7,6 +9,8 @@ import {
   Download,
   Pencil,
   KeyRound,
+  Zap,
+  Ban,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -58,6 +62,9 @@ export default function UsersList({
   // Enterprise Filter States
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [tierFilter, setTierFilter] = useState<string>('all');
+  const [seatEditing, setSeatEditing] = useState<{ userId: string; email: string; accountType: string } | null>(null);
+  const assignSeatMutation = useAssignSeatTokenMutation();
+  const revokeSeatMutation = useRevokeSeatTokenMutation();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Bulk Selection States
@@ -138,6 +145,16 @@ export default function UsersList({
       alert(`Failed to ${action.toLowerCase()} user: ${(err as Error).message}`);
     }
   };
+  const handleRevokeSeat = async (user: AdminUserListItem) => {
+    if (!confirm(`Revoke the One-API seat token for ${user.email}? Requests will fall back to the shared gateway credential.`)) return;
+    try {
+      await revokeSeatMutation.mutateAsync(user.id);
+      alert('Seat token revoked.');
+    } catch (err) {
+      alert(`Failed to revoke seat token: ${(err as Error).message}`);
+    }
+  };
+
   const handleDelete = async (user: AdminUserListItem) => {
     if (!confirm(`Delete user ${user.name || user.email}? This action cannot be undone.`)) {
       return;
@@ -342,6 +359,7 @@ export default function UsersList({
                 <th className="py-3 px-4">{localize('com_admin_users_role') || 'Role'}</th>
                 <th className="py-3 px-4">{localize('com_admin_users_account_type') || 'Plan Tier'}</th>
                 <th className="py-3 px-4">Family Seat</th>
+                        <th className="py-3 px-4">One-API Seat</th>
                 <th className="py-3 px-4">{localize('com_admin_users_status') || 'Status'}</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -399,6 +417,18 @@ export default function UsersList({
                         {user.accountType || 'free'}
                       </span>
                     </td>
+                    <td className="py-3 px-4">
+                      {user.seatAssigned ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          title={`Seat token ${user.seatTokenHint ?? ''}`}
+                        >
+                          <Zap size={11} /> Active
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-text-secondary">—</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-xs text-text-secondary capitalize">
                       {user.familyRole ? (
                         <span className="inline-flex items-center gap-1 rounded bg-surface-secondary px-1.5 py-0.5 text-[11px] border border-border-light">
@@ -440,6 +470,23 @@ export default function UsersList({
                         >
                           {user.suspended ? <Unlock size={14} /> : <Lock size={14} />}
                         </button>
+                        <button
+                          className="p-1.5 text-text-secondary hover:text-emerald-500 rounded-lg hover:bg-surface-secondary transition-colors"
+                          title="Assign / change One-API seat (licence)"
+                          onClick={() => setSeatEditing({ userId: user.id, email: user.email, accountType: user.accountType || '' })}
+                        >
+                          <Zap size={14} />
+                        </button>
+                        {user.seatAssigned && (
+                          <button
+                            className="p-1.5 text-text-secondary hover:text-rose-500 rounded-lg hover:bg-surface-secondary transition-colors"
+                            title="Revoke the One-API seat token"
+                            onClick={() => handleRevokeSeat(user)}
+                            disabled={revokeSeatMutation.isPending}
+                          >
+                            <Ban size={14} />
+                          </button>
+                        )}
                         <button
                           className="p-1.5 text-text-secondary hover:text-amber-500 rounded-lg hover:bg-surface-secondary transition-colors"
                           title="Reset Password"
@@ -534,6 +581,9 @@ export default function UsersList({
         />
       )}
 
+      {seatEditing && (
+        <SeatDialog target={seatEditing} onClose={() => setSeatEditing(null)} />
+      )}
       {editingUser && (
         <EditUserModal
           user={editingUser}
@@ -667,11 +717,13 @@ function EditUserModal({
                 className="w-full rounded-xl border border-border-light bg-surface-secondary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
               >
                 <option value="">None / Free</option>
-                <option value="demo">Demo</option>
+                <option value="basic">Basic</option>
                 <option value="standard">Standard</option>
-                <option value="pro">Pro</option>
                 <option value="family">Family</option>
-                <option value="enterprise">Enterprise</option>
+                <option value="pro">Pro</option>
+                <option value="pro_family">Pro Family</option>
+                <option value="privacy">Privacy</option>
+                <option value="enterprise">Enterprise (white-label)</option>
               </select>
             </div>
           </div>
@@ -958,6 +1010,99 @@ function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// SeatDialog: mint/rotate the per-user One-API seat token (R1). The backend
+// derives the seat policy from the licence group and stores the token on the
+// user; every relay from this user then attributes to the right tenant.
+// ---------------------------------------------------------------------------
+const SEAT_TYPES = ['basic', 'standard', 'family', 'pro', 'pro_family', 'privacy', 'enterprise'];
+
+function SeatDialog({
+  target,
+  onClose,
+}: {
+  target: { userId: string; email: string; accountType: string };
+  onClose: () => void;
+}) {
+  const [accountType, setAccountType] = useState(target.accountType || 'basic');
+  const assignMutation = useAssignSeatTokenMutation();
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await assignMutation.mutateAsync({ userId: target.userId, payload: { accountType } });
+      alert(`Seat assigned: ${res.accountType} (alias ${res.seatAlias})`);
+      onClose();
+    } catch (err) {
+      alert(`Failed to assign seat: ${(err as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-md rounded-2xl border border-border-medium bg-surface-primary p-6 shadow-2xl"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-border-light">
+          <div>
+            <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+              <Zap size={16} className="text-emerald-500" />
+              Assign seat — {target.email}
+            </h2>
+            <p className="text-xs text-text-secondary mt-0.5">
+              Mints an One-API seat token inside this user's tenant. The licence type sets the
+              seat's policy group, ceilings and attribution.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="my-4 space-y-3">
+          <div>
+            <label className="block font-semibold text-text-secondary mb-1">Licence type</label>
+            <select
+              value={accountType}
+              onChange={(e) => setAccountType(e.target.value)}
+              className="w-full rounded-xl border border-border-light bg-surface-secondary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
+            >
+              {SEAT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-[11px] text-text-secondary">
+            Re-assigning rotates the seat token: the previous key is disabled before the new one
+            is issued, so the user's access moves cleanly.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-border-light">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-border-light bg-surface-secondary px-4 py-2 text-xs font-semibold text-text-primary hover:bg-surface-tertiary"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={assignMutation.isPending}
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {assignMutation.isPending ? 'Minting…' : 'Assign seat'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

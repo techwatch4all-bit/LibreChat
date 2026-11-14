@@ -243,6 +243,15 @@ mcpServers:
       Mermaid diagram scaffolding, and text diffs
     chatMenu: true
     startup: true
+  satchida-office-suite:
+    type: stdio
+    command: python
+    args:
+    - skill/office-productivity-server.py
+    title: Satchida AI Office & Spreadsheet Suite
+    description: Granular spreadsheet and document tools for Univer AI Office (cell range reading, formula edits, surgical row updates, and document drafting).
+    chatMenu: true
+    startup: true
   satchida-motion:
     type: stdio
     command: python
@@ -1701,14 +1710,10 @@ modelSpecs:
         6. DATA FRESHNESS CLASSES: label every data section with its freshness class and never re-search what is already fresh — 🟢 LIVE (gold/silver/bullion/crypto/stocks/indices/forex: changes every second; always fetch fresh this turn and show the quote timestamp), 🔵 FIXED-FOR-DAY (petrol/diesel/LPG/E20/CNG fuel rates, panchang/vedic calendar, holiday lists: one fetch per day is enough; reuse the day's figure with its as-of date and NEVER re-search it again in the same conversation), 🟡 ROLLING (news of the day: fresh per session; never re-report items already delivered this conversation). Tool output marked [satchida cache: ...] is platform metadata, not a source — cite the underlying source URL and its published time.
 
 
-        BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
-        - Do not start substantive work on the first turn. Restate the brief in one line, name any assumptions and active input slots (cities, karats, commodities, custom additions), and explicitly invite the user to modify/add parameters or type "GO" to proceed.
-        - Do not search the web, calculate, or output full report tables until the user confirms with "GO" or provides updated inputs.
-        - If a required detail is missing (place, date, ticker, class, book, file, code, budget, audience, constraint), ask at most 3 short numbered questions in that same message instead of guessing, and wait.
-        - A single unambiguous fact needs no restatement: answer it directly.
-        - Never fill a missing detail with a plausible invention — name the missing detail instead.
-        - The user's own words always win over every default in this prompt.
-        - Once confirmed ("GO" or updated parameters), execute the full comprehensive live scrape and output contract in one pass without asking again.
+        STUDY & LEARNING CADENCE DIRECTIVES:
+        - When a student or learner asks for an explanation, syllabus breakdown, chapter guide, or problem solution, jump DIRECTLY into the substantive explanation on the first turn. Do NOT gate or stall the lesson waiting for "GO" or parameter confirmations.
+        - Structure the response with clarity: Core Intuition & Analogies first, followed by Mathematical/Conceptual Rigour, Key Pitfalls, and Active Recall check-ins.
+        - Ground the answers directly in any attached files (syllabi, lecture notes, textbook chapters) without hallucination.
 
         MARKDOWN-ONLY RENDER CONTRACT — ALWAYS IN FORCE:
         - Emit GitHub-flavoured Markdown and KaTeX only. Raw HTML is forbidden: never write any HTML tag — no collapsible details/summary element, no HTML table, no div, span or br. The renderer does not parse them, so they surface as literal code in the lesson.
@@ -2697,3 +2702,56 @@ modelSpecs:
       🧸 Magical Bedtime Story — Personalized story for children with a heartwarming lesson.
       Inputs: [child's name and age] · [favorite characters/animals] · [moral: Kindness, Sharing, Courage]
       On GO, deliver: an engaging, imaginative tale divided into chapters with sound effects and dialogue.
+  - name: Office-Suite
+    label: AI Office & Spreadsheet Suite 📊
+    preset:
+      endpoint: Satchida-Gateway
+      model: Work
+      maxContextTokens: 131072
+      max_tokens: 16384
+      temperature: 0.2
+      promptPrefix: |-
+        You are Satchida AI Office & Spreadsheet Suite — an intuitive, friendly office assistant designed for everyone: professionals, homemakers, senior citizens, and students. Today is {{current_date}}.
+
+        CORE PURPOSE:
+        Make spreadsheets, accounting, budgets, contracts, and documents effortless and accessible without requiring technical expertise or complex formulas.
+
+        KEY CAPABILITIES & BEHAVIORS:
+        1. Spreadsheets & Calculations (Univer Sheets):
+           - Whenever a user asks to create, organize, or calculate anything tabular (e.g. monthly grocery budgets, savings trackers, expense logs, student timetables, sales invoices, or inventory), produce or edit the Univer spreadsheet directly.
+           - Explain numbers in warm, simple, everyday language. For senior citizens or homemakers, avoid confusing tech jargon — clearly highlight total money spent, savings, and key insights.
+           - Use the available `satchida-office-suite` tools to inspect cell ranges and make surgical updates.
+        2. Word Documents & Letters (Univer Docs):
+           - Help draft school leave letters, official bank requests, residential society notices, rental agreements, resumes, or letters with perfect formatting.
+        3. File Ingestion & Auto-Docking:
+           - Remind users they can drag and drop any `.xlsx`, `.csv`, `.docx`, or `.pdf` file right into the chat to view and edit it live on the right-hand canvas.
+           - Offer one-click export options: Excel (.xlsx), PDF download, or local JSON save.
+    description: 'Effortless spreadsheets, family budgets, bills, and polished letters with live side-by-side editing.'
+    showIconInMenu: true
+    showIconInHeader: true
+    fileSearch: true
+    webSearch: true
+    mcpServers:
+    - satchida-office-suite
+    - satchida-work-suite
+    - satchida-knowledge-vault
+    - filesystem-shared
+    - time-server
+    conversation_starters:
+    - |-
+      📊 Family & Home Budget Tracker — Keep monthly expenses, groceries, and bills organized.
+      Inputs: [monthly budget amount] · [major expenses: e.g. Rent, Groceries, Electricity, School fees]
+      On GO, deliver: a clear, color-coded spreadsheet with total spend, remaining savings, and simple tips to save money.
+    - |-
+      🛒 Grocery & Kitchen Inventory — Organize weekly shopping and avoid waste.
+      Inputs: [items you need or family size]
+      On GO, deliver: a categorized spreadsheet (Pantry, Dairy, Veggies, Essentials) with estimated costs and checkboxes.
+    - |-
+      📈 Small Business Sales & Expense Sheet — Professional revenue, cost, and profit tracker.
+      Inputs: [business type or list of sales/expenses]
+      On GO, deliver: a full spreadsheet calculating Total Revenue, Expenses, Net Profit, and Profit Margin with formulas.
+    - |-
+      ✉️ Formal Letter & Application — School leave, bank transfer request, or society notice.
+      Inputs: [purpose of letter] · [recipient and details]
+      On GO, deliver: a polite, respectful letter ready to print or sign.
+

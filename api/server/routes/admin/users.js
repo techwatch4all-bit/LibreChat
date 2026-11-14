@@ -155,6 +155,13 @@ const ONEAPI_BASE_URL = (process.env.ONEAPI_BASE_URL || 'http://127.0.0.1:4000')
   '',
 );
 const ONEAPI_TENANT = process.env.ONEAPI_DEFAULT_TENANT || 'satchida-master';
+// Tenant-copy deployment mode: this LibreChat instance runs ON a tenant PC and
+// authenticates to One-API with THAT tenant's machine virtual key — never with
+// operator credentials. Seat minting then goes through One-API's self-service
+// route, which resolves the tenant from the key and hardens every field
+// server-side (quota/caps/keys cannot be set by the tenant).
+const TENANT_COPY_MODE = process.env.SATCHIDA_TENANT_MODE === 'true';
+const TENANT_VK = process.env.SATCHIDA_TENANT_VK || '';
 
 function oneApiConfigured() {
   return Boolean(process.env.ONEAPI_ADMIN_ACCESS_TOKEN);
@@ -168,9 +175,12 @@ function oneApiHeaders() {
 }
 
 async function oneApi(method, path, body) {
+  const useTenantKey = TENANT_COPY_MODE && TENANT_VK;
   const res = await fetch(ONEAPI_BASE_URL + path, {
     method,
-    headers: oneApiHeaders(),
+    headers: useTenantKey
+      ? { Authorization: TENANT_VK, 'Content-Type': 'application/json' }
+      : oneApiHeaders(),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   let json = {};
@@ -234,17 +244,25 @@ async function assignSeatTokenHandler(req, res) {
       accountType = user.accountType;
     }
     const policy = SEAT_POLICY_BY_TYPE[accountType];
-    // Tenant resolution — the security boundary of seat minting. A platform
-    // operator (OPERATOR_CONTROL, platform-only grant) may mint into any
-    // tenant via body.tenantId: that is how a copied tenant deployment gets
-    // its seats. Everyone else is BIND to their own tenant — a body.tenantId
-    // naming another tenant is ignored, so a tenant admin can never seat
-    // users into another tenant's One-API tenant.
-    const callerIsOperator = await hasCapability(req.user, SystemCapabilities.OPERATOR_CONTROL, {
-      platformOnly: true,
-    }).catch(() => false);
+    // Tenant resolution — the security boundary of seat minting.
+    // SATCHIDA_TENANT_MODE=true (a LibreChat copy deployed on a tenant PC):
+    // everything mints into THIS instance's tenant through the self-service
+    // route with the tenant's own machine key — operator credentials do not
+    // exist on that box, and the seat policy must be pre-provisioned by the
+    // operator (the self-service route refuses unknown aliases).
+    // Otherwise (the operator's own instance): a platform operator
+    // (OPERATOR_CONTROL, platform-only grant) may mint into any tenant via
+    // body.tenantId; everyone else is bound to their own tenant.
+    let callerIsOperator = false;
+    if (!TENANT_COPY_MODE) {
+      callerIsOperator = await hasCapability(req.user, SystemCapabilities.OPERATOR_CONTROL, {
+        platformOnly: true,
+      }).catch(() => false);
+    }
     let tenantId;
-    if (callerIsOperator && req.body?.tenantId) {
+    if (TENANT_COPY_MODE) {
+      tenantId = ONEAPI_TENANT;
+    } else if (callerIsOperator && req.body?.tenantId) {
       tenantId = String(req.body.tenantId).trim();
     } else if (user.tenantId) {
       tenantId = user.tenantId;
@@ -268,29 +286,63 @@ async function assignSeatTokenHandler(req, res) {
       allowed_models: policy.models.split(','),
     });
 
+    let mintedKey;
     // Disable the alias's previous token BEFORE minting: both share the
     // seat_alias, so disabling after creation would kill the new key too.
-    if (user.satchidaSeatAlias) {
-      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+    // Tenant-copy mode revokes through the self-service disable route using
+    // the token id stored on the user at the previous assignment.
+    if (TENANT_COPY_MODE) {
+      if (user.satchidaSeatTokenId) {
+        await oneApi(
+          'PUT',
+          `/api/tenant/${tenantId}/seat/${user.satchidaSeatTokenId}/disable`,
+        ).catch(() => {});
+      }
+      const created = await oneApi('POST', `/api/tenant/${tenantId}/seat`, {
+        group: accountType,
+        seat_alias: aliasId,
+        models: policy.models,
+        channels: '',
+        unlimited_quota: true,
+      });
+      mintedKey = created?.data?.key;
+      if (mintedKey) {
+        await runAsSystem(() =>
+          db.updateUser(id, {
+            seatToken: mintedKey,
+            satchidaSeatTokenId: created?.data?.id ?? null,
+            satchidaSeatAlias: aliasId,
+            accountType,
+          }),
+        );
+      }
+    } else {
+      if (user.satchidaSeatAlias) {
+        await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+      }
+      const created = await oneApi('POST', `/api/tenant/${tenantId}/token`, {
+        group: accountType,
+        seat_alias: aliasId,
+        models: policy.models,
+        channels: '',
+        unlimited_quota: true,
+      });
+      mintedKey = created?.data?.key;
+      if (mintedKey) {
+        await runAsSystem(() =>
+          db.updateUser(id, {
+            seatToken: mintedKey,
+            satchidaSeatTokenId: created?.data?.id ?? null,
+            satchidaSeatAlias: aliasId,
+            accountType,
+          }),
+        );
+      }
     }
-    const created = await oneApi('POST', `/api/tenant/${tenantId}/token`, {
-      group: accountType,
-      seat_alias: aliasId,
-      models: policy.models,
-      channels: '',
-      unlimited_quota: true,
-    });
-    const key = created?.data?.key;
+    const key = mintedKey;
     if (!key) {
       throw new Error('One-API did not return the seat token key');
     }
-    await runAsSystem(() =>
-      db.updateUser(id, {
-        seatToken: key,
-        satchidaSeatAlias: aliasId,
-        accountType,
-      }),
-    );
 
     // Keep the admin panel's Groups view consistent with the seat type: the
     // seat group is scoped to the SAME tenant as the user (a copied tenant

@@ -240,6 +240,14 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       type: String,
       default: null,
       select: false,
+    },
+    /** The One-API tenant-token row this seat's tk_ key belongs to, so a
+     *  tenant-copy deployment can revoke it through the self-service route
+     *  (which is keyed by token id) without operator credentials. */
+    satchidaSeatTokenId: {
+      type: Number,
+      default: null,
+      select: false,
       match: /^[A-Za-z0-9_-]{16,128}$/,
     },
     privacyAssertion: {

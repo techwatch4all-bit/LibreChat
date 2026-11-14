@@ -58,44 +58,236 @@ function getViewportSize() {
   return { w: Math.max(w, 320), h: Math.max(h, 240) };
 }
 
-function draw2DFurniture(f, px, py, scale) {
-  const fx = px(f.x), fy = py(f.z), fw = f.w * scale, fd = f.d * scale;
-  ctx.fillStyle = "rgba(56, 189, 248, 0.12)";
+// ---- 2D architectural CAD fixture symbols (drawn in local pixels, origin = fixture top-left) ----
+
+function drawFixtureBase(fw, fd) {
+  ctx.fillStyle = "rgba(56, 189, 248, 0.10)";
   ctx.strokeStyle = "#7dd3fc";
   ctx.lineWidth = 1.25;
-  ctx.fillRect(fx, fy, fw, fd);
-  ctx.strokeRect(fx, fy, fw, fd);
+  ctx.fillRect(0, 0, fw, fd);
+  ctx.strokeRect(0, 0, fw, fd);
+}
 
-  if (f.type === "bed") {
+function drawWc2D(fw, fd) {
+  // Water closet: flush tank, elongated bowl, seat hinge line, flush button.
+  const tankH = Math.max(3, fd * 0.26);
+  ctx.fillStyle = "rgba(226, 232, 240, 0.20)";
+  ctx.strokeStyle = "#e0f2fe";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.rect(fw * 0.08, 0, fw * 0.84, tankH);
+  ctx.fill();
+  ctx.stroke();
+  const bowlCx = fw * 0.5;
+  const bowlCy = tankH + (fd - tankH) * 0.52;
+  const rx = fw * 0.33;
+  const ry = Math.max(2, (fd - tankH) * 0.44);
+  ctx.beginPath();
+  ctx.ellipse(bowlCx, bowlCy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(bowlCx, bowlCy + ry * 0.08, rx * 0.72, ry * 0.68, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // seat hinge line
+  ctx.beginPath();
+  ctx.moveTo(bowlCx - rx * 0.82, tankH + 1.5);
+  ctx.lineTo(bowlCx + rx * 0.82, tankH + 1.5);
+  ctx.stroke();
+  ctx.fillStyle = "#7dd3fc";
+  ctx.beginPath();
+  ctx.arc(fw * 0.5, tankH * 0.5, Math.max(1, fw * 0.06), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawVanity2D(fw, fd) {
+  // Vanity counter + recessed oval basin + faucet dot + mirror line on the plumbing wall.
+  ctx.fillStyle = "rgba(226, 232, 240, 0.16)";
+  ctx.strokeStyle = "#e0f2fe";
+  ctx.lineWidth = 1.25;
+  ctx.fillRect(0, 0, fw, fd);
+  ctx.strokeRect(0, 0, fw, fd);
+  const basinCx = fw * 0.5;
+  const basinCy = fd * 0.56;
+  const rx = fw * 0.30;
+  const ry = fd * 0.26;
+  ctx.beginPath();
+  ctx.ellipse(basinCx, basinCy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(7, 17, 31, 0.55)";
+  ctx.fill();
+  ctx.strokeStyle = "#7dd3fc";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(basinCx, basinCy, rx * 0.62, ry * 0.55, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // faucet dot + spout
+  ctx.fillStyle = "#38bdf8";
+  ctx.beginPath();
+  ctx.arc(basinCx, fd * 0.16, Math.max(1.4, fw * 0.045), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(basinCx, fd * 0.16);
+  ctx.lineTo(basinCx, fd * 0.34);
+  ctx.stroke();
+  ctx.setLineDash([3, 2]);
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.55)";
+  ctx.beginPath();
+  ctx.moveTo(fw * 0.12, 1.5);
+  ctx.lineTo(fw * 0.88, 1.5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawShower2D(fw, fd) {
+  // 3' x 3' glass shower enclosure: tray, glass double-line, floor hatching, drain cross, head.
+  ctx.fillStyle = "rgba(56, 189, 248, 0.07)";
+  ctx.fillRect(0, 0, fw, fd);
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 1.6;
+  ctx.strokeRect(0, 0, fw, fd);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(2.2, 2.2, Math.max(1, fw - 4.4), Math.max(1, fd - 4.4));
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, fw, fd);
+  ctx.clip();
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.30)";
+  for (let d = -fd; d < fw + fd; d += 7) {
+    ctx.beginPath();
+    ctx.moveTo(d, 0);
+    ctx.lineTo(d + fd, fd);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const dx = fw / 2;
+  const dy = fd / 2;
+  const s = Math.max(3, Math.min(fw, fd) * 0.1);
+  ctx.strokeStyle = "#e0f2fe";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(dx - s, dy);
+  ctx.lineTo(dx + s, dy);
+  ctx.moveTo(dx, dy - s);
+  ctx.lineTo(dx, dy + s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(dx, dy, s * 0.55, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#7dd3fc";
+  ctx.beginPath();
+  ctx.arc(fw * 0.5, Math.max(3, fd * 0.1), Math.max(1.8, Math.min(fw, fd) * 0.06), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBathSuite2D(fw, fd) {
+  // Legacy single-rect bathroom entry: lay out WC + vanity + shower inside the footprint.
+  drawFixtureBase(fw, fd);
+  const gap = Math.max(1.5, Math.min(fw, fd) * 0.05);
+  const innerD = fd - gap * 2;
+  const showerW = Math.min(fw * 0.4, innerD);
+  const wcW = Math.max(6, Math.min(fw * 0.3, innerD * 0.55));
+  const vanityW = Math.max(8, fw - showerW - wcW - gap * 3);
+  const vanityX = gap + wcW + gap;
+  ctx.save();
+  ctx.translate(gap, gap);
+  drawWc2D(wcW, innerD);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(vanityX, gap);
+  drawVanity2D(vanityW, innerD);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(vanityX + vanityW + gap, gap);
+  drawShower2D(Math.max(4, fw - vanityX - vanityW - gap * 2), innerD);
+  ctx.restore();
+}
+
+function draw2DFurniture(f, px, py, scale) {
+  const fw = f.w * scale;
+  const fd = f.d * scale;
+  if (fw < 0.5 || fd < 0.5) return;
+  ctx.save();
+  ctx.translate(px(f.x + f.w / 2), py(f.z + f.d / 2));
+  const rot = ((Number(f.rot) || 0) * Math.PI) / 180;
+  if (rot) ctx.rotate(rot);
+  ctx.translate(-fw / 2, -fd / 2);
+  drawFixtureBase(fw, fd);
+
+  const type = f.type;
+  if (type === "bed") {
     ctx.fillStyle = "rgba(248, 250, 252, 0.18)";
-    ctx.fillRect(fx + 3, fy + 3, fw - 6, Math.max(4, fd * 0.12));
-    ctx.strokeRect(fx + 4, fy + Math.max(6, fd * 0.14), fw * 0.41, fd * 0.2);
-    ctx.strokeRect(fx + fw * 0.52, fy + Math.max(6, fd * 0.14), fw * 0.41, fd * 0.2);
-  } else if (f.type === "sofa") {
+    ctx.fillRect(3, 3, fw - 6, Math.max(4, fd * 0.12));
+    ctx.strokeRect(4, Math.max(6, fd * 0.14), fw * 0.41, fd * 0.2);
+    ctx.strokeRect(fw * 0.52, Math.max(6, fd * 0.14), fw * 0.41, fd * 0.2);
+    ctx.save();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = "rgba(125, 211, 252, 0.45)";
+    ctx.beginPath();
+    ctx.moveTo(3, fd * 0.45);
+    ctx.lineTo(fw - 3, fd * 0.45);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === "sofa") {
     const arm = Math.max(3, Math.min(fw, fd) * 0.18);
-    ctx.strokeRect(fx, fy, fw, arm);
-    ctx.strokeRect(fx, fy, arm, fd);
-    ctx.strokeRect(fx + fw - arm, fy, arm, fd);
-  } else if (f.type === "dining") {
+    ctx.strokeRect(0, 0, fw, arm);
+    ctx.strokeRect(0, 0, arm, fd);
+    ctx.strokeRect(fw - arm, 0, arm, fd);
+    const seatW = fw - arm * 2;
+    for (let i = 1; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(arm + (seatW / 3) * i, arm);
+      ctx.lineTo(arm + (seatW / 3) * i, fd);
+      ctx.stroke();
+    }
+  } else if (type === "dining") {
     const chairs = Math.max(2, Math.round(fw / (2.2 * scale)));
     for (let i = 0; i < chairs; i++) {
-      const cx = fx + (i + 0.5) * (fw / chairs);
-      ctx.beginPath(); ctx.arc(cx, fy - 4, 3.2, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, fy + fd + 4, 3.2, 0, Math.PI * 2); ctx.stroke();
+      const chx = (i + 0.5) * (fw / chairs);
+      ctx.beginPath(); ctx.arc(chx, -4, 3.2, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(chx, fd + 4, 3.2, 0, Math.PI * 2); ctx.stroke();
     }
-  } else if (f.type === "kitchen") {
-    ctx.strokeRect(fx + fw * 0.1, fy + fd * 0.2, fw * 0.28, fd * 0.6);
-    const bx = fx + fw * 0.62, by = fy + fd * 0.3;
-    for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
-      ctx.beginPath(); ctx.arc(bx + c * 7, by + r * 7, 2.3, 0, Math.PI * 2); ctx.stroke();
+  } else if (type === "kitchen") {
+    ctx.strokeRect(fw * 0.1, fd * 0.2, fw * 0.28, fd * 0.6);
+    const bx = fw * 0.62;
+    const by = fd * 0.3;
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 2; c++) {
+        ctx.beginPath();
+        ctx.arc(bx + c * 7, by + r * 7, 2.3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
-  } else if (f.type === "bath") {
-    ctx.beginPath(); ctx.ellipse(fx + fw * 0.3, fy + fd * 0.5, Math.max(3, fw * 0.18), Math.max(4, fd * 0.28), 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeRect(fx + fw * 0.58, fy + fd * 0.18, fw * 0.32, fd * 0.64);
-  } else if (f.type === "desk") {
-    ctx.strokeRect(fx + fw * 0.25, fy + 3, fw * 0.5, 4);
-    ctx.beginPath(); ctx.arc(fx + fw * 0.5, fy + fd + 5, 4, 0, Math.PI * 2); ctx.stroke();
+  } else if (type === "wc") {
+    drawWc2D(fw, fd);
+  } else if (type === "vanity") {
+    drawVanity2D(fw, fd);
+  } else if (type === "shower") {
+    drawShower2D(fw, fd);
+  } else if (type === "bath") {
+    drawBathSuite2D(fw, fd);
+  } else if (type === "desk") {
+    ctx.strokeRect(fw * 0.25, 3, fw * 0.5, 4);
+    ctx.beginPath(); ctx.arc(fw * 0.5, fd + 5, 4, 0, Math.PI * 2); ctx.stroke();
+  } else if (type === "wardrobe") {
+    ctx.beginPath();
+    ctx.moveTo(fw / 2, 2);
+    ctx.lineTo(fw / 2, fd - 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(fw * 0.42, fd / 2, 1.6, 0, Math.PI * 2);
+    ctx.arc(fw * 0.58, fd / 2, 1.6, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (type === "planter") {
+    ctx.beginPath();
+    ctx.ellipse(fw / 2, fd / 2, fw * 0.42, fd * 0.42, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(fw / 2, fd / 2, fw * 0.22, fd * 0.22, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
+  ctx.restore();
 }
 
 function draw2D() {
@@ -131,7 +323,13 @@ function draw2D() {
   }
 
   if (state.showFurn) {
-    for (const f of PLAN.furniture || []) draw2DFurniture(f, px, py, scale);
+    for (const f of PLAN.furniture || []) {
+      try {
+        draw2DFurniture(f, px, py, scale);
+      } catch (err) {
+        console.warn("[cad-studio] 2D furniture skipped:", f && f.type, err);
+      }
+    }
   }
 
   for (const w of PLAN.walls || []) {
@@ -155,21 +353,38 @@ function draw2D() {
         else { ctx.moveTo(px(fixed), py(op.at)); ctx.lineTo(px(fixed), py(op.at + op.len)); }
         ctx.stroke();
       } else if (op.kind === "door") {
-        const r = op.len * scale, dir = op.swing || 1;
-        ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 1.4;
+        const r = op.len * scale;
+        const dir = op.swing === -1 ? -1 : 1;
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 1.4;
+        // Hinge sits on the opening's start jamb; the leaf is drawn fully open
+        // (perpendicular to the wall) and the dashed arc sweeps from the closed
+        // position along the wall to the open leaf tip.
+        let hx, hy, closedAngle, openAngle;
         if (horiz) {
-          const hx = px(op.at), hy = py(fixed);
-          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy + dir * r); ctx.stroke();
-          ctx.setLineDash([4, 3]); ctx.beginPath();
-          ctx.arc(hx, hy, r, dir > 0 ? 0 : -Math.PI / 2, dir > 0 ? Math.PI / 2 : 0); ctx.stroke();
-          ctx.setLineDash([]);
+          hx = px(op.at);
+          hy = py(fixed);
+          closedAngle = 0;
+          openAngle = (dir > 0 ? Math.PI : -Math.PI) / 2;
         } else {
-          const hx = px(fixed), hy = py(op.at);
-          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + dir * r, hy); ctx.stroke();
-          ctx.setLineDash([4, 3]); ctx.beginPath();
-          ctx.arc(hx, hy, r, dir > 0 ? 0 : Math.PI / 2, dir > 0 ? Math.PI / 2 : Math.PI); ctx.stroke();
-          ctx.setLineDash([]);
+          hx = px(fixed);
+          hy = py(op.at);
+          closedAngle = Math.PI / 2;
+          openAngle = dir > 0 ? 0 : Math.PI;
         }
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(hx + Math.cos(openAngle) * r, hy + Math.sin(openAngle) * r);
+        ctx.stroke();
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.arc(hx, hy, r, Math.min(closedAngle, openAngle), Math.max(closedAngle, openAngle));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#f59e0b";
+        ctx.beginPath();
+        ctx.arc(hx, hy, 1.7, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
   }
@@ -295,6 +510,64 @@ function addPart(group, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
   return m;
 }
 
+// ---- 3D architectural sanitary fixtures (local origin = fixture centre) ----
+
+function addWc3D(group, mats, ox, oz, w, d) {
+  const tankD = Math.max(0.35, d * 0.28);
+  addPart(group, new THREE.BoxGeometry(w * 0.92, 1.35, tankD), mats.ceramicMat, ox, 1.05, oz - d / 2 + tankD / 2);
+  addPart(group, new THREE.BoxGeometry(w * 0.6, 0.16, 0.07), mats.chromeMat, ox, 1.76, oz - d / 2 + tankD + 0.03);
+  const bowlR = w * 0.34;
+  const bowlD = Math.max(0.7, Math.min(d - tankD - 0.06, w * 0.92));
+  const bowl = addPart(
+    group,
+    new THREE.CylinderGeometry(bowlR, bowlR * 0.78, 0.74, 20),
+    mats.ceramicMat,
+    ox,
+    0.49,
+    oz - d / 2 + tankD + bowlD / 2,
+  );
+  bowl.scale.z = Math.max(0.6, bowlD / (bowlR * 2));
+  const seat = addPart(group, new THREE.TorusGeometry(bowlR * 0.92, 0.05, 8, 24), mats.chromeMat, ox, 0.88, oz - d / 2 + tankD + bowlD / 2);
+  seat.rotation.x = Math.PI / 2;
+  seat.scale.y = Math.max(0.6, bowlD / (bowlR * 2));
+  // seat hinge line
+  addPart(group, new THREE.BoxGeometry(w * 0.5, 0.06, 0.06), mats.chromeMat, ox, 0.9, oz - d / 2 + tankD + 0.04);
+}
+
+function addVanity3D(group, mats, ox, oz, w, d) {
+  const counterY = 2.35;
+  addPart(group, new THREE.BoxGeometry(w, 1.32, d * 0.86), mats.walnutMat, ox, counterY - 0.88, oz);
+  addPart(group, new THREE.BoxGeometry(w + 0.06, 0.16, d), mats.marbleMat, ox, counterY, oz);
+  addPart(
+    group,
+    new THREE.CylinderGeometry(Math.min(w, d) * 0.3, Math.min(w, d) * 0.25, 0.32, 18),
+    mats.ceramicMat,
+    ox,
+    counterY + 0.22,
+    oz + d * 0.04,
+  );
+  addPart(group, new THREE.CylinderGeometry(0.045, 0.045, 0.5, 8), mats.chromeMat, ox, counterY + 0.33, oz - d * 0.3);
+  addPart(group, new THREE.BoxGeometry(0.08, 0.08, 0.3), mats.chromeMat, ox, counterY + 0.55, oz - d * 0.18);
+  // backlit mirror on the plumbing wall
+  addPart(group, new THREE.BoxGeometry(w * 0.82, 2.25, 0.06), mats.mirrorMat, ox, 4.32, oz - d / 2 + 0.04);
+  addPart(group, new THREE.BoxGeometry(w * 0.86, 2.33, 0.02), mats.lampGlowMat, ox, 4.32, oz - d / 2 + 0.01);
+}
+
+function addShower3D(group, mats, ox, oz, w, d) {
+  addPart(group, new THREE.BoxGeometry(w, 0.14, d), mats.trayMat, ox, 0.07, oz);
+  addPart(group, new THREE.CylinderGeometry(0.17, 0.17, 0.035, 14), mats.chromeMat, ox, 0.16, oz);
+  // glass panels + dark anodized frames on the two open sides
+  addPart(group, new THREE.BoxGeometry(0.06, 6.5, d), mats.glassMat, ox + w / 2 - 0.05, 3.42, oz);
+  addPart(group, new THREE.BoxGeometry(w, 6.5, 0.06), mats.glassMat, ox, 3.42, oz + d / 2 - 0.05);
+  addPart(group, new THREE.BoxGeometry(0.1, 6.7, 0.1), mats.mullionMat, ox + w / 2 - 0.05, 3.42, oz - d / 2 + 0.05);
+  addPart(group, new THREE.BoxGeometry(0.1, 6.7, 0.1), mats.mullionMat, ox + w / 2 - 0.05, 3.42, oz + d / 2 - 0.05);
+  addPart(group, new THREE.BoxGeometry(0.1, 6.7, 0.1), mats.mullionMat, ox - w / 2 + 0.05, 3.42, oz + d / 2 - 0.05);
+  addPart(group, new THREE.BoxGeometry(w, 0.08, 0.08), mats.mullionMat, ox, 6.72, oz + d / 2 - 0.05);
+  // shower arm + rain head
+  addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.72, 8), mats.chromeMat, ox - w / 2 + 0.12, 6.5, oz - d / 2 + 0.12);
+  addPart(group, new THREE.CylinderGeometry(0.32, 0.28, 0.08, 16), mats.chromeMat, ox - w / 4, 6.14, oz - d / 2 + 0.12);
+}
+
 function createFurniture3D(f, cx, cz, sharedMats) {
   const group = new THREE.Group();
   const fw = Number(f.w) || 2, fd = Number(f.d) || 2, fh = Number(f.h) || 2.5;
@@ -388,14 +661,16 @@ function createFurniture3D(f, cx, cz, sharedMats) {
       addPart(group, new THREE.CylinderGeometry(0.07, 0.06, fh - 0.14, 8), darkGlassMat, lx, (fh - 0.14) / 2, lz);
     }
     addPart(group, new THREE.BoxGeometry(fw * 0.3, 0.12, fd * 0.42), walnutMat, -fw * 0.15, fh + 0.06, 0);
+  } else if (f.type === "wc") {
+    addWc3D(group, sharedMats, 0, 0, fw, fd);
+  } else if (f.type === "vanity") {
+    addVanity3D(group, sharedMats, 0, 0, fw, fd);
+  } else if (f.type === "shower") {
+    addShower3D(group, sharedMats, 0, 0, fw, fd);
   } else if (f.type === "bath") {
-    // Ceramic WC + floating walnut vanity with vessel sink + backlit mirror
-    addPart(group, new THREE.CylinderGeometry(0.62, 0.48, 1.35, 14), ceramicMat, -fw * 0.26, 0.68, 0.15);
-    addPart(group, new THREE.BoxGeometry(1.2, 1.5, 0.65), ceramicMat, -fw * 0.26, 1.35, -fd * 0.28);
-    addPart(group, new THREE.BoxGeometry(fw * 0.46, 1.45, fd * 0.72), walnutMat, fw * 0.24, 1.35, 0);
-    addPart(group, new THREE.BoxGeometry(fw * 0.48, 0.14, fd * 0.74), marbleMat, fw * 0.24, 2.12, 0);
-    addPart(group, new THREE.CylinderGeometry(0.48, 0.4, 0.35, 14), ceramicMat, fw * 0.24, 2.32, 0);
-    addPart(group, new THREE.BoxGeometry(fw * 0.42, 2.4, 0.08), chromeMat, fw * 0.24, 4.1, -fd * 0.34);
+    // Legacy single-rect plumbing bay: ceramic WC + floating vanity with mirror.
+    addWc3D(group, sharedMats, -fw * 0.26, 0, Math.min(fw * 0.42, 2.2), Math.min(fd * 0.92, 2.9));
+    addVanity3D(group, sharedMats, fw * 0.24, 0, Math.max(fw * 0.4, 1.6), Math.max(fd * 0.7, 1.2));
   } else if (f.type === "wardrobe") {
     addPart(group, new THREE.BoxGeometry(fw, fh, fd), oakMat, 0, fh / 2, 0);
     addPart(group, new THREE.BoxGeometry(0.05, fh * 0.92, 0.06), walnutMat, 0, fh / 2, fd / 2 + 0.02);
@@ -409,7 +684,33 @@ function createFurniture3D(f, cx, cz, sharedMats) {
     addPart(group, new THREE.BoxGeometry(fw, fh, fd), oakMat, 0, fh / 2, 0);
   }
 
-  group.position.set(f.x + fw / 2 - cx, 0.12, f.z + fd / 2 - cz);
+  let finalX = f.x + fw / 2;
+  let finalZ = f.z + fd / 2;
+
+  // Dynamic Invariant: sanitary fixture vs door-swing envelope (>= 3.0 ft clear).
+  const isSanitary = f.type === "wc" || f.type === "vanity" || f.type === "shower" || f.type === "bath";
+  if (isSanitary && PLAN && PLAN.walls) {
+    for (const w of PLAN.walls) {
+      for (const op of w.openings || []) {
+        if (op.kind !== "door") continue;
+        const horiz = Math.abs(w.z1 - w.z2) < 0.001;
+        const doorMidX = horiz ? op.at + op.len / 2 : w.x1;
+        const doorMidZ = horiz ? w.z1 : op.at + op.len / 2;
+        const dist = Math.hypot(finalX - doorMidX, finalZ - doorMidZ);
+        if (dist < 3.2) {
+          if (horiz) {
+            finalX += finalX > doorMidX ? 2.5 : -2.5;
+          } else {
+            finalZ += finalZ > doorMidZ ? 2.5 : -2.5;
+          }
+        }
+      }
+    }
+  }
+
+  const rot = ((Number(f.rot) || 0) * Math.PI) / 180;
+  if (rot) group.rotation.y = -rot;
+  group.position.set(finalX - cx, 0.12, finalZ - cz);
   return group;
 }
 
@@ -479,7 +780,7 @@ function init3D() {
 
   for (const r of PLAN.rooms || []) {
     const id = (r.id || r.name || "").toLowerCase();
-    const isTile = /bath|kitchen|foyer|servant/.test(id);
+    const isTile = /bath|kitchen|foyer|servant|wc|toilet|wash|powder|shower|utility/.test(id);
     const isDeck = /balcony|deck|porch/.test(id);
     const mat = new THREE.MeshStandardMaterial({
       color: isDeck ? 0xd6bfa9 : isTile ? 0xe5e7eb : 0xf3e5d3,
@@ -518,6 +819,7 @@ function init3D() {
   const mullionMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 });
   const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.1 });
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x7c4d2b, map: woodFloorTex, roughness: 0.5 });
+  const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x4b3222, map: woodFloorTex, roughness: 0.55 });
   const brassMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.25 });
   const wallH = 9.0;
 
@@ -562,16 +864,36 @@ function init3D() {
         pane.position.set((horiz ? mid : fixed) - cx, 5.12, (horiz ? fixed : mid) - cz);
         scene.add(pane); wallMeshes.push({ mesh: pane, fullH: 3.85, fullY: 5.12 });
       } else if (op.kind === "door") {
+        // Lintel above door
         addWallBlock(horiz ? mid : fixed, 8.12, horiz ? fixed : mid, horiz ? op.len : w.t, 2.0, horiz ? w.t : op.len, mat);
-        const dir = op.swing || 1;
-        const leaf = new THREE.Mesh(new THREE.BoxGeometry(horiz ? 0.18 : op.len, 7.0, horiz ? op.len : 0.18), doorMat);
-        const lx = horiz ? op.at - cx : fixed + (dir * op.len) / 2 - cx;
-        const lz = horiz ? fixed + (dir * op.len) / 2 - cz : op.at - cz;
-        leaf.position.set(lx, 3.62, lz); leaf.castShadow = true;
-        scene.add(leaf); wallMeshes.push({ mesh: leaf, fullH: 7.0, fullY: 3.62 });
-        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.28), brassMat);
-        handle.position.set(horiz ? lx : lx + (dir * op.len) * 0.35, 3.4, horiz ? lz + (dir * op.len) * 0.35 : lz);
-        scene.add(handle); wallMeshes.push({ mesh: handle, fullH: 0.12, fullY: 3.4 });
+        // Architectural walnut door jamb frames
+        const frameW = 0.14;
+        addWallBlock(horiz ? op.at + frameW / 2 : fixed, 4.12, horiz ? fixed : op.at + frameW / 2, horiz ? frameW : w.t + 0.04, 7.0, horiz ? w.t + 0.04 : frameW, doorFrameMat);
+        addWallBlock(horiz ? op.at + op.len - frameW / 2 : fixed, 4.12, horiz ? fixed : op.at + op.len - frameW / 2, horiz ? frameW : w.t + 0.04, 7.0, horiz ? w.t + 0.04 : frameW, doorFrameMat);
+
+        // Door leaf on a hinge pivot at the jamb, 22 degrees ajar (0.38 rad).
+        // The pivot inherits the opening orientation, so the leaf and its handle
+        // stay geometrically consistent for horizontal and vertical walls.
+        const dir = op.swing === -1 ? -1 : 1;
+        const ajarAngle = 0.38 * dir;
+        const leafLen = Math.max(0.6, op.len - 0.16);
+        const hinge = new THREE.Group();
+        hinge.position.set(
+          (horiz ? op.at + 0.08 : fixed) - cx,
+          3.58,
+          (horiz ? fixed : op.at + 0.08) - cz,
+        );
+        hinge.rotation.y = horiz ? -ajarAngle : -Math.PI / 2 + ajarAngle;
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafLen, 6.9, 0.16), doorMat);
+        leaf.position.set(leafLen / 2, 0, 0);
+        leaf.castShadow = true;
+        leaf.receiveShadow = true;
+        hinge.add(leaf);
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.24), brassMat);
+        handle.position.set(leafLen * 0.88, -0.18, 0.14);
+        hinge.add(handle);
+        scene.add(hinge);
+        wallMeshes.push({ mesh: leaf, fullH: 6.9, fullY: 3.58 });
       } else if (op.kind === "open") {
         addWallBlock(horiz ? mid : fixed, 8.12, horiz ? fixed : mid, horiz ? op.len : w.t, 2.0, horiz ? w.t : op.len, mat);
       }
@@ -593,12 +915,20 @@ function init3D() {
     darkGlassMat: new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.4, roughness: 0.15 }),
     ceramicMat: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.18 }),
     lampGlowMat: new THREE.MeshStandardMaterial({ color: 0xfff3d6, emissive: 0xffd28a, emissiveIntensity: 0.85, roughness: 0.4 }),
+    mirrorMat: new THREE.MeshStandardMaterial({ color: 0xbcd4e8, metalness: 0.95, roughness: 0.05 }),
+    trayMat: new THREE.MeshStandardMaterial({ color: 0xdfe5ec, map: stoneTileTex, roughness: 0.35 }),
+    mullionMat,
+    glassMat,
   };
 
   for (const f of PLAN.furniture || []) {
-    const group = createFurniture3D(f, cx, cz, sharedMats);
-    scene.add(group);
-    furnMeshes.push(group);
+    try {
+      const group = createFurniture3D(f, cx, cz, sharedMats);
+      scene.add(group);
+      furnMeshes.push(group);
+    } catch (err) {
+      console.warn("[cad-studio] furniture skipped:", f && f.type, err);
+    }
   }
 
   function animate() {

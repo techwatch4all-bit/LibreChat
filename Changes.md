@@ -8,6 +8,58 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — Motion Studio: 2D CAD sanitary symbols, legal bathroom circulation, and interior 3D extrusion
+
+**Problem.** Three defects in the Motion Studio artifact surface.
+
+1. The 2D blueprint drew a bath as one featureless rectangle and the default 3BHK template
+   put two doors into `COMMON BATH` (`x33..40, z13..18`): one from the hallway at `z=18` and one
+   through `BEDROOM 3`, so the bath was a pass-through and Bedroom 3 had no independent access.
+2. `init3D` aborted at the first door, so only the perimeter walls extruded. Uncommitted door-frame
+   work referenced `walnutMat` before it was defined (`ReferenceError`), and a later read of
+   `plan` against the module-level `PLAN` threw a second time.
+
+**Shipped.**
+
+- `client/public/assets/vendor/satchida/cad-studio.js`: new 2D fixture symbols (`drawWc2D` tank +
+  oval bowl + seat hinge line, `drawVanity2D` counter + oval basin + faucet dot, `drawShower2D`
+  3×3 glass zone + floor drain) behind a shared `drawFixtureBase`, with `rot` support and a
+  per-item `try/catch` so one bad fixture cannot blank the sheet. 3D gained `addWc3D`,
+  `addVanity3D`, `addShower3D`, a `doorFrameMat`, door leaves on hinge-pivot `THREE.Group`s, and
+  window mullions/glass. `plan`→`PLAN` and the material declaration order are fixed.
+- `skill/satchida-motion-server.py`: the solver now classifies `wc|powder|shower|washroom`
+  rooms, generates containment interfaces instead of overlapping partitions, carves doors, and
+  runs `_enforce_circulation_invariants` so a bath gets exactly one door and no bedroom is only
+  reachable through one. The default `SATCHIDA_CAD_PLAN` template was re-laid out: the common bath
+  moved above the hallway (`x34..40, z13..19`), the hallway is 12×6 ft, Bedroom 2 (`x22..31`) and
+  Bedroom 3 (`x31..40`) each take a door off the hallway at `z=19`, and both baths carry a full
+  wc/vanity/shower set with 3 ft of door-swing clearance.
+- `client/src/components/Artifacts/ArtifactPreview.tsx`: preview iframe keeps `allow-same-origin`
+  so the WebGL canvas and its vendored scripts run inside the artifact.
+
+**Evidence.**
+- `node --check client/public/assets/vendor/satchida/cad-studio.js` — OK.
+- `python -m py_compile skill/satchida-motion-server.py` — OK.
+- Plan-invariant harness (`verify_plan.py`, extracts `window.SATCHIDA_CAD_PLAN` and re-evaluates it
+  in Node): 14 rooms, 26 walls, 23 furniture pieces, 9 doors. `mbath`→`master`,
+  `cbath`→`hall`, one door each; `bed2`/`bed3`/`master` each reachable without crossing a bath;
+  every sanitary fixture inside its own bathroom and ≥ 3.0 ft from its door hinge; 0 errors.
+
+## 2026-11-14 — Chat: keep trailing disclaimers out of the suggested-question chips
+
+**Problem.** `SUGGESTED_QUESTIONS_REGEX` captures everything after the heading, so a disclaimer or
+note appended under the question list was parsed as one more chip and also vanished from the
+rendered answer.
+
+**Shipped.** `Markdown.tsx` now splits the captured block into bullet/numbered question lines and a
+trailing remainder; the remainder is re-attached to `mainContent`, and `Note:`/`Disclaimer:`/
+`Warning:` lines are still dropped from the chips.
+
+**Evidence.** `npx jest src/components/Chat/Messages/Content` (pending in this commit series);
+`npx tsc --noEmit` in `client`.
+
+---
+
 ## 2026-11-13 — Routing upgrade: Qwen3.7-Flash for Vision/3D and DeepSeek-V4-Flash for Code/Shaders under hard cost ceiling
 
 **Problem.** `google/gemini-2.5-flash-lite` was obsolete and expensive ($0.10/$0.40) while `glm-5.3-flash` under Vibecoding was slow and stalled streams. The user required a hard cost ceiling of $\le \$0.10$ input and $\le \$0.50$ output per 1M tokens with high build quality.

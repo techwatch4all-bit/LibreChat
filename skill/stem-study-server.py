@@ -12,6 +12,7 @@ import os
 import re
 import io
 import base64
+import subprocess
 import urllib.request
 import urllib.parse
 from mcp.server.mcpserver import MCPServer
@@ -574,6 +575,206 @@ def search_curated_learning_videos(topic: str, provider: str = "all", max_result
         }, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e), "topic": topic})
+
+@mcp.tool()
+def solve_pedagogical_algebra(expression: str, operation: str = "solve") -> str:
+    """
+    Solves or simplifies algebra equations using Google's pedagogical mathsteps engine.
+    Returns step-by-step human tutor transformations (e.g. 'ADD_TO_BOTH_SIDES', 'DIVIDE_FROM_BOTH_SIDES')
+    with KaTeX formatting for students.
+    operation options:
+      - 'solve': Solves linear/algebraic equations like '2x + 3 = 11' or '3*x - 7 = 14'
+      - 'simplify': Combines like terms and simplifies expressions like '2x + 3x + 5'
+    """
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "mathsteps-eval.js")
+        proc = subprocess.run(
+            ["node", script_path, operation, expression],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if proc.returncode == 0:
+            data = json.loads(proc.stdout)
+            # Annotate with readable KaTeX descriptions
+            steps = data.get("steps", [])
+            annotated_steps = []
+            for idx, s in enumerate(steps, 1):
+                ctype = s.get("changeType", "").replace("_", " ").title()
+                eq_after = s.get("newEquation") or s.get("newNode") or ""
+                annotated_steps.append({
+                    "step_number": idx,
+                    "action": ctype,
+                    "result_equation": eq_after,
+                    "katex": f"$${eq_after}$$"
+                })
+            return json.dumps({
+                "status": "success",
+                "engine": "google-mathsteps",
+                "input": expression,
+                "operation": operation,
+                "step_count": len(annotated_steps),
+                "steps": annotated_steps
+            }, indent=2)
+        else:
+            return json.dumps({"status": "error", "message": proc.stderr or "Execution failed"})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e), "input": expression})
+
+@mcp.tool()
+def get_interactive_stem_simulation(topic: str) -> str:
+    """
+    Retrieves verified offline PhET interactive HTML5 simulation labs for physical and chemical concepts.
+    Returns the local path and responsive Artifact embed link for students to run in-browser offline.
+    Supported core topics:
+      - 'pendulum' (simple harmonic motion, period vs length/gravity)
+      - 'circuit' (Ohm's law, series/parallel DC circuits, lightbulbs, resistors)
+      - 'chemical_equations' (conservation of mass, balancing synthesis/combustion)
+      - 'projectile_motion' (kinematics, velocity vectors, air resistance, launch angles)
+      - 'wave' (transverse waves on a string, frequency, amplitude, damping, tension)
+      - 'ohms_law' (V = IR voltage, current, resistance relationship)
+      - 'forces_motion' (Newton's laws, net force, friction, acceleration)
+      - 'energy_skate_park' (kinetic and potential energy conservation, mechanical energy)
+    """
+    sim_catalog = {
+        "pendulum": {
+            "title": "Pendulum Lab",
+            "curriculum": "Physics (Class 9-12 / IGCSE / IB): Periodic Motion & Gravity",
+            "file": "pendulum-lab.html"
+        },
+        "circuit": {
+            "title": "Circuit Construction Kit: DC",
+            "curriculum": "Physics / Electronics: DC Circuits, Switches, Resistors & Ammeters",
+            "file": "circuit-construction-kit-dc.html"
+        },
+        "chemical_equations": {
+            "title": "Balancing Chemical Equations Lab",
+            "curriculum": "Chemistry (Class 8-12): Mass Conservation & Stoichiometry",
+            "file": "balancing-chemical-equations.html"
+        },
+        "projectile_motion": {
+            "title": "Projectile Motion Lab",
+            "curriculum": "Physics Mechanics: 2D Kinematics, Velocity Vectors & Trajectories",
+            "file": "projectile-motion.html"
+        },
+        "wave": {
+            "title": "Wave on a String Lab",
+            "curriculum": "Physics Waves: Frequency, Amplitude, Damping & Wave Speed",
+            "file": "wave-on-a-string.html"
+        },
+        "ohms_law": {
+            "title": "Ohm's Law Interactive Lab",
+            "curriculum": "Physics / Basic Electrical: V = I * R Proportionality",
+            "file": "ohms-law.html"
+        },
+        "forces_motion": {
+            "title": "Forces and Motion: Basics",
+            "curriculum": "Physics Mechanics: Newton's Laws of Motion & Friction",
+            "file": "forces-and-motion-basics.html"
+        },
+        "energy_skate_park": {
+            "title": "Energy Skate Park: Basics",
+            "curriculum": "Physics: Kinetic & Gravitational Potential Energy Conservation",
+            "file": "energy-skate-park-basics.html"
+        }
+    }
+    
+    t = topic.lower().strip()
+    matched_key = None
+    for k in sim_catalog:
+        if k in t or t in k:
+            matched_key = k
+            break
+            
+    if not matched_key:
+        if "gravity" in t or "oscillation" in t: matched_key = "pendulum"
+        elif "current" in t or "resistor" in t: matched_key = "ohms_law"
+        elif "reaction" in t or "stoichiometry" in t: matched_key = "chemical_equations"
+        elif "trajectory" in t or "cannon" in t: matched_key = "projectile_motion"
+        elif "frequency" in t or "harmonics" in t: matched_key = "wave"
+        elif "friction" in t or "newton" in t: matched_key = "forces_motion"
+        elif "kinetic" in t or "potential" in t: matched_key = "energy_skate_park"
+        
+    if matched_key:
+        sim = sim_catalog[matched_key]
+        sim_url = f"/assets/study/sims/{sim['file']}"
+        artifact_embed = f'<iframe src="{sim_url}" width="100%" height="600" frameborder="0" allowfullscreen></iframe>'
+        return json.dumps({
+            "status": "success",
+            "found": True,
+            "title": sim["title"],
+            "curriculum": sim["curriculum"],
+            "sim_url": sim_url,
+            "offline_ready": True,
+            "embed_code": artifact_embed,
+            "direct_link": f"[{sim['title']} (Interactive Offline Lab)]({sim_url})"
+        }, indent=2)
+    else:
+        return json.dumps({
+            "status": "not_found",
+            "found": False,
+            "query": topic,
+            "available_simulations": list(sim_catalog.keys())
+        }, indent=2)
+
+@mcp.tool()
+def query_local_zim_library(query: str, zim_filename: str = None) -> str:
+    """
+    Searches an offline Kiwix ZIM archive (Wikipedia, WikiMed, Wiktionary) if downloaded to the tenant machine.
+    Scans the default directory 'D:/LAN-AI-Infra/ZIM-Library/' or 'C:/LAN-AI-Infra/ZIM-Library/'.
+    Zero cloud dependencies. If no ZIM files are stored locally, returns a helpful notice.
+    """
+    try:
+        import libzim
+        zim_dirs = ["D:\\LAN-AI-Infra\\ZIM-Library", "C:\\LAN-AI-Infra\\ZIM-Library", "D:\\LAN-AI-Infra\\School\\ZIM"]
+        zim_files = []
+        for zd in zim_dirs:
+            if os.path.exists(zd):
+                for f in os.listdir(zd):
+                    if f.endswith(".zim"):
+                        zim_files.append(os.path.join(zd, f))
+                        
+        if not zim_files:
+            return json.dumps({
+                "status": "not_configured",
+                "message": "No local .zim archives found. To enable instant offline Wikipedia/Reference lookup, copy your .zim archive to 'D:\\LAN-AI-Infra\\ZIM-Library\\'."
+            })
+            
+        target_zim = zim_files[0]
+        if zim_filename:
+            for zf in zim_files:
+                if zim_filename.lower() in zf.lower():
+                    target_zim = zf
+                    break
+                    
+        archive = libzim.Archive(target_zim)
+        searcher = libzim.Searcher(archive)
+        q = libzim.Query().set_query(query)
+        search = searcher.search(q)
+        results_count = search.get_estimated_matches()
+        
+        results = []
+        # Get first 3 hits
+        results_iter = search.get_results(0, min(3, results_count))
+        for res in results_iter:
+            entry = archive.get_entry_by_path(res.path)
+            item = entry.get_item()
+            content = bytes(item.get_data()).decode("utf-8", errors="ignore")[:600]
+            clean_snippet = re.sub(r"<[^>]+>", " ", content).strip()
+            results.append({
+                "title": res.title,
+                "path": res.path,
+                "snippet": clean_snippet[:300] + "..."
+            })
+            
+        return json.dumps({
+            "status": "success",
+            "zim_file": os.path.basename(target_zim),
+            "estimated_matches": results_count,
+            "results": results
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e), "query": query})
 
 if __name__ == "__main__":
     mcp.run()

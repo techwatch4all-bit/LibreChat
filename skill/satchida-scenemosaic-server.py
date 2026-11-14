@@ -13,14 +13,16 @@ from mcp.server.mcpserver import MCPServer
 mcp = MCPServer("satchida-scenemosaic")
 
 DEFAULT_SCANDINAVIAN_LIVING_OBJECTS = [
-    {"id": "sofa_1", "name": "3-Seat Nordic Fabric Sofa", "type": "sofa", "x": 5.2, "z": 0.6, "w": 8.0, "d": 3.2, "h": 2.8, "wall_attach": "north", "yaw_deg": 0, "color": "#8c9294"},
-    {"id": "coffee_1", "name": "Solid Block Oak Coffee Table", "type": "coffee_table", "x": 6.8, "z": 5.2, "w": 4.8, "d": 2.4, "h": 1.4, "yaw_deg": 0, "color": "#b88b5c"},
-    {"id": "armchair_left", "name": "Scandinavian Oak Armchair", "type": "armchair", "x": 2.4, "z": 4.0, "w": 2.8, "d": 2.8, "h": 2.7, "yaw_deg": 45, "color": "#b88b5c"},
-    {"id": "armchair_right", "name": "Cognac Leather Sling Lounge Chair", "type": "armchair", "x": 12.6, "z": 4.0, "w": 2.8, "d": 2.8, "h": 2.7, "yaw_deg": -45, "color": "#a05a2c"},
-    {"id": "pouf_1", "name": "Stitched Leather Pouf (Left)", "type": "pouf", "x": 6.0, "z": 8.8, "w": 1.8, "d": 1.8, "h": 1.4, "yaw_deg": 0, "color": "#945328"},
-    {"id": "pouf_2", "name": "Stitched Leather Pouf (Right)", "type": "pouf", "x": 8.6, "z": 8.8, "w": 1.8, "d": 1.8, "h": 1.4, "yaw_deg": 0, "color": "#945328"},
-    {"id": "lamp_1", "name": "Cantilever Arched Brass Floor Lamp", "type": "lamp", "x": 11.6, "z": 0.8, "w": 1.4, "d": 1.4, "h": 5.8, "yaw_deg": 0, "color": "#d4af37"},
-    {"id": "plant_1", "name": "Multi-Stem Fiddle Leaf Fig Tree", "type": "planter", "x": 14.2, "z": 1.2, "w": 2.0, "d": 2.0, "h": 4.8, "wall_attach": "east", "yaw_deg": 0, "color": "#2d5a27"},
+    {"id": "sofa_1", "name": "3-Seat Nordic Fabric Sofa", "type": "sofa", "x": 4.1, "z": 0.6, "w": 7.8, "d": 3.2, "h": 2.8, "wall_attach": "north", "yaw_deg": 0, "color": "#7c8286"},
+    {"id": "coffee_1", "name": "Solid Block Oak Coffee Table", "type": "coffee_table", "x": 5.8, "z": 5.2, "w": 4.4, "d": 2.2, "h": 1.3, "yaw_deg": 0, "color": "#b88b5c"},
+    {"id": "pouf_1", "name": "Stitched Cognac Pouf (Left)", "type": "pouf", "x": 6.0, "z": 8.4, "w": 1.6, "d": 1.6, "h": 1.3, "yaw_deg": 180, "color": "#9b5a2b"},
+    {"id": "pouf_2", "name": "Stitched Cognac Pouf (Right)", "type": "pouf", "x": 8.4, "z": 8.4, "w": 1.6, "d": 1.6, "h": 1.3, "yaw_deg": 180, "color": "#9b5a2b"},
+    {"id": "armchair_left", "name": "Scandinavian Oak Low Armchair", "type": "armchair", "x": 1.8, "z": 4.8, "w": 2.6, "d": 2.6, "h": 2.5, "yaw_deg": 45, "color": "#c8b097"},
+    {"id": "armchair_right_1", "name": "Cognac Leather Sling Lounge Chair 1", "type": "armchair", "x": 12.2, "z": 4.2, "w": 2.6, "d": 2.6, "h": 2.6, "yaw_deg": -55, "color": "#8a4b29"},
+    {"id": "armchair_right_2", "name": "Cognac Leather Sling Lounge Chair 2", "type": "armchair", "x": 12.2, "z": 7.4, "w": 2.6, "d": 2.6, "h": 2.6, "yaw_deg": -75, "color": "#8a4b29"},
+    {"id": "lamp_1", "name": "Cantilever Arched Brass Floor Lamp", "type": "lamp", "x": 2.2, "z": 0.8, "w": 1.2, "d": 1.2, "h": 6.8, "yaw_deg": 25, "color": "#d4af37"},
+    {"id": "plant_1", "name": "Architectural Fiddle Leaf Fig Planter", "type": "planter", "x": 13.6, "z": 1.0, "w": 1.8, "d": 1.8, "h": 4.8, "wall_attach": "east", "yaw_deg": 0, "color": "#244a2b"},
+    {"id": "table_side", "name": "Natural Oak Pedestal Side Table", "type": "side_table", "x": 13.6, "z": 3.2, "w": 1.2, "d": 1.2, "h": 1.6, "yaw_deg": 0, "color": "#b88b5c"},
 ]
 
 DEFAULT_OBJECTS = [
@@ -231,12 +233,19 @@ def _resolve_containment_and_collisions(objects: list[dict], room_w: float, room
                     ot["z"] = oz
                     ot["yaw_deg"] = 180.0
 
-        # Place Floor Lamp at Sofa corner
+        # Place Floor Lamp at Sofa corner with guaranteed seating clearance
         if lamps:
             lp = lamps[0]
-            lp["x"] = round(max(margin + 0.2, sofa["x"] - lp["w"] - 0.4), 2)
+            lp["x"] = round(max(margin + 0.2, sofa["x"] - lp["w"] - 0.6), 2)
             lp["z"] = round(sofa["z"] + 0.1, 2)
-            lp["yaw_deg"] = 0.0
+            lp["yaw_deg"] = 25.0
+
+            # Enforce minimum 3.0ft clearance between lamps and any seating to prevent fixture-in-chair collisions
+            for seat in armchairs:
+                dist_x = abs((lp["x"] + lp["w"]/2.0) - (seat["x"] + seat["w"]/2.0))
+                dist_z = abs((lp["z"] + lp["d"]/2.0) - (seat["z"] + seat["d"]/2.0))
+                if dist_x < 3.0 and dist_z < 3.2:
+                    seat["z"] = round(max(seat["z"], lp["z"] + lp["d"] + 2.8), 2)
 
         # Place Side Table at opposite Sofa flank
         if side_tables:

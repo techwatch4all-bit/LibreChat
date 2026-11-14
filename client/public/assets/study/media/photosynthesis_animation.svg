@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%" style="background: linear-gradient(180deg, #0b1329 0%, #111f3d 60%, #1e130c 100%); border-radius: 14px; font-family: system-ui, -apple-system, sans-serif;">
+  <defs>
+    <style>
+      @keyframes sunPulse {
+        0%, 100% { transform: scale(1); opacity: 0.95; }
+        50% { transform: scale(1.06); opacity: 1; filter: drop-shadow(0 0 25px rgba(251, 191, 36, 0.8)); }
+      }
+      @keyframes rayFlow {
+        0% { stroke-dashoffset: 60; opacity: 0.3; }
+        50% { opacity: 1; }
+        100% { stroke-dashoffset: 0; opacity: 0.3; }
+      }
+      @keyframes waterFlow {
+        0% { stroke-dashoffset: 80; opacity: 0.4; }
+        50% { opacity: 1; }
+        100% { stroke-dashoffset: 0; opacity: 0.4; }
+      }
+      @keyframes gasFloatUp {
+        0% { transform: translateY(0); opacity: 0; }
+        30% { opacity: 0.9; }
+        80% { opacity: 0.9; }
+        100% { transform: translateY(-45px); opacity: 0; }
+      }
+      @keyframes gasDriftIn {
+        0% { transform: translateX(0); opacity: 0; }
+        30% { opacity: 0.85; }
+        80% { opacity: 0.85; }
+        100% { transform: translateX(-40px); opacity: 0; }
+      }
+      .sun-core { animation: sunPulse 4s ease-in-out infinite; transform-origin: 120px 100px; }
+      .sun-ray { stroke-dasharray: 12 8; animation: rayFlow 2.5s linear infinite; }
+      .water-path { stroke-dasharray: 10 6; animation: waterFlow 2s linear infinite; }
+      .o2-bubble { animation: gasFloatUp 3s ease-out infinite; }
+      .co2-bubble { animation: gasDriftIn 3.5s ease-in infinite; }
+    </style>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="60%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="60%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="soilGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3d2314"/>
+      <stop offset="100%" stop-color="#1c0f08"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title Badge -->
+  <rect x="250" y="16" width="300" height="36" rx="18" fill="rgba(16, 185, 129, 0.15)" stroke="rgba(52, 211, 153, 0.4)" stroke-width="1.2"/>
+  <text x="400" y="40" fill="#6ee7b7" font-size="14" font-weight="700" text-anchor="middle" letter-spacing="0.5">PHOTOSYNTHESIS ENGINE (ENGLISH)</text>
+
+  <!-- Sun System -->
+  <g class="sun-core">
+    <circle cx="120" cy="100" r="54" fill="url(#sunGrad)" filter="drop-shadow(0 0 18px rgba(245, 158, 11, 0.6))"/>
+    <circle cx="120" cy="100" r="42" fill="#fef3c7"/>
+    <text x="120" y="96" fill="#78350f" font-size="12" font-weight="800" text-anchor="middle">SUNLIGHT</text>
+    <text x="120" y="112" fill="#92400e" font-size="10" font-weight="600" text-anchor="middle">Light Energy (Photons)</text>
+  </g>
+
+  <!-- Sunlight Beams to Leaf -->
+  <line x1="170" y1="130" x2="350" y2="240" stroke="#fcd34d" stroke-width="3.5" stroke-linecap="round" class="sun-ray"/>
+  <line x1="185" y1="110" x2="380" y2="215" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" class="sun-ray" style="animation-delay: -0.8s;"/>
+  <line x1="150" y1="150" x2="320" y2="265" stroke="#fef08a" stroke-width="2.5" stroke-linecap="round" class="sun-ray" style="animation-delay: -1.4s;"/>
+
+  <!-- Soil Ground -->
+  <rect x="0" y="410" width="800" height="90" fill="url(#soilGrad)"/>
+  <line x1="0" y1="410" x2="800" y2="410" stroke="#5c3822" stroke-width="2.5"/>
+  <text x="100" y="450" fill="#a8714e" font-size="13" font-weight="700">SOIL &amp; ROOTS LAYER</text>
+
+  <!-- Root System -->
+  <path d="M400 410 Q380 435 340 455 M400 410 Q410 445 440 465 M400 410 Q395 450 390 480 M340 455 Q320 465 300 475" stroke="#854d0e" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Water Absorption Indicators -->
+  <path d="M300 475 Q350 440 400 410" stroke="#38bdf8" stroke-width="3" fill="none" class="water-path"/>
+  <text x="240" y="460" fill="#38bdf8" font-size="12" font-weight="700">Water (H₂O) from Soil</text>
+
+  <!-- Main Plant Stem -->
+  <path d="M400 410 Q398 320 400 220" stroke="#059669" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <!-- Water upward flow inside stem -->
+  <path d="M400 410 Q398 320 400 220" stroke="#7dd3fc" stroke-width="2.5" fill="none" class="water-path"/>
+
+  <!-- Main Focal Leaf (Microscopic Factory View) -->
+  <g transform="translate(400, 240)">
+    <path d="M0 0 C60 -90 190 -80 230 -10 C210 70 80 80 0 0 Z" fill="url(#leafGrad)" stroke="#047857" stroke-width="3" filter="drop-shadow(0 10px 18px rgba(0,0,0,0.4))"/>
+    <!-- Leaf Central Vein -->
+    <path d="M0 0 Q110 -15 220 -8" stroke="#a7f3d0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 -6 Q100 -40 140 -50" stroke="#a7f3d0" stroke-width="1.8" fill="none" opacity="0.8"/>
+    <path d="M80 0 Q130 35 170 42" stroke="#a7f3d0" stroke-width="1.8" fill="none" opacity="0.8"/>
+    <path d="M130 -8 Q165 -35 195 -38" stroke="#a7f3d0" stroke-width="1.5" fill="none" opacity="0.7"/>
+
+    <!-- Reaction Callout Inside Leaf -->
+    <rect x="70" y="-35" width="130" height="52" rx="8" fill="rgba(6, 78, 59, 0.85)" stroke="#34d399" stroke-width="1.2"/>
+    <text x="135" y="-18" fill="#a7f3d0" font-size="11" font-weight="800" text-anchor="middle">CHLOROPLAST</text>
+    <text x="135" y="-3" fill="#ffffff" font-size="9.5" font-weight="600" text-anchor="middle">Traps light energy</text>
+    <text x="135" y="10" fill="#fef08a" font-size="9" font-weight="700" text-anchor="middle">Glucose (C₆H₁₂O₆) Made</text>
+  </g>
+
+  <!-- Left Supporting Leaf -->
+  <g transform="translate(398, 310)">
+    <path d="M0 0 C-40 -50 -130 -40 -160 0 C-140 45 -50 45 0 0 Z" fill="url(#leafGrad)" stroke="#047857" stroke-width="2.5" opacity="0.95"/>
+    <path d="M0 0 Q-80 -8 -150 0" stroke="#a7f3d0" stroke-width="2.5" fill="none"/>
+  </g>
+
+  <!-- Incoming Carbon Dioxide (CO2) from Atmosphere -->
+  <g class="co2-bubble" style="transform-origin: 700px 220px;">
+    <rect x="630" y="200" width="130" height="38" rx="19" fill="rgba(148, 163, 184, 0.2)" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="695" y="224" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Carbon Dioxide (CO₂)</text>
+    <!-- Arrow pointing left into leaf -->
+    <path d="M625 219 L585 219 M595 212 L585 219 L595 226" stroke="#cbd5e1" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Outgoing Pure Oxygen (O2) Released into Atmosphere -->
+  <g class="o2-bubble" style="transform-origin: 470px 140px;">
+    <rect x="430" y="110" width="140" height="38" rx="19" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="500" y="134" fill="#bae6fd" font-size="12" font-weight="800" text-anchor="middle">Oxygen (O₂) Released ↑</text>
+    <!-- Arrow pointing up -->
+    <path d="M500 105 L500 75 M493 85 L500 75 L507 85" stroke="#38bdf8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Chemical Equation Footer Ribbon -->
+  <g transform="translate(100, 360)">
+    <rect x="0" y="0" width="600" height="34" rx="8" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="300" y="22" fill="#f8fafc" font-size="12.5" font-weight="600" text-anchor="middle">
+      <tspan fill="#38bdf8" font-weight="700">6 H₂O (Water)</tspan> + 
+      <tspan fill="#cbd5e1" font-weight="700">6 CO₂ (Carbon Dioxide)</tspan> + 
+      <tspan fill="#fcd34d" font-weight="700">Light</tspan> 
+      <tspan fill="#94a3b8">⟶</tspan> 
+      <tspan fill="#fef08a" font-weight="700">C₆H₁₂O₆ (Glucose Sugar)</tspan> + 
+      <tspan fill="#67e8f9" font-weight="700">6 O₂ (Oxygen)</tspan>
+    </text>
+  </g>
+</svg>

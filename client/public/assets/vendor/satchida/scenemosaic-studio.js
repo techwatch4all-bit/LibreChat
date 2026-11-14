@@ -346,23 +346,33 @@
     });
 
     if (t === 'sofa' || t === 'couch') {
-      addMesh(THREE, group, softBox(THREE, w - 0.2, h * 0.16, d * 0.84, 0.03), mats.darkWood, 0, h * 0.08, 0);
-      addMesh(THREE, group, softBox(THREE, w, h * 0.36, d * 0.86, 0.06), fabricMat, 0, h * 0.32, 0);
-      addMesh(THREE, group, softBox(THREE, w, h * 0.58, d * 0.2, 0.07), fabricMat, 0, h * 0.62, -d * 0.35);
-      addMesh(THREE, group, softBox(THREE, w * 0.12, h * 0.48, d * 0.82, 0.06), fabricMat, -w * 0.44, h * 0.48, 0.02);
-      addMesh(THREE, group, softBox(THREE, w * 0.12, h * 0.48, d * 0.82, 0.06), fabricMat, w * 0.44, h * 0.48, 0.02);
+      // 1. Recessed dark wood shadow plinth base
+      addMesh(THREE, group, softBox(THREE, w - 0.2, h * 0.12, d * 0.82, 0.02), mats.darkWood, 0, h * 0.06, 0);
+      // 2. Deep tailored seating platform in rich heather upholstery
+      addMesh(THREE, group, softBox(THREE, w, h * 0.32, d * 0.86, 0.04), fabricMat, 0, h * 0.28, 0);
+      // 3. Tailored backrest
+      addMesh(THREE, group, softBox(THREE, w, h * 0.62, d * 0.24, 0.05), fabricMat, 0, h * 0.58, -d * 0.36);
+      // 4. Sleek rectilinear track armrests
+      var armWidth = Math.max(0.65, w * 0.11);
+      addMesh(THREE, group, softBox(THREE, armWidth, h * 0.54, d * 0.84, 0.04), fabricMat, -w * 0.5 + armWidth * 0.5, h * 0.45, 0.01);
+      addMesh(THREE, group, softBox(THREE, armWidth, h * 0.54, d * 0.84, 0.04), fabricMat, w * 0.5 - armWidth * 0.5, h * 0.45, 0.01);
 
-      var count = Math.max(2, Math.min(4, Math.round(w / 2.2)));
-      var cw = (w * 0.74) / count;
+      // 5. Exactly 3 tailored boxed seat cushions in matching tailored wool fabric
+      var count = 3;
+      var seatSpan = w - armWidth * 2 - 0.06;
+      var cw = seatSpan / count;
       for (var i = 0; i < count; i++) {
-        var cx = (i + 0.5 - count / 2) * cw;
-        addMesh(THREE, group, softBox(THREE, cw * 0.94, h * 0.2, d * 0.66, 0.06, { puff: 0.32 }), cushionMat, cx, h * 0.54, d * 0.06);
+        var cx = -seatSpan * 0.5 + (i + 0.5) * cw;
+        addMesh(THREE, group, softBox(THREE, cw * 0.96, h * 0.18, d * 0.68, 0.04, { puff: 0.18 }), cushionMat, cx, h * 0.46, d * 0.06);
+        // Back cushions resting flush against backrest
+        addMesh(THREE, group, softBox(THREE, cw * 0.96, h * 0.38, d * 0.18, 0.04, { puff: 0.18 }), cushionMat, cx, h * 0.68, -d * 0.24, -0.12, 0, 0);
       }
-      var pColors = ['#e8c987', '#d88c66', '#8db3ad'];
+      // 6. Exactly 2 elegant, understated lumbar accent pillows in soft neutral cream linen angled into armrest corners
+      var pillowMat = new THREE.MeshStandardMaterial({ color: 0xede8df, roughness: 0.88 });
       for (var pi = 0; pi < 2; pi++) {
         var side = pi === 0 ? -1 : 1;
-        var pMat = new THREE.MeshStandardMaterial({ color: pColors[pi], roughness: 0.9 });
-        addMesh(THREE, group, softBox(THREE, w * 0.16, h * 0.32, 0.24, 0.05, { puff: 0.42 }), pMat, side * w * 0.32, h * 0.72, -d * 0.18, -0.26, side * 0.15, side * 0.08);
+        var px = side * (seatSpan * 0.5 - cw * 0.35);
+        addMesh(THREE, group, softBox(THREE, cw * 0.65, h * 0.28, 0.18, 0.04, { puff: 0.28 }), pillowMat, px, h * 0.52, -d * 0.16, -0.15, side * 0.22, side * 0.08);
       }
     } else if (t === 'bed') {
       addMesh(THREE, group, softBox(THREE, w, h * 0.88, d * 0.09, 0.05), mats.walnut, 0, h * 0.44, -d * 0.46);
@@ -523,39 +533,39 @@
       addMesh(THREE, group, new THREE.BoxGeometry(w * 0.8, h * 0.5, 0.02), scrMat, 0, h * 0.72, -d * 0.15);
     } else if (t === 'lamp' || t === 'arc_lamp' || t === 'floor_lamp') {
       // Photorealistic Arch / Cantilever Brass Floor Lamp matching Scandinavian photography
-      var baseR = Math.max(0.6, w * 0.35);
-      addMesh(THREE, group, new THREE.CylinderGeometry(baseR, baseR + 0.06, 0.12, 24), mats.brass, 0, 0.06, 0);
+      var baseR = Math.max(0.65, w * 0.4);
+      addMesh(THREE, group, new THREE.CylinderGeometry(baseR, baseR + 0.04, 0.12, 28), mats.brass, 0, 0.06, 0);
       
-      // Sweeping arch cantilever tube extending up and over towards the lounge
-      var archH = Math.max(6.5, h);
-      var archReach = Math.max(2.4, w * 1.4);
+      // Sweeping arch cantilever tube extending up and forward along +Z towards the lounge
+      var archH = Math.max(6.8, h);
+      var archReach = Math.max(2.6, w * 1.6);
       var curve = new THREE.CubicBezierCurve3(
         new THREE.Vector3(0, 0.12, 0),
-        new THREE.Vector3(0, archH * 0.82, 0),
-        new THREE.Vector3(-archReach * 0.65, archH * 1.04, 0),
-        new THREE.Vector3(-archReach, archH * 0.72, 0)
+        new THREE.Vector3(0, archH * 0.85, archReach * 0.15),
+        new THREE.Vector3(0, archH * 1.05, archReach * 0.68),
+        new THREE.Vector3(0, archH * 0.74, archReach)
       );
-      var archGeom = new THREE.TubeGeometry(curve, 28, 0.045, 10, false);
+      var archGeom = new THREE.TubeGeometry(curve, 32, 0.04, 12, false);
       addMesh(THREE, group, archGeom, mats.brass, 0, 0, 0);
       
       // Spun brass hemisphere dome shade hanging down
-      var shadeR = 0.45;
-      var domeGeom = new THREE.SphereGeometry(shadeR, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      var shadeR = 0.42;
+      var domeGeom = new THREE.SphereGeometry(shadeR, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2);
       var domeMat = new THREE.MeshStandardMaterial({
         color: 0xd4af37,
         roughness: 0.28,
         metalness: 0.82,
         side: THREE.DoubleSide
       });
-      addMesh(THREE, group, domeGeom, domeMat, -archReach, archH * 0.72, 0, Math.PI, 0, 0);
+      addMesh(THREE, group, domeGeom, domeMat, 0, archH * 0.74, archReach, Math.PI, 0, 0);
       
       // Warm glowing filament / shade underside
       var glowMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8 });
-      addMesh(THREE, group, new THREE.SphereGeometry(0.12, 12, 12), glowMat, -archReach, archH * 0.70, 0);
+      addMesh(THREE, group, new THREE.SphereGeometry(0.12, 14, 14), glowMat, 0, archH * 0.72, archReach);
       
       // Warm ambient pool of light
-      var pLight = new THREE.PointLight(0xffdfa4, 1.35, 14, 2);
-      pLight.position.set(-archReach, archH * 0.68, 0);
+      var pLight = new THREE.PointLight(0xffdfa4, 1.45, 14, 2);
+      pLight.position.set(0, archH * 0.70, archReach);
       pLight.castShadow = true;
       group.add(pLight);
     } else if (t === 'planter' || t === 'plant') {
@@ -667,19 +677,12 @@
     addMesh(THREE, eastWindowWall, new THREE.PlaneGeometry(roomD - 0.4, wallH - 0.8), glassEastMat, roomW / 2 + 0.02, (wallH - 0.8) / 2 + 0.38, 0, 0, -Math.PI / 2, 0);
     shell.add(eastWindowWall);
 
-    // Outside garden greenery visible through East glass wall
-    var gardenGroup = new THREE.Group();
-    gardenGroup.name = 'OutdoorGarden';
-    for (var gi = -2; gi <= 2; gi++) {
-      var treeG = new THREE.Group();
-      treeG.position.set(roomW / 2 + 2.2, 0, gi * (roomD * 0.26));
-      addMesh(THREE, treeG, new THREE.CylinderGeometry(0.12, 0.16, 4.5, 8), mats.darkWood, 0, 2.25, 0);
-      var folMat = new THREE.MeshStandardMaterial({ color: 0x2e5a36, roughness: 0.82 });
-      addMesh(THREE, treeG, new THREE.SphereGeometry(1.6, 10, 10), folMat, 0, 4.8, 0);
-      addMesh(THREE, treeG, new THREE.SphereGeometry(1.3, 8, 8), folMat, 0.4, 5.6, 0.3);
-      gardenGroup.add(treeG);
-    }
-    shell.add(gardenGroup);
+    // Architectural outdoor terrace decking outside East glass wall
+    var terraceGeo = new THREE.BoxGeometry(6.0, 0.22, roomD + 2.0);
+    var terraceMesh = new THREE.Mesh(terraceGeo, mats.darkWood);
+    terraceMesh.position.set(roomW / 2 + 3.0, -0.11, 0);
+    terraceMesh.receiveShadow = true;
+    shell.add(terraceMesh);
 
     // Baseboards
     var bbH = 0.38;

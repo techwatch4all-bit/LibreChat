@@ -1,0 +1,101 @@
+{
+  "verification_policy": {
+    "language": "EN_ONLY",
+    "strict_rejection": ["ar", "ru", "zh", "fa", "ko", "ja", "multilingual_switch"],
+    "video_embed_verification": "YouTube oEmbed 200 OK required",
+    "local_media_hosting": "/assets/study/media/"
+  },
+  "topics": {
+    "photosynthesis": {
+      "title": "Photosynthesis: Plant Food & Oxygen Production",
+      "animated_diagram": "/assets/study/media/photosynthesis_animation.svg",
+      "scientific_diagram": "/assets/study/media/simple_photosynthesis_overview.svg",
+      "detailed_diagram": "/assets/study/media/photosynthesis_en.svg",
+      "organelle_diagram": "/assets/study/media/chloroplast.svg",
+      "verified_videos": [
+        {
+          "id": "D1Ymc311XS8",
+          "title": "Photosynthesis | The Dr. Binocs Show | Learn Videos For Kids",
+          "thumbnail": "https://i.ytimg.com/vi/D1Ymc311XS8/hqdefault.jpg"
+        },
+        {
+          "id": "eo5XndJaz-Y",
+          "title": "The Simple Story of Photosynthesis and Food - TED-Ed",
+          "thumbnail": "https://i.ytimg.com/vi/eo5XndJaz-Y/hqdefault.jpg"
+        }
+      ]
+    },
+    "water_cycle": {
+      "title": "The Water Cycle (Evaporation, Condensation, Precipitation)",
+      "scientific_diagram": "/assets/study/media/water_cycle_en.svg",
+      "verified_videos": [
+        {
+          "id": "ncORPosDrjI",
+          "title": "The Water Cycle | The Dr. Binocs Show | Learn Videos For Kids",
+          "thumbnail": "https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg"
+        }
+      ]
+    },
+    "solar_system": {
+      "title": "Solar System & Planetary Orbits",
+      "verified_videos": [
+        {
+          "id": "libKVRa01L8",
+          "title": "Solar System 101 | National Geographic",
+          "thumbnail": "https://i.ytimg.com/vi/libKVRa01L8/hqdefault.jpg"
+        }
+      ]
+    },
+    "human_heart": {
+      "title": "Human Heart & Cardiovascular Circulation",
+      "verified_videos": [
+        {
+          "id": "GMBSU-2GK3E",
+          "title": "Heart 101 | National Geographic",
+          "thumbnail": "https://i.ytimg.com/vi/GMBSU-2GK3E/hqdefault.jpg"
+        }
+      ]
+    },
+    "states_of_matter": {
+      "title": "States of Matter: Solids, Liquids, and Gases",
+      "verified_videos": [
+        {
+          "id": "wclY8F-UoTE",
+          "title": "3 States of Matter for Kids - FreeSchool",
+          "thumbnail": "https://i.ytimg.com/vi/wclY8F-UoTE/hqdefault.jpg"
+        }
+      ]
+    },
+    "cell_division": {
+      "title": "Cell Division & Mitosis",
+      "scientific_diagram": "/assets/study/media/cell_division_-_mitosis_1_--_smart-servier.png.png",
+      "verified_videos": [
+        {
+          "id": "f-ldPgEfAHI",
+          "title": "Mitosis: The Amazing Cell Process that Uses Division to Multiply! - Amoeba Sisters",
+          "thumbnail": "https://i.ytimg.com/vi/f-ldPgEfAHI/hqdefault.jpg"
+        }
+      ]
+    },
+    "atoms": {
+      "title": "Atomic Structure: Protons, Neutrons, Electrons",
+      "verified_videos": [
+        {
+          "id": "R1RMV5qhwyE",
+          "title": "What is an Atom - Basics for Kids",
+          "thumbnail": "https://i.ytimg.com/vi/R1RMV5qhwyE/hqdefault.jpg"
+        }
+      ]
+    },
+    "gravity": {
+      "title": "Gravity & Orbital Physics",
+      "verified_videos": [
+        {
+          "id": "ljRlB6TuMOU",
+          "title": "Defining Gravity: Crash Course Kids #4.1",
+          "thumbnail": "https://i.ytimg.com/vi/ljRlB6TuMOU/hqdefault.jpg"
+        }
+      ]
+    }
+  }
+}

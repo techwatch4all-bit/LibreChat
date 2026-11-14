@@ -607,6 +607,34 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         mcpServers: ['satchida-stem-study'],
       }),
       starter({
+        title: 'Pedagogical Algebra Coach',
+        icon: '✏️',
+        description: 'Step-by-step human tutoring steps powered by Google mathsteps.',
+        inputs: ['algebraic equation or expression to simplify', 'unknown variable'],
+        deliver:
+          'the human tutor transformation breakdown using solve_pedagogical_algebra, explaining exactly what operation is applied to both sides at each step (e.g. Add/Subtract, Combine Like Terms, Divide), formatted in clean KaTeX blocks with zero skipped arithmetic.',
+        contract:
+          'explain the pedagogical "why" for each operation before showing the transformed equation; end with a verification check.',
+        badge: 'Algebra Coach',
+        badgeKey: 'starters_badge_algebra_coach',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
+        title: 'Offline Interactive STEM Lab',
+        icon: '🧪',
+        description: 'Interactive HTML5 PhET simulations for physics, circuits, and chemistry.',
+        inputs: [
+          'lab topic — pendulum / circuit / chemical_equations / projectile_motion / wave / ohms_law',
+        ],
+        deliver:
+          'an interactive offline PhET simulation loaded directly in an Artifact via get_interactive_stem_simulation, along with a guided inquiry experiment worksheet: variables to change, observation tables to fill, and questions to test understanding.',
+        contract:
+          'render the simulation embed and guide me through 3 sequential experimental trials with hypotheses.',
+        badge: 'Interactive Lab',
+        badgeKey: 'starters_badge_interactive_lab',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
         title: 'Visual Concept & Animated Physics Lab',
         icon: '🎬',
         description: 'Physical concepts with downloaded animated GIFs and video lessons.',

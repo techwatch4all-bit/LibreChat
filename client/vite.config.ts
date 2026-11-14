@@ -118,6 +118,7 @@ export default defineConfig(({ command }) => ({
           'assets/rum.*.js',
           'assets/locale-*.js',
           'assets/query-devtools*.js',
+          'assets/study/sims/**/*',
         ],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         /**

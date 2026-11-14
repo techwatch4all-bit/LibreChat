@@ -244,7 +244,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'office_docs',
     label: '📄 Letters & Official Documents',
     labelKey: 'starters_cat_office_docs',
-    modes: ['Office-Suite', 'Work', 'Pro'],
+    modes: ['Office-Suite', 'Document-Vault', 'Work', 'Pro'],
     starters: [
       starter({
         title: '✉️ Formal Letter & Application Writer',
@@ -317,6 +317,155 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     ],
   },
   {
+    id: 'stories_creative',
+    label: '🧸 Bedtime Stories & Creative',
+    labelKey: 'starters_cat_stories_creative',
+    modes: ['Document-Vault', 'Chat'],
+    starters: [
+      starter({
+        title: '🧸 Magical Bedtime Story',
+        icon: '🧸',
+        description: 'Personalized story for children with a heartwarming moral lesson and lively characters.',
+        inputs: [
+          "Child's Name and Age: e.g. Ananya, 6 years old",
+          'Favorite Characters/Animals: e.g. A curious squirrel and a wise old banyan tree',
+          'Moral Focus: Kindness, Sharing, Courage, or Gratitude',
+        ],
+        deliver:
+          'an imaginative, comforting bedtime story in 3 short illustrated chapters with gentle sound effects, playful dialogue, and a joyful peaceful ending.',
+        contract: DOC_CONTRACT,
+        badge: 'Bedtime Story',
+        badgeKey: 'starters_badge_formal_letter',
+        keywords: ['story', 'children', 'bedtime', 'kids', 'moral', 'fairy tale'],
+        mcpServers: ['satchida-knowledge-vault', 'filesystem-shared'],
+      }),
+      starter({
+        title: '📑 Plain-English Bill & PDF Breakdown',
+        icon: '📑',
+        description: 'Plain-English explanation of complex utility bills, hospital fees, or bank notices.',
+        inputs: [
+          'Document Type: e.g. Electricity Bill, Hospital Invoice, or Insurance Letter',
+          'What You Want to Understand: Due dates, unusual fees, or breakdown of charges',
+        ],
+        deliver:
+          'a clean 3-part breakdown: (1) Total Amount Due and Deadline in giant bold text, (2) Line-by-line explanation of every charge in everyday words, and (3) Actionable checklist of next steps or potential savings.',
+        contract: DOC_CONTRACT,
+        badge: 'Bill Explainer',
+        badgeKey: 'starters_badge_society_notice',
+        keywords: ['bill', 'pdf', 'statement', 'charges', 'fees', 'invoice', 'senior'],
+        mcpServers: ['satchida-knowledge-vault', 'filesystem-shared'],
+      }),
+    ],
+  },
+  {
+    id: 'architect_plans',
+    label: '📐 Floor Plans & Layouts',
+    labelKey: 'starters_cat_architect_plans',
+    modes: ['Architect-Studio', 'SceneMosaic', 'Motion'],
+    starters: [
+      starter({
+        title: '📐 Residential Floor Plan Planner',
+        icon: '📐',
+        description: 'Create or optimize a 1BHK, 2BHK, 3BHK, or duplex residential layout.',
+        inputs: [
+          'Plot Size / Area: e.g. 1,200 sq ft (30×40 ft) or 1,800 sq ft',
+          'Rooms Needed: Living, Kitchen, Master Bed, Kids Bed, 2 Baths, Balcony',
+          'Facing & Style: East-Facing Vastu, Modern Open Plan',
+        ],
+        deliver:
+          'a comprehensive spatial plan: Room-by-room dimensions (feet & metres), circulation corridors, door/window placements, furniture zoning, and an interactive 3D plan render.',
+        contract: DOC_CONTRACT,
+        badge: 'Floor Plan',
+        badgeKey: 'starters_badge_family_budget',
+        engineTag: 'Pascal · 3D',
+        keywords: ['architect', 'floorplan', 'layout', 'house', 'plot', 'vastu', 'rooms'],
+        mcpServers: ['satchida-architect', 'pascal-architect', 'satchida-motion'],
+      }),
+      starter({
+        title: '☀️ Sun-Path, Daylight & Ventilation Audit',
+        icon: '☀️',
+        description: 'Maximize natural daylight, cross-ventilation, and climate-responsive comfort.',
+        inputs: [
+          'Location & Climate: e.g. Bengaluru Tropical or Delhi Hot-Dry',
+          'Plot Orientation: North-Facing, East-Facing, or West-Facing',
+        ],
+        deliver:
+          'a detailed solar & airflow audit: Ideal window orientations, shading overhang depths, seasonal sun angles, and cross-ventilation breeze pathways.',
+        contract: DOC_CONTRACT,
+        badge: 'Daylight Sim',
+        badgeKey: 'starters_badge_family_budget',
+        engineTag: 'Daylight · Sim',
+        keywords: ['sun', 'daylight', 'ventilation', 'vastu', 'energy', 'windows', 'airflow'],
+        mcpServers: ['satchida-architect', 'pascal-architect', 'satchida-motion'],
+      }),
+    ],
+  },
+  {
+    id: 'scenemosaic_rooms',
+    label: '🏠 3D Room Reconstruction',
+    labelKey: 'starters_cat_scenemosaic_rooms',
+    modes: ['SceneMosaic', 'Architect-Studio'],
+    starters: [
+      starter({
+        title: '🏠 Photo to 3D Room Reconstruction',
+        icon: '🏠',
+        description: 'Rebuild any indoor photo into an interactive 3D scene with 3 layout variations.',
+        inputs: [
+          'Room Type: e.g. Living Room, Bedroom, or Home Office',
+          'Style Direction: e.g. Japandi Minimalist, Warm Contemporary, or Boho Warm Wood',
+        ],
+        deliver:
+          'a full 3D interactive room model with 3 layout evolutions (As-Is layout, Open-Plan entertainer, and Study/Work nook layout) plus estimated dimensions and furniture list.',
+        contract: DOC_CONTRACT,
+        badge: '3D Room',
+        badgeKey: 'starters_badge_family_budget',
+        engineTag: 'SceneMosaic · 3D',
+        keywords: ['room', '3d', 'interior', 'photo', 'furniture', 'decor', 'layout'],
+        mcpServers: ['satchida-scenemosaic'],
+      }),
+    ],
+  },
+  {
+    id: 'maker_diy',
+    label: '🛠️ Electronics & DIY Repair',
+    labelKey: 'starters_cat_maker_diy',
+    modes: ['Maker-Hardware', 'Study', 'Study-Local'],
+    starters: [
+      starter({
+        title: '🤖 Smart Arduino / ESP32 Project',
+        icon: '🤖',
+        description: 'Build an automated home gadget, school science model, or sensor tracker.',
+        inputs: [
+          'Project Idea: e.g. Automatic Plant Watering, Smart Nightlight, RFID Door Lock, or Weather Station',
+          'Skill Level: Beginner (simple jumpers) or Intermediate',
+        ],
+        deliver:
+          'a complete beginner-safe builder pack: Exact parts list (with Amazon/Robu search terms), pin-to-pin wiring table, ASCII circuit schematic, and fully commented, copy-paste ready Arduino C++ code.',
+        contract: CODE_CONTRACT,
+        badge: 'Arduino / IoT',
+        badgeKey: 'starters_badge_family_budget',
+        engineTag: 'Maker · Lab',
+        keywords: ['arduino', 'esp32', 'electronics', 'iot', 'robotics', 'sensors', 'maker'],
+        mcpServers: ['satchida-maker-engineering', 'satchida-stem-study', 'time-server'],
+      }),
+      starter({
+        title: '🔧 Home Appliance & Safe Repair Guide',
+        icon: '🔧',
+        description: 'Safe step-by-step diagnostic and repair steps for common household issues.',
+        inputs: [
+          'Appliance or Item: e.g. Dripping bathroom tap, ceiling fan hum, wobbly chair, or sticky door latch',
+        ],
+        deliver:
+          'Safety First protocol (power/water shutoff), required everyday tools, inspection checklist, and numbered fix steps with precautions anyone at home can follow.',
+        contract: DOC_CONTRACT,
+        badge: 'DIY Repair',
+        badgeKey: 'starters_badge_family_budget',
+        keywords: ['repair', 'diy', 'home', 'plumbing', 'faucet', 'fan', 'tools', 'fix'],
+        mcpServers: ['satchida-maker-engineering', 'time-server'],
+      }),
+    ],
+  },
+  {
     id: 'markets_finance',
     label: '📊 Markets & Bullion',
     labelKey: 'starters_cat_markets_finance',
@@ -376,7 +525,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'family_health',
     label: '🩺 Health & Emergency',
     labelKey: 'starters_cat_family_health',
-    modes: ['Chat'],
+    modes: ['Health-Wellness', 'Chat'],
     starters: [
       starter({
         title: 'Generic Medicine Prices',
@@ -432,7 +581,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'vedic_wellness',
     label: '🕉️ Vedic & Holistic Wellness',
     labelKey: 'starters_cat_vedic_wellness',
-    modes: ['Chat', 'Privacy'],
+    modes: ['Panchang-Vedic', 'Health-Wellness', 'Chat', 'Privacy'],
     starters: [
       starter({
         title: 'Panchang & Muhurta',
@@ -743,7 +892,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'study_core',
     label: '🎓 STEM & Math',
     labelKey: 'starters_cat_study_core',
-    modes: ['Study', 'Study-Local'],
+    modes: ['DeepTutor', 'Study', 'Study-Local'],
     starters: [
       starter({
         title: 'Symbolic Math Solver',
@@ -854,7 +1003,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'school_boards',
     label: '🎒 CBSE, IGCSE & IB STEM',
     labelKey: 'starters_cat_school_boards',
-    modes: ['Study', 'Study-Local'],
+    modes: ['DeepTutor', 'Study', 'Study-Local'],
     starters: [
       starter({
         title: 'CBSE Chapter Tutor',
@@ -983,7 +1132,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'textbook_navigator',
     label: '📖 Textbook Navigator',
     labelKey: 'starters_cat_textbook_navigator',
-    modes: ['Study', 'Study-Local'],
+    modes: ['DeepTutor', 'Study', 'Study-Local'],
     starters: [
       starter({
         title: 'Textbook Page Guide',

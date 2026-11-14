@@ -8,6 +8,47 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — Chat: Markdown-only reveal blocks and reliable follow-up chips
+
+**Problem.** DeepTutor and Study answers arrived with raw `<details>` / `<summary>` markup, which
+`react-markdown` renders as literal text because `rehype-raw` is not registered, and the follow-up
+question list did not always become clickable chips. The chip parser was one regex anchored to the
+end of the message: it required a heading the model had to reproduce exactly, it treated any
+trailing note as another question, and it never normalised the HTML reveal.
+
+**Shipped.**
+
+1. `client/src/utils/suggestedQuestions.ts` — one tested module for both problems.
+   - `stripDetailsBlocks()` rewrites raw and HTML-escaped `<details>`/`<summary>` blocks into a
+     Markdown blockquote, skips fenced code so a code sample is never rewritten, strips inline tags
+     from the summary, and leaves an unclosed block alone rather than swallowing the answer.
+   - `parseSuggestedQuestions()` finds the last standalone follow-up heading (hash or bold, any
+     emoji, `Suggested`/`Follow-up`/`Next`/`Related`/`Questions to ask`), takes the bullets under
+     it, cleans list/bold/quote/bracket decoration, drops `Note:`/`Disclaimer:`/`Warning:` lines,
+     deduplicates case-insensitively and caps at 8. Anything that is not a bullet — a disclaimer,
+     a source list — is re-attached to the rendered answer instead of becoming a chip.
+2. `client/src/components/Chat/Messages/Content/Markdown.tsx` — the inline regex and ad-hoc parser
+   are gone; the component now calls `parseSuggestedQuestions()` and keeps
+   `normalizeArtifactDirectives()` on the body.
+3. `client/src/store/satchiStore.ts` — the Study quiz prompt no longer instructs the model to emit a
+   collapsible details block; it asks for a blockquote reveal (`Answer` / `Why it holds` /
+   `Derivation`).
+4. `librechat.yaml` — Study and DeepTutor gained a `MARKDOWN-ONLY RENDER CONTRACT`: no HTML tags,
+   blockquote reveals, and the exact `### 💡 Suggested Follow-up Questions` section with 3–4
+   single-line bullets, disclaimers above it and nothing after the last bullet.
+
+**Evidence.**
+- `npx jest src/utils/suggestedQuestions.spec.ts
+  src/components/Chat/Messages/Content/__tests__/SuggestedQuestions.spec.tsx` — 26/26 pass. The
+  component suite asserts a chip renders per question in the two-column grid, that a click submits
+  the trimmed text via `submitMessage({ text })`, and that the composer is staged before sending.
+- `node -e "js-yaml.load(librechat.yaml)"` — parses; both prompts report `details? false` and
+  contain the canonical heading.
+- `npx tsc --noEmit` in `client` — no new errors (45 pre-existing in `Admin/*` and `SpecIcon.tsx`).
+- `npm run build:client` — exit 0.
+
+---
+
 ## 2026-11-14 — Motion Studio: 2D CAD sanitary symbols, legal bathroom circulation, and interior 3D extrusion
 
 **Problem.** Three defects in the Motion Studio artifact surface.
@@ -55,8 +96,9 @@ rendered answer.
 trailing remainder; the remainder is re-attached to `mainContent`, and `Note:`/`Disclaimer:`/
 `Warning:` lines are still dropped from the chips.
 
-**Evidence.** `npx jest src/components/Chat/Messages/Content` (pending in this commit series);
-`npx tsc --noEmit` in `client`.
+**Evidence.** `npx jest src/components/Chat/Messages/Content` (the mounted suites) and
+`src/utils/suggestedQuestions.spec.ts` — 26/26 pass; `npx tsc --noEmit` in `client` reports no new
+errors.
 
 ---
 

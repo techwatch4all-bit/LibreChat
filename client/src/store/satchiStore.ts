@@ -14,7 +14,8 @@ export const satchiImageGenAtom = createStorageAtom<boolean>('satchida_imagegen'
 export const STYLE_PROMPTS: Record<SatchiStyle, string> = {
   direct: '',
   plan: 'Please think step-by-step and produce a clear, actionable plan before taking any action. Detail each phase, required resources, and dependencies, and pause for approval before executing.',
-  build: 'Please execute now and produce the complete, production-ready deliverable with full implementation details.',
+  build:
+    'Please execute now and produce the complete, production-ready deliverable with full implementation details.',
 };
 
 /**
@@ -85,7 +86,9 @@ Implement an exhaustive, production-ready solution for the following requirement
   }
 
   // 2. SHTF / OSINT / Disaster / Crisis Operations
-  if (/shtf|situational awareness|crisis operations|disaster.*bulletin|natural threat/i.test(lower)) {
+  if (
+    /shtf|situational awareness|crisis operations|disaster.*bulletin|natural threat/i.test(lower)
+  ) {
     return `Provide an exhaustive, real-time SHTF / OSINT Situational Awareness Dossier for India (National, Metros & Sensitive Frontier States) covering today's latest ground reality across all 6 critical survival domains:
 
 1. 🌊 Severe Weather, Hydrology & Natural Disasters:
@@ -212,7 +215,11 @@ Output Requirements:
   }
 
   // 7. Medical, Health, Pharmacology & Skincare
-  if (/health|medicine|drug|treatment|symptom|skincare|disease|clinical|therapy|dose|niacinamide|kojic/i.test(lower)) {
+  if (
+    /health|medicine|drug|treatment|symptom|skincare|disease|clinical|therapy|dose|niacinamide|kojic/i.test(
+      lower,
+    )
+  ) {
     return `### 🩺 Clinical Intelligence & Evidence-Based Synthesis Protocol
 
 Investigative Subject:
@@ -265,7 +272,12 @@ Format Requirements:
 - For each question:
   1. State the Question clearly.
   2. Provide 4 Multiple-Choice Options (A, B, C, D).
-  3. Wrap the Correct Answer and Detailed Conceptual Explanation in a collapsed Markdown block (<details><summary>Reveal Answer & Derivation</summary>...</details>) so I can test myself first!
+  3. Put the Correct Answer and its Detailed Conceptual Explanation in a reveal block built from Markdown only — never raw HTML or a collapsible details/summary element, which renders as literal text. Use exactly this shape:
+     > **✅ Answer: [letter] — [option text]**
+     >
+     > **Why it holds:** [one-line mechanism]
+     >
+     > **Derivation:** [2–4 numbered steps]
   4. Include a Socratic "Follow-up Challenge" to test deeper intuition.`;
 }
 
@@ -326,4 +338,3 @@ Mathematical Formatting Rules:
 3. Define all variables and physical units (SI standard).
 4. Provide an intuitive physical/geometric interpretation of the final result.`;
 }
-

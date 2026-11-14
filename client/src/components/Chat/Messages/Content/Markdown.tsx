@@ -32,16 +32,43 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
     let main = content.slice(0, match.index).trim();
     main = main.replace(/(?:^|\n)[-*_]{3,}\s*$/g, '').trim();
     const rawQuestions = match[1];
-    const parsed = rawQuestions
-      .split('\n')
+    const rawLines = rawQuestions.split('\n');
+    const questionLines: string[] = [];
+    const trailingLines: string[] = [];
+    let inQuestions = true;
+
+    for (const line of rawLines) {
+      const trimmed = line.trim();
+      if (inQuestions) {
+        if (/^[-*•\u2022]\s+/.test(trimmed) || /^\d+[.)]\s+/.test(trimmed)) {
+          questionLines.push(trimmed);
+        } else if (trimmed === '') {
+          continue;
+        } else {
+          inQuestions = false;
+          trailingLines.push(line);
+        }
+      } else {
+        trailingLines.push(line);
+      }
+    }
+
+    const parsed = questionLines
       .map((line) =>
         line
-          .replace(/^[\s*\d.->•\u2022()]+\s*/, '')
+          .replace(/^[\s*\d.•\u2022()–—-]+\s*/u, '')
           .replace(/^\[|\]$/g, '')
           .replace(/^\*\*|\*\*$/g, '')
           .trim(),
       )
       .filter((q) => q.length > 3 && !/^(?:Note|Disclaimer|Warning):/i.test(q));
+
+    if (trailingLines.length > 0) {
+      const trailingText = trailingLines.join('\n').trim();
+      if (trailingText) {
+        main = main ? `${main}\n\n${trailingText}` : trailingText;
+      }
+    }
 
     return { mainContent: normalizeArtifactDirectives(main), questions: parsed };
   }, [content]);

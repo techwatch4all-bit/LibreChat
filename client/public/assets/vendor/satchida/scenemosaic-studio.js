@@ -768,7 +768,7 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.35;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
@@ -779,7 +779,7 @@
     var hemi = new THREE.HemisphereLight(0xf6f4ee, 0x3b352e, 0.65);
     scene.add(hemi);
 
-    var sun = new THREE.DirectionalLight(0xfff1dc, 1.45);
+    var sun = new THREE.DirectionalLight(0xfff5ea, 1.85);
     sun.position.set(-roomW * 0.35, wallH * 1.9, -roomD * 0.85);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -790,7 +790,7 @@
     sun.shadow.camera.bottom = -roomD;
     scene.add(sun);
 
-    var fill = new THREE.DirectionalLight(0xc4daf5, 0.42);
+    var fill = new THREE.DirectionalLight(0xd9e8fb, 0.75);
     fill.position.set(roomW, wallH * 1.1, roomD);
     scene.add(fill);
 
@@ -920,19 +920,99 @@
       a.click();
     }
 
-    // Raycast click-to-inspect
+    // Interactive Furniture Selection & Drag-and-Drop System
     var raycaster = new THREE.Raycaster();
     var pointer = new THREE.Vector2();
+    var floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    var planeIntersect = new THREE.Vector3();
+    var dragOffset = new THREE.Vector3();
+    var selectedFurniture = null;
+    var isDragging = false;
+    var pointerDownPos = new THREE.Vector2();
+
+    // Visual selection indicator ring
+    var selectRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.8, 0.92, 32),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+    );
+    selectRing.rotation.x = -Math.PI / 2;
+    selectRing.position.y = 0.04;
+    selectRing.visible = false;
+    scene.add(selectRing);
+
+    function updateSelectRing(node) {
+      if (!node) {
+        selectRing.visible = false;
+        return;
+      }
+      var box = new THREE.Box3().setFromObject(node);
+      var size = new THREE.Vector3();
+      box.getSize(size);
+      var radius = Math.max(size.x, size.z) * 0.58;
+      selectRing.geometry.dispose();
+      selectRing.geometry = new THREE.RingGeometry(Math.max(0.4, radius - 0.08), radius + 0.06, 32);
+      selectRing.position.set(node.position.x, 0.04, node.position.z);
+      selectRing.visible = true;
+    }
+
     renderer.domElement.addEventListener('pointerdown', function (ev) {
       var rect = renderer.domElement.getBoundingClientRect();
+      pointerDownPos.set(ev.clientX, ev.clientY);
       pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       var hits = raycaster.intersectObjects(furnitureGroup.children, true);
-      if (hits.length && hud.onInspect) {
+      if (hits.length) {
         var node = hits[0].object;
         while (node && node.parent && node.parent !== furnitureGroup) node = node.parent;
-        if (node && node.userData && node.userData.name) hud.onInspect(node.userData);
+        if (node && node.userData && node.userData.name) {
+          selectedFurniture = node;
+          updateSelectRing(node);
+          if (hud.onInspect) hud.onInspect(node.userData);
+          // Check intersection with floor plane for dragging offset
+          if (raycaster.ray.intersectPlane(floorPlane, planeIntersect)) {
+            dragOffset.copy(node.position).sub(planeIntersect);
+            dragOffset.y = 0;
+            isDragging = true;
+            controls.enabled = false; // Disable orbit while moving furniture
+          }
+        }
+      } else {
+        selectedFurniture = null;
+        updateSelectRing(null);
+        if (hud.onInspect) hud.onInspect(null);
+      }
+    });
+
+    global.addEventListener('pointermove', function (ev) {
+      if (!isDragging || !selectedFurniture) return;
+      var rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      if (raycaster.ray.intersectPlane(floorPlane, planeIntersect)) {
+        var newX = planeIntersect.x + dragOffset.x;
+        var newZ = planeIntersect.z + dragOffset.z;
+        // Clamp to room bounds with padding
+        var halfW = roomW * 0.45;
+        var halfD = roomD * 0.45;
+        newX = Math.max(-halfW, Math.min(halfW, newX));
+        newZ = Math.max(-halfD, Math.min(halfD, newZ));
+        selectedFurniture.position.x = newX;
+        selectedFurniture.position.z = newZ;
+        updateSelectRing(selectedFurniture);
+        if (selectedFurniture.userData) {
+          selectedFurniture.userData.x = Math.round(newX * 10) / 10;
+          selectedFurniture.userData.z = Math.round(newZ * 10) / 10;
+          if (hud.onInspect) hud.onInspect(selectedFurniture.userData);
+        }
+      }
+    });
+
+    global.addEventListener('pointerup', function () {
+      if (isDragging) {
+        isDragging = false;
+        controls.enabled = true;
       }
     });
 
@@ -1258,8 +1338,12 @@
           if (activeCam === '2d') draw2DMap();
         },
         onInspect: function (info) {
+          if (!info) {
+            inspectEl.style.display = 'none';
+            return;
+          }
           inspectEl.style.display = 'block';
-          inspectEl.textContent = info.name + ' (' + info.type + ') · ' + info.w + "' × " + info.d + "' × " + info.h + "'";
+          inspectEl.innerHTML = '<strong>' + info.name + '</strong> (' + info.type + ') · ' + info.w + "' × " + info.d + "' × " + info.h + "' <span style=\"color:#38bdf8;margin-left:6px;\">⇄ [x:" + (info.x || 0) + ", z:" + (info.z || 0) + "] (Drag to move)</span>";
         },
       },
     });

@@ -45,6 +45,10 @@ export const user = () => `${BASE_URL}/api/user`;
 export const userPreferences = () => `${user()}/preferences`;
 
 export const balance = () => `${BASE_URL}/api/balance`;
+export const balanceUsage = (params?: { startDate?: string; endDate?: string }) => {
+  const query = params ? buildQuery(params) : '';
+  return `${BASE_URL}/api/balance/usage${query}`;
+};
 
 export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
 

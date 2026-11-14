@@ -39,7 +39,7 @@ import { ManageFiles } from '../SettingsTabs/Data/ManageFiles';
 import { smoothStreamingAtom } from '~/store/smoothStreaming';
 import { RevokeKeys } from '../SettingsTabs/Data/RevokeKeys';
 import { ClearChats } from '../SettingsTabs/Data/ClearChats';
-import { TokenCredits, AutoRefill } from './BillingControls';
+import { TokenCredits, AutoRefill, UserUsageAnalytics } from './BillingControls';
 import AdminPanel from '../SettingsTabs/General/AdminPanel';
 import SharedLinks from '../SettingsTabs/Data/SharedLinks';
 import ImageResize from '../SettingsTabs/Chat/ImageResize';
@@ -742,6 +742,14 @@ export const registry: SettingEntry[] = [
     labelKey: 'com_ui_settings_label_auto_refill',
     show: (ctx) => ctx.balanceEnabled,
     Component: AutoRefill,
+  },
+  {
+    id: 'usageAnalytics',
+    tab: ACCOUNT,
+    section: 'billing',
+    labelKey: 'com_ui_settings_label_usage_analytics',
+    show: (ctx) => ctx.balanceEnabled,
+    Component: UserUsageAnalytics,
   },
   // Account · Danger zone
   {

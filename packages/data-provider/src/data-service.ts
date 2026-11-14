@@ -292,6 +292,13 @@ export function getUserBalance(): Promise<t.TBalanceResponse> {
   return request.get(endpoints.balance());
 }
 
+export function getUserUsageStats(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<t.TUserUsageStats> {
+  return request.get(endpoints.balanceUsage(params));
+}
+
 export const updateTokenCount = (text: string) => {
   return request.post(endpoints.tokenizer(), { arg: text });
 };

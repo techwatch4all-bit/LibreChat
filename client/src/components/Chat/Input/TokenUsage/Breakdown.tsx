@@ -28,6 +28,7 @@ interface RowProps {
   segment?: Pick<MeterSegment, 'slot' | 'hatched' | 'outlined'>;
   /** The free-space remainder, keyed to the bare track rather than a series */
   track?: boolean;
+  tooltip?: string;
   /** Meter segment this row keys; hovering it highlights its slice of the bar */
   id?: string;
   onHoverChange?: (id: string | null) => void;
@@ -42,6 +43,7 @@ function Row({
   max,
   segment,
   track,
+  tooltip,
   id,
   onHoverChange,
   onClick,
@@ -62,6 +64,11 @@ function Row({
           />
         )}
         <span className="min-w-0 break-words text-text-secondary">{label}</span>
+        {tooltip && (
+          <span className="group relative inline-flex items-center cursor-help" title={tooltip}>
+            <Info className="size-3 text-text-tertiary hover:text-text-primary transition-colors" />
+          </span>
+        )}
       </span>
       <span className="shrink-0 whitespace-nowrap font-medium text-text-primary">
         {formatTokens(safeValue)}
@@ -530,6 +537,7 @@ export default function Breakdown({
                       value={freeTokens}
                       max={maxTokens}
                       track
+                      tooltip={localize('com_ui_context_available_info')}
                       id="free"
                       onHoverChange={setHoveredSegment}
                     />

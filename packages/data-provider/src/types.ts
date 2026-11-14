@@ -33,6 +33,7 @@ import type { ProviderId } from './providers';
 import type { Agent } from './types/agents';
 
 export * from './schemas';
+export * from './balance';
 export * from './types/subagents';
 export * from './types/background';
 

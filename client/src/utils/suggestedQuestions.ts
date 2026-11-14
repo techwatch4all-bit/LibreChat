@@ -35,11 +35,12 @@ const HEADING_EMOJI = '[\\p{Extended_Pictographic}\\p{Emoji_Presentation}\\uFE0F
 const SECTION_HEADING_PATTERN = new RegExp(
   '^(?:#{1,6}\\s*)?(?:\\*\\*|__)?\\s*' +
     `${HEADING_EMOJI}*\\s*` +
-    '(?:suggested\\s+(?:next\\s+|follow[\\s-]?up\\s+)?questions?' +
-    '|follow[\\s-]?up\\s+questions?' +
-    '|next\\s+questions?' +
-    '|related\\s+questions?' +
-    '|questions?\\s+to\\s+(?:ask|explore))' +
+    '(?:suggested\\s+(?:next\\s+|follow[\\s-]?up\\s+)?(?:questions?|prompts?|topics?|steps?)' +
+    '|follow[\\s-]?up\\s+(?:questions?|prompts?|topics?|steps?)' +
+    '|next\\s+(?:questions?|prompts?|topics?|steps?)' +
+    '|related\\s+(?:questions?|prompts?|topics?|steps?)' +
+    '|questions?\\s+to\\s+(?:ask|explore)' +
+    '|what\\s+to\\s+ask\\s+next)' +
     '[\\s:：]*(?:\\*\\*|__)?\\s*$',
   'iu',
 );
@@ -153,8 +154,13 @@ function stripBoldWrapper(text: string): string {
   return result;
 }
 
+const LEADING_TAG_PATTERN =
+  /^(?:[^\w\s]*\s*)?(?:(?:quiz\s*me|deep\s*dive|flashcards?|study\s*book|learn\s*more|practice|explore|question|next|tip|hint)\s*[:：\-–—]\s*)/iu;
+
 function cleanQuestion(raw: string): string {
   let text = raw.replace(LIST_ITEM_PATTERN, '').trim();
+  text = stripBoldWrapper(text);
+  text = text.replace(LEADING_TAG_PATTERN, '').trim();
   text = stripBoldWrapper(text);
   if (text.length > 2 && text.startsWith('[') && text.endsWith(']')) {
     text = text.slice(1, -1).trim();

@@ -2,6 +2,7 @@ import type { TBalanceResponse } from 'librechat-data-provider';
 import AutoRefillSettings from '../SettingsTabs/Balance/AutoRefillSettings';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import TokenCreditsItem from '../SettingsTabs/Balance/TokenCreditsItem';
+import UsageAnalyticsItem from '../SettingsTabs/Balance/UsageAnalytics';
 import { useAuthContext, useLocalize } from '~/hooks';
 
 function useBalance(): Partial<TBalanceResponse> {
@@ -61,3 +62,8 @@ export function AutoRefill() {
     />
   );
 }
+
+export function UserUsageAnalytics() {
+  return <UsageAnalyticsItem />;
+}
+

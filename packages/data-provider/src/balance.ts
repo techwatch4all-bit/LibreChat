@@ -49,3 +49,13 @@ export function getRefillEligibilityDate(
     }
   }
 }
+
+export type TUserUsageStats = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  transactionCount: number;
+};
+

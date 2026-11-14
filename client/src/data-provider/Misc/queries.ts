@@ -31,6 +31,24 @@ export const useGetUserBalance = (
   });
 };
 
+export const useGetUserUsageStats = (
+  params?: { startDate?: string; endDate?: string },
+  config?: UseQueryOptions<t.TUserUsageStats>,
+): QueryObserverResult<t.TUserUsageStats> => {
+  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useQuery<t.TUserUsageStats>(
+    ['userUsageStats', params?.startDate, params?.endDate],
+    () => dataService.getUserUsageStats(params),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: true,
+      ...config,
+      enabled: (config?.enabled ?? true) === true && queriesEnabled,
+    },
+  );
+};
+
 export const useGetSearchEnabledQuery = (
   config?: UseQueryOptions<boolean>,
 ): QueryObserverResult<boolean> => {

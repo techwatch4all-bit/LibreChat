@@ -606,7 +606,7 @@ def _code_compliance(building):
             }
             if is_bath and door_counts.get(r["id"], 0) >= 2:
                 entry["is_passthrough_between_bedrooms"] = True
-                entry["doors"] = door_counts[r["id"]]
+                entry["doors"] = [f"door_{i}" for i in range(door_counts[r["id"]])]
             rooms_ft.append(entry)
 
     report = ArchitecturalVerifier({"rooms": rooms_ft, "walls": [], "doors": []}).verify_all()

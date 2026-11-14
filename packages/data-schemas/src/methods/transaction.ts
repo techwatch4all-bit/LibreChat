@@ -107,6 +107,18 @@ export function createTransactionMethods(
     insertOnly?: IBalanceUpdate,
   ) => Promise<IBalance | null>;
   getTransactions: (filter: FilterQuery<ITransaction>) => Promise<ITransaction[]>;
+  getUserUsageStats: (
+    userId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) => Promise<{
+    inputTokens: number;
+    outputTokens: number;
+    cacheRead: number;
+    cacheWrite: number;
+    totalTokens: number;
+    transactionCount: number;
+  }>;
   deleteTransactions: (
     filter: FilterQuery<ITransaction>,
   ) => Promise<import('mongodb').DeleteResult>;
@@ -747,12 +759,109 @@ export function createTransactionMethods(
     }
   }
 
+  /**
+   * Retrieves aggregated token usage metrics for a user across a specified date range.
+   */
+  async function getUserUsageStats(
+    userId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{
+    inputTokens: number;
+    outputTokens: number;
+    cacheRead: number;
+    cacheWrite: number;
+    totalTokens: number;
+    transactionCount: number;
+  }> {
+    try {
+      const Transaction = mongoose.models.Transaction;
+      const match: Record<string, unknown> = {
+        user: new mongoose.Types.ObjectId(userId),
+      };
+
+      if (startDate || endDate) {
+        match.createdAt = {};
+        if (startDate) {
+          (match.createdAt as Record<string, unknown>).$gte = startDate;
+        }
+        if (endDate) {
+          (match.createdAt as Record<string, unknown>).$lte = endDate;
+        }
+      }
+
+      const results = await Transaction.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            inputTokens: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$tokenType', 'prompt'] },
+                  { $abs: { $ifNull: ['$rawAmount', 0] } },
+                  { $abs: { $ifNull: ['$inputTokens', 0] } },
+                ],
+              },
+            },
+            outputTokens: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$tokenType', 'completion'] },
+                  { $abs: { $ifNull: ['$rawAmount', 0] } },
+                  0,
+                ],
+              },
+            },
+            cacheRead: {
+              $sum: { $abs: { $ifNull: ['$readTokens', 0] } },
+            },
+            cacheWrite: {
+              $sum: { $abs: { $ifNull: ['$writeTokens', 0] } },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      if (!results || results.length === 0) {
+        return {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          transactionCount: 0,
+        };
+      }
+
+      const row = results[0];
+      const input = Number(row.inputTokens) || 0;
+      const output = Number(row.outputTokens) || 0;
+      const cacheRead = Number(row.cacheRead) || 0;
+      const cacheWrite = Number(row.cacheWrite) || 0;
+
+      return {
+        inputTokens: input,
+        outputTokens: output,
+        cacheRead,
+        cacheWrite,
+        totalTokens: input + output + cacheRead + cacheWrite,
+        transactionCount: Number(row.count) || 0,
+      };
+    } catch (error) {
+      logger.error('Error calculating user usage stats:', error);
+      throw error;
+    }
+  }
+
   return {
     updateBalance,
     bulkInsertTransactions,
     findBalanceByUser,
     upsertBalanceFields,
     getTransactions,
+    getUserUsageStats,
     deleteTransactions,
     deleteBalances,
     createTransaction,

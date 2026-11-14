@@ -493,6 +493,9 @@ fileConfig:
       - application/pdf
       - text/plain
       - text/markdown
+      defaultLLMDeliveryPath:
+        overrides:
+          application/pdf: text
     Satchida-Gateway:
       fileLimit: 10
       totalSizeLimit: 25
@@ -504,6 +507,9 @@ fileConfig:
       - application/pdf
       - text/plain
       - text/markdown
+      defaultLLMDeliveryPath:
+        overrides:
+          application/pdf: text
   serverFileSizeLimit: 25
   avatarSizeLimit: 2
 modelSpecs:
@@ -653,6 +659,21 @@ modelSpecs:
         > **⚖️ Legal Information Disclaimer:** *This output is synthesized from public statutory texts, government portals, and search queries for informational reference only. Satchida AI does not provide legal representation or legal advice. Consult an advocate or licensed legal counsel for jurisdiction-specific legal counsel.*
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
+
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
 
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
@@ -860,6 +881,21 @@ modelSpecs:
         > **⚖️ Legal Information Disclaimer:** *This output is synthesized from public statutory texts, government portals, and search queries for informational reference only. Satchida AI does not provide legal representation or legal advice. Consult an advocate or licensed legal counsel for jurisdiction-specific legal counsel.*
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
+
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
 
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
@@ -1085,6 +1121,21 @@ modelSpecs:
         > **⚖️ Legal Information Disclaimer:** *This output is synthesized from public statutory texts, government portals, and search queries for informational reference only. Satchida AI does not provide legal representation or legal advice. Consult an advocate or licensed legal counsel for jurisdiction-specific legal counsel.*
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
+
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
 
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
@@ -1373,6 +1424,21 @@ modelSpecs:
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
 
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
+
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
         - Provide exactly 3–4 short, specific, high-value follow-up questions tailored to THIS answer (drill-downs, comparisons, related actionable next steps), one per numbered line:
@@ -1608,6 +1674,21 @@ modelSpecs:
         > **⚖️ Legal Information Disclaimer:** *This output is synthesized from public statutory texts, government portals, and search queries for informational reference only. Satchida AI does not provide legal representation or legal advice. Consult an advocate or licensed legal counsel for jurisdiction-specific legal counsel.*
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
+
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
 
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
@@ -1850,6 +1931,21 @@ modelSpecs:
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
 
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
+
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
         - Provide exactly 3–4 short, specific, high-value follow-up questions tailored to THIS answer (drill-downs, comparisons, related actionable next steps), one per numbered line:
@@ -2063,6 +2159,21 @@ modelSpecs:
         > **⚖️ Legal Information Disclaimer:** *This output is synthesized from public statutory texts, government portals, and search queries for informational reference only. Satchida AI does not provide legal representation or legal advice. Consult an advocate or licensed legal counsel for jurisdiction-specific legal counsel.*
         - For Technical, Academic, Coding, or General Informational queries:
         > **⚖️ Platform Information Disclaimer:** *Satchida AI is an automated sovereign intelligence assistant that synthesizes search queries, public data, and user prompts. It does not provide certified professional consulting. Users are solely responsible for independently verifying all critical code, figures, and technical directives before production implementation.*
+
+        EDUCATIONAL, SCIENTIFIC & CONCEPTUAL EXPLANATION DIRECTIVES (ACADEMIC / K-12 / STEM):
+        - When asked to explain a scientific concept, biological/physical cycle, process, or mechanism (e.g. water cycle, photosynthesis, gravity, human anatomy, solar system, atoms, electricity, etc.) for any student or learner:
+          * Multi-Modal Rich Visuals: Embed clean, verified educational SVG diagrams and animations from the local verified asset store `/assets/study/media/`:
+            - Water Cycle: `![Water Cycle Diagram](https://upload.wikimedia.org/wikipedia/commons/9/94/Water_cycle.png)` or invoke `fetch_learning_visuals`
+            - Photosynthesis: `![Photosynthesis Animated Process](/assets/study/media/photosynthesis_animation.svg)`
+          * Curated Video Lesson Card: Embed a verified video lesson embed:
+            `[![Watch Video: Water Cycle](https://i.ytimg.com/vi/ncORPosDrjI/hqdefault.jpg)](https://www.youtube.com/watch?v=ncORPosDrjI)`
+            `*📺 Curated Video Lesson: The Water Cycle (Dr. Binocs Show) — visual walkthrough.*`
+          * Flashcards Self-Check: Include a structured flashcard self-check table with 2-3 cards:
+            ### 🎴 Flashcard Self-Check (Test Your Memory)
+            | 🎴 Card | Concept / Question | 🔄 Core Takeaway & Mechanism |
+            | :--- | :--- | :--- |
+            | **Card 1** | **[Key Concept Question]** | [1-sentence breakdown with vivid analogy] |
+            | **Card 2** | **[Mechanism Question]** | [Core principle or rule to remember] |
 
         5. FOLLOW-UP ENGAGEMENT: after the Sources & References and Legal Disclaimer section of every substantive answer, add a final section:
         ### 🔄 Suggested Next Questions
@@ -2502,6 +2613,8 @@ modelSpecs:
     webSearch: true
     mcpServers:
     - satchida-architect
+    - pascal-architect
+    - satchida-motion
     - satchida-knowledge-vault
     - time-server
     conversation_starters:

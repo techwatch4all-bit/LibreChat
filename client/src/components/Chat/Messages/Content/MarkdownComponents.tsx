@@ -1,4 +1,5 @@
-import React, { memo, useMemo, useRef, useEffect } from 'react';
+import React, { memo, useMemo, useRef, useEffect, useState } from 'react';
+import { Play, ExternalLink } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
 import { useToastContext } from '@librechat/client';
 import { PermissionTypes, Permissions, apiBaseUrl } from 'librechat-data-provider';
@@ -114,10 +115,91 @@ type TAnchorProps = {
   children: React.ReactNode;
 };
 
+const YOUTUBE_REGEX =
+  /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+
+const YouTubeCard = memo(function YouTubeCard({
+  videoId,
+  title,
+  href,
+}: {
+  videoId: string;
+  title: string;
+  href: string;
+}) {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  if (isPlaying) {
+    return (
+      <div className="my-3 w-full max-w-xl overflow-hidden rounded-xl border border-border-light bg-black shadow-md">
+        <div className="relative w-full pt-[56.25%]">
+          <iframe
+            className="absolute inset-0 h-full w-full"
+            src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`}
+            title={title || 'YouTube video player'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-3 flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-sky-500/30 bg-surface-secondary/80 shadow-md transition-all duration-200 hover:border-sky-500/60">
+      <div
+        className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden bg-slate-900"
+        onClick={() => setIsPlaying(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsPlaying(true);
+          }
+        }}
+        title="Click to play interactive lesson video"
+      >
+        <img
+          src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+          alt={title || 'Video lesson preview'}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={(e) => {
+            // Graceful fallback for networks where ytimg is restricted
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <div className="absolute flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-xl transition-all duration-200 group-hover:scale-110 group-hover:bg-red-500">
+          <Play className="ml-1 h-6 w-6 fill-white" />
+        </div>
+        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-semibold text-white">
+          <span className="truncate drop-shadow-md">📺 {title || 'Watch Video Lesson'}</span>
+          <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-sky-300">YouTube</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-between px-3 py-2 text-xs text-text-secondary">
+        <span className="truncate">{title || 'Curated educational video lesson'}</span>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-2 flex items-center gap-1 font-semibold text-sky-400 hover:underline shrink-0"
+        >
+          <span>Open in YouTube</span>
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    </div>
+  );
+});
+
 export const a: React.ElementType = memo(function MarkdownAnchor({ href, children }: TAnchorProps) {
   const user = useRecoilValue(store.user);
   const { showToast } = useToastContext();
   const localize = useLocalize();
+
+  const ytMatch = useMemo(() => href.match(YOUTUBE_REGEX), [href]);
 
   const {
     file_id = '',
@@ -138,6 +220,18 @@ export const a: React.ElementType = memo(function MarkdownAnchor({ href, childre
 
   const { refetch: downloadFile } = useFileDownload(user?.id ?? '', file_id, { direct: false });
   const props: { target?: string; onClick?: React.MouseEventHandler } = { target: '_blank' };
+
+  if (ytMatch && ytMatch[1]) {
+    const videoId = ytMatch[1];
+    let title = 'Educational Video Lesson';
+    if (typeof children === 'string') {
+      title = children;
+    } else if (React.isValidElement(children)) {
+      const childProps = children.props as { alt?: string; title?: string };
+      title = childProps.alt || childProps.title || 'Educational Video Lesson';
+    }
+    return <YouTubeCard videoId={videoId} title={title} href={href} />;
+  }
 
   if (!file_id || !filename) {
     return (

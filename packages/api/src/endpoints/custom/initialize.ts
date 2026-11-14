@@ -271,10 +271,13 @@ export async function initializeCustom(
         throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
       }
     } else {
-      // Without a policy the seat's modes are unknown, so only the modes every
-      // tenant seat is guaranteed to hold are permitted. A dedicated
-      // `privacy` seat falls back to Privacy, which is its purpose.
-      const fallback = user?.accountType === 'privacy' ? ['privacy'] : ['chat'];
+      // Without an explicit per-seat policy record, fall back to the accountType standard modes
+      const fallback =
+        user?.accountType === 'privacy'
+          ? ['privacy']
+          : user?.accountType === 'pro' || user?.accountType === 'enterprise'
+            ? ['chat', 'study', 'work', 'vibecoding', 'pro']
+            : ['chat', 'study'];
       if (!fallback.includes(normalizedMode)) {
         throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
       }

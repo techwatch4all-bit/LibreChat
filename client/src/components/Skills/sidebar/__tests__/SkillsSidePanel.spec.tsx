@@ -30,10 +30,12 @@ jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) => key,
   useDebounce: (value: string) => value,
   useNavScrolling: (options: object) => mockUseNavScrolling(options),
+  useAuthContext: () => ({ user: { id: 'user-1', role: 'USER' } }),
 }));
 
 jest.mock('~/data-provider', () => ({
   useSkillsInfiniteQuery: () => mockUseSkillsInfiniteQuery(),
+  useRestoreSkillMutation: () => ({ mutate: jest.fn(), mutateAsync: jest.fn() }),
 }));
 
 jest.mock('~/components/ui', () => {

@@ -84,7 +84,7 @@ describe('skill creation cache updates', () => {
       has_more: false,
       after: null,
     };
-    const queryKey = [QueryKeys.skills, 'infinite', '', '', 100];
+    const queryKey = [QueryKeys.skills, 'infinite', '', '', 100, ''];
     queryClient.setQueryData(queryKey, {
       pages: [firstPage],
       pageParams: [undefined],

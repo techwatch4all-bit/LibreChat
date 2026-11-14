@@ -18,6 +18,7 @@ import {
   parseProjectManifest,
   PROJECT_ARTIFACT_TYPE,
   TAILWIND_RUNTIME_URL,
+  GSAP_RUNTIME_URL,
   TOOL_ARTIFACT_TYPES,
 } from '../artifacts';
 
@@ -101,23 +102,30 @@ describe('SVG artifact template mapping (#16087)', () => {
 });
 
 describe('buildSandpackOptions', () => {
+  /** Both vendored runtimes ride along: the motion pipeline emits GSAP-based
+   *  artifacts, and a missing resource would leave the preview blank. */
+  const expectedResources = [TAILWIND_RUNTIME_URL, GSAP_RUNTIME_URL];
+
   it('includes externalResources with .js fragment hint for static template', () => {
     const options = buildSandpackOptions('static');
-    expect(options?.externalResources).toEqual([TAILWIND_RUNTIME_URL]);
+    expect(options?.externalResources).toEqual(expectedResources);
   });
 
   it('includes externalResources for react-ts template', () => {
     const options = buildSandpackOptions('react-ts');
-    expect(options?.externalResources).toEqual([TAILWIND_RUNTIME_URL]);
+    expect(options?.externalResources).toEqual(expectedResources);
   });
 
   it('uses staticBundlerURL when template is static and config is provided', () => {
-    const config = { staticBundlerURL: 'https://static.example.com' } as Parameters<
-      typeof buildSandpackOptions
-    >[1];
+    const staticBundlerURL = 'https://static.example.com';
+    const config = { staticBundlerURL } as Parameters<typeof buildSandpackOptions>[1];
     const options = buildSandpackOptions('static', config);
-    expect(options?.bundlerURL).toBe('https://static.example.com');
-    expect(options?.externalResources).toEqual([TAILWIND_RUNTIME_URL]);
+    expect(options?.bundlerURL).toBe(staticBundlerURL);
+    /** The static preview is framed from the bundler host, so the vendored
+     *  runtimes must resolve there too — a loopback origin would be blocked. */
+    expect(options?.externalResources).toEqual(
+      expectedResources.map((url) => url.replace(window.location.origin, staticBundlerURL)),
+    );
   });
 
   it('uses bundlerURL when template is react-ts and config is provided', () => {
@@ -126,7 +134,7 @@ describe('buildSandpackOptions', () => {
     >[1];
     const options = buildSandpackOptions('react-ts', config);
     expect(options?.bundlerURL).toBe('https://bundler.example.com');
-    expect(options?.externalResources).toEqual([TAILWIND_RUNTIME_URL]);
+    expect(options?.externalResources).toEqual(expectedResources);
   });
 
   it('returns base options without bundlerURL when no config is provided', () => {
@@ -1327,7 +1335,7 @@ describe('VibeCoder multi-file project manifest parsing', () => {
       ['/package.json', '/App.tsx', '/src/lib/Button.tsx'].sort(),
     );
     expect(files['/package.json']).toContain('"quiz-app"');
-    expect(files['/App.tsx']).toContain("export default function App()");
+    expect(files['/App.tsx']).toContain('export default function App()');
   });
 
   it('normalises relative paths and trims boundary newlines', () => {
@@ -1369,9 +1377,7 @@ describe('VibeCoder multi-file project manifest parsing', () => {
   });
 
   it('registers a project row kind with a folder glyph', () => {
-    expect(
-      artifactRowKind({ type: PROJECT_ARTIFACT_TYPE, title: 'my-app' }),
-    ).toMatchObject({
+    expect(artifactRowKind({ type: PROJECT_ARTIFACT_TYPE, title: 'my-app' })).toMatchObject({
       rendersPreview: true,
       fallbackGlyph: 'project',
       label: { key: 'com_ui_artifact_format_project' },

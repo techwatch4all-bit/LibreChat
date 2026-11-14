@@ -87,6 +87,12 @@ const setup = ({
     .spyOn(miscDataProvider, 'useGetBannerQuery')
     //@ts-ignore - we don't need all parameters of the QueryObserverSuccessResult
     .mockReturnValue(useGetBannerQueryReturnValue);
+  /** The auth route is a landing page until asked for the form, so open the
+   *  registration card the way a bookmarked `?signin=1` link does. */
+  const params = new URLSearchParams(window.location.search);
+  params.set('signin', '1');
+  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+
   const renderResult = render(
     <AuthLayout
       startupConfig={useGetStartupConfigReturnValue.data as TStartupConfig}
@@ -191,16 +197,13 @@ test('shows validation error messages', async () => {
   await userEvent.type(getByTestId('password'), 'pass');
   await userEvent.type(getByTestId('confirm_password'), 'password1');
   const alerts = getAllByRole('alert');
-  expect(alerts).toHaveLength(6);
+  expect(alerts).toHaveLength(5);
 
-  // This first alert is for the theme toggle, which is empty within this test but still picked up by getAllByRole as an alert
-  expect(alerts[0]).toHaveTextContent('');
-
-  expect(alerts[1]).toHaveTextContent(/Name must be at least 3 characters/i);
-  expect(alerts[2]).toHaveTextContent(/Username must be at least 2 characters/i);
-  expect(alerts[3]).toHaveTextContent(/You must enter a valid email address/i);
-  expect(alerts[4]).toHaveTextContent(/Password must be at least 8 characters/i);
-  expect(alerts[5]).toHaveTextContent(/Passwords do not match/i);
+  expect(alerts[0]).toHaveTextContent(/Name must be at least 3 characters/i);
+  expect(alerts[1]).toHaveTextContent(/Username must be at least 2 characters/i);
+  expect(alerts[2]).toHaveTextContent(/You must enter a valid email address/i);
+  expect(alerts[3]).toHaveTextContent(/Password must be at least 8 characters/i);
+  expect(alerts[4]).toHaveTextContent(/Passwords do not match/i);
 });
 
 test('shows error message when registration fails', async () => {

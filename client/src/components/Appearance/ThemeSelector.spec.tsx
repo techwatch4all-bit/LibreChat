@@ -65,16 +65,17 @@ describe('ThemeSelector', () => {
       unobserve = jest.fn();
       disconnect = jest.fn();
     };
-    const { getByRole, getByTestId } = render(
+    const { findByRole, getByTestId } = render(
       <RecoilRoot>
         <ThemeSelector theme="satchida-dark" onChange={mockOnChange} />
       </RecoilRoot>,
     );
 
-    fireEvent.click(getByTestId('theme-selector'));
+    await clickDropdown(getByTestId('theme-selector'));
+    await flushDropdownEffects();
 
-    expect(getByRole('option', { name: 'Satchida dark' })).toBeInTheDocument();
-    expect(getByRole('option', { name: 'Satchida light' })).toBeInTheDocument();
+    expect(await findByRole('option', { name: 'Satchida Dark' })).toBeInTheDocument();
+    expect(await findByRole('option', { name: 'Satchida Light' })).toBeInTheDocument();
   });
 
   it('offers both high contrast options and reports the selected one', async () => {

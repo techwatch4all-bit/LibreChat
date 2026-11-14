@@ -251,6 +251,9 @@ describe('global shortcut dispatch', () => {
     renderHarness();
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
+    /** jsdom performs no layout, so every element reports an empty box and the
+     *  "paints no box" guard in `anyModalOpen` would skip a real dialog. */
+    jest.spyOn(dialog, 'getClientRects').mockReturnValue([{} as DOMRect] as unknown as DOMRectList);
     document.body.appendChild(dialog);
 
     const event = dispatchKey({ key: 's', ctrlKey: true, shiftKey: true });

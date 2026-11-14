@@ -8,6 +8,65 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — the 48 remaining client failures fixed
+
+**Problem.** After the dependency repair the client suite stood at 8729 passed / 48 failed in
+12 suites. Seven of those suites had never executed at all before that repair (`Login`,
+`Registration`, `Breakdown`, `MCPSelect`, `ThemeSelector`, `SkillsSidePanel`,
+`useKeyboardShortcuts`); the other five carried failures of their own (`artifacts`,
+`ArtifactPreview`, `useSkillPermissions`, `mutations`, `appearanceTokens`). Each was a real
+defect in this fork's code or tests, not a consequence of the repair — re-running the seven
+against `@react-spring/web@9.7.5` gave the same 48.
+
+**Shipped.**
+
+- `store/usage.ts` — `contextBreakdownExpandedAtom` default `true` to `false`. The comment
+  above it already said "the gauge alone is the default", and `Breakdown.spec` opened with
+  `aria-expanded="false"`; the fork's import had flipped the value, so every "click to
+  expand" test was toggling the detail shut. Fixes 23.
+- `Chat/Input/MCPSelect.tsx` — restored the shared trigger: `composerControlClasses()` plus
+  `min-w-theme-control` / `md:px-theme-normal`, and the `displayText` label the fork's
+  rewrite had computed but never rendered (it also left `composerControlClasses` and
+  `ChevronDown` imported and unused). The accessible name is the selected server again, so
+  a screen reader is no longer told only "MCP Servers". Fixes 3.
+- `Auth/__tests__/Login.spec.tsx`, `Auth/__tests__/Registration.spec.tsx` — the auth route is
+  a landing page until asked for the form, so the suites now open it the way a bookmarked
+  `?signin=1` link does (preserving the OAuth `error`/`redirect` query). Fixes 12.
+- `utils/__tests__/artifacts.test.ts` — `externalResources` now also carries
+  `GSAP_RUNTIME_URL`, and for a `static` template with `staticBundlerURL` both vendored
+  runtimes resolve against that host instead of the app origin (the cross-origin fix).
+  Fixes 4.
+- `Artifacts/ArtifactPreview.spec.tsx` — expects the `allow-same-origin` token the 3D
+  artifact needs, and waits for the async vendor-script inlining instead of asserting on
+  the first paint. Fixes 1.
+- `hooks/useKeyboardShortcuts.spec.tsx` — the `anyModalOpen` guard skips dialogs that paint
+  no box, and jsdom lays out nothing, so the test reports a box the way a browser would.
+  Fixes 1.
+- `hooks/Skills/__tests__/useSkillPermissions.test.ts` — `canDelete` is author-or-admin by
+  design: `deleteHandler` answers 403 for anyone else, so the ACL DELETE bit must not light
+  up a button the API rejects. Fixes 1.
+- `data-provider/Skills/__tests__/mutations.spec.tsx` — the infinite-query key gained the
+  `deleted` segment the trash view added. Fixes 1.
+- `Appearance/ThemeSelector.spec.tsx` — the option names are the localized, title-cased
+  `Satchida Dark` / `Satchida Light`, and the popover needs the shared dropdown helpers.
+  Fixes 1.
+- `Skills/sidebar/__tests__/SkillsSidePanel.spec.tsx` — the `~/hooks` mock did not provide
+  the `useAuthContext` the panel now reads, nor `useRestoreSkillMutation` from
+  `~/data-provider`. Fixes 1.
+- `Registration.spec.tsx` — the alert count drops from 6 to 5: the old theme toggle's empty
+  live region is gone with the landing selector. Fixes 1.
+- `utils/suggestedQuestions.ts` + its spec — reconciled to the strip-stray-tags behaviour
+  another session had left uncommitted: an unclosed `<details>` now loses the tags but keeps
+  its text, and the docstring and test say so. Fixes 1.
+
+**Evidence.** `npx jest` in `client` -> 636/636 suites and 8777/8777 tests, against 635/636
+and 8776/8777 before. `npx tsc --noEmit` in `client` -> 45 errors, the same pre-existing
+Admin/SpecIcon set as the baseline. `node --check` clean on `admin/app.js` and
+`api/server/routes/admin/users.js`; `python -m py_compile` clean on
+`skill/stem-study-server.py`.
+
+---
+
 ## 2026-11-14 — 50 chat-rendering suites were dead; dependency tree repaired
 
 **Problem.** `npx jest src/components/Chat/Messages/Content` ran 579 tests in 33 suites and reported

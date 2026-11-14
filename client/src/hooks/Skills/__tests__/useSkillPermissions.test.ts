@@ -96,14 +96,16 @@ describe('useSkillPermissions', () => {
     expect(result.current.canShare).toBe(false);
   });
 
-  it('grants DELETE + SHARE when the ACL owner role bits are present', () => {
+  it('leaves DELETE to the author or an admin even when the ACL carries the DELETE bit', () => {
     mockUser('user-owner-acl');
     mockPermissions(
       PermissionBits.VIEW | PermissionBits.EDIT | PermissionBits.DELETE | PermissionBits.SHARE,
     );
     const { result } = renderHook(() => useSkillPermissions(makeSkill()));
     expect(result.current.canEdit).toBe(true);
-    expect(result.current.canDelete).toBe(true);
+    /** The delete endpoint answers 403 for a non-author, so offering the
+     *  action on the ACL bit alone would render a button the API rejects. */
+    expect(result.current.canDelete).toBe(false);
     expect(result.current.canShare).toBe(true);
   });
 

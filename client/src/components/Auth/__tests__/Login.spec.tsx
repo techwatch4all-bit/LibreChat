@@ -96,6 +96,12 @@ const setup = ({
   const mockUseOutletContext = jest.spyOn(reactRouter, 'useOutletContext').mockReturnValue({
     startupConfig: useGetStartupConfigReturnValue.data,
   });
+  /** The auth route is a landing page until asked for the form, so open the
+   *  sign-in card the way a bookmarked `?signin=1` link does. */
+  const params = new URLSearchParams(window.location.search);
+  params.set('signin', '1');
+  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+
   const renderResult = render(
     <AuthLayout
       startupConfig={useGetStartupConfigReturnValue.data as TStartupConfig}

@@ -1,6 +1,21 @@
 import React, { memo } from 'react';
 import { ProviderIcon } from '@librechat/client';
-import { MessageSquare, Sparkles, Terminal, GraduationCap, ShieldCheck, Film } from 'lucide-react';
+import {
+  MessageSquare,
+  Sparkles,
+  Terminal,
+  GraduationCap,
+  ShieldCheck,
+  Film,
+  Home,
+  BookOpen,
+  HeartPulse,
+  Sun,
+  DraftingCompass,
+  Wrench,
+  FileText,
+  Crown,
+} from 'lucide-react';
 import type { TModelSpec, TEndpointsConfig } from 'librechat-data-provider';
 import { EntityEndpointMark, isEntityEndpoint } from '~/components/Endpoints/EntityEndpointMark';
 import { URLIcon } from '~/components/Endpoints/URLIcon';
@@ -27,6 +42,14 @@ const SPEC_ICONS: Record<
   'study-local': { icon: GraduationCap, color: 'text-teal-400' },
   privacy: { icon: ShieldCheck, color: 'text-amber-400' },
   motion: { icon: Film, color: 'text-fuchsia-400' },
+  scenemosaic: { icon: Home, color: 'text-orange-400' },
+  deeptutor: { icon: BookOpen, color: 'text-teal-300' },
+  'health-wellness': { icon: HeartPulse, color: 'text-rose-400' },
+  'panchang-vedic': { icon: Sun, color: 'text-amber-300' },
+  'architect-studio': { icon: DraftingCompass, color: 'text-cyan-400' },
+  'maker-hardware': { icon: Wrench, color: 'text-lime-400' },
+  'document-vault': { icon: FileText, color: 'text-blue-400' },
+  pro: { icon: Crown, color: 'text-purple-300' },
 };
 
 const SpecIcon: React.FC<SpecIconProps> = ({

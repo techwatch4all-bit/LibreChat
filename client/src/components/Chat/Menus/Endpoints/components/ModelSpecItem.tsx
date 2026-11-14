@@ -66,6 +66,46 @@ const SPEC_META: Record<string, SpecMetadata> = {
     badgeClass: 'bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30',
     cardGlow: 'hover:border-fuchsia-500/40',
   },
+  scenemosaic: {
+    badge: '3D Spatial Room',
+    badgeClass: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    cardGlow: 'hover:border-orange-500/40',
+  },
+  deeptutor: {
+    badge: 'AI Academic Studio',
+    badgeClass: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+    cardGlow: 'hover:border-teal-500/40',
+  },
+  'health-wellness': {
+    badge: 'Holistic Wellness',
+    badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    cardGlow: 'hover:border-rose-500/40',
+  },
+  'panchang-vedic': {
+    badge: 'Vedic Almanac',
+    badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    cardGlow: 'hover:border-amber-500/40',
+  },
+  'architect-studio': {
+    badge: 'Spatial Planning',
+    badgeClass: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    cardGlow: 'hover:border-cyan-500/40',
+  },
+  'maker-hardware': {
+    badge: 'Electronics & DIY',
+    badgeClass: 'bg-lime-500/15 text-lime-400 border-lime-500/30',
+    cardGlow: 'hover:border-lime-500/40',
+  },
+  'document-vault': {
+    badge: 'Docs & Stories',
+    badgeClass: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+    cardGlow: 'hover:border-blue-500/40',
+  },
+  pro: {
+    badge: 'Pro Seat Tier',
+    badgeClass: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+    cardGlow: 'hover:border-purple-500/40',
+  },
 };
 
 export function ModelSpecItem({ spec, isSelected, posInSet, setSize }: ModelSpecItemProps) {

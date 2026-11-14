@@ -3,10 +3,8 @@
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx.cmd",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@modelcontextprotocol/server-filesystem@2026.8.31",
         "${PLUGIN_DATA}/workspace"
@@ -15,22 +13,22 @@
     },
     "memory": {
       "type": "stdio",
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-memory@2026.8.31"],
+      "command": "npx.cmd",
+      "args": ["-y", "@modelcontextprotocol/server-memory@2026.8.31"],
       "env": {
         "MEMORY_FILE_PATH": "${PLUGIN_DATA}/memory/knowledge-graph.json"
       }
     },
     "sequential-thinking": {
       "type": "stdio",
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking@2026.8.31"],
+      "command": "npx.cmd",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@2026.8.31"],
       "env": {}
     },
     "playwright": {
       "type": "stdio",
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp@0.0.83", "--isolated"],
+      "command": "npx.cmd",
+      "args": ["-y", "@playwright/mcp@0.0.83", "--isolated"],
       "env": {}
     },
     "context7": {

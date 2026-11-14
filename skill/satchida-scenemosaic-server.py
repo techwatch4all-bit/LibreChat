@@ -12,6 +12,17 @@ from mcp.server.mcpserver import MCPServer
 
 mcp = MCPServer("satchida-scenemosaic")
 
+DEFAULT_SCANDINAVIAN_LIVING_OBJECTS = [
+    {"id": "sofa_1", "name": "3-Seat Nordic Fabric Sofa", "type": "sofa", "x": 5.2, "z": 0.6, "w": 8.0, "d": 3.2, "h": 2.8, "wall_attach": "north", "yaw_deg": 0, "color": "#8c9294"},
+    {"id": "coffee_1", "name": "Solid Block Oak Coffee Table", "type": "coffee_table", "x": 6.8, "z": 5.2, "w": 4.8, "d": 2.4, "h": 1.4, "yaw_deg": 0, "color": "#b88b5c"},
+    {"id": "armchair_left", "name": "Scandinavian Oak Armchair", "type": "armchair", "x": 2.4, "z": 4.0, "w": 2.8, "d": 2.8, "h": 2.7, "yaw_deg": 45, "color": "#b88b5c"},
+    {"id": "armchair_right", "name": "Cognac Leather Sling Lounge Chair", "type": "armchair", "x": 12.6, "z": 4.0, "w": 2.8, "d": 2.8, "h": 2.7, "yaw_deg": -45, "color": "#a05a2c"},
+    {"id": "pouf_1", "name": "Stitched Leather Pouf (Left)", "type": "pouf", "x": 6.0, "z": 8.8, "w": 1.8, "d": 1.8, "h": 1.4, "yaw_deg": 0, "color": "#945328"},
+    {"id": "pouf_2", "name": "Stitched Leather Pouf (Right)", "type": "pouf", "x": 8.6, "z": 8.8, "w": 1.8, "d": 1.8, "h": 1.4, "yaw_deg": 0, "color": "#945328"},
+    {"id": "lamp_1", "name": "Cantilever Arched Brass Floor Lamp", "type": "lamp", "x": 11.6, "z": 0.8, "w": 1.4, "d": 1.4, "h": 5.8, "yaw_deg": 0, "color": "#d4af37"},
+    {"id": "plant_1", "name": "Multi-Stem Fiddle Leaf Fig Tree", "type": "planter", "x": 14.2, "z": 1.2, "w": 2.0, "d": 2.0, "h": 4.8, "wall_attach": "east", "yaw_deg": 0, "color": "#2d5a27"},
+]
+
 DEFAULT_OBJECTS = [
     {"id": "sofa_1", "name": "3-Seat Linen Sofa", "type": "sofa", "x": 4.4, "z": 0.6, "w": 7.2, "d": 3.0, "h": 2.7, "wall_attach": "north", "yaw_deg": 0, "color": "#5f6b6d"},
     {"id": "coffee_1", "name": "Oak Coffee Table", "type": "coffee_table", "x": 5.9, "z": 5.1, "w": 4.2, "d": 2.2, "h": 1.4, "yaw_deg": 0, "color": "#a47c54"},
@@ -33,7 +44,12 @@ TYPE_BOUNDS = {
     "table": (3.0, 6.0, 4.2, 2.0, 3.6, 2.4, 2.2, 2.7, 2.5),
     "dining": (4.5, 7.5, 5.5, 2.8, 4.0, 3.2, 2.3, 2.7, 2.5),
     "chair": (1.7, 2.3, 1.9, 1.7, 2.3, 1.9, 2.4, 3.1, 2.7),
-    "armchair": (2.4, 3.3, 2.8, 2.4, 3.3, 2.8, 2.4, 3.1, 2.7),
+    "armchair": (2.4, 3.4, 2.8, 2.4, 3.4, 2.8, 2.4, 3.2, 2.7),
+    "ottoman": (1.4, 2.8, 1.8, 1.4, 2.8, 1.8, 1.2, 1.8, 1.5),
+    "pouf": (1.4, 2.6, 1.8, 1.4, 2.6, 1.8, 1.1, 1.7, 1.4),
+    "bench": (2.8, 5.0, 3.6, 1.2, 2.2, 1.6, 1.2, 1.8, 1.5),
+    "side_table": (1.4, 2.4, 1.8, 1.4, 2.4, 1.8, 1.6, 2.4, 2.0),
+    "end_table": (1.4, 2.4, 1.8, 1.4, 2.4, 1.8, 1.6, 2.4, 2.0),
     "tv": (4.2, 7.0, 5.4, 1.2, 2.0, 1.5, 2.8, 4.2, 3.4),
     "media": (4.2, 7.0, 5.4, 1.2, 2.0, 1.5, 2.8, 4.2, 3.4),
     "lamp": (1.1, 1.8, 1.4, 1.1, 1.8, 1.4, 4.4, 6.0, 5.2),
@@ -43,7 +59,8 @@ TYPE_BOUNDS = {
     "nightstand": (1.4, 2.2, 1.8, 1.3, 2.0, 1.6, 1.6, 2.3, 2.0),
     "kitchen": (5.0, 10.0, 7.0, 2.0, 2.6, 2.2, 2.8, 3.2, 3.0),
     "bath": (4.5, 6.5, 5.2, 2.4, 3.2, 2.7, 1.6, 2.4, 2.0),
-    "planter": (1.3, 2.4, 1.8, 1.3, 2.4, 1.8, 2.4, 4.6, 3.6),
+    "planter": (1.2, 2.4, 1.6, 1.2, 2.4, 1.6, 2.2, 4.8, 3.4),
+    "plant": (1.2, 2.4, 1.6, 1.2, 2.4, 1.6, 2.2, 4.8, 3.4),
 }
 
 WALL_YAW = {"north": 0.0, "south": 180.0, "west": 90.0, "east": -90.0}
@@ -59,13 +76,38 @@ def _footprint_for_yaw(w: float, d: float, yaw_deg: float) -> tuple[float, float
 
 def _clamp_dimensions(raw: dict, idx: int, room_w: float, room_d: float) -> dict:
     obj = dict(raw)
-    ftype = str(obj.get("type", "table")).lower().strip()
+    raw_name = str(obj.get("name", "")).lower()
+    raw_type = str(obj.get("type", "table")).lower().strip()
+
+    # Intelligent semantic type inference from object name
+    if any(k in raw_name for k in ("ottoman", "pouf", "footstool")):
+        ftype = "ottoman"
+    elif any(k in raw_name for k in ("armchair", "lounge chair", "accent chair")):
+        ftype = "armchair"
+    elif any(k in raw_name for k in ("side table", "end table", "nightstand")):
+        ftype = "side_table"
+    elif "coffee table" in raw_name:
+        ftype = "coffee_table"
+    elif any(k in raw_name for k in ("plant", "planter", "tree", "fig", "monstera")):
+        ftype = "planter"
+    elif "lamp" in raw_name or "light" in raw_name:
+        ftype = "lamp"
+    else:
+        ftype = raw_type
+
     lo_w, hi_w, def_w, lo_d, hi_d, def_d, lo_h, hi_h, def_h = TYPE_BOUNDS.get(
         ftype, (1.5, 6.0, 2.8, 1.5, 4.5, 2.2, 1.5, 5.0, 2.5)
     )
     w = float(obj.get("w", def_w) or def_w)
     d = float(obj.get("d", def_d) or def_d)
     h = float(obj.get("h", def_h) or def_h)
+
+    # Detect metric input (meters to feet conversion: e.g. sofa w=2.4m, h=0.8m)
+    if (ftype in ("sofa", "couch", "bed") and 0 < w < 3.8) or (0 < h < 1.2 and ftype in ("sofa", "chair", "armchair", "tv")):
+        w *= 3.28084
+        d *= 3.28084
+        h *= 3.28084
+
     if w > 20.0:
         w /= 12.0
     if d > 20.0:
@@ -99,53 +141,131 @@ def _clamp_dimensions(raw: dict, idx: int, room_w: float, room_d: float) -> dict
 def _resolve_containment_and_collisions(objects: list[dict], room_w: float, room_d: float) -> tuple[list[dict], int]:
     """
     Intelligent architectural zoning & collision solver:
-    - Merges duplicate TV/Console footprints into a single grounded media unit.
-    - Enforces opposite-wall orientation for Sofa and TV (7.5'-9.5' viewing distance).
-    - Centers Coffee Table on the rug between Sofa and TV.
-    - Zoned Study Desk on East/West wall with facing chair.
-    - Protects West entry door swing corridor.
+    - Normalizes semantic types and handles metric/relative coordinate inputs.
+    - Archetype-aware spatial layout: Conversational Lounge, Bedroom, or Studio.
+    - Establishes focal seating hierarchy (Sofa North, Coffee Table center, Armchairs East/West, Ottomans South).
+    - Unifies duplicate TV footprints and protects walkway clearances (minimum 1.2ft-1.5ft gaps).
     - Multi-pass iterative AABB relaxation guaranteeing 0 collisions.
     """
     margin = 0.45
     raw_list = [dict(o) for o in objects]
 
+    # Pre-clamp each item to have valid dimensions and semantic types
+    pre_clamped = [_clamp_dimensions(raw, idx, room_w, room_d) for idx, raw in enumerate(raw_list)]
+
     # 1. Unify duplicate TV and TV Console objects so they don't fight for floor space
-    tvs = [o for o in raw_list if o.get("type") in ("tv", "media") or "tv" in str(o.get("name", "")).lower()]
+    tvs = [o for o in pre_clamped if o.get("type") in ("tv", "media") or "tv" in str(o.get("name", "")).lower()]
     if len(tvs) > 1:
-        # Keep the largest console as the primary media unit, drop duplicate screen footprint
         primary_tv = max(tvs, key=lambda item: float(item.get("w", 5.0)) * float(item.get("d", 1.5)))
         primary_tv["name"] = "Media Console & TV"
         primary_tv["type"] = "tv"
-        raw_list = [o for o in raw_list if o not in tvs or o is primary_tv]
+        pre_clamped = [o for o in pre_clamped if o not in tvs or o is primary_tv]
 
-    # 2. Opposite-wall living room arrangement (TV vs Sofa)
-    sofa = next((o for o in raw_list if o.get("type") in ("sofa", "couch")), None)
-    tv = next((o for o in raw_list if o.get("type") in ("tv", "media")), None)
-    desk = next((o for o in raw_list if o.get("type") == "desk"), None)
+    # 2. Conversational Living Room Lounge Layout Engine
+    sofa = next((o for o in pre_clamped if o.get("type") in ("sofa", "couch")), None)
+    coffee = next((o for o in pre_clamped if o.get("type") == "coffee_table"), None)
+    tv = next((o for o in pre_clamped if o.get("type") in ("tv", "media")), None)
+    armchairs = [o for o in pre_clamped if o.get("type") == "armchair" or (o.get("type") == "chair" and not any(d.get("type") == "desk" for d in pre_clamped))]
+    ottomans = [o for o in pre_clamped if o.get("type") in ("ottoman", "pouf", "bench")]
+    side_tables = [o for o in pre_clamped if o.get("type") in ("side_table", "end_table")]
+    lamps = [o for o in pre_clamped if o.get("type") == "lamp"]
+    planters = [o for o in pre_clamped if o.get("type") in ("planter", "plant")]
+    desk = next((o for o in pre_clamped if o.get("type") == "desk"), None)
 
-    if sofa and tv:
-        # If TV is placed along North wall, place TV on North wall and Sofa on South wall facing North
-        tv["wall_attach"] = "north"
-        tv["yaw_deg"] = 0.0
-        tv["x"] = round(room_w * 0.28, 2)
-        tv["z"] = margin
+    if sofa:
+        # Center Sofa against North wall (focal seating axis)
+        sofa["wall_attach"] = "north"
+        sofa["yaw_deg"] = 0.0
+        sofa["x"] = round((room_w - sofa["w"]) / 2.0, 2)
+        sofa["z"] = round(margin + 0.35, 2)
 
-        sofa["wall_attach"] = "south"
-        sofa["yaw_deg"] = 180.0
-        sofa["x"] = round(room_w * 0.28, 2)
-        sofa_d = float(sofa.get("d", 3.0))
-        sofa["z"] = round(max(margin, room_d - sofa_d - 1.2), 2)
+        # Place TV if present
+        if tv:
+            tv["wall_attach"] = "south"
+            tv["yaw_deg"] = 180.0
+            tv["x"] = round((room_w - tv["w"]) / 2.0, 2)
+            tv["z"] = round(room_d - tv["d"] - margin, 2)
 
-    # 3. Relocate Desk to East wall if it was colliding with North TV wall
+        # Center Coffee Table in front of Sofa with 1.4ft walkway clearance
+        if coffee:
+            coffee["x"] = round(sofa["x"] + (sofa["w"] - coffee["w"]) / 2.0, 2)
+            coffee["z"] = round(sofa["z"] + sofa["d"] + 1.4, 2)
+            coffee["yaw_deg"] = 0.0
+
+            # Flank Armchairs on West & East facing inward toward Coffee Table
+            if armchairs:
+                if len(armchairs) >= 2:
+                    a_west = armchairs[0]
+                    a_east = armchairs[1]
+                    # West Armchair (facing East)
+                    a_west["yaw_deg"] = 90.0
+                    a_west["wall_attach"] = "west"
+                    a_west["x"] = round(max(margin + 0.25, coffee["x"] - a_west["w"] - 1.2), 2)
+                    a_west["z"] = round(coffee["z"] + (coffee["d"] - a_west["d"]) / 2.0, 2)
+                    # East Armchair (facing West)
+                    a_east["yaw_deg"] = -90.0
+                    a_east["wall_attach"] = "east"
+                    a_east["x"] = round(min(room_w - a_east["w"] - margin - 0.25, coffee["x"] + coffee["w"] + 1.2), 2)
+                    a_east["z"] = round(coffee["z"] + (coffee["d"] - a_east["d"]) / 2.0, 2)
+                elif len(armchairs) == 1:
+                    a_west = armchairs[0]
+                    a_west["yaw_deg"] = 90.0
+                    a_west["x"] = round(max(margin + 0.25, coffee["x"] - a_west["w"] - 1.2), 2)
+                    a_west["z"] = round(coffee["z"] + (coffee["d"] - a_west["d"]) / 2.0, 2)
+
+            # Place Ottomans opposite Sofa on the South side of Coffee Table, facing North
+            if ottomans:
+                oz = round(coffee["z"] + coffee["d"] + 1.1, 2)
+                mid_x = coffee["x"] + coffee["w"] / 2.0
+                if len(ottomans) >= 2:
+                    ot1, ot2 = ottomans[0], ottomans[1]
+                    ot1["x"] = round(mid_x - ot1["w"] - 0.35, 2)
+                    ot1["z"] = oz
+                    ot1["yaw_deg"] = 180.0
+                    ot2["x"] = round(mid_x + 0.35, 2)
+                    ot2["z"] = oz
+                    ot2["yaw_deg"] = 180.0
+                elif len(ottomans) == 1:
+                    ot = ottomans[0]
+                    ot["x"] = round(mid_x - ot["w"] / 2.0, 2)
+                    ot["z"] = oz
+                    ot["yaw_deg"] = 180.0
+
+        # Place Floor Lamp at Sofa corner
+        if lamps:
+            lp = lamps[0]
+            lp["x"] = round(max(margin + 0.2, sofa["x"] - lp["w"] - 0.4), 2)
+            lp["z"] = round(sofa["z"] + 0.1, 2)
+            lp["yaw_deg"] = 0.0
+
+        # Place Side Table at opposite Sofa flank
+        if side_tables:
+            st = side_tables[0]
+            st["x"] = round(min(room_w - st["w"] - margin - 0.2, sofa["x"] + sofa["w"] + 0.4), 2)
+            st["z"] = round(sofa["z"] + 0.2, 2)
+
+        # Distribute Planters into open room corners
+        if planters:
+            corners = [
+                (margin + 0.3, margin + 0.3),
+                (room_w - planters[0]["w"] - margin - 0.3, margin + 0.3),
+                (margin + 0.3, room_d - planters[0]["d"] - margin - 0.6),
+                (room_w - planters[0]["w"] - margin - 0.3, room_d - planters[0]["d"] - margin - 0.6),
+            ]
+            for p_idx, pl in enumerate(planters):
+                c_pos = corners[p_idx % len(corners)]
+                pl["x"] = round(c_pos[0], 2)
+                pl["z"] = round(c_pos[1], 2)
+
+    # 3. Zoned Study Desk on East wall if present
     if desk:
         desk["wall_attach"] = "east"
         desk["yaw_deg"] = -90.0
         desk["x"] = round(room_w - float(desk.get("d", 2.2)) - margin, 2)
-        desk["z"] = round(max(margin, room_d * 0.42), 2)
+        desk["z"] = round(max(margin, room_d * 0.45), 2)
 
     resolved = []
-    for idx, raw in enumerate(raw_list):
-        obj = _clamp_dimensions(raw, idx, room_w, room_d)
+    for obj in pre_clamped:
         bw, bd = _footprint_for_yaw(obj["w"], obj["d"], obj["yaw_deg"])
         x, z = obj["x"], obj["z"]
         attach = obj["wall_attach"]
@@ -176,22 +296,9 @@ def _resolve_containment_and_collisions(objects: list[dict], room_w: float, room
         obj["_bd"] = bd
         resolved.append(obj)
 
-    # 4. Semantic pairing: Coffee Table centered between Sofa and TV
-    sofa_res = next((o for o in resolved if o["type"] in ("sofa", "couch")), None)
-    coffee_res = next((o for o in resolved if o["type"] == "coffee_table"), None)
-    if sofa_res and coffee_res:
-        sx = sofa_res["x"] + sofa_res["_bw"] / 2.0
-        coffee_res["x"] = round(max(margin, min(room_w - coffee_res["_bw"] - margin, sx - coffee_res["_bw"] / 2.0)), 2)
-        if abs(sofa_res["yaw_deg"]) < 45:  # Sofa on North facing South
-            coffee_res["z"] = round(min(room_d - coffee_res["_bd"] - margin, sofa_res["z"] + sofa_res["_bd"] + 1.2), 2)
-            coffee_res["yaw_deg"] = 0.0
-        else:  # Sofa on South facing North
-            coffee_res["z"] = round(max(margin, sofa_res["z"] - coffee_res["_bd"] - 1.2), 2)
-            coffee_res["yaw_deg"] = 180.0
-
-    # 5. Semantic pairing: Chair in front of desk
+    # 4. Semantic pairing: Chair in front of desk
     desk_res = next((o for o in resolved if o["type"] == "desk"), None)
-    chair_res = next((o for o in resolved if o["type"] == "chair"), None)
+    chair_res = next((o for o in resolved if o["type"] == "chair" and o not in armchairs), None)
     if desk_res and chair_res:
         dz = desk_res["z"] + desk_res["_bd"] / 2.0
         if abs(desk_res["yaw_deg"] + 90) < 30:  # Desk on East wall, facing West (-X)
@@ -203,7 +310,7 @@ def _resolve_containment_and_collisions(objects: list[dict], room_w: float, room
             chair_res["z"] = round(max(margin, min(room_d - chair_res["_bd"] - margin, dz - chair_res["_bd"] / 2.0)), 2)
             chair_res["yaw_deg"] = -90.0
 
-    # 6. Multi-pass collision relaxation loop (guarantees 0 overlap)
+    # 5. Multi-pass collision relaxation loop (guarantees 0 overlap)
     total_nudges = 0
     for _pass in range(6):
         overlap_found = False
@@ -227,6 +334,7 @@ def _resolve_containment_and_collisions(objects: list[dict], room_w: float, room
                         if a["z"] >= b["z"]:
                             a["z"] = round(min(room_d - a["_bd"] - margin, a["z"] + shift), 2)
                         else:
+                            a["z"] = round(max(margin, a["z"] - shift), 2)
                             a["z"] = round(max(margin, a["z"] - shift), 2)
         if not overlap_found:
             break
@@ -377,7 +485,12 @@ def build_scenemosaic_scene(
     rd = max(10.0, min(60.0, float(room_depth)))
     if str(window_wall).lower() not in ("north", "south", "east", "west"):
         window_wall = "north"
-    objs = json.loads(objects_json) if objects_json.strip() not in ("", "[]") else DEFAULT_OBJECTS
+    if objects_json.strip() not in ("", "[]"):
+        objs = json.loads(objects_json)
+    elif any(k in (title + " " + style_preset).lower() for k in ("scandinavian", "living", "nordic", "lounge")):
+        objs = DEFAULT_SCANDINAVIAN_LIVING_OBJECTS
+    else:
+        objs = DEFAULT_OBJECTS
     variants, verification = _evolve_variants(objs, rw, rd, str(window_wall).lower(), int(window_count), float(window_width))
     safe_title = title.replace("<", "&lt;").replace(">", "&gt;")
     safe_style = style_preset.replace("<", "&lt;").replace(">", "&gt;")
@@ -397,6 +510,7 @@ def build_scenemosaic_scene(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{safe_title}</title>
+  <script>window.PERSON_NAME = 0; var PERSON_NAME = 0;</script>
   <script src="/assets/vendor/three/three.min.js"></script>
   <script src="/assets/vendor/three/OrbitControls.js"></script>
   <script src="/assets/vendor/three/GLTFExporter.js"></script>

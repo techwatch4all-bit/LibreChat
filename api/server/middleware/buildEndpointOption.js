@@ -66,6 +66,13 @@ const SPEC_TO_MODE = {
   Study: 'Study',
   Privacy: 'Privacy',
   Motion: 'Work',
+  SceneMosaic: 'Work',
+  DeepTutor: 'Study',
+  'Health-Wellness': 'Work',
+  'Panchang-Vedic': 'Work',
+  'Architect-Studio': 'Work',
+  'Maker-Hardware': 'Work',
+  'Document-Vault': 'Work',
 };
 
 /** Cached lookup: is the current user a member of the "Demo" group? */
@@ -131,6 +138,13 @@ async function buildEndpointOption(req, res, next) {
     'Privacy',
     'Motion',
     'SceneMosaic',
+    'DeepTutor',
+    'Health-Wellness',
+    'Panchang-Vedic',
+    'Architect-Studio',
+    'Maker-Hardware',
+    'Document-Vault',
+    'Pro',
   ];
   const isByokOrAgent =
     req.body.endpoint === 'openAI' ||
@@ -144,11 +158,9 @@ async function buildEndpointOption(req, res, next) {
     const spec =
       requestedSpec ?? (allowedSpecs.includes(requestedModel) ? requestedModel : undefined);
     if (!spec || !allowedSpecs.includes(spec)) {
-      return res
-        .status(403)
-        .json({
-          error: 'A Satchida mode (Chat, Work, VibeCoder, Study, Privacy, or Motion) is required',
-        });
+      return res.status(403).json({
+        error: 'A Satchida mode (Chat, Work, VibeCoder, Study, Privacy, or Motion) is required',
+      });
     }
     const configuredSpec = req.config?.modelSpecs?.list?.find((item) => item.name === spec);
     if (!configuredSpec?.preset) {

@@ -1,6 +1,7 @@
 /* Satchida SceneMosaic Studio — Self-contained Photorealistic 3D Room Reconstruction & Layout Evolution Engine */
 (function (global) {
   'use strict';
+  if (typeof global.PERSON_NAME === 'undefined') { global.PERSON_NAME = 0; }
 
   function softBox(THREE, w, h, d, radius, opts) {
     var puff = (opts && opts.puff) || 0;
@@ -126,6 +127,13 @@
     taupe: '#9c8e80',
     wood: '#a47c54',
     espresso: '#3b281c',
+    cognac: '#9e472a',
+    gray: '#6b7280',
+    grey: '#6b7280',
+    brass: '#d4af37',
+    gold: '#d4af37',
+    green: '#2e6638',
+    emerald: '#1b5e20',
   };
 
   function normalizeColor(c) {
@@ -365,7 +373,26 @@
       for (var bx = -1; bx <= 1; bx += 2) {
         addMesh(THREE, group, softBox(THREE, w * 0.38, h * 0.16, d * 0.22, 0.06, { puff: 0.36 }), mats.linen, bx * w * 0.23, h * 0.66, -d * 0.31, 0.1, 0, bx * 0.03);
       }
-    } else if (t === 'desk' || t === 'table' || t === 'dining' || t === 'coffee_table') {
+    } else if (t === 'coffee_table') {
+      // Solid rustic oak block coffee table with tabletop styling
+      var tabletopMat = new THREE.MeshStandardMaterial({
+        map: makeWoodTexture(THREE, item.color || '#8a6341', 2, 2),
+        roughness: 0.52,
+        metalness: 0.02
+      });
+      // Solid timber plinth table
+      addMesh(THREE, group, softBox(THREE, w, h * 0.72, d, 0.05), tabletopMat, 0, h * 0.50, 0);
+      // Recessed dark wood plinth base
+      addMesh(THREE, group, softBox(THREE, w * 0.88, h * 0.16, d * 0.88, 0.02), mats.darkWood, 0, h * 0.08, 0);
+      
+      // Tabletop decor: ceramic bud vase + stacked art books
+      var vaseMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f2, roughness: 0.25, metalness: 0.05 });
+      addMesh(THREE, group, new THREE.CylinderGeometry(0.12, 0.16, 0.38, 16), vaseMat, -w * 0.22, h * 1.02, 0);
+      var bookMat1 = new THREE.MeshStandardMaterial({ color: 0x3d4148, roughness: 0.7 });
+      var bookMat2 = new THREE.MeshStandardMaterial({ color: 0xc4a47c, roughness: 0.75 });
+      addMesh(THREE, group, new THREE.BoxGeometry(0.48, 0.08, 0.34), bookMat1, w * 0.22, h * 0.90, 0.05, 0, 0.15, 0);
+      addMesh(THREE, group, new THREE.BoxGeometry(0.44, 0.07, 0.30), bookMat2, w * 0.21, h * 0.97, 0.05, 0, -0.08, 0);
+    } else if (t === 'desk' || t === 'table' || t === 'dining') {
       var topThick = Math.max(0.08, h * 0.1);
       addMesh(THREE, group, softBox(THREE, w, topThick, d, 0.03), woodMat, 0, h - topThick * 0.5, 0);
       var legH = h - topThick;
@@ -383,13 +410,81 @@
         addMesh(THREE, group, new THREE.CylinderGeometry(0.22, 0.18, 0.36, 14), mats.ceramic, 0, h + 0.18, 0);
         addMesh(THREE, group, new THREE.IcosahedronGeometry(0.28, 1), mats.foliage, 0, h + 0.44, 0);
       }
-    } else if (t === 'chair' || t === 'armchair') {
+    } else if (t === 'armchair' || t === 'accent_chair' || t === 'lounge_chair') {
+      var isLeather = /cognac|leather|saddle|brown|caramel/i.test(item.color || '') || /leather|safari|lounge/i.test(item.name || '');
+      
+      if (isLeather) {
+        // Modern Cognac Leather Sling Lounge Chair on blackened steel frame
+        var leatherMat = new THREE.MeshStandardMaterial({
+          color: 0x8a4b29,
+          roughness: 0.55,
+          metalness: 0.12
+        });
+        var steelMat = mats.charcoal;
+        [-1, 1].forEach(function (side) {
+          addMesh(THREE, group, new THREE.CylinderGeometry(0.035, 0.035, h * 0.65, 10), steelMat, side * w * 0.44, h * 0.32, -d * 0.35, -0.22, 0, 0);
+          addMesh(THREE, group, new THREE.CylinderGeometry(0.035, 0.035, h * 0.48, 10), steelMat, side * w * 0.44, h * 0.24, d * 0.35, 0.15, 0, 0);
+          addMesh(THREE, group, new THREE.BoxGeometry(0.07, 0.04, d * 0.78), steelMat, side * w * 0.44, h * 0.56, 0);
+          addMesh(THREE, group, softBox(THREE, 0.10, 0.06, d * 0.45, 0.02), leatherMat, side * w * 0.44, h * 0.58, 0.02);
+        });
+        addMesh(THREE, group, new THREE.CylinderGeometry(0.03, 0.03, w * 0.88, 10), steelMat, 0, h * 0.12, -d * 0.25, 0, 0, Math.PI / 2);
+        addMesh(THREE, group, new THREE.CylinderGeometry(0.03, 0.03, w * 0.88, 10), steelMat, 0, h * 0.12, d * 0.25, 0, 0, Math.PI / 2);
+        
+        addMesh(THREE, group, softBox(THREE, w * 0.78, h * 0.14, d * 0.72, 0.04, { puff: 0.28 }), leatherMat, 0, h * 0.34, d * 0.05, 0.12, 0, 0);
+        addMesh(THREE, group, softBox(THREE, w * 0.76, h * 0.55, d * 0.12, 0.04, { puff: 0.22 }), leatherMat, 0, h * 0.64, -d * 0.28, -0.25, 0, 0);
+      } else {
+        // Scandinavian Solid Oak Armchair with angled tapered frame and tailored linen cushions
+        var scandOakMat = new THREE.MeshStandardMaterial({
+          map: makeWoodTexture(THREE, '#6b4c33', 2, 2),
+          roughness: 0.52
+        });
+        var scandCushionMat = new THREE.MeshStandardMaterial({
+          map: makeFabricTexture(THREE, item.color || '#c8b097'),
+          roughness: 0.88
+        });
+        [-1, 1].forEach(function (side) {
+          addMesh(THREE, group, new THREE.CylinderGeometry(0.045, 0.035, h * 0.48, 10), scandOakMat, side * w * 0.42, h * 0.24, d * 0.34, 0.12, 0, side * 0.06);
+          addMesh(THREE, group, new THREE.CylinderGeometry(0.05, 0.04, h * 0.75, 10), scandOakMat, side * w * 0.42, h * 0.38, -d * 0.32, -0.22, 0, side * 0.06);
+          addMesh(THREE, group, softBox(THREE, 0.10, 0.06, d * 0.78, 0.02), scandOakMat, side * w * 0.42, h * 0.54, 0.02, -0.06, 0, 0);
+        });
+        addMesh(THREE, group, softBox(THREE, w * 0.82, 0.07, d * 0.76, 0.02), scandOakMat, 0, h * 0.26, 0);
+        addMesh(THREE, group, softBox(THREE, w * 0.78, h * 0.22, d * 0.74, 0.05, { puff: 0.32 }), scandCushionMat, 0, h * 0.40, d * 0.03, 0.08, 0, 0);
+        addMesh(THREE, group, softBox(THREE, w * 0.76, h * 0.52, d * 0.18, 0.05, { puff: 0.26 }), scandCushionMat, 0, h * 0.65, -d * 0.28, -0.22, 0, 0);
+      }
+    } else if (t === 'chair') {
       addMesh(THREE, group, softBox(THREE, w * 0.9, h * 0.14, d * 0.88, 0.04, { puff: 0.2 }), fabricMat, 0, h * 0.48, 0);
       addMesh(THREE, group, softBox(THREE, w * 0.88, h * 0.48, d * 0.14, 0.04), fabricMat, 0, h * 0.74, -d * 0.38);
       var cLegGeo = new THREE.CylinderGeometry(0.045, 0.03, h * 0.45, 8);
       [[-w * 0.36, -d * 0.34], [w * 0.36, -d * 0.34], [-w * 0.36, d * 0.34], [w * 0.36, d * 0.34]].forEach(function (pt) {
         addMesh(THREE, group, cLegGeo, mats.darkWood, pt[0], h * 0.225, pt[1]);
       });
+    } else if (t === 'ottoman' || t === 'pouf' || t === 'bench') {
+      // Tailored upholstered ottoman / pouf with plump rounded cushion and wooden plinth
+      var otMat = new THREE.MeshStandardMaterial({
+        map: makeFabricTexture(THREE, baseColor),
+        roughness: 0.82,
+        metalness: 0.02,
+      });
+      // Low plinth base
+      addMesh(THREE, group, softBox(THREE, w * 0.92, h * 0.14, d * 0.92, 0.02), mats.darkWood, 0, h * 0.07, 0);
+      // Main plush tufted cushion
+      addMesh(THREE, group, softBox(THREE, w, h * 0.84, d, 0.06, { puff: 0.34 }), otMat, 0, h * 0.56, 0);
+      // 4 low tapered feet
+      var otLeg = new THREE.CylinderGeometry(0.04, 0.025, h * 0.14, 8);
+      [[-w * 0.38, -d * 0.38], [w * 0.38, -d * 0.38], [-w * 0.38, d * 0.38], [w * 0.38, d * 0.38]].forEach(function (pt) {
+        addMesh(THREE, group, otLeg, mats.brass, pt[0], h * 0.07, pt[1]);
+      });
+    } else if (t === 'side_table' || t === 'end_table') {
+      // Sculptural circular accent side table
+      var sRad = Math.min(w, d) * 0.48;
+      addMesh(THREE, group, new THREE.CylinderGeometry(sRad, sRad, 0.06, 24), woodMat, 0, h - 0.03, 0);
+      var sLeg = new THREE.CylinderGeometry(0.03, 0.02, h - 0.06, 8);
+      for (var sIdx = 0; sIdx < 3; sIdx++) {
+        var sAng = (sIdx / 3) * Math.PI * 2;
+        var sLx = Math.cos(sAng) * sRad * 0.65;
+        var sLz = Math.sin(sAng) * sRad * 0.65;
+        addMesh(THREE, group, sLeg, mats.brass, sLx, (h - 0.06) * 0.5, sLz, 0.06 * Math.cos(sAng), 0, 0.06 * Math.sin(sAng));
+      }
     } else if (t === 'wardrobe' || t === 'cabinet' || t === 'dresser' || t === 'nightstand') {
       addMesh(THREE, group, softBox(THREE, w, h, d, 0.03), woodMat, 0, h * 0.5, 0);
       if (t === 'wardrobe' || t === 'cabinet') {
@@ -426,47 +521,62 @@
       addMesh(THREE, group, softBox(THREE, w * 0.84, h * 0.54, 0.08, 0.02), mats.charcoal, 0, h * 0.72, -d * 0.2);
       var scrMat = new THREE.MeshStandardMaterial({ color: 0x11161f, roughness: 0.12, metalness: 0.2 });
       addMesh(THREE, group, new THREE.BoxGeometry(w * 0.8, h * 0.5, 0.02), scrMat, 0, h * 0.72, -d * 0.15);
-    } else if (t === 'lamp') {
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.32, w * 0.38, 0.1, 16), mats.brass, 0, 0.05, 0);
-      addMesh(THREE, group, new THREE.CylinderGeometry(0.04, 0.05, h * 0.72, 12), mats.brass, 0, h * 0.4, 0);
-      var shadeMat = new THREE.MeshStandardMaterial({
-        color: 0xfff3dc,
-        roughness: 0.85,
-        emissive: 0xffc878,
-        emissiveIntensity: 0.55,
-        side: THREE.DoubleSide,
+    } else if (t === 'lamp' || t === 'arc_lamp' || t === 'floor_lamp') {
+      // Photorealistic Arch / Cantilever Brass Floor Lamp matching Scandinavian photography
+      var baseR = Math.max(0.6, w * 0.35);
+      addMesh(THREE, group, new THREE.CylinderGeometry(baseR, baseR + 0.06, 0.12, 24), mats.brass, 0, 0.06, 0);
+      
+      // Sweeping arch cantilever tube extending up and over towards the lounge
+      var archH = Math.max(6.5, h);
+      var archReach = Math.max(2.4, w * 1.4);
+      var curve = new THREE.CubicBezierCurve3(
+        new THREE.Vector3(0, 0.12, 0),
+        new THREE.Vector3(0, archH * 0.82, 0),
+        new THREE.Vector3(-archReach * 0.65, archH * 1.04, 0),
+        new THREE.Vector3(-archReach, archH * 0.72, 0)
+      );
+      var archGeom = new THREE.TubeGeometry(curve, 28, 0.045, 10, false);
+      addMesh(THREE, group, archGeom, mats.brass, 0, 0, 0);
+      
+      // Spun brass hemisphere dome shade hanging down
+      var shadeR = 0.45;
+      var domeGeom = new THREE.SphereGeometry(shadeR, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      var domeMat = new THREE.MeshStandardMaterial({
+        color: 0xd4af37,
+        roughness: 0.28,
+        metalness: 0.82,
+        side: THREE.DoubleSide
       });
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.26, w * 0.42, h * 0.28, 18, 1, true), shadeMat, 0, h * 0.84, 0);
-      var pLight = new THREE.PointLight(0xffd6a0, 0.75, 11, 2);
-      pLight.position.set(0, h * 0.82, 0);
+      addMesh(THREE, group, domeGeom, domeMat, -archReach, archH * 0.72, 0, Math.PI, 0, 0);
+      
+      // Warm glowing filament / shade underside
+      var glowMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8 });
+      addMesh(THREE, group, new THREE.SphereGeometry(0.12, 12, 12), glowMat, -archReach, archH * 0.70, 0);
+      
+      // Warm ambient pool of light
+      var pLight = new THREE.PointLight(0xffdfa4, 1.35, 14, 2);
+      pLight.position.set(-archReach, archH * 0.68, 0);
+      pLight.castShadow = true;
       group.add(pLight);
     } else if (t === 'planter' || t === 'plant') {
-      // Ceramic ribbed/fluted pot
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.38, w * 0.30, h * 0.38, 20), mats.ceramic, 0, h * 0.19, 0);
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.40, w * 0.40, 0.05, 20), mats.brass, 0, h * 0.38, 0);
+      // Modern off-white ceramic cylindrical planter
+      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.42, w * 0.36, h * 0.36, 24), mats.ceramic, 0, h * 0.18, 0);
       // Dark potting soil
-      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.35, w * 0.35, 0.03, 16), mats.darkWood, 0, h * 0.36, 0);
-      // Bamboo support stake
-      addMesh(THREE, group, new THREE.CylinderGeometry(0.025, 0.025, h * 0.65, 8), mats.darkWood, 0, h * 0.65, 0);
-      // Elegant broad architectural leaves (Fiddle-Leaf Fig / Monstera style)
-      var leafMat = new THREE.MeshStandardMaterial({
-        color: 0x2e6638,
-        roughness: 0.65,
-        metalness: 0.08,
-        side: THREE.DoubleSide,
-      });
-      var leafCount = 6;
-      for (var li = 0; li < leafCount; li++) {
-        var ang = (li / leafCount) * Math.PI * 2 + (li % 2) * 0.3;
-        var ly = h * (0.42 + (li / leafCount) * 0.45);
-        var lDist = w * 0.22 + (li % 3) * 0.08;
-        var lx = Math.cos(ang) * lDist;
-        var lz = Math.sin(ang) * lDist;
-        var leaf = new THREE.Mesh(softBox(THREE, w * 0.32, 0.02, w * 0.22, 0.005), leafMat);
-        leaf.position.set(lx, ly, lz);
-        leaf.rotation.set(0.35 * Math.sin(ang), -ang, 0.45);
-        leaf.castShadow = true;
-        group.add(leaf);
+      addMesh(THREE, group, new THREE.CylinderGeometry(w * 0.39, w * 0.39, 0.04, 20), mats.charcoal, 0, h * 0.34, 0);
+      
+      // Multi-stemmed Fiddle Leaf Fig Tree (Ficus Lyrata)
+      var leafMat = new THREE.MeshStandardMaterial({ color: 0x244a2b, roughness: 0.55, metalness: 0.04 });
+      var stemMat = new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.78 });
+      addMesh(THREE, group, new THREE.CylinderGeometry(0.04, 0.07, h * 0.72, 8), stemMat, 0, h * 0.58, 0);
+      addMesh(THREE, group, new THREE.CylinderGeometry(0.03, 0.04, h * 0.52, 8), stemMat, 0.15, h * 0.62, 0.1, 0.25, 0.5, -0.15);
+      
+      for (var l = 0; l < 10; l++) {
+        var ang = (l / 10) * Math.PI * 2 + (l * 0.35);
+        var ly = h * (0.44 + (l / 10) * 0.52);
+        var reach = w * (0.38 + (l % 3) * 0.12);
+        addMesh(THREE, group, new THREE.CylinderGeometry(0.015, 0.02, reach * 0.5, 6), stemMat, Math.cos(ang) * reach * 0.3, ly - 0.08, Math.sin(ang) * reach * 0.3, 0.4, ang, 0);
+        var leafGeom = new THREE.BoxGeometry(reach * 0.55, 0.015, reach * 0.38);
+        addMesh(THREE, group, leafGeom, leafMat, Math.cos(ang) * reach * 0.7, ly, Math.sin(ang) * reach * 0.7, 0.35, ang, 0.2);
       }
     } else if (t === 'kitchen') {
       addMesh(THREE, group, softBox(THREE, w, h * 0.92, d, 0.02), woodMat, 0, h * 0.46, 0);
@@ -487,12 +597,13 @@
   function buildArchitecturalShell(THREE, roomW, roomD, wallH, mats, stylePreset) {
     var shell = new THREE.Group();
     shell.name = 'ArchitecturalShell';
-    var isConcrete = /concrete|industrial|slate|dark/i.test(stylePreset || '');
-
+    var isConcrete = /concrete|industrial|slate/i.test(stylePreset || '');
+    // Scandinavian photo uses rich warm dark walnut/espresso wood planks
+    var floorHex = isConcrete ? '#7a756f' : '#3e3126';
     var floorMat = new THREE.MeshStandardMaterial({
-      map: makeWoodTexture(THREE, isConcrete ? '#7a756f' : '#c09a6b', Math.max(2, Math.round(roomW / 3)), Math.max(2, Math.round(roomD / 3))),
-      roughness: isConcrete ? 0.78 : 0.48,
-      metalness: 0.04,
+      map: makeWoodTexture(THREE, floorHex, Math.max(3, Math.round(roomW / 2.5)), Math.max(3, Math.round(roomD / 2.5))),
+      roughness: 0.42,
+      metalness: 0.05,
     });
     var floor = new THREE.Mesh(new THREE.BoxGeometry(roomW + 0.4, 0.35, roomD + 0.4), floorMat);
     floor.position.set(0, -0.175, 0);
@@ -535,12 +646,40 @@
     westWall.name = 'WestWall';
     shell.add(westWall);
 
-    // East (right) partial/low cutaway wall so interior stays visible in Iso
-    var eastWall = new THREE.Mesh(new THREE.BoxGeometry(wallT, wallH * 0.35, roomD), wallMat);
-    eastWall.position.set(roomW / 2 + wallT / 2, (wallH * 0.35) / 2, 0);
-    eastWall.receiveShadow = true;
-    eastWall.name = 'EastCutawayWall';
-    shell.add(eastWall);
+    // East (right) Architectural Glass Window Wall with Vertical Warm Oak Mullions matching the photo
+    var eastWindowWall = new THREE.Group();
+    eastWindowWall.name = 'EastGlassWindowWall';
+    addMesh(THREE, eastWindowWall, new THREE.BoxGeometry(wallT, 0.38, roomD), mats.walnut, roomW / 2 + wallT / 2, 0.19, 0);
+    addMesh(THREE, eastWindowWall, new THREE.BoxGeometry(wallT, 0.42, roomD), mats.walnut, roomW / 2 + wallT / 2, wallH - 0.21, 0);
+    var mullions = 5;
+    for (var mi = 0; mi < mullions; mi++) {
+      var mz = -roomD / 2 + (mi / (mullions - 1)) * roomD;
+      addMesh(THREE, eastWindowWall, new THREE.BoxGeometry(wallT + 0.08, wallH - 0.8, 0.22), mats.walnut, roomW / 2 + wallT / 2, (wallH - 0.8) / 2 + 0.38, mz);
+    }
+    var glassEastMat = new THREE.MeshPhysicalMaterial({
+      color: 0xe8f4fc,
+      roughness: 0.08,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.38,
+      reflectivity: 0.65
+    });
+    addMesh(THREE, eastWindowWall, new THREE.PlaneGeometry(roomD - 0.4, wallH - 0.8), glassEastMat, roomW / 2 + 0.02, (wallH - 0.8) / 2 + 0.38, 0, 0, -Math.PI / 2, 0);
+    shell.add(eastWindowWall);
+
+    // Outside garden greenery visible through East glass wall
+    var gardenGroup = new THREE.Group();
+    gardenGroup.name = 'OutdoorGarden';
+    for (var gi = -2; gi <= 2; gi++) {
+      var treeG = new THREE.Group();
+      treeG.position.set(roomW / 2 + 2.2, 0, gi * (roomD * 0.26));
+      addMesh(THREE, treeG, new THREE.CylinderGeometry(0.12, 0.16, 4.5, 8), mats.darkWood, 0, 2.25, 0);
+      var folMat = new THREE.MeshStandardMaterial({ color: 0x2e5a36, roughness: 0.82 });
+      addMesh(THREE, treeG, new THREE.SphereGeometry(1.6, 10, 10), folMat, 0, 4.8, 0);
+      addMesh(THREE, treeG, new THREE.SphereGeometry(1.3, 8, 8), folMat, 0.4, 5.6, 0.3);
+      gardenGroup.add(treeG);
+    }
+    shell.add(gardenGroup);
 
     // Baseboards
     var bbH = 0.38;
@@ -551,14 +690,14 @@
     bbW.position.set(-roomW / 2 + 0.04, bbH / 2, 0);
     shell.add(bbW);
 
-    // Framed Daylight Window on North Wall
-    var winW = Math.min(5.2, roomW * 0.38);
-    var winH = Math.min(4.8, wallH * 0.54);
-    var winY = wallH * 0.55;
-    var winZ = -roomD / 2 + 0.05;
+    // High Panoramic Transom / Ribbon Window on North Wall matching Scandinavian architecture
+    var trW = roomW * 0.72;
+    var trH = 1.45;
+    var trY = wallH * 0.72;
+    var trZ = -roomD / 2 + 0.05;
     var winGroup = new THREE.Group();
-    winGroup.name = 'DaylightWindow';
-    winGroup.position.set(-roomW * 0.12, winY, winZ);
+    winGroup.name = 'TransomDaylightWindow';
+    winGroup.position.set(0, trY, trZ);
     var glassMat = new THREE.MeshPhysicalMaterial({
       color: 0xdff2ff,
       roughness: 0.08,
@@ -568,10 +707,11 @@
       emissive: 0xfff5e0,
       emissiveIntensity: 0.35,
     });
-    addMesh(THREE, winGroup, new THREE.BoxGeometry(winW, winH, 0.12), mats.charcoal, 0, 0, 0);
-    addMesh(THREE, winGroup, new THREE.PlaneGeometry(winW - 0.28, winH - 0.28), glassMat, 0, 0, 0.07);
-    addMesh(THREE, winGroup, new THREE.BoxGeometry(0.1, winH - 0.2, 0.16), mats.charcoal, 0, 0, 0.04);
-    addMesh(THREE, winGroup, new THREE.BoxGeometry(winW + 0.24, 0.14, 0.28), mats.charcoal, 0, -winH / 2 - 0.04, 0.08);
+    addMesh(THREE, winGroup, new THREE.BoxGeometry(trW, trH, 0.14), mats.darkWood, 0, 0, 0);
+    addMesh(THREE, winGroup, new THREE.PlaneGeometry(trW - 0.22, trH - 0.22), glassMat, 0, 0, 0.08);
+    addMesh(THREE, winGroup, new THREE.BoxGeometry(trW - 0.22, 0.05, 0.16), mats.darkWood, 0, 0, 0.08);
+    addMesh(THREE, winGroup, new THREE.BoxGeometry(0.08, trH - 0.2, 0.16), mats.darkWood, -trW * 0.25, 0, 0.08);
+    addMesh(THREE, winGroup, new THREE.BoxGeometry(0.08, trH - 0.2, 0.16), mats.darkWood, trW * 0.25, 0, 0.08);
     shell.add(winGroup);
 
     // Paneled Door on West Wall

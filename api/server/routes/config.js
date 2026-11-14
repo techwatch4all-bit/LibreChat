@@ -307,13 +307,35 @@ router.get('/', async function (req, res) {
       idOnTheSource: req.user.idOnTheSource ?? null,
     });
     const fullModelSpecs = sanitizeModelSpecs(excludeHiddenModelSpecs(appConfig?.modelSpecs));
-    const DESIRED_MODES = ['Chat', 'Work', 'Vibecoding', 'VibeCoder', 'Study', 'Privacy', 'Motion', 'SceneMosaic'];
+    const DESIRED_MODES = [
+      'Chat',
+      'Work',
+      'Vibecoding',
+      'VibeCoder',
+      'Study',
+      'Privacy',
+      'Motion',
+      'SceneMosaic',
+      'DeepTutor',
+      'Health-Wellness',
+      'Panchang-Vedic',
+      'Architect-Studio',
+      'Maker-Hardware',
+      'Document-Vault',
+    ];
     const semanticModelSpecs = fullModelSpecs
       ? {
           ...fullModelSpecs,
           list: (fullModelSpecs.list ?? [])
-            .filter((spec) => DESIRED_MODES.includes(spec.name))
-            .sort((a, b) => DESIRED_MODES.indexOf(a.name) - DESIRED_MODES.indexOf(b.name)),
+            .filter((spec) => DESIRED_MODES.includes(spec.name) || spec.showIconInMenu === true)
+            .sort((a, b) => {
+              const idxA = DESIRED_MODES.indexOf(a.name);
+              const idxB = DESIRED_MODES.indexOf(b.name);
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return 0;
+            }),
         }
       : undefined;
     const userInterface = { ...appConfig?.interfaceConfig, modelSelect: true, presets: false };

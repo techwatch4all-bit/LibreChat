@@ -27,6 +27,9 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { useLocalize } from '~/hooks';
+import { useGroupsQuery } from '~/data-provider/admin/groups';
+import { useUserGroupsQuery } from '~/data-provider/admin/users';
+import { useEffectiveCapabilitiesQuery, hasCapability } from '~/data-provider/admin/grants';
 import {
   useUsersQuery,
   useDeleteUserMutation,
@@ -631,6 +634,42 @@ function EditUserModal({
   const [dailyMessageLimit, setDailyMessageLimit] = useState<number | string>(user.dailyMessageLimit ?? '');
   const [error, setError] = useState<string | null>(null);
 
+  // Licence-group membership: the tenant IT guy's primary workflow. Visibility
+  // is gated by the caller's effective capabilities — manage:groups enables
+  // add/remove; read:groups shows the memberships read-only.
+  const capsQuery = useEffectiveCapabilitiesQuery();
+  const canManageGroups = hasCapability(capsQuery.data?.capabilities, 'manage:groups');
+  const groupsQuery = useGroupsQuery();
+  const userGroupsQuery = useUserGroupsQuery(user.id);
+  const userGroupIds = new Set((userGroupsQuery.data?.groups ?? []).map((g) => g.id));
+  const joinableGroups = (groupsQuery.data ?? []).filter((g) => !userGroupIds.has(g._id));
+
+  const handleAddToGroup = async (groupId: string) => {
+    setError(null);
+    try {
+      // The endpoint binds to the group id; the '__add__' placeholder groupId
+      // on the mutation object is unused for these two calls.
+      await fetch(`/api/admin/groups/${groupId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      userGroupsQuery.refetch();
+    } catch (err) {
+      setError(`Failed to add user to group: ${(err as Error).message}`);
+    }
+  };
+
+  const handleRemoveFromGroup = async (groupId: string) => {
+    setError(null);
+    try {
+      await fetch(`/api/admin/groups/${groupId}/members/${user.id}`, { method: 'DELETE' });
+      userGroupsQuery.refetch();
+    } catch (err) {
+      setError(`Failed to remove user from group: ${(err as Error).message}`);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -740,6 +779,55 @@ function EditUserModal({
               <option value="minor">Minor / Dependent</option>
             </select>
           </div>
+
+          {canManageGroups || (userGroupsQuery.data?.groups ?? []).length > 0 ? (
+            <div>
+              <label className="block font-semibold text-text-secondary mb-1">
+                Licence Groups {canManageGroups ? '' : '(read-only)'}
+              </label>
+              <div className="space-y-2">
+                {(userGroupsQuery.data?.groups ?? []).map((g) => (
+                  <div
+                    key={g.id}
+                    className="flex items-center justify-between rounded-xl border border-border-light bg-surface-secondary px-3 py-2 text-xs"
+                  >
+                    <span className="font-semibold text-text-primary capitalize">{g.name}</span>
+                    {canManageGroups && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromGroup(g.id)}
+                        className="rounded-lg border border-border-light px-2.5 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {canManageGroups && joinableGroups.length > 0 && (
+                  <select
+                    className="w-full rounded-xl border border-border-light bg-surface-secondary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
+                    value=""
+                    onChange={(e) => e.target.value && handleAddToGroup(e.target.value)}
+                  >
+                    <option value="">+ Add to licence group…</option>
+                    {joinableGroups.map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {g.name}
+                        {g.accountType ? ` (${g.accountType})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!canManageGroups && (userGroupsQuery.data?.groups ?? []).length === 0 && (
+                  <div className="text-[11px] text-text-secondary">No licence groups assigned.</div>
+                )}
+              </div>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Membership places the user into the group's licence policy. Seat assignment
+                (Users list, lightning icon) mints the One-API credential.
+              </p>
+            </div>
+          ) : null}
 
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Daily Message Limit (Optional)</label>

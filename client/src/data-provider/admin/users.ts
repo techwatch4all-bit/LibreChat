@@ -313,3 +313,16 @@ export function useRevokeSeatTokenMutation(): UseMutationResult<
     onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY }),
   });
 }
+
+
+export function useUserGroupsQuery(
+  userId: string,
+  enabled = true,
+): UseQueryResult<{ groups: AdminUserGroup[] }, Error> {
+  return useQuery({
+    queryKey: [...USERS_QUERY_KEY, userId, 'groups'],
+    queryFn: ({ signal }) => fetchUserGroups(userId, signal),
+    enabled: enabled && Boolean(userId),
+    staleTime: 10_000,
+  });
+}

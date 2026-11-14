@@ -30,6 +30,7 @@ import {
   type AdminGroup,
 } from '~/data-provider/admin/groups';
 import { useSearchUsersQuery } from '~/data-provider/admin/users';
+import { useEffectiveCapabilitiesQuery, hasCapability } from '~/data-provider/admin/grants';
 
 const ACCOUNT_TYPES = GROUP_ACCOUNT_TYPES;
 const MODES = ['Chat', 'Study', 'Work', 'Privacy'] as const;
@@ -39,6 +40,8 @@ interface GroupsPanelProps {
   initialCreateOpen?: boolean;
   onClearInitialCreate?: () => void;
 }
+
+const canManage = (caps?: string[]) => hasCapability(caps, 'manage:groups');
 
 export default function GroupsPanel({
   initialCreateOpen = false,
@@ -106,16 +109,18 @@ export default function GroupsPanel({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingTarget(undefined);
-            setIsEditing(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-        >
-          <Plus size={15} />
-          {localize('com_admin_groups_new') || 'Create Policy Group'}
-        </button>
+        {canManageGroups && (
+          <button
+            onClick={() => {
+              setEditingTarget(undefined);
+              setIsEditing(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
+          >
+            <Plus size={15} />
+            {localize('com_admin_groups_new') || 'Create Policy Group'}
+          </button>
+        )}
       </div>
 
       {/* Filter / Search Bar */}
@@ -185,16 +190,18 @@ export default function GroupsPanel({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleDelete(group)}
-                        disabled={deleteMutation.isPending}
-                        className="p-1.5 text-text-tertiary hover:text-rose-500 rounded-lg hover:bg-surface-tertiary transition-colors"
-                        title="Delete group"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    {canManageGroups && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDelete(group)}
+                          disabled={deleteMutation.isPending}
+                          className="p-1.5 text-text-tertiary hover:text-rose-500 rounded-lg hover:bg-surface-tertiary transition-colors"
+                          title="Delete group"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Description */}

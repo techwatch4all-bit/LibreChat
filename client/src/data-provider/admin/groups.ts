@@ -43,6 +43,8 @@ export type AdminGroupMember = {
   name: string;
   email: string;
   avatarUrl?: string;
+  accountType?: string | null;
+  seatAssigned?: boolean;
 };
 
 export type GroupsResponse = {

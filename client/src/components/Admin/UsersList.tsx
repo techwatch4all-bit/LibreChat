@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useAssignSeatTokenMutation, useRevokeSeatTokenMutation } from '~/data-provider/admin/users';
 import { Spinner } from '@librechat/client';
 import {
@@ -65,6 +65,15 @@ export default function UsersList({
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [seatEditing, setSeatEditing] = useState<{ userId: string; email: string; accountType: string } | null>(null);
+  const [seatFilter, setSeatFilter] = useState<string>('all');
+  const [tenantFilter, setTenantFilter] = useState<string>('all');
+
+  // Distinct tenant list for the operator's filter dropdown
+  const tenantOptions = useMemo(() => {
+    const set = new Set<string>();
+    users.forEach((u) => set.add(u.tenantId || 'satchida-master'));
+    return Array.from(set).sort();
+  }, [users]);
   const assignSeatMutation = useAssignSeatTokenMutation();
   const revokeSeatMutation = useRevokeSeatTokenMutation();
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -110,6 +119,13 @@ export default function UsersList({
     // Status filter
     if (statusFilter === 'active' && u.mustChangePassword) return false;
     if (statusFilter === 'temp' && !u.mustChangePassword) return false;
+
+    // Seat filter (One-API seat token assigned or not)
+    if (seatFilter === 'assigned' && !u.seatAssigned) return false;
+    if (seatFilter === 'unassigned' && u.seatAssigned) return false;
+
+    // Tenant filter (operator view spans tenants)
+    if (tenantFilter !== 'all' && (u.tenantId || 'satchida-master') !== tenantFilter) return false;
 
     return true;
   });
@@ -280,10 +296,14 @@ export default function UsersList({
             className="rounded-xl border border-border-light bg-surface-secondary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
           >
             <option value="all">All Tiers</option>
-            <option value="free">Free / Demo</option>
+            <option value="free">None / Free</option>
+            <option value="basic">Basic</option>
             <option value="standard">Standard</option>
-            <option value="pro">Pro</option>
             <option value="family">Family</option>
+            <option value="pro">Pro</option>
+            <option value="pro_family">Pro Family</option>
+            <option value="privacy">Privacy</option>
+            <option value="enterprise">Enterprise (white-label)</option>
             <option value="enterprise">Enterprise</option>
           </select>
 

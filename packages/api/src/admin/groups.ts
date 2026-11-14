@@ -546,7 +546,12 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (validObjectIds.length > 0) {
         conditions.push({ _id: { $in: validObjectIds } });
       }
-      const users = await findUsers({ $or: conditions }, 'name email avatar idOnTheSource');
+      // seatToken is select:false in the schema — include it explicitly so the
+      // seatAssigned badge can be derived for each member.
+      const users = await findUsers(
+        { $or: conditions },
+        'name email avatar idOnTheSource accountType seatToken',
+      );
 
       const userMap = new Map<string, IUser>();
       for (const user of users) {
@@ -559,7 +564,14 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       }
 
       const seen = new Set<string>();
-      const members: { userId: string; name: string; email: string; avatarUrl?: string }[] = [];
+      const members: {
+        userId: string;
+        name: string;
+        email: string;
+        avatarUrl?: string;
+        accountType?: string | null;
+        seatAssigned?: boolean;
+      }[] = [];
       for (const memberId of memberIds) {
         const user = userMap.get(memberId);
         const userId = user?._id?.toString() ?? memberId;
@@ -572,6 +584,8 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
           name: user?.name ?? memberId,
           email: user?.email ?? '',
           avatarUrl: user?.avatar,
+          accountType: user?.accountType ?? null,
+          seatAssigned: Boolean(user?.seatToken),
         });
       }
 

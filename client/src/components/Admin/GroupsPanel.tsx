@@ -390,6 +390,13 @@ function GroupMembersModal({ group, onClose }: { group: AdminGroup; onClose: () 
                   <div className="font-semibold text-text-primary">{member.name || member.username || 'Unnamed'}</div>
                   <div className="text-[11px] font-mono text-text-secondary">{member.email}</div>
                 </div>
+                <div className="flex items-center gap-2">
+                  {member.accountType && (
+                    <span className="inline-flex items-center rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      {member.accountType}
+                    </span>
+                  )}
+                </div>
 
                 <button
                   onClick={() => handleRemove(member.id)}

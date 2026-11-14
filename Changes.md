@@ -8,6 +8,46 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — 50 chat-rendering suites were dead; dependency tree repaired
+
+**Problem.** `npx jest src/components/Chat/Messages/Content` ran 579 tests in 33 suites and reported
+50 suites that never loaded. Both causes were module resolution, not assertions:
+
+1. `Cannot find module '@react-spring/web' from '../packages/client/dist/index.cjs'`. The shared
+   package's dist imports spring, but it was only a peer (`^10.0.1`) while the app pinned `^9.7.5`,
+   so npm nested v9 under `client/node_modules` and nothing resolved from `packages/client`.
+2. Once spring resolved: `Cannot find module '@radix-ui/react-compose-refs' from
+   '../node_modules/@radix-ui/react-slot/dist/index.js'`. `packages/client/src` imports `Slot`
+   directly (`Button.tsx`, `Breadcrumb.tsx`), yet `@radix-ui/react-slot` was only a peer and the app
+   never declared it, so npm nested copies under individual radix packages. The root copy on disk
+   was a phantom `slot@1.5.0` absent from `package-lock.json`, and it was missing its own dependency.
+
+**Shipped.** `packages/client/package.json` now declares what its own code imports:
+`@react-spring/web ^10.1.2` and `@radix-ui/react-slot 1.3.3` as dependencies (both stay in
+`peerDependencies` too, so the upstream contract is unchanged). The app's `@react-spring/web` entry
+was removed — nothing in `client/src` imports it. Root `overrides` pins `@radix-ui/react-slot` to
+`1.3.3` so the tree keeps one copy instead of the mixed 1.1.2 / 1.2.3 / 1.3.3 set the lock carried.
+`client/vite.config.ts` lost the `@react-spring/web` alias that pointed at
+`client/node_modules/@react-spring/web`: it existed only because npm used to nest v9 there, and with
+v10 hoisted to the root it made `npm run build:client` fail with
+`[UNLOADABLE_DEPENDENCY] ... (os error 3)`. Installed with `--legacy-peer-deps`, since the tree
+already carries an unrelated peer conflict (`@opentelemetry/sdk-node` 0.220.0 vs `packages/api`'s
+`^0.218.0`); the lockfile change is a net minus 548 / plus 74 lines, almost all of it dedupe of the
+nested radix copies.
+
+**Evidence.** `npx jest src/components/Chat/Messages/Content` -> 83/83 suites and 1390/1390 tests,
+against 33 suites and 579 tests before: 811 tests had never executed. `npm run build:client` ->
+exit 0, with `client/dist/assets/vendor/satchida/cad-studio.js` byte-identical to `client/public`
+(SHA-256 `5dafdc9e...`). `npx tsc --noEmit` in `client` -> 45 errors, the same pre-existing
+Admin/SpecIcon set as before the change. Full `client` suite: 8729 passed, 48 failed in 12 suites.
+Seven of those suites are among the ones that could not load at all before this repair, so their
+tests had never run; the eight suites that did run at baseline have an identical failure set (0 new
+failures). Re-running them against `@react-spring/web@9.7.5` produces the same 48 failures, so the
+repair is not what breaks them. `src/components/Chat/Input/__tests__/CodeWorkspaceMenu.spec.tsx` is
+flaky independent of this change: it passes, then fails with 1 failing test on an immediate re-run.
+
+---
+
 ## 2026-11-14 — `librechat.yaml` back under version control
 
 **Problem.** `7da7d429f` (`chore(repo): keep librechat.yaml out of git`, 2,144 deletions) dropped

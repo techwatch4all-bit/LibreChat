@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react';
-import { Zap, Ban } from 'lucide-react';
 import { useAssignSeatTokenMutation, useRevokeSeatTokenMutation } from '~/data-provider/admin/users';
 import { Spinner } from '@librechat/client';
 import {

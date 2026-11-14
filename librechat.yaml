@@ -248,7 +248,7 @@ mcpServers:
     command: python
     args:
     - skill/office-productivity-server.py
-    title: Satchida AI Office & Spreadsheet Suite
+    title: Satchida AI Office and Spreadsheet Suite
     description: Granular spreadsheet and document tools for Univer AI Office (cell range reading, formula edits, surgical row updates, and document drafting).
     chatMenu: true
     startup: true

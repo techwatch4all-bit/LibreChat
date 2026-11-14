@@ -422,6 +422,61 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     toolType: 'builtin',
     responseFormat: geminiToolkit.gemini_image_gen.responseFormat,
   },
+  sheet_get_summary: {
+    name: 'sheet_get_summary',
+    description: 'Inspect the structural metadata of a spreadsheet (sheet names, row counts, column counts) without dumping raw cell content into the prompt context.',
+    schema: {
+      type: 'object',
+      properties: {
+        snapshot: { type: 'string', description: 'The Univer sheet snapshot JSON string' },
+      },
+      required: ['snapshot'],
+    },
+    toolType: 'builtin',
+  },
+  sheet_get_range: {
+    name: 'sheet_get_range',
+    description: 'Read cell values from a spreadsheet given an A1 notation range (e.g. "A1:D10").',
+    schema: {
+      type: 'object',
+      properties: {
+        snapshot: { type: 'string', description: 'The Univer sheet snapshot JSON string' },
+        range: { type: 'string', description: 'A1 notation range to extract, e.g. "A1:C5"' },
+        sheetId: { type: 'string', description: 'Optional sheet ID, defaults to first sheet' },
+      },
+      required: ['snapshot', 'range'],
+    },
+    toolType: 'builtin',
+  },
+  sheet_set_values: {
+    name: 'sheet_set_values',
+    description: 'Surgically update a block of cells in a spreadsheet starting at startCell (e.g. "B2") with a 2D matrix of values.',
+    schema: {
+      type: 'object',
+      properties: {
+        snapshot: { type: 'string', description: 'The Univer sheet snapshot JSON string' },
+        startCell: { type: 'string', description: 'A1 notation starting cell, e.g. "A1"' },
+        values: { type: 'array', items: { type: 'array', items: {} }, description: '2D matrix of values' },
+        sheetId: { type: 'string', description: 'Optional sheet ID' },
+      },
+      required: ['snapshot', 'startCell', 'values'],
+    },
+    toolType: 'builtin',
+  },
+  doc_insert_text: {
+    name: 'doc_insert_text',
+    description: 'Insert or append a paragraph of text into an active Univer doc.',
+    schema: {
+      type: 'object',
+      properties: {
+        snapshot: { type: 'string', description: 'The Univer doc snapshot JSON string' },
+        text: { type: 'string', description: 'Text or paragraph to insert' },
+        position: { type: 'string', enum: ['append', 'prepend'], description: 'Insert position' },
+      },
+      required: ['snapshot', 'text'],
+    },
+    toolType: 'builtin',
+  },
 };
 
 /**

@@ -3,7 +3,13 @@ import { useSetRecoilState } from 'recoil';
 import { Constants, EToolResources } from 'librechat-data-provider';
 import type { UploadLifecycleCallbacks } from './useFileHandling';
 import { useChatContext } from '~/Providers/ChatContext';
-import { ephemeralAgentByConvoId } from '~/store';
+import store, { ephemeralAgentByConvoId } from '~/store';
+import {
+  excelBufferToUniverSnapshot,
+  docxBufferToUniverDocSnapshot,
+  UNIVER_SHEET_MIME,
+  UNIVER_DOC_MIME,
+} from '~/components/Artifacts/Univer';
 import useFileHandling from './useFileHandling';
 
 /**
@@ -18,9 +24,58 @@ export default function useFileUploadRouter() {
   const setEphemeralAgent = useSetRecoilState(
     ephemeralAgentByConvoId(conversation?.conversationId ?? Constants.NEW_CONVO),
   );
+  const setArtifacts = useSetRecoilState(store.artifactsState);
+  const setCurrentArtifactId = useSetRecoilState(store.currentArtifactId);
+  const setArtifactsVisible = useSetRecoilState(store.artifactsVisibility);
 
   return useCallback(
     (files: File[], toolResource?: EToolResources, uploadLifecycle?: UploadLifecycleCallbacks) => {
+      // Check for Office files (.xlsx, .xls, .csv, .docx) to auto-dock in Univer
+      if (files && files.length > 0) {
+        const firstFile = files[0];
+        const lowerName = (firstFile.name || '').toLowerCase();
+
+        if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls') || lowerName.endsWith('.csv')) {
+          firstFile.arrayBuffer().then((buf) => {
+            const snapshot = excelBufferToUniverSnapshot(buf, firstFile.name);
+            const artifactId = `univer-sheet-${Date.now()}`;
+            setArtifacts((prev) => ({
+              ...(prev || {}),
+              [artifactId]: {
+                id: artifactId,
+                title: firstFile.name,
+                type: UNIVER_SHEET_MIME,
+                content: JSON.stringify(snapshot),
+                lastUpdateTime: Date.now(),
+              },
+            }));
+            setCurrentArtifactId(artifactId);
+            setArtifactsVisible(true);
+          }).catch((err) => {
+            console.error('Failed to parse excel in browser:', err);
+          });
+        } else if (lowerName.endsWith('.docx')) {
+          firstFile.arrayBuffer().then(async (buf) => {
+            const snapshot = await docxBufferToUniverDocSnapshot(buf, firstFile.name);
+            const artifactId = `univer-doc-${Date.now()}`;
+            setArtifacts((prev) => ({
+              ...(prev || {}),
+              [artifactId]: {
+                id: artifactId,
+                title: firstFile.name,
+                type: UNIVER_DOC_MIME,
+                content: JSON.stringify(snapshot),
+                lastUpdateTime: Date.now(),
+              },
+            }));
+            setCurrentArtifactId(artifactId);
+            setArtifactsVisible(true);
+          }).catch((err) => {
+            console.error('Failed to parse docx in browser:', err);
+          });
+        }
+      }
+
       if (toolResource && toolResource !== EToolResources.file_search) {
         setEphemeralAgent((prev) => ({
           ...prev,
@@ -29,6 +84,6 @@ export default function useFileUploadRouter() {
       }
       return handleFiles(files, toolResource, uploadLifecycle);
     },
-    [handleFiles, setEphemeralAgent],
+    [handleFiles, setEphemeralAgent, setArtifacts, setCurrentArtifactId, setArtifactsVisible],
   );
 }

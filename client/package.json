@@ -98,6 +98,7 @@
     "lodash": "^4.17.23",
     "lucide": "^0.528.0",
     "lucide-react": "^0.528.0",
+    "mammoth": "^1.13.0",
     "match-sorter": "^8.1.0",
     "mdast-util-directive": "^3.0.0",
     "mdast-util-from-markdown": "^2.0.1",

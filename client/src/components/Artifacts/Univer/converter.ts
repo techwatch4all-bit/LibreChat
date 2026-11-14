@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import mammoth from 'mammoth';
 
 /**
  * Converts raw Excel/CSV binary or array buffer into a Univer snapshot format.
@@ -47,6 +48,24 @@ export function excelBufferToUniverSnapshot(buffer: ArrayBuffer | Uint8Array, fi
     name: filename.replace(/\.[^/.]+$/, ''),
     sheetOrder: Object.keys(sheets),
     sheets,
+  };
+}
+
+/**
+ * Converts raw DOCX array buffer into a Univer Doc snapshot.
+ * Runs in-memory with pure JavaScript.
+ */
+export async function docxBufferToUniverDocSnapshot(buffer: ArrayBuffer, filename = 'Document') {
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+  const rawText = result.value || '';
+  const cleanDataStream = (rawText.endsWith('\n') ? rawText : `${rawText}\n`).replace(/\n/g, '\r\n');
+
+  return {
+    id: `univer-doc-${Date.now()}`,
+    title: filename.replace(/\.[^/.]+$/, ''),
+    body: {
+      dataStream: cleanDataStream || 'Document content...\r\n',
+    },
   };
 }
 

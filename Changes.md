@@ -8,6 +8,25 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — `librechat.yaml` back under version control
+
+**Problem.** `7da7d429f` (`chore(repo): keep librechat.yaml out of git`, 2,144 deletions) dropped
+the deployment config and added it to `.gitignore:80`. Every later change to that file — agent
+prompts, MCP registrations, endpoints — then existed only on this machine and was invisible to
+review. The Study/DeepTutor markdown-only render contract shipped today would have been unreachable
+from a fresh clone.
+
+**Shipped.** `librechat.yaml` re-tracked with `git add -f` (2,568 lines), including the two
+`MARKDOWN-ONLY RENDER CONTRACT` blocks (Study at line 1629, DeepTutor at 2300). None of its
+credentials are literal: the three provider keys are `${SATCHIDA_GATEWAY_LICENCE}`,
+`${SATCHIDA_GATEWAY_VK}` and `${ANYTHINGLLM_API_KEY}` interpolations resolved at runtime.
+
+**Evidence.** `yaml.safe_load` parses the file (11 top-level keys); a scan for `sk-`, `AIza`,
+`ghp_`, `xox[bap]-`, PEM headers, 40-hex and 60+ character base64 blobs returns zero matches;
+`git check-ignore -v librechat.yaml` no longer reports the file after the re-track.
+
+---
+
 ## 2026-11-14 — Motion Studio: sanitary fixtures stay inside their room
 
 **Problem.** The 3D placement safety net moved any sanitary fixture whose centre was within 3.2 ft

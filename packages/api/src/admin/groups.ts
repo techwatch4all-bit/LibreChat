@@ -65,7 +65,13 @@ interface GroupMemberParams extends GroupIdParams {
 function validateGroupEntitlement(
   body: Partial<CreateGroupRequest> | Partial<UpdateGroupRequest>,
 ): string | undefined {
-  if (body.accountType !== undefined && !isTenantAccountType(body.accountType)) {
+  // null clears a group's seat type (demote to a plain group); an invalid
+  // non-null string is rejected against the operator's catalogue.
+  if (
+    body.accountType !== undefined &&
+    body.accountType !== null &&
+    !isTenantAccountType(body.accountType)
+  ) {
     return `accountType must be one of ${TENANT_ACCOUNT_TYPES.join(', ')}`;
   }
   if (body.familySeats !== undefined) {

@@ -246,6 +246,10 @@ function formModal(title, fields, submitLabel, defaults, onSubmit) {
           input.id = fld.key;
           input.name = fld.key;
           input.value = (defaults || {})[fld.key] ?? fld.value ?? '';
+          if (fld.type === 'checkbox') {
+            delete input.value;
+            input.checked = !!(defaults || {})[fld.key];
+          }
           if (fld.required) input.required = true;
         }
         fx.appendChild(lbl);
@@ -556,7 +560,7 @@ function renderGroups() {
     return;
   }
   const head =
-    '<tr><th>Name</th><th>Description</th><th>Source</th><th>Members</th><th class="thActions">Actions</th></tr>';
+    '<tr><th>Name</th><th>Seat type</th><th>Description</th><th>Source</th><th>Members</th><th class="thActions">Actions</th></tr>';
   const body = S.groups
     .map((g) => {
       const id = g._id || g.id || '';
@@ -566,6 +570,11 @@ function renderGroups() {
         '">' +
         '<td>' +
         escapeHtml(g.name || '') +
+        '</td>' +
+        '<td>' +
+        (g.accountType
+          ? '<span class="badge">' + escapeHtml(g.accountType) + '</span>'
+          : '<span class="muted">—</span>') +
         '</td>' +
         '<td>' +
         escapeHtml(truncate(g.description || '', 70)) +
@@ -1304,18 +1313,51 @@ async function refreshDependents() {
   populateGrantsAssign();
 }
 
+// Seat/licence types — mirrors One-API's TENANT_ACCOUNT_TYPES catalogue
+// (packages/data-schemas/src/types/entitlement.ts). A group carrying one of
+// these is a licensed seat type: every member of the group holds that account
+// type, which is what the operator's policy and billing enforce.
+const SEAT_TYPES = ['basic', 'standard', 'family', 'pro', 'pro_family', 'enterprise', 'privacy'];
+
+function seatTypeOptions(current) {
+  return [{ value: '', label: '— none (plain group) —' }]
+    .concat(
+      SEAT_TYPES.map(function (t) {
+        return { value: t, label: t };
+      }),
+    )
+    .map(function (o) {
+      return {
+        value: o.value,
+        label: o.label,
+        selected: String(o.value) === String(current || ''),
+      };
+    });
+}
+
 async function createGroup() {
   await formModal(
     'Create group',
     [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'description', label: 'Description', type: 'textarea' },
+      {
+        key: 'accountType',
+        label: 'Seat type (licence)',
+        type: 'select',
+        options: seatTypeOptions(''),
+      },
+      { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
+      { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
     ],
     'Create',
     {},
     async (v) => {
       if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
       const body = { name: v.name.trim(), description: v.description || '' };
+      if (v.accountType) body.accountType = v.accountType;
+      body.shared = v.shared === 'on';
+      body.localPrivacyEnabled = v.localPrivacyEnabled === 'on';
       const res = await apiAdmin('/groups', { method: 'POST', body: JSON.stringify(body) });
       if (res.ok) {
         await loadGroups();
@@ -1333,14 +1375,31 @@ function editGroup(id) {
     [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'description', label: 'Description', type: 'textarea' },
+      {
+        key: 'accountType',
+        label: 'Seat type (licence)',
+        type: 'select',
+        options: seatTypeOptions(g.accountType || ''),
+      },
+      { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
+      { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
     ],
     'Save',
-    { name: g.name || '', description: g.description || '' },
+    {
+      name: g.name || '',
+      description: g.description || '',
+      shared: !!g.shared,
+      localPrivacyEnabled: !!g.localPrivacyEnabled,
+    },
     async (v) => {
       if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
+      const body = { name: v.name.trim(), description: v.description || '' };
+      body.accountType = v.accountType || null;
+      body.shared = v.shared === 'on';
+      body.localPrivacyEnabled = v.localPrivacyEnabled === 'on';
       const res = await apiAdmin('/groups/' + encodeURIComponent(id), {
         method: 'PATCH',
-        body: JSON.stringify({ name: v.name.trim(), description: v.description || '' }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         await loadGroups();

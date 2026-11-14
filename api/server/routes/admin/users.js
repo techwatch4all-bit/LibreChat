@@ -115,6 +115,224 @@ const handlers = createAdminUsersHandlers({
 
 router.use(requireJwtAuth, requireAdminSurface);
 
+/* ---------------------------------------------------------------------------
+ * Seat tokens (R1): a per-user One-API tenant credential.
+ *
+ * Assigning a seat mints an One-API seat-bound tenant token (tk_…) inside the
+ * configured tenant + policy group, upserts the seat policy the token needs,
+ * and stores the key on the LibreChat user. The endpoint layer already prefers
+ * `user.seatToken` over the shared endpoint credential
+ * (packages/api/src/endpoints/openai/initialize.ts), so once the token is
+ * stored every request from this user reaches One-API as that seat — which is
+ * what makes LibreChat user → One-API tenant/group → Bifrost attribution
+ * automatic end to end.
+ *
+ * Config (LibreChat .env):
+ *   ONEAPI_BASE_URL            default http://127.0.0.1:4000
+ *   ONEAPI_ADMIN_ACCESS_TOKEN  an One-API admin/root user access_token
+ *   ONEAPI_DEFAULT_TENANT      default satchida-master
+ * ------------------------------------------------------------------------ */
+
+const SEAT_TYPES = ['basic', 'standard', 'family', 'pro', 'pro_family', 'enterprise', 'privacy'];
+
+/** Seat policy per account type — mirrors the satchida-master tenant template groups. */
+const SEAT_POLICY_BY_TYPE = {
+  basic: { modes: 'chat', models: 'Chat' },
+  standard: { modes: 'chat,work', models: 'Chat,Work' },
+  family: { modes: 'chat,study,work', models: 'Chat,Study,Work' },
+  pro: { modes: 'chat,study,work,vibecoding', models: 'Chat,Study,Work,Vibecoding' },
+  pro_family: { modes: 'chat,study,work,vibecoding', models: 'Chat,Study,Work,Vibecoding' },
+  enterprise: {
+    modes: 'chat,study,work,privacy,vibecoding',
+    models: 'Chat,Study,Work,Privacy,Vibecoding',
+  },
+  privacy: { modes: 'chat,study,work,privacy', models: 'Chat,Study,Work,Privacy' },
+};
+
+const ONEAPI_BASE_URL = (process.env.ONEAPI_BASE_URL || 'http://127.0.0.1:4000').replace(
+  /\/+$/,
+  '',
+);
+const ONEAPI_TENANT = process.env.ONEAPI_DEFAULT_TENANT || 'satchida-master';
+
+function oneApiConfigured() {
+  return Boolean(process.env.ONEAPI_ADMIN_ACCESS_TOKEN);
+}
+
+function oneApiHeaders() {
+  return {
+    Authorization: process.env.ONEAPI_ADMIN_ACCESS_TOKEN,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function oneApi(method, path, body) {
+  const res = await fetch(ONEAPI_BASE_URL + path, {
+    method,
+    headers: oneApiHeaders(),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let json = {};
+  try {
+    json = await res.json();
+  } catch {
+    /* non-JSON body */
+  }
+  if (!res.ok) {
+    const detail = json.message || json.error || `HTTP ${res.status}`;
+    throw new Error(`One-API ${method} ${path} failed: ${detail}`);
+  }
+  return json;
+}
+
+function seatAliasForUser(user) {
+  const prefix = (user.email || user.username || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+  return `lc_${prefix}_${crypto.randomBytes(3).toString('hex')}`;
+}
+
+async function disableSeatTokenByAlias(aliasId) {
+  const list = await oneApi(
+    'GET',
+    `/api/tenant/${ONEAPI_TENANT}/token?seat_alias=${encodeURIComponent(aliasId)}`,
+  );
+  const tokens = (list.data || []).filter((t) => t.seat_alias === aliasId && t.status === 1);
+  for (const t of tokens) {
+    await oneApi('PUT', `/api/tenant/${ONEAPI_TENANT}/token/${t.id}/disable`);
+  }
+  return tokens.length;
+}
+
+async function assignSeatTokenHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await db.getUserById(
+      id,
+      'email username seatToken satchidaSeatAlias accountType tenantId',
+    );
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!oneApiConfigured()) {
+      return res.status(503).json({ error: 'ONEAPI_ADMIN_ACCESS_TOKEN is not configured' });
+    }
+
+    /** An explicit, valid seat type wins; otherwise the user's current type
+     *  is kept when it is still a known one, falling back to `basic`. */
+    const requestedAccountType = req.body?.accountType;
+    let accountType = 'basic';
+    if (SEAT_TYPES.includes(requestedAccountType)) {
+      accountType = requestedAccountType;
+    } else if (SEAT_TYPES.includes(user.accountType)) {
+      accountType = user.accountType;
+    }
+    const policy = SEAT_POLICY_BY_TYPE[accountType];
+    // A user keeps ONE seat alias across re-assignments so the operator can
+    // follow the seat's history in One-API; the previous token is disabled.
+    const aliasId = user.satchidaSeatAlias || seatAliasForUser(user);
+
+    // One-API's seat-policy binding uses snake_case (alias_id / seat_tier /
+    // account_type); the list fields are pointers on the Go side, so present
+    // values replace and absent ones are left alone.
+    await oneApi('PUT', `/api/tenant/${ONEAPI_TENANT}/seat-policy`, {
+      alias_id: aliasId,
+      seat_tier: accountType,
+      profile_type: 'adult',
+      account_type: accountType,
+      allowed_modes: policy.modes.split(','),
+      allowed_models: policy.models.split(','),
+    });
+
+    const created = await oneApi('POST', `/api/tenant/${ONEAPI_TENANT}/token`, {
+      group: accountType,
+      seat_alias: aliasId,
+      models: policy.models,
+      channels: '',
+      unlimited_quota: true,
+    });
+    const key = created?.data?.key;
+    if (!key) {
+      throw new Error('One-API did not return the seat token key');
+    }
+    // The old key stops working the moment the new one is stored.
+    if (user.satchidaSeatAlias) {
+      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+    }
+
+    await db.updateUser(id, {
+      seatToken: key,
+      satchidaSeatAlias: aliasId,
+      accountType,
+    });
+
+    // Keep the admin panel's Groups view consistent with the seat type.
+    const seatGroup = await db.findGroupByQuery({ accountType });
+    if (seatGroup?._id) {
+      await db.addUserToGroup(id, seatGroup._id.toString()).catch(() => {});
+    }
+
+    // 'user.updated' is the catalogued action for seat changes; the seat
+    // detail travels as metadata so the audit log stays queryable by action.
+    await db
+      .recordAuditEntry({
+        action: 'user.updated',
+        outcome: 'success',
+        actor: {
+          type: 'user',
+          id: req.user?._id?.toString() ?? req.user?.id,
+          name: req.user?.name || req.user?.username || req.user?.email || 'admin',
+        },
+        target: { type: 'user', id, name: user.email || user.username || id },
+        metadata: { seat: 'assigned', accountType, seatAlias: aliasId },
+      })
+      .catch(() => {});
+
+    return res.status(200).json({
+      accountType,
+      seatAlias: aliasId,
+      seatTokenHint: key.slice(0, 6) + '…' + key.slice(-4),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to assign seat' });
+  }
+}
+
+async function revokeSeatTokenHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await db.getUserById(id, 'email seatToken satchidaSeatAlias');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (user.satchidaSeatAlias && oneApiConfigured()) {
+      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+    }
+    await db.updateUser(id, { seatToken: null });
+    await db
+      .recordAuditEntry({
+        action: 'user.updated',
+        outcome: 'success',
+        actor: {
+          type: 'user',
+          id: req.user?._id?.toString() ?? req.user?.id,
+          name: req.user?.name || req.user?.username || req.user?.email || 'admin',
+        },
+        target: { type: 'user', id, name: user.email || user.satchidaSeatAlias || id },
+        metadata: { seat: 'revoked', seatAlias: user.satchidaSeatAlias ?? null },
+      })
+      .catch(() => {});
+    return res.status(200).json({ revoked: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to revoke seat' });
+  }
+}
+
+router.post('/:id/seat-token', requireManageUsers, assignSeatTokenHandler);
+router.delete('/:id/seat-token', requireManageUsers, revokeSeatTokenHandler);
+
 router.get('/', requireReadUsers, handlers.listUsers);
 router.get('/search', requireReadUsers, handlers.searchUsers);
 router.delete('/:id', requireManageUsers, handlers.deleteUser);

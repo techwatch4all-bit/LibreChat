@@ -8,9 +8,12 @@ Compatible with MCP SDK 2.x (MCPServer).
 import sys
 import json
 import math
+import os
 import re
 import io
 import base64
+import urllib.request
+import urllib.parse
 from mcp.server.mcpserver import MCPServer
 
 mcp = MCPServer("satchida-stem-study")
@@ -409,6 +412,168 @@ def scientific_physics_solver(problem_type: str, parameters: dict) -> str:
             return json.dumps({"status": "error", "message": f"Unsupported problem_type: {problem_type}"})
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
+
+@mcp.tool()
+def fetch_learning_visuals(topic: str, media_type: str = "both", max_results: int = 3) -> str:
+    """
+    Finds and downloads high-quality educational diagrams, figures, or animated GIFs from Wikimedia Commons.
+    Saves files locally to client/public/assets/study/media/ and returns both local markdown embeds and source URLs.
+    
+    media_type options:
+      - 'image': static scientific/curriculum diagrams, anatomy charts, apparatus setups
+      - 'gif': animated physical processes, wave propagation, mechanical linkages, chemical cycles
+      - 'both': mix of high-yield diagrams and animated GIFs
+    max_results: number of visual assets to download and embed (default: 3)
+    """
+    headers = {"User-Agent": "SatchidaStudyEngine/1.0 (contact@satchida.com)"}
+    results = []
+    gsr_query = topic
+    if media_type == "gif":
+        gsr_query += " filetype:bitmap"
+        
+    url = f"https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch={urllib.parse.quote(gsr_query)}&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url|mime|size"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode())
+            pages = data.get("query", {}).get("pages", {})
+            for pid, p in pages.items():
+                raw_title = p.get("title", "").replace("File:", "")
+                ii = p.get("imageinfo", [{}])[0]
+                mime = ii.get("mime", "")
+                remote_url = ii.get("url", "")
+                if not remote_url:
+                    continue
+                is_gif = (mime == "image/gif") or remote_url.lower().endswith(".gif")
+                is_img = mime.startswith("image/")
+                
+                if media_type == "gif" and not is_gif:
+                    continue
+                if media_type == "image" and is_gif:
+                    continue
+                if not is_img:
+                    continue
+                    
+                # Clean filename and normalize extension
+                base_name, existing_ext = os.path.splitext(raw_title)
+                slug = re.sub(r"[^a-zA-Z0-9_\-]", "_", base_name.lower())[:45]
+                ext = existing_ext if existing_ext.lower() in [".jpg", ".jpeg", ".png", ".gif", ".svg"] else (".gif" if is_gif else ".png")
+                filename = f"{slug}{ext}"
+                
+                # Determine absolute path to client/public/assets/study/media
+                local_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "client", "public", "assets", "study", "media")
+                os.makedirs(local_dir, exist_ok=True)
+                local_path = os.path.join(local_dir, filename)
+                
+                if not os.path.exists(local_path):
+                    dl_req = urllib.request.Request(remote_url, headers=headers)
+                    with urllib.request.urlopen(dl_req, timeout=12) as dl_res:
+                        with open(local_path, "wb") as f:
+                            f.write(dl_res.read())
+                            
+                web_url = f"/assets/study/media/{filename}"
+                asset_kind = "Animated GIF" if is_gif else "Curriculum Diagram"
+                results.append({
+                    "title": base_name,
+                    "kind": asset_kind,
+                    "type": "gif" if is_gif else "image",
+                    "local_url": web_url,
+                    "remote_url": remote_url,
+                    "markdown_embed": f"![{base_name} - {asset_kind}]({web_url})"
+                })
+                if len(results) >= max_results:
+                    break
+        return json.dumps({
+            "status": "success",
+            "topic": topic,
+            "media_type": media_type,
+            "count": len(results),
+            "visuals": results
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e), "topic": topic})
+
+@mcp.tool()
+def search_curated_learning_videos(topic: str, provider: str = "all", max_results: int = 4) -> str:
+    """
+    Finds verified, highly authoritative educational videos and lecture playlists across Khan Academy,
+    MIT OpenCourseWare, Stanford, CrashCourse, 3Blue1Brown, and NPTEL.
+    Returns clean, clickable markdown video links with channel/instructor attribution.
+    
+    provider options:
+      - 'all': broad search across all top educational repositories
+      - 'khan_academy': Khan Academy concept tutorials & mastery paths
+      - 'mit_ocw': MIT OpenCourseWare foundational undergraduate lectures
+      - 'crash_course': High-engagement visual concept overviews
+      - '3blue1brown': Deep intuitive visual mathematics & physics
+      - 'nptel': Indian IIT/IISc engineering curriculum & GATE prep
+    max_results: number of video suggestions to retrieve (default: 4)
+    """
+    channels = {
+        "khan_academy": "Khan Academy",
+        "mit_ocw": "MIT OpenCourseWare",
+        "crash_course": "CrashCourse",
+        "3blue1brown": "3Blue1Brown",
+        "nptel": "NPTEL-NOC IITM",
+        "veritasium": "Veritasium",
+        "ted_ed": "TED-Ed"
+    }
+    
+    query = f"{topic} video"
+    if provider in channels:
+        query = f"{topic} {channels[provider]}"
+        
+    url = f"http://127.0.0.1:8880/search?q={urllib.parse.quote(query)}&format=json"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    videos = []
+    seen_urls = set()
+    
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode())
+            for item in data.get("results", []):
+                u = item.get("url", "")
+                t = item.get("title", "")
+                snippet = item.get("content", "")
+                
+                is_yt = "youtube.com" in u or "youtu.be" in u
+                is_khan = "khanacademy.org" in u
+                is_mit = "ocw.mit.edu" in u
+                is_nptel = "nptel.ac.in" in u
+                
+                if not (is_yt or is_khan or is_mit or is_nptel):
+                    continue
+                if u in seen_urls:
+                    continue
+                seen_urls.add(u)
+                
+                source = "Educational Media"
+                for k, v in channels.items():
+                    if v.lower() in t.lower() or v.lower() in snippet.lower():
+                        source = v
+                        break
+                if is_khan: source = "Khan Academy"
+                elif is_mit: source = "MIT OpenCourseWare"
+                elif is_nptel: source = "NPTEL India (IIT/IISc)"
+                
+                clean_title = re.sub(r" - YouTube.*", "", t).strip()
+                videos.append({
+                    "title": clean_title,
+                    "url": u,
+                    "source": source,
+                    "markdown_link": f"[{clean_title} ({source})]({u})"
+                })
+                if len(videos) >= max_results:
+                    break
+        return json.dumps({
+            "status": "success",
+            "topic": topic,
+            "provider": provider,
+            "count": len(videos),
+            "videos": videos
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e), "topic": topic})
 
 if __name__ == "__main__":
     mcp.run()

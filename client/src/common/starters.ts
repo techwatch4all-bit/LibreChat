@@ -607,6 +607,19 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         mcpServers: ['satchida-stem-study'],
       }),
       starter({
+        title: 'Visual Concept & Animated Physics Lab',
+        icon: '🎬',
+        description: 'Physical concepts with downloaded animated GIFs and video lessons.',
+        inputs: ['physical or natural phenomenon', 'level — school / undergraduate'],
+        deliver:
+          'the core principle explained intuitively, 1–2 downloaded animated GIFs or apparatus diagrams embedded via fetch_learning_visuals, mathematical derivation in KaTeX, and 2–3 recommended video lessons from Khan Academy, MIT OCW, or 3Blue1Brown via search_curated_learning_videos.',
+        contract:
+          'always embed verified local visual media and clickable video links for complete multi-modal learning.',
+        badge: 'Visual Physics & STEM',
+        badgeKey: 'starters_badge_visual_physics',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
         title: 'Concept Book Builder',
         icon: '📘',
         description: 'A Socratic learning module with milestones and quizzes.',
@@ -759,6 +772,22 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         badgeKey: 'starters_badge_flashcards',
       }),
       starter({
+        title: 'Biology & Living Systems Visual Lab',
+        description:
+          'Cell biology, anatomy & physiology with verified animated GIFs and video demos.',
+        inputs: [
+          'board and grade',
+          'biological concept — e.g. mitosis / cardiac cycle / photosynthesis',
+        ],
+        deliver:
+          'step-by-step biological mechanism, 1–2 downloaded animated GIFs or anatomical cutaway diagrams embedded into the chat via fetch_learning_visuals, labeled cellular stages, and curated Khan Academy or CrashCourse video recommendations via search_curated_learning_videos.',
+        contract:
+          'deliver rich visual evidence with local image embeds; follow with an exam-style identification question.',
+        badge: 'Visual Biology Lab',
+        badgeKey: 'starters_badge_visual_biology',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
         title: 'Concept Gap Diagnostic',
         description: 'Ten questions, then a report card and revision order.',
         inputs: ['board', 'class', 'subject', 'chapter'],
@@ -822,6 +851,23 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'where you are not certain of the exact question text in this edition, list it as "needs my textbook" instead of guessing.',
         badge: 'Answer Bank',
         badgeKey: 'starters_badge_answer_bank',
+        mcpServers: ['satchida-stem-study'],
+      }),
+      starter({
+        title: 'Multi-Source Concept Explainer & Video Hub',
+        description:
+          'Deep conceptual breakdown with textbook context, visual diagrams, and multi-source video links.',
+        inputs: [
+          'topic or concept',
+          'curriculum — NCERT / Cambridge / IB / College',
+          'target depth — simple / detailed / rigorous',
+        ],
+        deliver:
+          'a comprehensive explanation using first principles, 1–2 downloaded curriculum diagrams or animated GIFs embedded via fetch_learning_visuals, step-by-step mathematical formulation in KaTeX, and a curated list of top video tutorials from Khan Academy, MIT OCW, CrashCourse, and 3Blue1Brown via search_curated_learning_videos.',
+        contract:
+          'combine verbal clarity, verified KaTeX equations, local media embeds, and authoritative video links in one unified lesson.',
+        badge: 'Visual Concept & Video Hub',
+        badgeKey: 'starters_badge_concept_video_hub',
         mcpServers: ['satchida-stem-study'],
       }),
     ],

@@ -111,8 +111,9 @@ function renderDetails(inner: string): string {
 
 /**
  * Rewrites every raw or HTML-escaped `<details>` block as Markdown, leaving fenced code
- * blocks untouched. Unclosed blocks are returned unchanged rather than swallowing the
- * rest of the answer.
+ * blocks untouched. A block that is never closed keeps its text but loses the stray
+ * `<details>`/`<summary>` tags, so a truncated answer still reads as prose instead of
+ * showing raw markup.
  */
 export function stripDetailsBlocks(content: string): string {
   if (!content || !/details/i.test(content)) {
@@ -124,9 +125,13 @@ export function stripDetailsBlocks(content: string): string {
     if (segment.code) {
       return segment.text;
     }
-    const next = segment.text.replace(DETAILS_BLOCK_PATTERN, (_match, inner: string) =>
+    let next = segment.text.replace(DETAILS_BLOCK_PATTERN, (_match, inner: string) =>
       renderDetails(inner),
     );
+    // Strip any remaining stray unclosed details/summary tags outside code fences
+    next = next
+      .replace(/<\/?(?:details|summary)\b[^>]*>/gi, '')
+      .replace(/&lt;\/?(?:details|summary)\b[^&]{0,400}?&gt;/gi, '');
     if (next !== segment.text) {
       changed = true;
     }

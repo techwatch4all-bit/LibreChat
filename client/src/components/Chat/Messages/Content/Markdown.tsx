@@ -6,9 +6,11 @@ import { parseSuggestedQuestions } from '~/utils/suggestedQuestions';
 import useSmoothStreaming from '~/hooks/Messages/useSmoothStreaming';
 import MarkdownErrorBoundary from './MarkdownErrorBoundary';
 import SuggestedQuestions from './SuggestedQuestions';
+import { parseFlashcards } from '~/utils/flashcards';
 import { FADE_HYDRATION_THRESHOLD } from './animate';
 import { useMessageContext } from '~/Providers';
 import MarkdownBlocks from './MarkdownBlocks';
+import Flashcards from './Flashcards';
 import store from '~/store';
 
 type TContentProps = {
@@ -22,12 +24,14 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
   const LaTeXParsing = useRecoilValue<boolean>(store.LaTeXParsing);
   const isInitializing = content === '';
 
-  const { mainContent, questions } = useMemo(() => {
-    if (!content) return { mainContent: '', questions: [] };
-    const parsed = parseSuggestedQuestions(content);
+  const { mainContent, questions, flashcards } = useMemo(() => {
+    if (!content) return { mainContent: '', questions: [], flashcards: [] };
+    const { content: contentWithoutCards, flashcards } = parseFlashcards(content);
+    const parsed = parseSuggestedQuestions(contentWithoutCards);
     return {
       mainContent: normalizeArtifactDirectives(parsed.mainContent),
       questions: parsed.questions,
+      flashcards,
     };
   }, [content]);
 
@@ -72,6 +76,7 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
         animate={animate}
         hydrated={hydratedRef.current}
       />
+      {flashcards.length > 0 && <Flashcards cards={flashcards} />}
       {questions.length > 0 && <SuggestedQuestions questions={questions} />}
     </MarkdownErrorBoundary>
   );

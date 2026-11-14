@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { SandpackPreviewRef } from '@codesandbox/sandpack-react/unstyled';
 import { ArtifactPreview } from './ArtifactPreview';
 
@@ -27,8 +27,10 @@ describe('ArtifactPreview', () => {
 
     const iframe = screen.getByTitle('Artifact Preview') as HTMLIFrameElement;
     expect(iframe.tagName).toBe('IFRAME');
+    /** `allow-same-origin` stays: the vendored WebGL/canvas scripts in the 3D
+     *  floor-plan artifact need a same-origin document to run against. */
     expect(iframe.getAttribute('sandbox')).toBe(
-      'allow-scripts allow-downloads allow-popups allow-forms',
+      'allow-scripts allow-downloads allow-popups allow-forms allow-same-origin',
     );
     expect(iframe.getAttribute('srcdoc')).toContain(`<base href="${window.location.origin}/">`);
     expect(screen.queryByTestId('sandpack-provider')).toBeNull();
@@ -80,6 +82,9 @@ describe('ArtifactPreview', () => {
       expect(global.fetch).toHaveBeenCalledWith('/assets/vendor/three/three.min.js', {
         credentials: 'same-origin',
       });
+      await waitFor(() =>
+        expect(iframe.getAttribute('srcdoc')).toContain('window.THREE = { ok: true };'),
+      );
       expect(iframe.getAttribute('srcdoc')).toContain(
         '<script>window.THREE = { ok: true };</script>',
       );

@@ -99,9 +99,9 @@ describe('stripDetailsBlocks', () => {
     expect(output).toContain('> **Real**');
   });
 
-  test('leaves an unclosed details block alone rather than swallowing the answer', () => {
+  test('strips stray unclosed details tags but keeps the answer text', () => {
     const input = 'Intro\n\n<details>\n<summary>Half</summary>\nno close tag';
-    expect(stripDetailsBlocks(input)).toBe(input);
+    expect(stripDetailsBlocks(input)).toBe('Intro\n\n\nHalf\nno close tag');
   });
 
   test('is idempotent', () => {

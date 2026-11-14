@@ -491,6 +491,14 @@ function renderUsers() {
         '<button type="button" data-op="editUser" data-uid="' +
         escapeHtml(id) +
         '" class="action" title="Edit account">Edit</button>' +
+        '<button type="button" data-op="assignSeat" data-uid="' +
+        escapeHtml(id) +
+        '" class="action" title="Assign seat (licence) type">Seat</button>' +
+        (u.seatAssigned
+          ? '<button type="button" data-op="revokeSeat" data-uid="' +
+            escapeHtml(id) +
+            '" class="action actionDel" title="Revoke seat token">Revoke seat</button>'
+          : '') +
         '<button type="button" data-op="userGroups" data-uid="' +
         escapeHtml(id) +
         '" class="action" title="Group memberships">Groups</button>' +
@@ -894,6 +902,51 @@ async function editUser(u) {
       return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
     },
   );
+}
+
+async function assignSeat(u) {
+  await formModal(
+    'Assign seat — ' + (u.email || uname(u)),
+    [
+      {
+        key: 'accountType',
+        label: 'Seat type (licence)',
+        type: 'select',
+        options: seatTypeOptions(u.accountType || ''),
+      },
+    ],
+    'Assign',
+    {},
+    async (v) => {
+      if (!v.accountType) return { ok: false, error: 'Pick a seat type.' };
+      const res = await apiAdmin('/users/' + encodeURIComponent(uid(u)) + '/seat-token', {
+        method: 'POST',
+        body: JSON.stringify({ accountType: v.accountType }),
+      });
+      if (res.ok) {
+        toast('Seat assigned: ' + v.accountType, 'ok');
+        await loadUsers();
+        return { ok: true };
+      }
+      return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
+    },
+  );
+}
+
+async function revokeSeat(u) {
+  const ok = await confirmDialog(
+    "Revoke this user's seat token? Their requests will fall back to the shared gateway credential.",
+  );
+  if (!ok) return;
+  const res = await apiAdmin('/users/' + encodeURIComponent(uid(u)) + '/seat-token', {
+    method: 'DELETE',
+  });
+  if (res.ok) {
+    toast('Seat revoked.', 'ok');
+    await loadUsers();
+  } else {
+    toast((res.json && res.json.error) || `HTTP ${res.status}`, 'err');
+  }
 }
 
 async function userGroups(u) {
@@ -1603,6 +1656,8 @@ function attachListeners() {
     const u = S.users.find((x) => uid(x) === b.dataset.uid);
     if (!u) return;
     if (b.dataset.op === 'editUser') editUser(u);
+    else if (b.dataset.op === 'assignSeat') assignSeat(u);
+    else if (b.dataset.op === 'revokeSeat') revokeSeat(u);
     else if (b.dataset.op === 'userGroups') userGroups(u);
     else if (b.dataset.op === 'resetUser') resetUserPassword(u);
     else if (b.dataset.op === 'delUser') deleteUser(u);

@@ -182,26 +182,46 @@ function drawShower2D(fw, fd) {
 }
 
 function drawBathSuite2D(fw, fd) {
-  // Legacy single-rect bathroom entry: lay out WC + vanity + shower inside the footprint.
+  // Architectural CAD bathroom fixture layout: adapts to horizontal or vertical footprint
   drawFixtureBase(fw, fd);
-  const gap = Math.max(1.5, Math.min(fw, fd) * 0.05);
-  const innerD = fd - gap * 2;
-  const showerW = Math.min(fw * 0.4, innerD);
-  const wcW = Math.max(6, Math.min(fw * 0.3, innerD * 0.55));
-  const vanityW = Math.max(8, fw - showerW - wcW - gap * 3);
-  const vanityX = gap + wcW + gap;
-  ctx.save();
-  ctx.translate(gap, gap);
-  drawWc2D(wcW, innerD);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(vanityX, gap);
-  drawVanity2D(vanityW, innerD);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(vanityX + vanityW + gap, gap);
-  drawShower2D(Math.max(4, fw - vanityX - vanityW - gap * 2), innerD);
-  ctx.restore();
+  const gap = Math.max(1.5, Math.min(fw, fd) * 0.04);
+  if (fd > fw * 1.05) {
+    // Vertical bathroom layout: stack Shower, Vanity, WC vertically
+    const innerW = fw - gap * 2;
+    const showerH = Math.min(fd * 0.42, innerW);
+    const wcH = Math.min(fd * 0.28, innerW * 0.7);
+    const vanityH = Math.max(6, fd - showerH - wcH - gap * 4);
+    ctx.save();
+    ctx.translate(gap, gap);
+    drawShower2D(innerW, showerH);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(gap, gap + showerH + gap);
+    drawVanity2D(innerW, vanityH);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(gap, gap + showerH + gap + vanityH + gap);
+    drawWc2D(innerW, wcH);
+    ctx.restore();
+  } else {
+    // Horizontal bathroom layout: arrange WC, Vanity, Shower horizontally
+    const innerD = fd - gap * 2;
+    const showerW = Math.min(fw * 0.4, innerD);
+    const wcW = Math.max(6, Math.min(fw * 0.28, innerD * 0.6));
+    const vanityW = Math.max(8, fw - showerW - wcW - gap * 4);
+    ctx.save();
+    ctx.translate(gap, gap);
+    drawWc2D(wcW, innerD);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(gap + wcW + gap, gap);
+    drawVanity2D(vanityW, innerD);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(gap + wcW + gap + vanityW + gap, gap);
+    drawShower2D(Math.max(4, fw - (gap + wcW + gap + vanityW + gap) - gap), innerD);
+    ctx.restore();
+  }
 }
 
 function draw2DFurniture(f, px, py, scale) {

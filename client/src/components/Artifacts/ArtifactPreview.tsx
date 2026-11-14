@@ -153,20 +153,24 @@ export const ArtifactPreview = memo(function ({
     return null;
   }
 
-  if (template === 'static' && resolvedStaticHtml !== null) {
+  if (template === 'static') {
+    const htmlToRender = resolvedStaticHtml ?? rawStaticHtml;
+    if (!htmlToRender) {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-[#07111f] text-sm text-slate-400">
+          <span>Loading preview...</span>
+        </div>
+      );
+    }
     return (
       <iframe
         key={staticRefreshKey}
         title="Artifact Preview"
-        srcDoc={resolvedStaticHtml}
+        srcDoc={htmlToRender}
         sandbox="allow-scripts allow-downloads allow-popups allow-forms allow-same-origin"
         className="h-full w-full border-0 bg-[#07111f]"
       />
     );
-  }
-
-  if (template === 'static') {
-    return null;
   }
 
   return (

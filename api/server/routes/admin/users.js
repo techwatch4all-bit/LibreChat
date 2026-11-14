@@ -234,11 +234,23 @@ async function assignSeatTokenHandler(req, res) {
       accountType = user.accountType;
     }
     const policy = SEAT_POLICY_BY_TYPE[accountType];
-    // Tenant resolution: an explicit tenantId in the body (operator minting a
-    // seat for a copied tenant deployment) wins; otherwise the user's own
-    // tenantId; otherwise the operator's default tenant. Validated to exist
-    // in One-API before anything is minted.
-    const tenantId = (req.body?.tenantId || user.tenantId || ONEAPI_TENANT).trim();
+    // Tenant resolution — the security boundary of seat minting. A platform
+    // operator (OPERATOR_CONTROL, platform-only grant) may mint into any
+    // tenant via body.tenantId: that is how a copied tenant deployment gets
+    // its seats. Everyone else is BIND to their own tenant — a body.tenantId
+    // naming another tenant is ignored, so a tenant admin can never seat
+    // users into another tenant's One-API tenant.
+    const callerIsOperator = await hasCapability(req.user, SystemCapabilities.OPERATOR_CONTROL, {
+      platformOnly: true,
+    }).catch(() => false);
+    let tenantId;
+    if (callerIsOperator && req.body?.tenantId) {
+      tenantId = String(req.body.tenantId).trim();
+    } else if (user.tenantId) {
+      tenantId = user.tenantId;
+    } else {
+      tenantId = ONEAPI_TENANT;
+    }
     await oneApi('GET', `/api/tenant/${encodeURIComponent(tenantId)}`);
     // A user keeps ONE seat alias across re-assignments so the operator can
     // follow the seat's history in One-API; the previous token is disabled.

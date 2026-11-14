@@ -8,6 +8,27 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-14 — Motion Studio: sanitary fixtures stay inside their room
+
+**Problem.** The 3D placement safety net moved any sanitary fixture whose centre was within 3.2 ft
+of a door's midpoint by a flat 2.5 ft on the room's short axis, with no containment check. In the
+default plan it fired on the common bath vanity (3.04 ft from the door midpoint) and pushed it from
+`z 17.2–18.8` to `z 19.7–21.3` — through the `z=19` wall into Bedroom 3.
+
+**Shipped.** `client/public/assets/vendor/satchida/cad-studio.js` now models the door as a swing
+envelope (the opening swept 3.2 ft into the room) instead of a circle around the midpoint, and
+`settleSanitaryPlacement()` shifts a fixture only along the wall normal, clamps the result to the
+room that owns it, and reverts when the clamp cannot clear the envelope. Rotation is accounted for
+when the world footprint is computed, so a 90°-turned WC is measured by its true extent.
+
+**Evidence.** `npx jest src/utils/__tests__/cadStudioPlacement.spec.ts` — 7/7 pass. The suite loads
+the helper block out of the shipped asset (not a copy) and asserts: the envelope geometry, that the
+default common-bath vanity/shower/WC are returned unchanged, that an overlapping fixture is pushed
+clear while staying inside the room, that a room too small to give clearance leaves the fixture
+alone, and that `smallestRoomAt()` prefers the nested en-suite over the master suite.
+
+---
+
 ## 2026-11-14 — Chat: Markdown-only reveal blocks and reliable follow-up chips
 
 **Problem.** DeepTutor and Study answers arrived with raw `<details>` / `<summary>` markup, which

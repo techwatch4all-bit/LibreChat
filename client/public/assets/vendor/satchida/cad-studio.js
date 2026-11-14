@@ -568,6 +568,77 @@ function addShower3D(group, mats, ox, oz, w, d) {
   addPart(group, new THREE.CylinderGeometry(0.32, 0.28, 0.08, 16), mats.chromeMat, ox - w / 4, 6.14, oz - d / 2 + 0.12);
 }
 
+// ---- Plan geometry helpers (placement safety net shared by the 3D builders) ----
+
+function clampNumber(value, lo, hi) {
+  if (lo > hi) return value;
+  return Math.min(hi, Math.max(lo, value));
+}
+
+function boxOf(cx, cz, w, d) {
+  return { x1: cx - w / 2, z1: cz - d / 2, x2: cx + w / 2, z2: cz + d / 2 };
+}
+
+function rectsOverlap(a, b) {
+  return a.x1 < b.x2 && a.x2 > b.x1 && a.z1 < b.z2 && a.z2 > b.z1;
+}
+
+function smallestRoomAt(rooms, x, z) {
+  let best = null;
+  for (const r of rooms || []) {
+    if (x < r.x || x > r.x + r.w || z < r.z || z > r.z + r.d) continue;
+    if (!best || r.w * r.d < best.w * best.d) best = r;
+  }
+  return best;
+}
+
+function doorSwingZone(op, horiz, fixed, px, pz) {
+  const depth = 3.2;
+  const into = horiz ? (pz >= fixed ? 1 : -1) : (px >= fixed ? 1 : -1);
+  const near = Math.min(fixed, fixed + into * depth);
+  const far = Math.max(fixed, fixed + into * depth);
+  return horiz
+    ? { x1: op.at, x2: op.at + op.len, z1: near, z2: far }
+    : { x1: near, x2: far, z1: op.at, z2: op.at + op.len };
+}
+
+/**
+ * Nudges a sanitary fixture out of any door-swing envelope, clamping to the room that
+ * owns it. If the room cannot give back clearance the fixture stays put, because a
+ * fixture through a wall is worse than a tight swing.
+ */
+function settleSanitaryPlacement(plan, centerX, centerZ, extentW, extentD) {
+  let x = centerX;
+  let z = centerZ;
+  const owner = smallestRoomAt(plan && plan.rooms, x, z);
+
+  for (const w of (plan && plan.walls) || []) {
+    for (const op of w.openings || []) {
+      if (op.kind !== "door") continue;
+      const horiz = Math.abs(w.z1 - w.z2) < 0.001;
+      const fixed = horiz ? w.z1 : w.x1;
+      const rect = boxOf(x, z, extentW, extentD);
+      const zone = doorSwingZone(op, horiz, fixed, x, z);
+      if (!rectsOverlap(rect, zone)) continue;
+
+      const shift = horiz
+        ? (z > fixed ? zone.z2 + 0.05 - rect.z1 : zone.z1 - 0.05 - rect.z2)
+        : (x > fixed ? zone.x2 + 0.05 - rect.x1 : zone.x1 - 0.05 - rect.x2);
+      let nextX = horiz ? x : x + shift;
+      let nextZ = horiz ? z + shift : z;
+      if (owner) {
+        nextX = clampNumber(nextX, owner.x + extentW / 2, owner.x + owner.w - extentW / 2);
+        nextZ = clampNumber(nextZ, owner.z + extentD / 2, owner.z + owner.d - extentD / 2);
+      }
+      if (rectsOverlap(boxOf(nextX, nextZ, extentW, extentD), zone)) continue;
+      x = nextX;
+      z = nextZ;
+    }
+  }
+
+  return { x, z };
+}
+
 function createFurniture3D(f, cx, cz, sharedMats) {
   const group = new THREE.Group();
   const fw = Number(f.w) || 2, fd = Number(f.d) || 2, fh = Number(f.h) || 2.5;
@@ -684,33 +755,27 @@ function createFurniture3D(f, cx, cz, sharedMats) {
     addPart(group, new THREE.BoxGeometry(fw, fh, fd), oakMat, 0, fh / 2, 0);
   }
 
-  let finalX = f.x + fw / 2;
-  let finalZ = f.z + fd / 2;
+  const rotDeg = Number(f.rot) || 0;
+  const rot = (rotDeg * Math.PI) / 180;
+  const quarterTurn = Math.abs(Math.round(rotDeg / 90)) % 2 === 1;
+  const extentW = quarterTurn ? fd : fw;
+  const extentD = quarterTurn ? fw : fd;
 
-  // Dynamic Invariant: sanitary fixture vs door-swing envelope (>= 3.0 ft clear).
+  let centerX = f.x + fw / 2;
+  let centerZ = f.z + fd / 2;
+
+  // Sanitary fixtures keep 3.0 ft clear of a door's swing envelope. Any nudge is
+  // clamped to the room that owns the fixture, so a crowded plan can never push a
+  // WC or vanity through a wall into the next room.
   const isSanitary = f.type === "wc" || f.type === "vanity" || f.type === "shower" || f.type === "bath";
-  if (isSanitary && PLAN && PLAN.walls) {
-    for (const w of PLAN.walls) {
-      for (const op of w.openings || []) {
-        if (op.kind !== "door") continue;
-        const horiz = Math.abs(w.z1 - w.z2) < 0.001;
-        const doorMidX = horiz ? op.at + op.len / 2 : w.x1;
-        const doorMidZ = horiz ? w.z1 : op.at + op.len / 2;
-        const dist = Math.hypot(finalX - doorMidX, finalZ - doorMidZ);
-        if (dist < 3.2) {
-          if (horiz) {
-            finalX += finalX > doorMidX ? 2.5 : -2.5;
-          } else {
-            finalZ += finalZ > doorMidZ ? 2.5 : -2.5;
-          }
-        }
-      }
-    }
+  if (isSanitary) {
+    const settled = settleSanitaryPlacement(PLAN, centerX, centerZ, extentW, extentD);
+    centerX = settled.x;
+    centerZ = settled.z;
   }
 
-  const rot = ((Number(f.rot) || 0) * Math.PI) / 180;
   if (rot) group.rotation.y = -rot;
-  group.position.set(finalX - cx, 0.12, finalZ - cz);
+  group.position.set(centerX - cx, 0.12, centerZ - cz);
   return group;
 }
 

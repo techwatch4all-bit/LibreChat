@@ -249,7 +249,11 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
     },
     accountType: {
       type: String,
-      enum: ['basic', 'pro', 'family', 'privacy', null],
+      // The full operator catalogue: One-API additionally carries
+      // standard/pro_family/enterprise, which a user can hold once seated
+      // through those licence types even though self-service sign-up offers
+      // only the four user-facing ones.
+      enum: ['basic', 'standard', 'pro', 'family', 'pro_family', 'enterprise', 'privacy', null],
       default: null,
     },
     familyLimits: {

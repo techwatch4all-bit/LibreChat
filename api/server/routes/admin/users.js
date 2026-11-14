@@ -13,6 +13,7 @@ const {
   purgeAgentTriggerDeliveriesForUser,
 } = require('~/server/services/Agents/triggers');
 const db = require('~/models');
+const { runAsSystem } = require('@librechat/data-schemas');
 const { getAppConfig, invalidateCodeEnvironmentConfigCache } = require('~/server/services/Config');
 
 const router = express.Router();
@@ -209,9 +210,12 @@ async function disableSeatTokenByAlias(aliasId) {
 async function assignSeatTokenHandler(req, res) {
   try {
     const { id } = req.params;
-    const user = await db.getUserById(
-      id,
-      'email username seatToken satchidaSeatAlias accountType tenantId',
+    // Operator minting runs as system scope: the seat may target ANY tenant
+    // deployment (that is the whole point of copied-instance tenancy), and
+    // the user row lives in that tenant, which the isolation plugin would
+    // otherwise hide from this request's own tenant context.
+    const user = await runAsSystem(() =>
+      db.getUserById(id, 'email username seatToken satchidaSeatAlias accountType tenantId'),
     );
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -230,6 +234,12 @@ async function assignSeatTokenHandler(req, res) {
       accountType = user.accountType;
     }
     const policy = SEAT_POLICY_BY_TYPE[accountType];
+    // Tenant resolution: an explicit tenantId in the body (operator minting a
+    // seat for a copied tenant deployment) wins; otherwise the user's own
+    // tenantId; otherwise the operator's default tenant. Validated to exist
+    // in One-API before anything is minted.
+    const tenantId = (req.body?.tenantId || user.tenantId || ONEAPI_TENANT).trim();
+    await oneApi('GET', `/api/tenant/${encodeURIComponent(tenantId)}`);
     // A user keeps ONE seat alias across re-assignments so the operator can
     // follow the seat's history in One-API; the previous token is disabled.
     const aliasId = user.satchidaSeatAlias || seatAliasForUser(user);
@@ -237,7 +247,7 @@ async function assignSeatTokenHandler(req, res) {
     // One-API's seat-policy binding uses snake_case (alias_id / seat_tier /
     // account_type); the list fields are pointers on the Go side, so present
     // values replace and absent ones are left alone.
-    await oneApi('PUT', `/api/tenant/${ONEAPI_TENANT}/seat-policy`, {
+    await oneApi('PUT', `/api/tenant/${tenantId}/seat-policy`, {
       alias_id: aliasId,
       seat_tier: accountType,
       profile_type: 'adult',
@@ -251,7 +261,7 @@ async function assignSeatTokenHandler(req, res) {
     if (user.satchidaSeatAlias) {
       await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
     }
-    const created = await oneApi('POST', `/api/tenant/${ONEAPI_TENANT}/token`, {
+    const created = await oneApi('POST', `/api/tenant/${tenantId}/token`, {
       group: accountType,
       seat_alias: aliasId,
       models: policy.models,
@@ -262,16 +272,26 @@ async function assignSeatTokenHandler(req, res) {
     if (!key) {
       throw new Error('One-API did not return the seat token key');
     }
-    await db.updateUser(id, {
-      seatToken: key,
-      satchidaSeatAlias: aliasId,
-      accountType,
-    });
+    await runAsSystem(() =>
+      db.updateUser(id, {
+        seatToken: key,
+        satchidaSeatAlias: aliasId,
+        accountType,
+      }),
+    );
 
-    // Keep the admin panel's Groups view consistent with the seat type.
-    const seatGroup = await db.findGroupByQuery({ accountType });
+    // Keep the admin panel's Groups view consistent with the seat type: the
+    // seat group is scoped to the SAME tenant as the user (a copied tenant
+    // deployment has its own groups), falling back to the operator instance's
+    // group when no tenant-scoped one exists.
+    let seatGroup = await runAsSystem(() =>
+      db.findGroupByQuery({ accountType, tenantId }).catch(() => null),
+    );
+    if (!seatGroup) {
+      seatGroup = await runAsSystem(() => db.findGroupByQuery({ accountType }).catch(() => null));
+    }
     if (seatGroup?._id) {
-      await db.addUserToGroup(id, seatGroup._id.toString()).catch(() => {});
+      await runAsSystem(() => db.addUserToGroup(id, seatGroup._id.toString()).catch(() => {}));
     }
 
     // 'user.updated' is the catalogued action for seat changes; the seat
@@ -286,13 +306,14 @@ async function assignSeatTokenHandler(req, res) {
           name: req.user?.name || req.user?.username || req.user?.email || 'admin',
         },
         target: { type: 'user', id, name: user.email || user.username || id },
-        metadata: { seat: 'assigned', accountType, seatAlias: aliasId },
+        metadata: { seat: 'assigned', accountType, seatAlias: aliasId, oneapiTenant: tenantId },
       })
       .catch(() => {});
 
     return res.status(200).json({
       accountType,
       seatAlias: aliasId,
+      oneapiTenant: tenantId,
       seatTokenHint: key.slice(0, 6) + '…' + key.slice(-4),
     });
   } catch (error) {
@@ -303,14 +324,26 @@ async function assignSeatTokenHandler(req, res) {
 async function revokeSeatTokenHandler(req, res) {
   try {
     const { id } = req.params;
-    const user = await db.getUserById(id, 'email seatToken satchidaSeatAlias');
+    const user = await runAsSystem(() => db.getUserById(id, 'email seatToken satchidaSeatAlias'));
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     if (user.satchidaSeatAlias && oneApiConfigured()) {
-      await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+      const revokeTenant = (user.tenantId || ONEAPI_TENANT).trim();
+      const list = await oneApi(
+        'GET',
+        `/api/tenant/${encodeURIComponent(revokeTenant)}/token?seat_alias=${encodeURIComponent(user.satchidaSeatAlias)}`,
+      ).catch(() => ({ data: [] }));
+      for (const t of (list.data || []).filter(
+        (t) => t.seat_alias === user.satchidaSeatAlias && t.status === 1,
+      )) {
+        await oneApi(
+          'PUT',
+          `/api/tenant/${encodeURIComponent(revokeTenant)}/token/${t.id}/disable`,
+        ).catch(() => {});
+      }
     }
-    await db.updateUser(id, { seatToken: null });
+    await runAsSystem(() => db.updateUser(id, { seatToken: null }));
     await db
       .recordAuditEntry({
         action: 'user.updated',

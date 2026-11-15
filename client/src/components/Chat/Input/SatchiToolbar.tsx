@@ -1,5 +1,13 @@
 import React, { memo, useCallback, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
+import { useSetRecoilState } from 'recoil';
+import store from '~/store';
+import {
+  UNIVER_SHEET_MIME,
+  UNIVER_DOC_MIME,
+  excelBufferToUniverSnapshot,
+  docxBufferToUniverDocSnapshot,
+} from '~/components/Artifacts/Univer';
 import { Constants } from 'librechat-data-provider';
 import {
   DropdownMenu,
@@ -30,6 +38,7 @@ import {
   FolderLock,
   FileText,
   Presentation,
+  Volume2,
   Table2,
   SlidersHorizontal,
   Film,
@@ -95,6 +104,10 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
   const { conversation } = useChatContext();
   const convoKey = conversation?.conversationId ?? Constants.NEW_CONVO;
   const [, setMCPValues] = useAtom(mcpValuesAtomFamily(convoKey));
+
+  const setArtifacts = useSetRecoilState(store.artifactsState);
+  const setCurrentArtifactId = useSetRecoilState(store.currentArtifactId);
+  const setArtifactsVisible = useSetRecoilState(store.artifactsVisibility);
 
   const toggleWebSearch = useCallback(() => {
     if (disabled) return;
@@ -230,10 +243,24 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
         pptx: 'Presentation Slide Deck (.pptx)',
       };
       const instructions = {
-        pdf: `Generate a comprehensive, professionally formatted Executive Report as a PDF file named "Executive_Report_${Date.now()}.pdf". Ingest it into my private AnythingLLM vault upon completion. Body context:\n${current || 'Provide strategic industry analysis, SWOT evaluation, and executive milestones.'}`,
-        docx: `Compile a complete Microsoft Word document (.docx) named "Project_Brief_${Date.now()}.docx" with structured headings, executive summary, and bullet points based on the following:\n${current || 'Scope of work, technical architecture, and risk mitigations.'}`,
-        xlsx: `Build an Excel spreadsheet (.xlsx) named "Financial_Model_${Date.now()}.xlsx" with clean tabular matrix data, column headers, and financial summaries for:\n${current || 'Quarterly revenue, operational expenses, and net profit projections.'}`,
-        pptx: `Create a PowerPoint slide presentation (.pptx) named "Pitch_Deck_${Date.now()}.pptx" with a title slide and structured bullet slides detailing:\n${current || 'Problem statement, proposed AI solution, system architecture, and go-to-market plan.'}`,
+        pdf: `Generate an authoritative, publication-grade Visual Report as a PDF file named "Learning_Dossier_${Date.now()}.pdf". Follow the Satchida Gold Standard:
+1. Executive Header & Core Concept Analogy (highlighted in a > callout block)
+2. Detailed Technical Breakdown & Mathematical Equations (clean formulas)
+3. Multi-Modal Diagram Embeds: MUST include relevant Markdown images: ![Figure Caption](/assets/study/media/...)
+4. Structured Comparative Matrix Table (| Parameter | Category A | Category B |)
+5. Real-Life Use Cases & Hardware Devices Section
+6. Further Reading & Authoritative Reference Sources with clickable Markdown links
+Ingest into my private AnythingLLM vault upon completion. Context:\n${current || 'Topic analysis, comparative architecture, and verified reference sources.'}`,
+        docx: `Compile an exhaustive, professionally formatted Microsoft Word document (.docx) named "Technical_Brief_${Date.now()}.docx". Include structured numbered headings (#, ##, ###), an executive summary callout block (> ...), full data comparison tables, embedded visual diagrams (![Figure](/assets/study/media/...)), practical device implementations, and curated reference citations based on:\n${current || 'Technical specification, architectural trade-offs, and verified evidence.'}`,
+        xlsx: `Build an Excel spreadsheet (.xlsx) named "Data_Matrix_${Date.now()}.xlsx" with clean tabular matrix data, formatted column headers, numerical formulas, and categorized summaries for:\n${current || 'Quantitative benchmark data, performance metrics, and comparison parameters.'}`,
+        pptx: `Create an executive, visual presentation slide deck (.pptx) in 16:9 widescreen layout named "Presentation_Deck_${Date.now()}.pptx". Strictly enforce rich content density across every slide (no empty containers):
+- Separate every slide with '---'
+- Slide 1: Hero Title Slide with kicker subtitle and metadata
+- Slide 2: Core Concept & Intuition (use :::cards with 3 distinct '### Card Title' pillars and 2-3 bullets each)
+- Slide 3: Comparative Trade-Off Matrix (use :::comparison with left and right cards)
+- Slide 4: Real-Life Use Cases & Consumer Devices (use :::cards or :::stats with KPI metrics)
+- Slide 5: Strategic Roadmap & Key Takeaways (use :::timeline with Phase 1, Phase 2, Phase 3)
+Context:\n${current || 'Core problem, technical comparison, real-life devices, and strategic roadmap.'}`,
       };
       setText(instructions[format]);
       showToast({
@@ -255,6 +282,163 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
       status: 'info',
     });
   }, [disabled, getText, setText, showToast]);
+
+  // SATCHIDA OFFICE SUITE: Direct File Actions
+  const handleNewSheet = useCallback(() => {
+    if (disabled) return;
+    const artifactId = `satchida-sheet-${Date.now()}`;
+    const blankWorkbook = {
+      id: `wb-${Date.now()}`,
+      name: 'Untitled Spreadsheet',
+      sheetOrder: ['sheet1'],
+      sheets: {
+        sheet1: {
+          id: 'sheet1',
+          name: 'Sheet 1',
+          rowCount: 50,
+          columnCount: 26,
+        },
+      },
+    };
+    setArtifacts((prev) => ({
+      ...(prev || {}),
+      [artifactId]: {
+        id: artifactId,
+        title: 'Untitled Spreadsheet',
+        type: UNIVER_SHEET_MIME,
+        content: JSON.stringify(blankWorkbook),
+        lastUpdateTime: Date.now(),
+      },
+    }));
+    setCurrentArtifactId(artifactId);
+    setArtifactsVisible(true);
+    showToast({
+      message: 'Created new Satchida Spreadsheet!',
+      status: 'success',
+    });
+  }, [disabled, setArtifacts, setCurrentArtifactId, setArtifactsVisible, showToast]);
+
+  const handleNewDoc = useCallback(() => {
+    if (disabled) return;
+    const artifactId = `satchida-doc-${Date.now()}`;
+    const blankDoc = {
+      id: `doc-${Date.now()}`,
+      title: 'Untitled Document',
+      body: {
+        dataStream: 'Start typing your document here...\r\n\r\n',
+      },
+    };
+    setArtifacts((prev) => ({
+      ...(prev || {}),
+      [artifactId]: {
+        id: artifactId,
+        title: 'Untitled Document',
+        type: UNIVER_DOC_MIME,
+        content: JSON.stringify(blankDoc),
+        lastUpdateTime: Date.now(),
+      },
+    }));
+    setCurrentArtifactId(artifactId);
+    setArtifactsVisible(true);
+    showToast({
+      message: 'Created new Satchida Document!',
+      status: 'success',
+    });
+  }, [disabled, setArtifacts, setCurrentArtifactId, setArtifactsVisible, showToast]);
+
+  const handleOpenOfficeFile = useCallback(async () => {
+    if (disabled) return;
+    const processFile = async (file: File) => {
+      const lower = file.name.toLowerCase();
+      const buffer = await file.arrayBuffer();
+      if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')) {
+        const snapshot = excelBufferToUniverSnapshot(buffer, file.name);
+        const artifactId = `satchida-sheet-${Date.now()}`;
+        setArtifacts((prev) => ({
+          ...(prev || {}),
+          [artifactId]: {
+            id: artifactId,
+            title: file.name,
+            type: UNIVER_SHEET_MIME,
+            content: JSON.stringify(snapshot),
+            lastUpdateTime: Date.now(),
+          },
+        }));
+        setCurrentArtifactId(artifactId);
+        setArtifactsVisible(true);
+        showToast({
+          message: `Opened ${file.name} in Satchida Sheet!`,
+          status: 'success',
+        });
+      } else if (lower.endsWith('.docx')) {
+        const snapshot = await docxBufferToUniverDocSnapshot(buffer, file.name);
+        const artifactId = `satchida-doc-${Date.now()}`;
+        setArtifacts((prev) => ({
+          ...(prev || {}),
+          [artifactId]: {
+            id: artifactId,
+            title: file.name,
+            type: UNIVER_DOC_MIME,
+            content: JSON.stringify(snapshot),
+            lastUpdateTime: Date.now(),
+          },
+        }));
+        setCurrentArtifactId(artifactId);
+        setArtifactsVisible(true);
+        showToast({
+          message: `Opened ${file.name} in Satchida Doc!`,
+          status: 'success',
+        });
+      } else {
+        showToast({
+          message: 'Unsupported format. Please select an .xlsx, .csv, or .docx file.',
+          status: 'warning',
+        });
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'showOpenFilePicker' in window) {
+      try {
+        const [handle] = await (window as unknown as {
+          showOpenFilePicker: (options: unknown) => Promise<Array<{
+            getFile: () => Promise<File>;
+          }>>;
+        }).showOpenFilePicker({
+          types: [
+            {
+              description: 'Office Files (.xlsx, .csv, .docx)',
+              accept: {
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                'application/vnd.ms-excel': ['.xls'],
+                'text/csv': ['.csv'],
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+              },
+            },
+          ],
+          multiple: false,
+        });
+        const file = await handle.getFile();
+        await processFile(file);
+        return;
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') return;
+      }
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.csv,.docx';
+    input.style.display = 'none';
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (!file) return;
+      await processFile(file);
+    };
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  }, [disabled, setArtifacts, setCurrentArtifactId, setArtifactsVisible, showToast]);
 
   // STUDY Quick-Tools
   const handleCreateQuiz = useCallback(() => {
@@ -610,6 +794,60 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
             <DropdownMenuSeparator className="my-1 bg-border-light/60" />
 
             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              {localize('com_satchida_section_office')}
+            </div>
+
+            {/* 📊 New Satchida Sheet */}
+            <DropdownMenuItem
+              onClick={handleNewSheet}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Table2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_new_sheet')}
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  {localize('com_satchida_new_sheet_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 📝 New Satchida Doc */}
+            <DropdownMenuItem
+              onClick={handleNewDoc}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <FileText className="h-4 w-4 shrink-0 text-blue-400" />
+              <div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_new_doc')}
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  {localize('com_satchida_new_doc_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 📂 Open Local Office File */}
+            <DropdownMenuItem
+              onClick={handleOpenOfficeFile}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <FolderLock className="h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <div className="font-semibold text-text-primary">
+                  {localize('com_satchida_open_office_file')}
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  {localize('com_satchida_open_office_file_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="my-1 bg-border-light/60" />
+
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
               {localize('com_satchida_section_documents')}
             </div>
 
@@ -673,6 +911,32 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
                   {localize('com_satchida_doc_docx_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 🎙️ Audio Podcast Explanation */}
+            <DropdownMenuItem
+              onClick={() => {
+                if (disabled || !getText || !setText) return;
+                const current = getText();
+                setText(
+                  `Act as an elite educational audio educator and podcast host. Deliver a high-quality, conversational audio masterclass breakdown titled "Audio_Masterclass_${Date.now()}":\n1. Hook: Start with a real-world mystery or vivid physical analogy (no robotic greetings).\n2. Core Mechanics: Explain the principles intuitively using conversational spoken language (do not read raw algebraic equations).\n3. Tangible Hardware: Contrast how engineers use this in real everyday consumer devices.\n4. Memorable Takeaway: End with a punchy 2-sentence mental anchor.\n\nSubject to explain:\n${current || 'Provide a compelling, crystal-clear spoken explanation of the concept and its real-world significance.'}`
+                );
+                showToast({
+                  message: 'Prepared High-Yield Audio Masterclass Prompt!',
+                  status: 'info',
+                });
+              }}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Volume2 className="h-4 w-4 shrink-0 text-purple-400" />
+              <div>
+                <div className="font-semibold text-text-primary">
+                  Audio Masterclass / Podcast Explainer 🎙️
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  High-yield conversational audio explanation tailored for listening
                 </div>
               </div>
             </DropdownMenuItem>

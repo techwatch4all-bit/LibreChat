@@ -133,6 +133,8 @@ export function ModelSpecItem({ spec, isSelected, posInSet, setSize }: ModelSpec
   // Studio and advanced tools paywall definition
   const STUDIO_SPECS = new Set([
     'motion',
+    'satchida-studio',
+    'satchida studio',
     'scenemosaic',
     'deeptutor',
     'health-wellness',

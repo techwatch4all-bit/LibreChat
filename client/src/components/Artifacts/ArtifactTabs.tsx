@@ -5,9 +5,14 @@ import type { SandpackPreviewRef } from '@codesandbox/sandpack-react/unstyled';
 import type { editor } from 'monaco-editor';
 import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
 import { MermaidRenderer } from '~/components/Messages/Content/Mermaid/Mermaid';
-import { MERMAID_ARTIFACT_TYPE, type Artifact } from '~/common/artifacts';
+import {
+  MERMAID_ARTIFACT_TYPE,
+  SATCHIDA_FILM_ARTIFACT_TYPE,
+  type Artifact,
+} from '~/common/artifacts';
 import { PROJECT_ARTIFACT_TYPE } from '~/utils/artifacts';
 import { isUniverArtifact, UniverOffice } from './Univer';
+import { isFilmArtifact, OpenFilmStudio } from './OpenFilm';
 import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useCodeState } from '~/Providers/EditorContext';
 import { useLocalize } from '~/hooks';
@@ -109,6 +114,10 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
 
   if (isUniverArtifact(props.artifact.type)) {
     return <UniverOffice artifact={props.artifact} />;
+  }
+
+  if (isFilmArtifact(props.artifact.type) || props.artifact.type === SATCHIDA_FILM_ARTIFACT_TYPE) {
+    return <OpenFilmStudio artifact={props.artifact} />;
   }
 
   /* Multi-file project artifacts get their own IDE renderer (file tree +

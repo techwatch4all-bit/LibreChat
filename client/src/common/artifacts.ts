@@ -7,6 +7,7 @@ export interface CodeBlock {
 export const MERMAID_ARTIFACT_TYPE = 'application/vnd.mermaid' as const;
 export const UNIVER_SHEET_ARTIFACT_TYPE = 'application/vnd.univer-sheet' as const;
 export const UNIVER_DOC_ARTIFACT_TYPE = 'application/vnd.univer-doc' as const;
+export const SATCHIDA_FILM_ARTIFACT_TYPE = 'application/vnd.satchida.film' as const;
 
 /**
  * Original-file download metadata for artifacts backed by a real

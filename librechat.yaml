@@ -212,6 +212,19 @@ webSearch:
   searchProvider: keenable
   rerankerType: none
 mcpServers:
+  satchida-tools:
+    type: stdio
+    command: python
+    args:
+    - skill/satchida-unified-hub.py
+    env:
+      ANYTHINGLLM_URL: http://127.0.0.1:3012/api/v1
+      ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
+      SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated
+    title: Satchida Unified Intelligence Hub
+    description: Unified high-performance engine aggregating 86+ local STEM, Office, LMS, Search, Motion, and Knowledge Vault tools with dynamic extensible auto-discovery.
+    chatMenu: true
+    startup: true
   satchida-web-search:
     type: stdio
     command: python
@@ -222,7 +235,7 @@ mcpServers:
       News RSS, Yandex RSS, Wikipedia. Tools: web_search, news_search, academic_web_search,
       fetch_page. Zero API keys, zero SearxNG.'
     chatMenu: true
-    startup: true
+    startup: false
   satchida-stem-study:
     type: stdio
     command: python
@@ -232,7 +245,7 @@ mcpServers:
     description: Verified symbolic math (SymPy), calculus, matrix linear algebra,
       function plotting (Matplotlib), chemistry balancing, and physics solver
     chatMenu: true
-    startup: true
+    startup: false
   satchida-work-suite:
     type: stdio
     command: python
@@ -242,7 +255,7 @@ mcpServers:
     description: Local tabular data analysis (Pandas), syntax validation, SHA256 hashing,
       Mermaid diagram scaffolding, and text diffs
     chatMenu: true
-    startup: true
+    startup: false
   satchida-office-suite:
     type: stdio
     command: python
@@ -251,7 +264,7 @@ mcpServers:
     title: Satchida AI Office and Spreadsheet Suite
     description: Granular spreadsheet and document tools for Univer AI Office (cell range reading, formula edits, surgical row updates, and document drafting).
     chatMenu: true
-    startup: true
+    startup: false
   satchida-motion:
     type: stdio
     command: python
@@ -260,7 +273,7 @@ mcpServers:
     title: Satchida Motion Graphics and Video Engine
     description: Deterministic GSAP motion graphics engine, HTML animation linter, and frame-by-frame 60 FPS MP4 video exporter.
     chatMenu: true
-    startup: true
+    startup: false
   satchida-scenemosaic:
     type: stdio
     command: python
@@ -269,7 +282,7 @@ mcpServers:
     title: Satchida SceneMosaic 3D Room Reconstructor
     description: Photo-to-3D indoor scene reconstruction and hybrid agentic layout evolution.
     chatMenu: true
-    startup: true
+    startup: false
   pascal-architect:
     type: stdio
     command: node
@@ -289,7 +302,7 @@ mcpServers:
     title: Satchida Architect Studio
     description: Whole-building interactive 3D floor plans — rooms, walls, doors, windows, stairs, roofs, multi-level — validated by the IBC/NBC/Neufert code verifier and rendered by the Axonometra engine.
     chatMenu: true
-    startup: true
+    startup: false
   satchida-panchang-vedic:
     type: stdio
     command: python
@@ -299,7 +312,7 @@ mcpServers:
     description: Verified Drik Panchang, Tithi, Nakshatra, Yoga, Karana, Rahu Kaalam,
       Abhijit Muhurat, Hindu festival calendars
     chatMenu: true
-    startup: true
+    startup: false
   satchida-health-wellness:
     type: stdio
     command: python
@@ -309,7 +322,7 @@ mcpServers:
     description: BMR/TDEE nutrition planning, skincare ingredient safety & trichology,
       classical Yoga Asanas & Pranayama, and Ayurvedic remedies with drug contraindications
     chatMenu: true
-    startup: true
+    startup: false
   satchida-maker-engineering:
     type: stdio
     command: python
@@ -319,7 +332,7 @@ mcpServers:
     description: Electronics (555, Op-Amps, PCB trace widths), mechanical gears/stress/hydraulics,
       3D printing volumetric limits, and drone propulsion
     chatMenu: true
-    startup: true
+    startup: false
   satchida-ai-engineer:
     type: stdio
     command: python
@@ -329,7 +342,7 @@ mcpServers:
     description: LLM VRAM & KV cache estimator, Transformer tensor shapes, GQA ratios,
       and quantization metrics
     chatMenu: true
-    startup: true
+    startup: false
   satchida-knowledge-vault:
     type: stdio
     command: python
@@ -343,7 +356,7 @@ mcpServers:
     description: Multi-tenant document creation PDF DOCX XLSX PPTX LanceDB vector
       search enterprise RAG and verified citations
     chatMenu: true
-    startup: true
+    startup: false
   deeptutor-integration:
     type: stdio
     command: node
@@ -711,13 +724,12 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-work-suite
+    - satchida-tools
     - devops-security
-    - satchida-knowledge-vault
+    - satchida-tools
     - git-librechat
     - time-server
-    - satchida-web-search
-    - satchida-ai-engineer
+    - satchida-tools
     conversation_starters:
     - |-
       Code Review Pass — Bugs, race conditions and security issues, ranked.
@@ -933,18 +945,14 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-motion
-    - satchida-web-search
-    - satchida-knowledge-vault
-    - satchida-work-suite
-    - satchida-stem-study
+    - satchida-tools
     - time-server
     - web-fetch
     - devops-security
     - academic-search
     - legal-research
     - git-librechat
-    - satchida-ai-engineer
+    - satchida-tools
     - arxiv-search
     conversation_starters:
     - |-
@@ -1171,15 +1179,13 @@ modelSpecs:
     default: true
     webSearch: true
     mcpServers:
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     - web-fetch
     - accessibility-tools
-    - satchida-web-search
-    - satchida-panchang-vedic
-    - satchida-health-wellness
+    - satchida-tools
     - openfda-drugs
-    - satchida-work-suite
+    - satchida-tools
     - devops-security
     conversation_starters:
     - |-
@@ -1475,16 +1481,14 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-work-suite
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     - web-fetch
     - git-librechat
     - devops-security
     - legal-research
     - deeptutor-integration
-    - satchida-web-search
-    - satchida-ai-engineer
+    - satchida-tools
     - arxiv-search
     - academic-search
     conversation_starters:
@@ -1743,14 +1747,13 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-stem-study
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     - web-fetch
     - arxiv-search
     - academic-search
     - deeptutor-integration
-    - satchida-web-search
+    - satchida-tools
     conversation_starters:
     - |-
       EMI Problem Walkthrough — One step at a time, with the physics named at each step.
@@ -1979,9 +1982,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-stem-study
-    - satchida-knowledge-vault
-    - satchida-web-search
+    - satchida-tools
     - deeptutor-integration
     conversation_starters:
     - |-
@@ -2207,12 +2208,11 @@ modelSpecs:
     webSearch: false
     fileSearch: true
     mcpServers:
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     - devops-security
     - accessibility-tools
-    - satchida-panchang-vedic
-    - satchida-health-wellness
+    - satchida-tools
     conversation_starters:
     - |-
       On-Device Deck — A PowerPoint built entirely on this machine.
@@ -2260,15 +2260,34 @@ modelSpecs:
       promptPrefix: |-
         You are Satchida Motion Studio — an elite Creative Technologist, Simulation Architect, and Motion Graphics Director. Today is {{current_date}}. You transform ideas, architectural floor plans, drone/robotics concepts, scientific & medical mechanisms, and business metrics into interactive, cinema-grade single-file HTML5/CSS3/SVG/Canvas/GSAP/Three.js artifacts following the Satchida-Motion Gold Standard.
 
+        OPENFILM FORMAT SPECIFICATION & DETERMINISTIC FRAME CONTRACT:
+        - For video synthesis, kinetic motion, social reels, teasers, and timeline animations, adhere strictly to the OpenFilm specification and agent manual invariants:
+        - Track Structure & Document Order: Structure timeline layers with semantic `<section data-track="video|kinetic|audio">` blocks in `film.html`. Top-to-bottom document order dictates the layering (the first section is on the top layer).
+        - Deterministic Frame Pure Function (The Golden Rule):
+          Every motion film MUST expose the standard `window.film` interface:
+          ```javascript
+          window.film = {
+            duration: 10,        // duration in seconds
+            width: 1920,         // render resolution width (default 1920, or 1080 for 9:16 reels)
+            height: 1080,        // render resolution height (default 1080, or 1920 for 9:16 reels)
+            frame: function(t) { // pure function: draw the complete picture at 't' seconds
+              // Calculate all geometry, transforms, opacities, and canvas/WebGL states purely from 't'
+            }
+          };
+          ```
+        - Golden Invariant of Determinism: The same timestamp 't' MUST ALWAYS draw the exact same visual frame, independent of past execution history or frame sequence. Renderers query frames out of order and at fractional intervals for hardware encoding; NEVER couple visual state to internal accumulators or unlinked requestAnimationFrame loops.
+        - Visual & Kinetic Typography: Use fluid CSS transforms, SVG motion paths, and crisp font hierarchies. Provide responsive layout across 16:9 widescreen, 9:16 vertical reels, and 1:1 square formats.
+
         CRITICAL INLINE ARTIFACT OUTPUT CONTRACT (NON-NEGOTIABLE):
         - NEVER attempt `bash_tool`, `create_file`, `edit_file`, `read_file`, or `skill` — you have no filesystem or shell tools, and interactive previews render inline directly from your chat response.
-        - Output EVERY complete HTML5 simulation using LibreChat's EXACT artifact directive syntax so the interactive preview opens automatically:
-          :::artifact{identifier="kebab-case-id" type="text/html" title="Concise Descriptive Title"}
+        - Output motion films using the Satchida Film artifact directive so the studio preview and video exporter mount automatically:
+          :::artifact{identifier="kebab-case-id" type="application/vnd.satchida.film" title="Concise Descriptive Title"}
           ````html
           <!DOCTYPE html>
           <html lang="en">...</html>
           ````
           :::
+        - (For static 2D/3D CAD architectural floor plans or anatomical simulations without timeline playheads, `type="text/html"` remains fully supported).
         - NEVER invent custom directive names like `:::apartment-blueprint` or `:::floorplan` (the container keyword MUST be literally `:::artifact{...}`).
         - NEVER output unwrapped raw `<!DOCTYPE html>` outside `:::artifact{...}` + ````html ... ````, NEVER omit closing ```` or closing `:::`, and NEVER insert placeholders like `// ... rest of code`.
         - Keep the single-file HTML clean, well-structured, and compact (~160–280 lines of clean inline CSS/SVG/JS) so it completes in one response with zero truncation. EXCEPTION: an artifact block returned by an MCP tool must be output IN FULL exactly as returned — template outputs may exceed 280 lines and must never be shortened, rewritten, or truncated to satisfy the compactness rule.
@@ -2299,7 +2318,7 @@ modelSpecs:
         - A single unambiguous request needs no restatement: build it directly.
         - Never invent a missing parameter — name it instead.
         - The user's own words always win over every default in this prompt.
-    description: 'Cinema-grade interactive motion & simulation studio: 3D floor plans, drones, robotics, STEM cutaways, medical anatomy, kinetic graphics & 60fps MP4 export.'
+    description: 'Cinema-grade interactive motion & OpenFilm video studio: 3D floor plans, drones, robotics, STEM cutaways, medical anatomy, kinetic graphics & 60fps client-side export.'
     showIconInMenu: true
     showIconInHeader: true
     artifacts: custom
@@ -2308,8 +2327,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-motion
-    - satchida-web-search
+    - satchida-tools
     - time-server
     conversation_starters:
     - |-
@@ -2371,7 +2389,7 @@ modelSpecs:
     fileSearch: false
     webSearch: false
     mcpServers:
-    - satchida-scenemosaic
+    - satchida-tools
     conversation_starters:
     - |-
       Room Reconstruction — A photo rebuilt in 3D with three layout evolutions.
@@ -2480,8 +2498,7 @@ modelSpecs:
     webSearch: true
     mcpServers:
     - deeptutor-integration
-    - satchida-stem-study
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     - web-fetch
     conversation_starters:
@@ -2534,7 +2551,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-health-wellness
+    - satchida-tools
     - openfda-drugs
     - clinical-research
     - time-server
@@ -2576,9 +2593,9 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-panchang-vedic
+    - satchida-tools
     - time-server
-    - satchida-knowledge-vault
+    - satchida-tools
     conversation_starters:
     - |-
       🌅 Today's Panchang & Auspicious Timings — Tithi, Nakshatra, Rahu Kaal, and Shubh Muhurat.
@@ -2617,10 +2634,9 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-architect
+    - satchida-tools
     - pascal-architect
-    - satchida-motion
-    - satchida-knowledge-vault
+    - satchida-tools
     - time-server
     conversation_starters:
     - |-
@@ -2652,8 +2668,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-maker-engineering
-    - satchida-stem-study
+    - satchida-tools
     - time-server
     conversation_starters:
     - |-
@@ -2686,7 +2701,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-knowledge-vault
+    - satchida-tools
     - filesystem-shared
     - time-server
     conversation_starters:
@@ -2732,9 +2747,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
-    - satchida-office-suite
-    - satchida-work-suite
-    - satchida-knowledge-vault
+    - satchida-tools
     - filesystem-shared
     - time-server
     conversation_starters:

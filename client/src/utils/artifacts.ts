@@ -16,7 +16,7 @@ import type { TStartupConfig, TAttachment, TFile } from 'librechat-data-provider
 import type { PhrasingContent } from 'mdast';
 import type { TranslationKeys } from '~/hooks/useLocalize';
 import type { Artifact } from '~/common';
-import { MERMAID_ARTIFACT_TYPE } from '~/common/artifacts';
+import { MERMAID_ARTIFACT_TYPE, SATCHIDA_FILM_ARTIFACT_TYPE } from '~/common/artifacts';
 import { getCodeBlockFilename } from './downloadFile';
 
 /**
@@ -40,6 +40,7 @@ const artifactFilename = {
   'application/vnd.librechat.docx-preview': 'index.html',
   'application/vnd.librechat.spreadsheet-preview': 'index.html',
   'application/vnd.librechat.presentation-preview': 'index.html',
+  [SATCHIDA_FILM_ARTIFACT_TYPE]: 'film.html',
   'application/vnd.univer-sheet': 'spreadsheet.json',
   'application/vnd.univer-doc': 'document.json',
   'application/vnd.librechat.univer-sheet': 'spreadsheet.json',
@@ -89,6 +90,7 @@ const artifactTemplate: Record<
   'application/vnd.librechat.docx-preview': 'static',
   'application/vnd.librechat.spreadsheet-preview': 'static',
   'application/vnd.librechat.presentation-preview': 'static',
+  'application/vnd.satchida.film': 'static',
   'application/vnd.univer-sheet': 'static',
   'application/vnd.univer-doc': 'static',
   'application/vnd.librechat.univer-sheet': 'static',
@@ -337,6 +339,7 @@ const dependenciesMap: Record<
   'application/vnd.librechat.docx-preview': {},
   'application/vnd.librechat.spreadsheet-preview': {},
   'application/vnd.librechat.presentation-preview': {},
+  'application/vnd.satchida.film': {},
   'application/vnd.univer-sheet': {},
   'application/vnd.univer-doc': {},
   'application/vnd.librechat.univer-sheet': {},

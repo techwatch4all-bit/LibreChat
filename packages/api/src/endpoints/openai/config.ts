@@ -261,6 +261,21 @@ export function getOpenAIConfig(
       rawUser?.name || rawUser?.username || rawUser?.email || 'Satchida User',
     );
     const modeName = String(options.modelOptions?.model || 'default');
+    const specName = String(
+      (options as Record<string, unknown>)?.spec ||
+        (options.modelOptions as Record<string, unknown>)?.spec ||
+        (options.modelOptions as Record<string, unknown>)?.specName ||
+        options.modelOptions?.model ||
+        '',
+    );
+    const isVideoGenRequest =
+      specName.toLowerCase().includes('motion') ||
+      specName.toLowerCase().includes('studio') ||
+      specName.toLowerCase().includes('openfilm') ||
+      specName.toLowerCase().includes('film') ||
+      Boolean((options.modelOptions as Record<string, unknown>)?.isVideoGeneration) ||
+      Boolean((options as Record<string, unknown>)?.isVideoGeneration);
+
     configOptions.defaultHeaders = {
       ...configOptions.defaultHeaders,
       'X-Tenant-Id': tenantId,
@@ -272,13 +287,21 @@ export function getOpenAIConfig(
       'X-Bf-App': 'LibreChat',
       'x-bf-app': 'LibreChat',
       'x-bf-dim-app': 'LibreChat',
-      'x-bf-dim-mode': modeName,
+      'x-bf-dim-mode': isVideoGenRequest ? 'studio_video' : modeName,
       'x-bf-dim-user_id': userId,
       'x-bf-dim-user_name': userName,
       'x-bf-dim-customer_id': tenantId,
       'x-bf-dim-customer_name': tenantId,
       'x-bf-dim-team_id': tenantId,
       'x-bf-dim-team_name': tenantId,
+      ...(isVideoGenRequest
+        ? {
+            'X-Bifrost-Activity': 'video_generation',
+            'X-Bifrost-Subsystem': 'satchida_studio',
+            'x-bf-dim-activity': 'video_generation',
+            'x-bf-dim-media-type': 'motion_video',
+          }
+        : {}),
     };
   }
 

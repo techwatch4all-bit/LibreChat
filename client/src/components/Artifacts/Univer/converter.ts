@@ -56,8 +56,13 @@ export function excelBufferToUniverSnapshot(buffer: ArrayBuffer | Uint8Array, fi
  * Runs in-memory with pure JavaScript.
  */
 export async function docxBufferToUniverDocSnapshot(buffer: ArrayBuffer, filename = 'Document') {
-  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-  const rawText = result.value || '';
+  let rawText = '';
+  try {
+    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+    rawText = result.value || '';
+  } catch {
+    rawText = '';
+  }
   const cleanDataStream = (rawText.endsWith('\n') ? rawText : `${rawText}\n`).replace(/\n/g, '\r\n');
 
   return {

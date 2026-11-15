@@ -7,7 +7,11 @@ import sheetsEnUS from '@univerjs/preset-sheets-core/locales/en-US';
 import docsEnUS from '@univerjs/preset-docs-core/locales/en-US';
 import type { FUniver } from '@univerjs/core/facade';
 import type { Artifact } from '~/common';
-import { univerSnapshotToExcelBuffer } from './converter';
+import {
+  univerSnapshotToExcelBuffer,
+  excelBufferToUniverSnapshot,
+  docxBufferToUniverDocSnapshot,
+} from './converter';
 import '@univerjs/preset-sheets-core/lib/index.css';
 import '@univerjs/preset-docs-core/lib/index.css';
 
@@ -58,12 +62,12 @@ export default function UniverOffice({
 
       if (isDoc) {
         const doc = api.getActiveDocument();
-        snapshot = doc ? doc.getSnapshot() : null;
-        defaultFileName = `${artifact.title || 'document'}.univer.json`;
+        snapshot = doc ? (doc as any).getSnapshot() : null;
+        defaultFileName = `${artifact.title || 'document'}.satchida.doc.json`;
       } else {
         const workbook = api.getActiveWorkbook();
-        snapshot = workbook ? workbook.getSnapshot() : null;
-        defaultFileName = `${artifact.title || 'spreadsheet'}.univer.json`;
+        snapshot = workbook ? (workbook as any).getSnapshot() : null;
+        defaultFileName = `${artifact.title || 'spreadsheet'}.satchida.sheet.json`;
       }
 
       if (!snapshot) {
@@ -86,7 +90,7 @@ export default function UniverOffice({
             suggestedName: defaultFileName,
             types: [
               {
-                description: 'Univer JSON Document',
+                description: 'Satchida Office Document',
                 accept: { 'application/json': ['.json'] },
               },
             ],
@@ -128,9 +132,9 @@ export default function UniverOffice({
       if (!workbook) {
         return;
       }
-      const snapshot = workbook.getSnapshot();
+      const snapshot = (workbook as any).getSnapshot();
       const xlsxBuffer = univerSnapshotToExcelBuffer(snapshot);
-      const blob = new Blob([xlsxBuffer], {
+      const blob = new Blob([xlsxBuffer as unknown as BlobPart], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       const url = URL.createObjectURL(blob);
@@ -149,6 +153,91 @@ export default function UniverOffice({
   const handlePrintPdf = useCallback(() => {
     window.print();
   }, []);
+
+  const handleOpenLocalFile = useCallback(async () => {
+    try {
+      const processBuffer = async (name: string, buffer: ArrayBuffer) => {
+        const lower = name.toLowerCase();
+        const api = univerApiRef.current;
+        if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')) {
+          const snapshot = excelBufferToUniverSnapshot(buffer, name);
+          if (api && !isDoc) {
+            try {
+              (api as any).createWorkbook(snapshot);
+            } catch (err) {
+              console.error('Failed to mount workbook snapshot:', err);
+            }
+          }
+          if (onSnapshotChange) {
+            onSnapshotChange(JSON.stringify(snapshot));
+          }
+        } else if (lower.endsWith('.docx')) {
+          const snapshot = await docxBufferToUniverDocSnapshot(buffer, name);
+          if (api && isDoc) {
+            try {
+              (api as any).createUniverDoc(snapshot);
+            } catch (err) {
+              console.error('Failed to mount document snapshot:', err);
+            }
+          }
+          if (onSnapshotChange) {
+            onSnapshotChange(JSON.stringify(snapshot));
+          }
+        }
+      };
+
+      if (typeof window !== 'undefined' && 'showOpenFilePicker' in window) {
+        try {
+          const [fileHandle] = await (window as unknown as {
+            showOpenFilePicker: (options: unknown) => Promise<
+              Array<{
+                getFile: () => Promise<File>;
+              }>
+            >;
+          }).showOpenFilePicker({
+            types: [
+              {
+                description: 'Office Files (.xlsx, .csv, .docx)',
+                accept: {
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                  'application/vnd.ms-excel': ['.xls'],
+                  'text/csv': ['.csv'],
+                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+                },
+              },
+            ],
+            multiple: false,
+          });
+          const file = await fileHandle.getFile();
+          const buffer = await file.arrayBuffer();
+          await processBuffer(file.name, buffer);
+          return;
+        } catch (err: unknown) {
+          if ((err as Error)?.name === 'AbortError') {
+            return;
+          }
+        }
+      }
+
+      // Android / iOS / Firefox file picker fallback
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx,.xls,.csv,.docx';
+      input.style.display = 'none';
+      input.onchange = async (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file) return;
+        const buffer = await file.arrayBuffer();
+        await processBuffer(file.name, buffer);
+      };
+      document.body.appendChild(input);
+      input.click();
+      document.body.removeChild(input);
+    } catch (err) {
+      console.error('Error opening local office file:', err);
+    }
+  }, [isDoc, onSnapshotChange]);
 
   useEffect(() => {
     let isDisposed = false;
@@ -170,7 +259,7 @@ export default function UniverOffice({
           : UniverSheetsCorePreset({
               container: containerId,
               header: true,
-              footer: true,
+              footer: { sheetBar: true } as any,
               toolbar: true,
               formulaBar: true,
             });
@@ -202,9 +291,9 @@ export default function UniverOffice({
 
         if (isDoc) {
           if (initialData && typeof initialData === 'object') {
-            univerAPI.createUniverDoc(initialData);
+            (univerAPI as any).createUniverDoc(initialData);
           } else {
-            univerAPI.createUniverDoc({
+            (univerAPI as any).createUniverDoc({
               id: 'doc-1',
               title: artifact.title || 'Untitled Document',
               body: {
@@ -214,9 +303,9 @@ export default function UniverOffice({
           }
         } else {
           if (initialData && typeof initialData === 'object') {
-            univerAPI.createWorkbook(initialData);
+            (univerAPI as any).createWorkbook(initialData);
           } else {
-            univerAPI.createWorkbook({
+            (univerAPI as any).createWorkbook({
               id: 'workbook-1',
               name: artifact.title || 'Untitled Spreadsheet',
               sheetOrder: ['sheet1'],
@@ -241,12 +330,12 @@ export default function UniverOffice({
               if (isDoc) {
                 const doc = univerAPI.getActiveDocument();
                 if (doc) {
-                  onSnapshotChange(JSON.stringify(doc.getSnapshot()));
+                  onSnapshotChange(JSON.stringify((doc as any).getSnapshot()));
                 }
               } else {
                 const workbook = univerAPI.getActiveWorkbook();
                 if (workbook) {
-                  onSnapshotChange(JSON.stringify(workbook.getSnapshot()));
+                  onSnapshotChange(JSON.stringify((workbook as any).getSnapshot()));
                 }
               }
             } catch {
@@ -255,13 +344,13 @@ export default function UniverOffice({
           };
 
           // Univer API command event listener
-          univerAPI.onCommandExecuted(() => {
+          (univerAPI as any).onCommandExecuted?.(() => {
             notifyChange();
           });
         }
       } catch (err: unknown) {
         if (!isDisposed) {
-          setInitError((err as Error)?.message || 'Failed to initialize Univer Office workspace');
+          setInitError((err as Error)?.message || 'Failed to initialize Satchida Office workspace');
         }
       }
     }, 50);
@@ -286,13 +375,21 @@ export default function UniverOffice({
       <div className="flex h-9 items-center justify-between border-b border-border-light bg-surface-primary px-3 text-xs text-text-secondary dark:border-border-medium">
         <div className="flex items-center space-x-2">
           <span className="font-semibold text-text-primary">
-            {isDoc ? '📝 Univer Doc' : '📊 Univer Sheet'}
+            {isDoc ? '📝 Satchida Doc' : '📊 Satchida Sheet'}
           </span>
           <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
             Native Client Canvas
           </span>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={handleOpenLocalFile}
+            className="flex items-center space-x-1 rounded px-2 py-1 font-medium text-text-primary transition-colors hover:bg-surface-tertiary"
+            title="Open local .xlsx, .csv, or .docx file directly into this canvas"
+          >
+            <span>📂 Open File</span>
+          </button>
           {!isDoc && (
             <button
               type="button"
@@ -325,7 +422,7 @@ export default function UniverOffice({
       {initError && (
         <div className="flex h-full w-full items-center justify-center p-4 text-center text-sm text-red-500">
           <div>
-            <p className="font-semibold">Unable to load Univer Workspace</p>
+            <p className="font-semibold">Unable to load Satchida Office Workspace</p>
             <p className="mt-1 text-xs opacity-80">{initError}</p>
           </div>
         </div>

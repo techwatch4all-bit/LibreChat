@@ -2247,3 +2247,53 @@ describe('Grok 4.7 xAI configuration', () => {
     expect(result.llmConfig.modelKwargs?.reasoning_effort).toBeUndefined();
   });
 });
+
+describe('Satchida Gateway & Bifrost Video Activity Telemetry Headers', () => {
+  it('injects video_generation activity headers when routing upstream for Motion or Studio spec', () => {
+    const result = getOpenAIConfig('test-key', {
+      reverseProxyUrl: 'http://127.0.0.1:4000/v1',
+      modelOptions: {
+        model: 'deepseek-v4.1-flash',
+        spec: 'Motion',
+      } as Parameters<typeof getOpenAIConfig>[1] extends { modelOptions?: infer M } ? M : never,
+      user: {
+        id: 'user-123',
+        name: 'Test Creator',
+        role: 'PRO',
+        tenantId: 'tenant-abc',
+      },
+    } as unknown as Parameters<typeof getOpenAIConfig>[1]);
+
+    const headers = result.configOptions?.defaultHeaders as Record<string, string>;
+    expect(headers).toBeDefined();
+    expect(headers['X-Bifrost-Activity']).toBe('video_generation');
+    expect(headers['X-Bifrost-Subsystem']).toBe('satchida_studio');
+    expect(headers['x-bf-dim-activity']).toBe('video_generation');
+    expect(headers['x-bf-dim-media-type']).toBe('motion_video');
+    expect(headers['x-bf-dim-mode']).toBe('studio_video');
+    expect(headers['X-Tenant-Id']).toBe('tenant-abc');
+    expect(headers['X-User-Id']).toBe('user-123');
+  });
+
+  it('omits video_generation activity headers for regular chat queries', () => {
+    const result = getOpenAIConfig('test-key', {
+      reverseProxyUrl: 'http://127.0.0.1:4000/v1',
+      modelOptions: {
+        model: 'deepseek-v4.1-flash',
+      },
+      user: {
+        id: 'user-456',
+        name: 'Standard User',
+        role: 'USER',
+        tenantId: 'tenant-xyz',
+      },
+    } as unknown as Parameters<typeof getOpenAIConfig>[1]);
+
+    const headers = result.configOptions?.defaultHeaders as Record<string, string>;
+    expect(headers).toBeDefined();
+    expect(headers['X-Bifrost-Activity']).toBeUndefined();
+    expect(headers['x-bf-dim-activity']).toBeUndefined();
+    expect(headers['x-bf-dim-mode']).toBe('deepseek-v4.1-flash');
+    expect(headers['X-Tenant-Id']).toBe('tenant-xyz');
+  });
+});

@@ -626,6 +626,25 @@ Upstream LibreChat lacked automated artifact syntax healing for LLMs that emit u
    - Allowed cross-origin access to `/assets/vendor` and bypassed `__csb_sw` interception on vendor and cross-origin assets.
    - Configured `buildSandpackOptions` to route `externalResources` through `staticBundlerURL` (`https://ai.satchida.com`) to prevent private-network loopback blocks.
 
+## C33. Satchida Studio & Satchida Office Suite Integration (2026-11-15)
+
+Upstream LibreChat lacks video motion timeline tooling, client-side video compilation, and native office file creation/loading.
+
+**Customization:**
+1. **Satchida Office Suite (Univer Rebranding & Tooling) (`client/src/components/Artifacts/Univer/`, `client/src/components/Chat/Input/SatchiToolbar.tsx`, `client/src/locales/en/translation.json`, `client/src/common/starters.ts`)**:
+   - Fully rebranded user-visible strings from "Univer" to "Satchida" across office starters, header badges, and localization keys.
+   - Added zero-server "New Spreadsheet", "New Document", and "Open Local File" (`.xlsx`, `.csv`, `.docx`) handlers allowing client-side in-memory document creation and inspection.
+2. **Gateway & Bifrost Video Activity Telemetry (`packages/api/src/endpoints/openai/config.ts`)**:
+   - Injected `X-Bifrost-Activity: video_generation`, `X-Bifrost-Subsystem: satchida_studio`, and `x-bf-dim-activity: video_generation` headers for requests targeting `Motion` or `Satchida Studio` model specs to enforce distinct quota tracking and billing.
+3. **OpenFilm Engine & Studio Artifact (`client/src/components/Artifacts/OpenFilm/`, `client/src/common/artifacts.ts`, `client/src/components/Artifacts/ArtifactTabs.tsx`)**:
+   - Registered `application/vnd.satchida.film` and embedded `OpenFilmStudio` visual editor with multi-track timeline, transport playhead, and aspect ratio controls.
+   - Suppressed dual chat boxes by mounting OpenFilm's internal chat hidden in DOM to maintain prompt contract integrity.
+4. **Hardware-Accelerated Client-Side Video Export (`client/src/components/Artifacts/OpenFilm/exportEngine.ts`)**:
+   - Implemented 100% in-browser WebGL/Canvas + `MediaRecorder` video export with MP4/WebM codec negotiation.
+   - Direct device persistence via HTML5 `showSaveFilePicker` with zero server computation or storage overhead.
+5. **OpenFilm Spec & Deterministic Prompt Contract (`librechat.yaml`)**:
+   - Injected OpenFilm `SPEC.md` / `MANUAL.md` invariants (track layering, `window.film = { frame(t) }` deterministic pure function contract) into the `Motion` model spec system prompt.
+
 ## C29. Satchida Motion Studio Engine, Offline Three.js Vendor & 70-Persona Navigator (2026-11-12)
 
 Upstream LibreChat includes no motion-graphics studio mode, grouped persona navigator, or headless Playwright MP4/WebGL renderer.

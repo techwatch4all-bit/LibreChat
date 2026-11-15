@@ -8,6 +8,37 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-15 — Satchida Studio & Satchida Office Suite Integration (Phases 1–5)
+
+**Problem.** 
+1. Univer Office integration was incomplete, lacking direct creation of blank sheets/docs or local file loading, and still exposed upstream "Univer" branding in user-visible strings.
+2. Motion video generation lacked a production timeline player, video telemetry headers for Bifrost/One-API accounting, client-side rendering pipeline (risking server bloat), and OpenFilm's native prompt engineering invariants.
+
+**Shipped.**
+
+- `client/src/locales/en/translation.json`, `client/src/common/starters.ts`, `client/src/components/Artifacts/Univer/UniverOffice.tsx`:
+  Rebranded all user-visible "Univer" references to "Satchida". Added "📂 Open File" to the office header and attached defensive Mammoth `.docx` fallbacks.
+- `client/src/components/Chat/Input/SatchiToolbar.tsx`:
+  Added "New Spreadsheet", "New Document", and "Open Local File" handlers using native Univer SDK factory snapshots without network requests.
+- `packages/api/src/endpoints/openai/config.ts` & `config.spec.ts`:
+  Injected `X-Bifrost-Activity: video_generation`, `X-Bifrost-Subsystem: satchida_studio`, and `x-bf-dim-activity: video_generation` headers for `Motion` / `Satchida Studio` model specs.
+- `client/src/common/artifacts.ts`, `client/src/utils/artifacts.ts`, `client/src/components/Artifacts/ArtifactTabs.tsx`:
+  Registered `application/vnd.satchida.film` artifact type and routed it to `OpenFilmStudio`.
+- `client/src/components/Artifacts/OpenFilm/OpenFilmStudio.tsx` & `exportEngine.ts`:
+  Built full Satchida Studio player with multi-track timeline, deterministic frame seeker (`postSeek`), 16:9 / 9:16 / 1:1 aspect controls, 100% client-side WebGL/Canvas + `MediaRecorder` video export, native `showSaveFilePicker` local persistence, and suppressed dual-chat UI via hidden-in-DOM side-chat mount.
+- `librechat.yaml`:
+  Injected OpenFilm `SPEC.md` / `MANUAL.md` invariants (track layering, `window.film = { frame(t) }` deterministic contract) into the `Motion` model spec system prompt and configured output to `application/vnd.satchida.film`.
+- `client/src/components/Chat/Menus/Endpoints/components/ModelSpecItem.tsx`:
+  Configured Pro/Privacy tier gating for Studio specs.
+
+**Evidence.**
+- All 14 OpenFilm and Export Engine tests pass: `PASS src/components/Artifacts/OpenFilm/__tests__/exportEngine.spec.ts`, `PASS src/components/Artifacts/OpenFilm/__tests__/OpenFilmStudio.spec.tsx`.
+- All 110 OpenAI / Bifrost config telemetry tests pass: `PASS packages/api/src/endpoints/openai/config.spec.ts`.
+- All 20 Artifact suites in client pass: 518/518 tests PASS.
+- Zero TypeScript errors in touched files.
+
+---
+
 ## 2026-11-14 — the 48 remaining client failures fixed
 
 **Problem.** After the dependency repair the client suite stood at 8729 passed / 48 failed in

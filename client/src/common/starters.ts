@@ -84,7 +84,7 @@ export interface StarterCategory {
  * user's own words. Defined once so 130+ cards cannot drift apart.
  */
 export const STARTER_GATE =
-  'Before you start: restate the brief in one line, name any slot you had to default, and ask "GO?" — if a slot cannot be answered without me, ask at most 3 short questions instead and stop. Do not search, calculate or write anything until I reply.';
+  'Before you start: restate the brief in one line, name any slot you had to default, and prominently highlight your confirmation prompt in bold: "**Reply GO to execute, or customize constraints below:**" — if a slot cannot be answered without me, ask at most 3 short questions instead and stop. Do not search, calculate or write anything until I reply.';
 
 export const STARTER_TAIL =
   'My additions: [ ]   ← type your own constraints here: audience, budget, tone, must-include, must-avoid';
@@ -179,12 +179,29 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Major Expenses: Rent, Groceries, Electricity, School Fees, Medicine, Savings',
         ],
         deliver:
-          'Open an interactive Univer Spreadsheet with a color-coded Monthly Budget tab: Itemized rows, Category totals, automated SUM formulas, Remaining Savings highlight, and clear money-saving advice in simple language for [Monthly Budget: e.g. ₹40,000 or $3,500] and [Major Expenses: Rent, Groceries, Electricity, School Fees, Medicine, Savings].',
+          'Open an interactive Satchida Spreadsheet with a color-coded Monthly Budget tab: Itemized rows, Category totals, automated SUM formulas, Remaining Savings highlight, and clear money-saving advice in simple language for [Monthly Budget: e.g. ₹40,000 or $3,500] and [Major Expenses: Rent, Groceries, Electricity, School Fees, Medicine, Savings].',
         contract: DOC_CONTRACT,
         badge: 'Family Budget',
         badgeKey: 'starters_badge_family_budget',
-        engineTag: 'Univer · Sheets',
+        engineTag: 'Satchida · Sheets',
         keywords: ['budget', 'family', 'homemaker', 'expenses', 'groceries', 'savings', 'home'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+      starter({
+        title: '📑 Multi-Year Financial Forecast & DCF Model',
+        icon: '📑',
+        description: '3-statement integrated financial model (P&L, Balance Sheet, Cash Flow) with CAGR & WACC.',
+        inputs: [
+          'Company & Sector: e.g. D2C Consumer Goods or B2B SaaS',
+          'Base Year Revenue & Growth: e.g. ₹5 Cr ARR, 25% projected annual growth across 3 years',
+        ],
+        deliver:
+          'Open a multi-tab Satchida Spreadsheet with (1) Assumptions & Drivers, (2) Revenue & COGS forecast, (3) Operating Expenses, (4) EBITDA and Free Cash Flow schedule with automated formula references across tabs for [Company & Sector: e.g. D2C Consumer Goods or B2B SaaS] based on [Base Year Revenue & Growth: e.g. ₹5 Cr ARR, 25% projected annual growth across 3 years].',
+        contract: DOC_CONTRACT,
+        badge: 'Financial KPI',
+        badgeKey: 'starters_badge_kpi_dashboard',
+        engineTag: 'Satchida · Sheets',
+        keywords: ['dcf', 'financial model', 'forecast', 'cagr', 'ebitda', 'cash flow', 'valuation'],
         mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
       }),
       starter({
@@ -196,11 +213,11 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Shopping Focus: Fresh Vegetables, Dairy, Grains, Cleaning, Snacks',
         ],
         deliver:
-          'Create a categorized Univer Sheet with sections (Vegetables & Fruits, Dairy, Pantry Grains, Household) containing Quantity, Est Price, checkbox status, and auto-sum Grand Total for [Family Size: e.g. 4 Members] focusing on [Shopping Focus: Fresh Vegetables, Dairy, Grains, Cleaning, Snacks].',
+          'Create a categorized Satchida Sheet with sections (Vegetables & Fruits, Dairy, Pantry Grains, Household) containing Quantity, Est Price, checkbox status, and auto-sum Grand Total for [Family Size: e.g. 4 Members] focusing on [Shopping Focus: Fresh Vegetables, Dairy, Grains, Cleaning, Snacks].',
         contract: DOC_CONTRACT,
         badge: 'Kitchen & Pantry',
         badgeKey: 'starters_badge_kitchen_grocery',
-        engineTag: 'Univer · Sheets',
+        engineTag: 'Satchida · Sheets',
         keywords: ['grocery', 'shopping', 'kitchen', 'pantry', 'homemaker', 'checklist', 'food'],
         mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
       }),
@@ -213,12 +230,29 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Period & Currency: e.g. Monthly / INR (₹) or USD ($)',
         ],
         deliver:
-          'Build a professional Univer financial ledger with Date, Description, Income, Expense, Running Balance columns, and summary KPI cards for Total Revenue, Total Cost, Net Profit, and Margin % for [Business Activity: e.g. Bakery, Tuition Center, Retail Shop, or Freelancing] for [Period & Currency: e.g. Monthly / INR (₹) or USD ($)].',
+          'Build a professional Satchida financial ledger with Date, Description, Income, Expense, Running Balance columns, and summary KPI cards for Total Revenue, Total Cost, Net Profit, and Margin % for [Business Activity: e.g. Bakery, Tuition Center, Retail Shop, or Freelancing] for [Period & Currency: e.g. Monthly / INR (₹) or USD ($)].',
         contract: DOC_CONTRACT,
         badge: 'Business P&L',
         badgeKey: 'starters_badge_business_pnl',
-        engineTag: 'Univer · Sheets',
+        engineTag: 'Satchida · Sheets',
         keywords: ['business', 'pnl', 'profit', 'revenue', 'expense', 'accounting', 'shop'],
+        mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+      starter({
+        title: '📦 Supply Chain & Inventory Restock Model',
+        icon: '📦',
+        description: 'SKU reorder point calculation, Economic Order Quantity (EOQ), and safety stock formula.',
+        inputs: [
+          'Product Category: e.g. Electronics Accessories, FMCG, or Apparel',
+          'Demand & Lead Time: e.g. 500 units/mo, 14 days lead time',
+        ],
+        deliver:
+          'Create an active Satchida Sheet calculating Lead Time Demand, Safety Stock, Reorder Point (ROP), and Order Flags with automated conditional formatting highlights for [Product Category: e.g. Electronics Accessories, FMCG, or Apparel] given [Demand & Lead Time: e.g. 500 units/mo, 14 days lead time].',
+        contract: DOC_CONTRACT,
+        badge: 'Inventory EOQ',
+        badgeKey: 'starters_badge_business_pnl',
+        engineTag: 'Satchida · Sheets',
+        keywords: ['inventory', 'eoq', 'safety stock', 'reorder', 'sku', 'supply chain', 'warehouse'],
         mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
       }),
       starter({
@@ -230,13 +264,55 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Key Subjects: Math, Science, English, Social Science',
         ],
         deliver:
-          'Produce an interactive weekly study schedule and grade tracker in Univer Sheets with Day/Time matrix, priority flags, study goal checkboxes, and test mark calculations for [Student Grade / Exam: e.g. Class 10 CBSE Board or College Semester] covering [Key Subjects: Math, Science, English, Social Science].',
+          'Produce an interactive weekly study schedule and grade tracker in Satchida Sheets with Day/Time matrix, priority flags, study goal checkboxes, and test mark calculations for [Student Grade / Exam: e.g. Class 10 CBSE Board or College Semester] covering [Key Subjects: Math, Science, English, Social Science].',
         contract: DOC_CONTRACT,
         badge: 'Student Schedule',
         badgeKey: 'starters_badge_school_grades',
-        engineTag: 'Univer · Sheets',
+        engineTag: 'Satchida · Sheets',
         keywords: ['student', 'timetable', 'exam', 'school', 'study', 'grades', 'homework'],
         mcpServers: ['satchida-office-suite', 'satchida-work-suite'],
+      }),
+    ],
+  },
+  {
+    id: 'office_analytics',
+    label: '📈 Pandas Data & Statistical Analysis',
+    labelKey: 'starters_cat_office_analytics',
+    modes: ['Office-Suite', 'Work', 'Pro'],
+    starters: [
+      starter({
+        title: '📈 Statistical Data & Outlier Analysis',
+        icon: '📈',
+        description: 'Run Pandas descriptive stats, missing value audit, IQR outlier detection, and correlation matrix.',
+        inputs: [
+          'Data Source: e.g. Paste CSV or table of Monthly Sales, Inventory, or Patient Records',
+          'Analytical Focus: Outlier detection, distribution skew, or correlation between columns',
+        ],
+        deliver:
+          'Call `analyze_tabular_data` from `satchida-work-suite` to compute full descriptive statistics (mean, std, 25%, 75%, IQR bounds), missing value ratios, and correlation matrix, accompanied by executive summary insights.',
+        contract: SOURCED_CONTRACT,
+        badge: 'Pandas Analytics',
+        badgeKey: 'starters_badge_data_analysis',
+        engineTag: 'Pandas · NumPy',
+        keywords: ['pandas', 'data', 'statistics', 'outliers', 'correlation', 'iqr', 'analytics'],
+        mcpServers: ['satchida-work-suite', 'satchida-office-suite'],
+      }),
+      starter({
+        title: '📊 Executive KPI Dashboard & Gantt Flow',
+        icon: '📊',
+        description: 'Generate high-impact executive KPI summaries and verified Mermaid Gantt/flowchart milestones.',
+        inputs: [
+          'Project or Business: e.g. Q4 Retail Expansion or Product Rollout',
+          'Milestones & Dates: e.g. Design, Procurement, Testing, Launch across 60 days',
+        ],
+        deliver:
+          'Call `generate_workflow_diagram` from `satchida-work-suite` to produce a linted Mermaid Gantt schedule and KPI revenue metric comparison with base/bull scenarios.',
+        contract: DOC_CONTRACT,
+        badge: 'Gantt Flow',
+        badgeKey: 'starters_badge_gantt_workflow',
+        engineTag: 'Mermaid · Work',
+        keywords: ['gantt', 'kpi', 'workflow', 'schedule', 'milestones', 'project', 'executive'],
+        mcpServers: ['satchida-work-suite', 'satchida-office-suite'],
       }),
     ],
   },
@@ -255,16 +331,16 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Sender & Recipient Details: e.g. Parent name, School Principal name, Dates',
         ],
         deliver:
-          'Draft a respectful, impeccably formatted formal letter in Univer Docs ready for print or signature, including Sender Header, Recipient Address, Subject line, polite Body paragraphs, and closing signature block for [Letter Purpose: e.g. Leave Application for child illness, or Request to Bank Manager for Cheque Book] with [Sender & Recipient Details: e.g. Parent name, School Principal name, Dates].',
+          'Draft a respectful, impeccably formatted formal letter in Satchida Docs ready for print or signature, including Sender Header, Recipient Address, Subject line, polite Body paragraphs, and closing signature block for [Letter Purpose: e.g. Leave Application for child illness, or Request to Bank Manager for Cheque Book] with [Sender & Recipient Details: e.g. Parent name, School Principal name, Dates].',
         contract: DOC_CONTRACT,
         badge: 'Official Letter',
         badgeKey: 'starters_badge_formal_letter',
-        engineTag: 'Univer · Docs',
+        engineTag: 'Satchida · Docs',
         keywords: ['letter', 'application', 'school', 'leave', 'formal', 'request', 'senior'],
         mcpServers: ['satchida-office-suite', 'filesystem-shared'],
       }),
       starter({
-        title: '🏢 Residential Society Notice & Maintenance Receipt',
+        title: '🏢 Residential Society Notice & Circular',
         icon: '🏢',
         description: 'Resident meeting notice, maintenance invoice summary, or building rules circular.',
         inputs: [
@@ -272,11 +348,11 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Society Name & Date: e.g. Shanti Niketan Apartments, 20th Nov',
         ],
         deliver:
-          'Create a clear, community-friendly official society notice in Univer Docs with prominent Agenda points, contact numbers, and clear instructions for [Notice Subject: e.g. Lift Maintenance Schedule, Water Tank Cleaning, or Annual AGM Notice] for [Society Name & Date: e.g. Shanti Niketan Apartments, 20th Nov].',
+          'Create a clear, community-friendly official society notice in Satchida Docs with prominent Agenda points, contact numbers, and clear instructions for [Notice Subject: e.g. Lift Maintenance Schedule, Water Tank Cleaning, or Annual AGM Notice] for [Society Name & Date: e.g. Shanti Niketan Apartments, 20th Nov].',
         contract: DOC_CONTRACT,
         badge: 'Notice & Bill',
         badgeKey: 'starters_badge_society_notice',
-        engineTag: 'Univer · Docs',
+        engineTag: 'Satchida · Docs',
         keywords: ['society', 'notice', 'building', 'maintenance', 'meeting', 'apartment'],
         mcpServers: ['satchida-office-suite', 'filesystem-shared'],
       }),
@@ -289,11 +365,11 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Request Type: e.g. Address Change with attached Aadhaar copy or Account Branch Transfer',
         ],
         deliver:
-          'Draft an authoritative, standard banking letter in Univer Docs specifying Account Number placeholder, KYC document enclosure list, and formal acknowledgement slip for [Bank Name & Branch: e.g. SBI MG Road Branch] regarding [Request Type: e.g. Address Change with attached Aadhaar copy or Account Branch Transfer].',
+          'Draft an authoritative, standard banking letter in Satchida Docs specifying Account Number placeholder, KYC document enclosure list, and formal acknowledgement slip for [Bank Name & Branch: e.g. SBI MG Road Branch] regarding [Request Type: e.g. Address Change with attached Aadhaar copy or Account Branch Transfer].',
         contract: DOC_CONTRACT,
         badge: 'Banking Request',
         badgeKey: 'starters_badge_bank_request',
-        engineTag: 'Univer · Docs',
+        engineTag: 'Satchida · Docs',
         keywords: ['bank', 'kyc', 'account', 'transfer', 'branch', 'senior', 'address'],
         mcpServers: ['satchida-office-suite', 'filesystem-shared'],
       }),
@@ -306,13 +382,79 @@ export const ALL_CATEGORIES: StarterCategory[] = [
           'Property & Rent: e.g. Flat 302, Green Acres, Rent ₹18,000/mo, Deposit ₹50,000, 11 Months',
         ],
         deliver:
-          'Draft a legally structured residential tenancy agreement in Univer Docs with numbered clauses (Rent, Deposit, Maintenance, Notice Period, Termination, Fixtures) for [Landlord & Tenant Names: [Owner Name] and [Tenant Name]] covering [Property & Rent: e.g. Flat 302, Green Acres, Rent ₹18,000/mo, Deposit ₹50,000, 11 Months].',
+          'Draft a legally structured residential tenancy agreement in Satchida Docs with numbered clauses (Rent, Deposit, Maintenance, Notice Period, Termination, Fixtures) for [Landlord & Tenant Names: [Owner Name] and [Tenant Name]] covering [Property & Rent: e.g. Flat 302, Green Acres, Rent ₹18,000/mo, Deposit ₹50,000, 11 Months].',
         contract: LEGAL_CONTRACT,
         badge: 'Rental Draft',
         badgeKey: 'starters_badge_rental_agreement',
-        engineTag: 'Univer · Docs',
+        engineTag: 'Satchida · Docs',
         keywords: ['rental', 'agreement', 'lease', 'tenant', 'landlord', 'deposit', 'flat'],
         mcpServers: ['satchida-office-suite', 'filesystem-shared'],
+      }),
+    ],
+  },
+  {
+    id: 'office_knowledge',
+    label: '📚 Multi-Tenant RAG & Document Compiler',
+    labelKey: 'starters_cat_office_knowledge',
+    modes: ['Office-Suite', 'Work', 'Pro'],
+    starters: [
+      starter({
+        title: '📚 Compile Polished Multi-Format Document',
+        icon: '📚',
+        description: 'Compile high-fidelity PDF, DOCX, or XLSX file using Knowledge Vault background compiler.',
+        inputs: [
+          'Document Title: e.g. Annual Company Overview, Student Handbook, or Research Brief',
+          'Export Format: PDF, DOCX, or XLSX',
+          'Document Sections: Executive Summary, Market Analysis, Financials, Action Steps',
+        ],
+        deliver:
+          'Call `create_formatted_document` from `satchida-knowledge-vault` to compile a professional, multi-page formatted document with verified typography, tables, and direct file download link.',
+        contract: DOC_CONTRACT,
+        badge: 'Document Compiler',
+        badgeKey: 'starters_badge_doc_compiler',
+        engineTag: 'Vault · Compiler',
+        keywords: ['pdf', 'docx', 'xlsx', 'compile', 'vault', 'document', 'report'],
+        mcpServers: ['satchida-knowledge-vault', 'satchida-office-suite'],
+      }),
+      starter({
+        title: '🔍 LanceDB Isolated Vector Search & Citations',
+        icon: '🔍',
+        description: 'Search private tenant knowledge vaults with verified citations and zero cross-user leakage.',
+        inputs: [
+          'Question / Query: e.g. What are our company leave policies or Q3 vendor agreements?',
+        ],
+        deliver:
+          'Call `query_vault_rag_with_citations` from `satchida-knowledge-vault` to retrieve verified document excerpts, page numbers, and direct source citations from the isolated user vault.',
+        contract: SOURCED_CONTRACT,
+        badge: 'LanceDB RAG',
+        badgeKey: 'starters_badge_vector_rag',
+        engineTag: 'LanceDB · RAG',
+        keywords: ['rag', 'lancedb', 'citations', 'vault', 'search', 'private', 'documents'],
+        mcpServers: ['satchida-knowledge-vault', 'satchida-office-suite'],
+      }),
+    ],
+  },
+  {
+    id: 'office_files',
+    label: '📁 Shared Workspace & File System',
+    labelKey: 'starters_cat_office_files',
+    modes: ['Office-Suite', 'Work', 'Pro'],
+    starters: [
+      starter({
+        title: '📁 Inspect & Manage Shared Document Folder',
+        icon: '📁',
+        description: 'Read, list, and write files directly in the shared local document workspace.',
+        inputs: [
+          'Folder or Action: e.g. List files in SharedDocs, or Read latest invoice',
+        ],
+        deliver:
+          'Inspect the local shared workspace using `filesystem-shared` tools, reading file structure, file sizes, and delivering organized directory summaries.',
+        contract: DOC_CONTRACT,
+        badge: 'Shared Drive',
+        badgeKey: 'starters_badge_shared_folder',
+        engineTag: 'MCP · Filesystem',
+        keywords: ['filesystem', 'shared', 'folder', 'workspace', 'drive', 'files'],
+        mcpServers: ['filesystem-shared', 'satchida-office-suite'],
       }),
     ],
   },

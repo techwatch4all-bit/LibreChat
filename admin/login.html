@@ -11,14 +11,22 @@
     <h1>Satchida Admin</h1>
     <p class="subtitle">Operator account login</p>
     <form id="loginForm" autocomplete="off">
-      <label>
-        <span>Email</span>
-        <input type="email" name="email" autocomplete="username" required />
-      </label>
-      <label>
-        <span>Password</span>
-        <input type="password" name="password" autocomplete="current-password" required />
-      </label>
+      <div id="credentialsFields">
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" autocomplete="username" required />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+      </div>
+      <div id="totpFields" style="display:none">
+        <label>
+          <span>Authenticator Code (6-digit TOTP)</span>
+          <input type="text" id="totpCode" placeholder="123456" maxlength="6" autocomplete="one-time-code" style="font-size:18px;letter-spacing:4px;text-align:center" />
+        </label>
+      </div>
       <button type="submit" id="submitBtn">Sign in</button>
       <p id="errorMsg" class="error" hidden></p>
     </form>
@@ -31,11 +39,41 @@
     const form = document.getElementById('loginForm');
     const submitBtn = document.getElementById('submitBtn');
     const errorMsg = document.getElementById('errorMsg');
+    const credentialsFields = document.getElementById('credentialsFields');
+    const totpFields = document.getElementById('totpFields');
+    const totpCodeInput = document.getElementById('totpCode');
+    let pendingTempToken = null;
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       submitBtn.disabled = true;
       errorMsg.hidden = true;
       try {
+        if (pendingTempToken) {
+          // Submit 2FA verification
+          const code = totpCodeInput.value.trim();
+          if (!code || code.length < 6) {
+            throw new Error('Please enter the 6-digit authenticator code');
+          }
+          const res = await fetch('/api/auth/2fa/verify-temp', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tempToken: pendingTempToken,
+              token: code,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.message || data.error || 'Invalid 2FA code');
+          if (data.token) {
+            sessionStorage.setItem('token', data.token);
+            location.href = './index.html';
+            return;
+          }
+          throw new Error('No authentication token returned');
+        }
+
         const res = await fetch('/api/admin/login/local', {
           method: 'POST',
           credentials: 'include',
@@ -47,16 +85,24 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || data.error || 'Login failed');
-        // `/login/local` returns a short-lived operator JWT in the body. The server's
-        // session cookie is flagged `Secure; SameSite=Strict`, so it is NOT transmitted
-        // when this panel is served over plain HTTP on the host. Keep the token in
-        // sessionStorage and send it as `Authorization: Bearer` on every request.
+
+        // Check if 2FA is required for this account
+        if (data.twoFAPending && data.tempToken) {
+          pendingTempToken = data.tempToken;
+          credentialsFields.style.display = 'none';
+          totpFields.style.display = 'block';
+          submitBtn.textContent = 'Verify Authenticator Code';
+          totpCodeInput.focus();
+          return;
+        }
+
+        // Standard direct login
         if (data.token) {
           sessionStorage.setItem('token', data.token);
+          location.href = './index.html';
         } else {
           throw new Error('No token returned by login');
         }
-        location.href = './index.html';
       } catch (err) {
         errorMsg.textContent = err.message;
         errorMsg.hidden = false;

@@ -216,7 +216,7 @@ router.get('/verify', middleware.requireJwtAuth, requireAdminSurface, async (req
 });
 
 const adminTotpLimiter = createTwoFactorManagementLimiter({
-  keyPrefix: 'rl:admin:totp',
+  getAppConfig: () => getAppConfig({ baseOnly: true }),
 });
 
 /**

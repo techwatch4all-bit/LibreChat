@@ -6,7 +6,7 @@ import { useLocalize } from '~/hooks';
 interface SatchiUpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  featureName: 'work' | 'study' | 'vibecoding' | 'research' | 'privacy' | 'studio';
+  featureName: 'work' | 'study' | 'vibecoding' | 'research' | 'privacy' | 'studio' | 'voice';
 }
 
 function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeModalProps) {
@@ -29,8 +29,11 @@ function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeMo
             : featureName === 'studio'
               ? localize('com_satchi_upgrade_pro_studio') ||
                 'Satchida Studios (DeepTutor, Motion Studio, SceneMosaic, Architect BIM, Office & Maker Suites) are reserved for Pro, Pro_Family, and Privacy tiers. Upgrade to \'Pro\' by contacting your site administrator (RWA committee, school/college office, or organization administrator).'
-              : localize('com_satchi_upgrade_pro_research') ||
-                'Deep Research is reserved for Pro, Enterprise, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator.';
+              : featureName === 'voice'
+                ? localize('com_satchi_upgrade_pro_voice') ||
+                  'Live Realtime Conversational Voice is reserved for Pro, Pro_Family, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator (RWA committee, school/college office, or workplace administrator) to experience zero-lag, human-like voice conversations.'
+                : localize('com_satchi_upgrade_pro_research') ||
+                  'Deep Research is reserved for Pro, Enterprise, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator.';
 
   return (
     <OGDialog open={open} onOpenChange={onOpenChange}>
@@ -46,7 +49,7 @@ function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeMo
             <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-text-secondary">{description}</p>
             <div className="mt-5 w-full rounded-xl border border-border-light bg-surface-secondary/50 p-3 text-xs text-text-tertiary">
-              ✨ Includes unlimited reasoning, Vibe-Coding architecture blueprints, Mermaid diagram exports, Satchida Studios & Deep Research.
+              ✨ Includes realtime speech-to-speech, emotional voice cadence, unlimited reasoning, Satchida Studios & Deep Research.
             </div>
           </div>
         }

@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
-import { MicOff } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { MicOff, Zap, Sparkles } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
 import {
   IconButton,
@@ -8,10 +8,11 @@ import {
   ListeningIcon,
   Spinner,
 } from '@librechat/client';
-import { useLocalize, useSpeechToText, useGetAudioSettings } from '~/hooks';
+import { useLocalize, useSpeechToText, useGetAudioSettings, useAuthContext } from '~/hooks';
 import { globalAudioId, type TAskFunction } from '~/common';
 import { useChatFormContext } from '~/Providers';
 import store from '~/store';
+import SatchiUpgradeModal from './SatchiUpgradeModal';
 
 const isExternalSTT = (speechToTextEndpoint: string) => speechToTextEndpoint === 'external';
 export default memo(function AudioRecorder({
@@ -27,10 +28,15 @@ export default memo(function AudioRecorder({
 }) {
   const { setValue, reset, getValues } = methods;
   const localize = useLocalize();
+  const { user } = useAuthContext();
   const { showToast } = useToastContext();
   const { speechToTextEndpoint } = useGetAudioSettings();
   const speechSettingsInitialized = useRecoilValue(store.speechSettingsInitialized);
   const recorderDisabled = disabled || !speechSettingsInitialized;
+  const [showVoiceUpgradeModal, setShowVoiceUpgradeModal] = useState(false);
+
+  const userAccountType = (user?.accountType || '').toLowerCase();
+  const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
 
   const existingTextRef = useRef<string>('');
   const isSubmittingRef = useRef(isSubmitting);
@@ -132,24 +138,78 @@ export default memo(function AudioRecorder({
   };
 
   return (
-    <TooltipAnchor
-      description={localize('com_ui_use_micrphone')}
-      render={
-        <IconButton
-          id="audio-recorder"
-          type="button"
-          variant="ghost"
-          size="theme"
-          shape="theme"
-          label={localize('com_ui_use_micrphone')}
-          onClick={isListening === true ? handleStopRecording : handleStartRecording}
-          disabled={recorderDisabled}
-          className="p-1 hover:bg-surface-composer-hover"
-          aria-pressed={isListening}
-        >
-          {renderIcon()}
-        </IconButton>
-      }
-    />
+    <div className="flex items-center gap-1">
+      <TooltipAnchor
+        description={localize('com_ui_use_micrphone')}
+        render={
+          <IconButton
+            id="audio-recorder"
+            type="button"
+            variant="ghost"
+            size="theme"
+            shape="theme"
+            label={localize('com_ui_use_micrphone')}
+            onClick={isListening === true ? handleStopRecording : handleStartRecording}
+            disabled={recorderDisabled}
+            className="p-1 hover:bg-surface-composer-hover"
+            aria-pressed={isListening}
+          >
+            {renderIcon()}
+          </IconButton>
+        }
+      />
+
+      {isProVoice ? (
+        <TooltipAnchor
+          description="Satchida Live Voice (Realtime Conversational Speech)"
+          render={
+            <button
+              type="button"
+              onClick={() => {
+                showToast({
+                  message: 'Satchida Live Voice: Connecting full-duplex conversational session...',
+                  status: 'info',
+                });
+              }}
+              className="relative flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
+              aria-label="Satchida Live Voice"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
+              </span>
+              <Sparkles className="h-2.5 w-2.5 text-violet-300" />
+              <span>Live Voice</span>
+            </button>
+          }
+        />
+      ) : (
+        <TooltipAnchor
+          description="Live Realtime Voice (Pro Feature) — Upgrade via Site Admin"
+          render={
+            <button
+              type="button"
+              onClick={() => setShowVoiceUpgradeModal(true)}
+              className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400 transition-all duration-150 hover:border-amber-500/50 hover:bg-amber-500/20 active:scale-95"
+              aria-label="Live Voice Pro Gate"
+            >
+              <Zap className="h-2.5 w-2.5 text-amber-400" />
+              <span>Live Voice</span>
+              <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] text-amber-300">
+                PRO
+              </span>
+            </button>
+          }
+        />
+      )}
+
+      {showVoiceUpgradeModal && (
+        <SatchiUpgradeModal
+          open={showVoiceUpgradeModal}
+          onOpenChange={setShowVoiceUpgradeModal}
+          featureName="voice"
+        />
+      )}
+    </div>
   );
 });

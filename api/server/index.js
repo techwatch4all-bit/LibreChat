@@ -614,7 +614,7 @@ RULES FOR YOUR SPOKEN EXPLANATION:
         res.status(500).json({ ok: false, error: err.message });
       });
 
-      llmReq.setTimeout(8000, () => {
+      llmReq.setTimeout(25000, () => {
         llmReq.destroy();
         res.status(504).json({ ok: false, error: 'Explain LLM timeout' });
       });

@@ -144,6 +144,11 @@ export interface AdminGroupsDeps {
     searchCriteria: FilterQuery<IUser>,
     fieldsToSelect?: string | string[] | null,
   ) => Promise<IUser[]>;
+  updateUser?: (
+    userId: string | Types.ObjectId,
+    data: Partial<IUser>,
+    session?: ClientSession,
+  ) => Promise<IUser | null>;
   deleteConfig: (
     principalType: PrincipalType,
     principalId: string | Types.ObjectId,
@@ -179,6 +184,7 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
     removeUserFromGroup,
     removeMemberById,
     findUsers,
+    updateUser,
     deleteConfig,
     deleteAclEntries,
     recordAuditEntry,
@@ -616,6 +622,11 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (!group) {
         return res.status(404).json({ error: 'Group not found' });
       }
+      if (group.accountType && updateUser) {
+        await updateUser(userId, { accountType: group.accountType }).catch((err: unknown) => {
+          logger.error('[adminGroups] failed to sync user accountType on addGroupMember:', err);
+        });
+      }
       await emitGroupAudit(req, 'group.member_added', group, { memberUserId: userId });
       return res.status(200).json({ group });
     } catch (error) {
@@ -660,6 +671,17 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
 
       if (!group) {
         return res.status(404).json({ error: 'Group not found' });
+      }
+      if (group.accountType && updateUser && isValidObjectIdString(userId)) {
+        const users = await findUsers({ _id: userId }, 'accountType').catch(() => []);
+        if (users[0]?.accountType === group.accountType) {
+          await updateUser(userId, { accountType: null }).catch((err: unknown) => {
+            logger.error(
+              '[adminGroups] failed to clear user accountType on removeGroupMember:',
+              err,
+            );
+          });
+        }
       }
       await emitGroupAudit(req, 'group.member_removed', group, { memberUserId: userId });
       return res.status(200).json({ success: true });

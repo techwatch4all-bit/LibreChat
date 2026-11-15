@@ -85,6 +85,7 @@ function createDeps(overrides: Partial<AdminUsersDeps> = {}): AdminUsersDeps {
     invalidateCodeEnvironmentConfigCache: jest.fn().mockResolvedValue(undefined),
     deleteConfig: jest.fn().mockResolvedValue(null),
     deleteAclEntries: jest.fn().mockResolvedValue(undefined),
+    removeUserFromAllGroups: jest.fn().mockResolvedValue(undefined),
     deleteAllUserSessions: jest.fn().mockResolvedValue(undefined),
     recordAuditEntry: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -561,6 +562,7 @@ describe('createAdminUsersHandlers', () => {
         principalType: PrincipalType.USER,
         principalId: expect.any(Types.ObjectId),
       });
+      expect(deps.removeUserFromAllGroups).toHaveBeenCalledWith(validUserId);
     });
 
     it('returns success even when cascade cleanup partially fails', async () => {

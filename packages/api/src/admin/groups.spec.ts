@@ -873,7 +873,7 @@ describe('createAdminGroupsHandlers', () => {
             { _id: { $in: [validUserId] } },
           ],
         },
-        'name email avatar idOnTheSource',
+        'name email avatar idOnTheSource accountType seatToken',
       );
       expect(status).toHaveBeenCalledWith(200);
       const members = json.mock.calls[0][0].members;
@@ -893,7 +893,7 @@ describe('createAdminGroupsHandlers', () => {
 
       expect(deps.findUsers).toHaveBeenCalledWith(
         { $or: [{ idOnTheSource: { $in: ['ext-1', 'ext-2'] } }] },
-        'name email avatar idOnTheSource',
+        'name email avatar idOnTheSource accountType seatToken',
       );
     });
 
@@ -909,7 +909,14 @@ describe('createAdminGroupsHandlers', () => {
       await handlers.getGroupMembers(req, res);
 
       expect(json.mock.calls[0][0].members).toEqual([
-        { userId: 'unknown-member', name: 'unknown-member', email: '', avatarUrl: undefined },
+        {
+          userId: 'unknown-member',
+          name: 'unknown-member',
+          email: '',
+          avatarUrl: undefined,
+          accountType: null,
+          seatAssigned: false,
+        },
       ]);
     });
 

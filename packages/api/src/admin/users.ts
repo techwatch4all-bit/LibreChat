@@ -297,6 +297,7 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
+  removeUserFromAllGroups?: (userId: string | Types.ObjectId) => Promise<void>;
   /** Kills every active session/JWT for the user, so a reset password takes
    * effect on the next login rather than at token expiry. */
   deleteAllUserSessions: (params: { userId: string }) => Promise<unknown>;
@@ -356,6 +357,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     invalidateCodeEnvironmentConfigCache,
     deleteConfig,
     deleteAclEntries,
+    removeUserFromAllGroups,
     deleteAllUserSessions,
     reserveTenantSeat,
     releaseTenantSeat,
@@ -632,6 +634,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         deleteConfig(PrincipalType.USER, id),
         ...(codeEnvironmentCleanupSafe ? [deleteUserCodeEnvironments(objectId)] : []),
         deleteAclEntries({ principalType: PrincipalType.USER, principalId: objectId }),
+        ...(removeUserFromAllGroups ? [removeUserFromAllGroups(id)] : []),
       ]);
       for (const r of cleanupResults) {
         if (r.status === 'rejected') {

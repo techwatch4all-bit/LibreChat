@@ -1,6 +1,6 @@
 const express = require('express');
 const { createAdminGroupsHandlers } = require('@librechat/api');
-const { SystemCapabilities } = require('@librechat/data-schemas');
+const { SystemCapabilities, runAsSystem } = require('@librechat/data-schemas');
 const { requireCapability } = require('~/server/middleware/roles/capabilities');
 const { requireJwtAuth } = require('~/server/middleware');
 const db = require('~/models');
@@ -29,6 +29,7 @@ const handlers = createAdminGroupsHandlers({
   removeUserFromGroup: db.removeUserFromGroup,
   removeMemberById: db.removeMemberById,
   findUsers: db.findUsers,
+  updateUser: (userId, data) => runAsSystem(() => db.updateUser(userId, data)),
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,
   recordAuditEntry: db.recordAuditEntry,

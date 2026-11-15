@@ -51,7 +51,20 @@ const handlers = createAdminUsersHandlers({
   upsertBalanceFields: db.upsertBalanceFields,
   hashPassword: (plain) => bcrypt.hash(plain, 10),
   generateTempPassword: () => generateSecureTempPassword(12),
-  findGroupByName: (name) => db.findGroupByQuery({ name }),
+  findGroupByName: (nameOrQuery) => {
+    if (typeof nameOrQuery === 'object' && nameOrQuery !== null) {
+      return runAsSystem(() => db.findGroupByQuery(nameOrQuery));
+    }
+    return runAsSystem(() =>
+      db.findGroupByQuery({
+        $or: [
+          { name: nameOrQuery },
+          { name: new RegExp(`^${nameOrQuery}$`, 'i') },
+          { accountType: String(nameOrQuery).toLowerCase() },
+        ],
+      }),
+    );
+  },
   addUserToGroup: db.addUserToGroup,
   /**
    * Bulk deps, batched on purpose.
@@ -108,6 +121,7 @@ const handlers = createAdminUsersHandlers({
   invalidateCodeEnvironmentConfigCache,
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,
+  removeUserFromAllGroups: (userId) => runAsSystem(() => db.removeUserFromAllGroups(userId)),
   deleteAllUserSessions: (params) => db.deleteAllUserSessions(params),
   reserveTenantSeat: db.reserveTenantSeat,
   releaseTenantSeat: db.releaseTenantSeat,
@@ -342,6 +356,16 @@ async function assignSeatTokenHandler(req, res) {
     const key = mintedKey;
     if (!key) {
       throw new Error('One-API did not return the seat token key');
+    }
+
+    // Remove user from any other licence tier group first, to prevent multi-tier group drift.
+    if (user.accountType && user.accountType !== accountType) {
+      const oldGroup = await runAsSystem(() =>
+        db.findGroupByQuery({ accountType: user.accountType, tenantId }).catch(() => null),
+      );
+      if (oldGroup?._id) {
+        await runAsSystem(() => db.removeMemberById(oldGroup._id.toString(), id).catch(() => {}));
+      }
     }
 
     // Keep the admin panel's Groups view consistent with the seat type: the

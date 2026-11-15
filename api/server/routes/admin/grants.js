@@ -4,6 +4,7 @@ const { SystemCapabilities, runAsSystem } = require('@librechat/data-schemas');
 const { PrincipalType } = require('librechat-data-provider');
 const { hasCapability, requireCapability } = require('~/server/middleware/roles/capabilities');
 const { requireJwtAuth } = require('~/server/middleware');
+const { requireAdminStepUp } = require('~/server/middleware/adminStepUp');
 const db = require('~/models');
 
 const router = express.Router();
@@ -73,8 +74,13 @@ const handlers = createAdminGrantsHandlers({
 
 router.use(requireJwtAuth, requireAdminSurface);
 
-router.get('/', handlers.listGrants);
+// Effective capabilities is called by client to determine UI permissions
 router.get('/effective', handlers.getEffectiveCapabilities);
+
+// All direct grant listings and grant assignments require step-up authentication
+router.use(requireAdminStepUp);
+
+router.get('/', handlers.listGrants);
 router.get('/:principalType/:principalId', handlers.getPrincipalGrants);
 router.post('/', handlers.assignGrant);
 /**

@@ -24,6 +24,7 @@ const {
   AdminRefreshError,
   buildOpenIDRefreshParams,
   isEmailDomainAllowed,
+  createTwoFactorManagementLimiter,
 } = require('@librechat/api');
 const { loginController } = require('~/server/controllers/auth/LoginController');
 const { hasOperatorControl, requireCapability } = require('~/server/middleware/roles/capabilities');
@@ -37,6 +38,13 @@ const {
   updateUser,
   deleteAllUserSessions,
 } = require('~/models');
+const {
+  verifyOTPOrBackupCode,
+  generateTOTPSecret,
+  generateBackupCodes,
+} = require('~/server/services/twoFactorService');
+const { signStepUpToken } = require('~/server/middleware/adminStepUp');
+const { encryptV3 } = require('@librechat/data-schemas');
 const { getAppConfig } = require('~/server/services/Config');
 const getLogStores = require('~/cache/getLogStores');
 const { getOpenIdConfig } = require('~/strategies');
@@ -199,8 +207,165 @@ router.get('/verify', middleware.requireJwtAuth, requireAdminSurface, async (req
   } catch (err) {
     logger.warn(`[admin/verify] operator capability check failed, denying: ${err?.message}`);
   }
-  res.status(200).json({ user, isOperator, tenantId: user.tenantId ?? null });
+  res.status(200).json({
+    user,
+    isOperator,
+    tenantId: user.tenantId ?? null,
+    twoFactorEnabled: !!req.user.twoFactorEnabled,
+  });
 });
+
+const adminTotpLimiter = createTwoFactorManagementLimiter({
+  keyPrefix: 'rl:admin:totp',
+});
+
+/**
+ * Initiates TOTP setup for the admin user if not already configured.
+ * Generates Base32 secret and otpauthUrl.
+ */
+router.post(
+  '/2fa/setup',
+  middleware.requireJwtAuth,
+  requireAdminSurface,
+  adminTotpLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const user = await getUserById(userId, '+totpSecret +pendingTotpSecret email');
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const secret = generateTOTPSecret();
+      const { plainCodes, codeObjects } = await generateBackupCodes();
+      const encryptedSecret = encryptV3(secret);
+
+      await updateUser(userId, {
+        pendingTotpSecret: encryptedSecret,
+        pendingBackupCodes: codeObjects,
+      });
+
+      const safeAppTitle = (process.env.APP_TITLE || 'Satchida Admin').replace(/\s+/g, '');
+      const email = user.email || 'admin';
+      const otpauthUrl = `otpauth://totp/${safeAppTitle}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(safeAppTitle)}`;
+
+      return res.status(200).json({
+        secret,
+        otpauthUrl,
+        backupCodes: plainCodes,
+      });
+    } catch (err) {
+      logger.error('[admin/auth/2fa/setup] error:', err);
+      return res.status(500).json({ error: 'Failed to initiate 2FA setup' });
+    }
+  },
+);
+
+/**
+ * Verifies TOTP code and completes initial 2FA enrollment.
+ * Automatically mints a step-up token on success.
+ */
+router.post(
+  '/2fa/confirm',
+  middleware.requireJwtAuth,
+  requireAdminSurface,
+  adminTotpLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ error: 'TOTP token is required' });
+      }
+
+      const user = await getUserById(
+        userId,
+        '+totpSecret +pendingTotpSecret +pendingBackupCodes +backupCodes',
+      );
+      if (!user || (!user.pendingTotpSecret && !user.totpSecret)) {
+        return res.status(400).json({ error: 'No 2FA setup in progress' });
+      }
+
+      const result = await verifyOTPOrBackupCode({
+        user,
+        token,
+        persistBackupUse: false,
+      });
+
+      if (!result.verified) {
+        return res.status(400).json({ error: result.message || 'Invalid verification code' });
+      }
+
+      // Activate 2FA
+      await updateUser(userId, {
+        totpSecret: user.pendingTotpSecret || user.totpSecret,
+        backupCodes: user.pendingBackupCodes || user.backupCodes,
+        twoFactorEnabled: true,
+        pendingTotpSecret: null,
+        pendingBackupCodes: null,
+      });
+
+      const stepUpToken = signStepUpToken(userId);
+      return res.status(200).json({
+        message: '2FA enrolled successfully',
+        twoFactorEnabled: true,
+        stepUpToken,
+      });
+    } catch (err) {
+      logger.error('[admin/auth/2fa/confirm] error:', err);
+      return res.status(500).json({ error: 'Failed to confirm 2FA' });
+    }
+  },
+);
+
+/**
+ * Step-up authentication endpoint.
+ * Validates TOTP token (or backup code) and mints a short-lived stepUpToken.
+ */
+router.post(
+  '/step-up',
+  middleware.requireJwtAuth,
+  requireAdminSurface,
+  adminTotpLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { token, backupCode } = req.body;
+
+      if (!token && !backupCode) {
+        return res.status(400).json({ error: 'Authentication code is required' });
+      }
+
+      const user = await getUserById(userId, '+totpSecret +backupCodes twoFactorEnabled email');
+      if (!user || !user.twoFactorEnabled || !user.totpSecret) {
+        return res.status(400).json({
+          error: '2FA is not yet configured for this account. Please enroll first.',
+          needsEnrollment: true,
+        });
+      }
+
+      const result = await verifyOTPOrBackupCode({
+        user,
+        token,
+        backupCode,
+        persistBackupUse: true,
+      });
+
+      if (!result.verified) {
+        return res.status(401).json({ error: result.message || 'Invalid authenticator code' });
+      }
+
+      const stepUpToken = signStepUpToken(userId);
+      return res.status(200).json({
+        stepUpToken,
+        expiresIn: '10m',
+      });
+    } catch (err) {
+      logger.error('[admin/auth/step-up] error:', err);
+      return res.status(500).json({ error: 'Step-up authentication failed' });
+    }
+  },
+);
 
 router.get('/oauth/openid/check', (req, res) => {
   const openidConfig = getOptionalOpenIdConfig();

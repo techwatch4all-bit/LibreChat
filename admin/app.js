@@ -5,10 +5,12 @@
 const BASE = '/api/admin';
 
 const API = (path, opts = {}) => {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const token = sessionStorage.getItem('token');
   if (token) headers.Authorization = `Bearer ${token}`;
-  return fetch(path, { credentials: 'include', headers, ...opts });
+  const stepUpToken = sessionStorage.getItem('stepUpToken');
+  if (stepUpToken) headers['X-Admin-StepUp-Token'] = stepUpToken;
+  return fetch(path, { credentials: 'include', ...opts, headers });
 };
 
 async function apiAdmin(path, opts = {}) {
@@ -385,8 +387,172 @@ async function loadGroups() {
   if (!res.ok) toast(`Could not load groups (HTTP ${res.status})`, 'err');
 }
 
+function renderQRCodeSVG(text, size = 180) {
+  if (window.qrcodegen && window.qrcodegen.QrCode) {
+    try {
+      const qr = window.qrcodegen.QrCode.encodeText(text, window.qrcodegen.QrCode.Ecc.MEDIUM);
+      const s = qr.size;
+      const border = 2;
+      const total = s + border * 2;
+      let svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+        total +
+        ' ' +
+        total +
+        '" width="' +
+        size +
+        '" height="' +
+        size +
+        '" style="background:#fff;border-radius:8px;padding:6px;display:block;margin:12px auto">';
+      for (let y = 0; y < s; y++) {
+        for (let x = 0; x < s; x++) {
+          if (qr.getModule(x, y)) {
+            svg +=
+              '<rect x="' +
+              (x + border) +
+              '" y="' +
+              (y + border) +
+              '" width="1" height="1" fill="#000"/>';
+          }
+        }
+      }
+      svg += '</svg>';
+      return svg;
+    } catch (e) {
+      console.warn('QR render error:', e);
+    }
+  }
+  return '';
+}
+
+/**
+ * Prompts the admin for Step-Up TOTP authentication (or enrollment if not yet setup).
+ * Returns true if step-up authentication succeeded, false otherwise.
+ */
+async function promptStepUpAuth() {
+  if (sessionStorage.getItem('stepUpToken')) {
+    return true;
+  }
+
+  const vRes = await apiAdmin('/verify');
+  const twoFactorEnabled = vRes.json?.twoFactorEnabled === true;
+
+  if (!twoFactorEnabled) {
+    // Initiate 2FA enrollment wizard
+    const sRes = await apiAdmin('/2fa/setup', { method: 'POST' });
+    if (!sRes.ok) {
+      toast('Failed to initialize 2FA setup: ' + (sRes.json?.error || sRes.status), 'err');
+      return false;
+    }
+    const { secret, otpauthUrl } = sRes.json;
+    const qrSvg = renderQRCodeSVG(otpauthUrl, 180);
+
+    const bodyHtml =
+      '<div style="text-align:center">' +
+      '<p style="color:var(--text);font-size:14px;margin-bottom:8px"><strong>Step-Up Security Requirement</strong></p>' +
+      '<p style="color:var(--muted);font-size:13px">Grants & Audit Log access requires Two-Factor Authentication (TOTP). Scan this QR code with Google Authenticator, 1Password, or Microsoft Authenticator:</p>' +
+      (qrSvg ||
+        '<p style="font-family:monospace;padding:12px;background:var(--panel2);border-radius:6px;margin:12px 0">' +
+          escapeHtml(otpauthUrl) +
+          '</p>') +
+      '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">Secret key: <code style="color:var(--accent);font-weight:600">' +
+      escapeHtml(secret) +
+      '</code></p>' +
+      '<div class="modalField" style="text-align:left"><label for="stepUpVerifyCode">Enter 6-digit Authenticator Code</label>' +
+      '<input id="stepUpVerifyCode" type="text" placeholder="123456" maxlength="6" autocomplete="off" style="font-size:18px;letter-spacing:4px;text-align:center" /></div>' +
+      '</div>';
+
+    return new Promise((resolve) => {
+      Modal.show(
+        'Enroll Two-Factor Authentication',
+        (b) => {
+          b.innerHTML = bodyHtml;
+        },
+        (f) => {
+          f.innerHTML =
+            '<button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+            '<button type="button" id="confirmEnrollBtn" class="btn btn-primary">Verify & Continue</button>';
+        },
+      );
+      document.getElementById('confirmEnrollBtn')?.addEventListener('click', async () => {
+        const code = document.getElementById('stepUpVerifyCode')?.value?.trim();
+        if (!code || code.length < 6) {
+          toast('Please enter a 6-digit verification code.', 'err');
+          return;
+        }
+        const cRes = await apiAdmin('/2fa/confirm', {
+          method: 'POST',
+          body: JSON.stringify({ token: code }),
+        });
+        if (cRes.ok && cRes.json?.stepUpToken) {
+          sessionStorage.setItem('stepUpToken', cRes.json.stepUpToken);
+          toast('2FA enrolled and verified successfully!', 'ok');
+          Modal.close();
+          resolve(true);
+        } else {
+          toast('Verification failed: ' + (cRes.json?.error || 'Invalid code'), 'err');
+        }
+      });
+    });
+  }
+
+  // Already enrolled, prompt for 6-digit TOTP
+  const bodyHtml =
+    '<div style="text-align:center">' +
+    '<p style="color:var(--text);font-size:14px;margin-bottom:8px"><strong>Protected Security Gate</strong></p>' +
+    '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Grants & Audit Log access requires active TOTP step-up authentication. Please enter the current 6-digit code from your authenticator app:</p>' +
+    '<div class="modalField" style="text-align:left"><label for="stepUpCode">Authenticator Code</label>' +
+    '<input id="stepUpCode" type="text" placeholder="123456" maxlength="6" autocomplete="off" style="font-size:18px;letter-spacing:4px;text-align:center" /></div>' +
+    '</div>';
+
+  return new Promise((resolve) => {
+    Modal.show(
+      'Security Verification Required',
+      (b) => {
+        b.innerHTML = bodyHtml;
+      },
+      (f) => {
+        f.innerHTML =
+          '<button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+          '<button type="button" id="verifyStepUpBtn" class="btn btn-primary">Authenticate</button>';
+      },
+    );
+    document.getElementById('verifyStepUpBtn')?.addEventListener('click', async () => {
+      const code = document.getElementById('stepUpCode')?.value?.trim();
+      if (!code || code.length < 6) {
+        toast('Please enter a valid 6-digit code.', 'err');
+        return;
+      }
+      const res = await apiAdmin('/step-up', {
+        method: 'POST',
+        body: JSON.stringify({ token: code }),
+      });
+      if (res.ok && res.json?.stepUpToken) {
+        sessionStorage.setItem('stepUpToken', res.json.stepUpToken);
+        toast('Step-up verification approved.', 'ok');
+        Modal.close();
+        resolve(true);
+      } else {
+        toast('Verification failed: ' + (res.json?.error || 'Invalid code'), 'err');
+      }
+    });
+  });
+}
+
 async function loadGrants() {
+  const authed = await promptStepUpAuth();
+  if (!authed) {
+    document.getElementById('grantsTable').innerHTML =
+      '<p class="empty">Step-up authentication required to view and manage security grants.</p>';
+    return;
+  }
   const res = await apiAdmin('/grants');
+  if (res.status === 403 && res.json?.stepUpRequired) {
+    sessionStorage.removeItem('stepUpToken');
+    const retry = await promptStepUpAuth();
+    if (retry) return loadGrants();
+    return;
+  }
   S.grants = normalizeList(res);
   renderGrants();
   const c = document.getElementById('grantsCount');
@@ -401,7 +567,19 @@ async function loadEffective() {
 }
 
 async function loadAudit() {
+  const authed = await promptStepUpAuth();
+  if (!authed) {
+    document.getElementById('auditTable').innerHTML =
+      '<p class="empty">Step-up authentication required to view audit log.</p>';
+    return;
+  }
   const res = await apiAdmin('/audit-log');
+  if (res.status === 403 && res.json?.stepUpRequired) {
+    sessionStorage.removeItem('stepUpToken');
+    const retry = await promptStepUpAuth();
+    if (retry) return loadAudit();
+    return;
+  }
   const list = normalizeList(res);
   const c = document.getElementById('auditCount');
   if (c) c.textContent = `${list.length} record(s)`;
@@ -446,17 +624,67 @@ function renderTable(containerSel, rows, columns, allFields) {
     '</tbody></table>';
 }
 
+function populateTenantFilter() {
+  const sel = document.getElementById('usersTenantFilter');
+  if (!sel) return;
+  const current = sel.value || 'all';
+  const tenants = new Set();
+  S.users.forEach((u) => {
+    if (u.tenantId) tenants.add(u.tenantId);
+    else tenants.add('satchida-master');
+  });
+  let html = '<option value="all">All Tenants</option>';
+  Array.from(tenants)
+    .sort()
+    .forEach((t) => {
+      html +=
+        '<option value="' +
+        escapeHtml(t) +
+        '"' +
+        (t === current ? ' selected' : '') +
+        '>' +
+        escapeHtml(t) +
+        '</option>';
+    });
+  sel.innerHTML = html;
+}
+
+function getFilteredUsers() {
+  const tenantFilter = document.getElementById('usersTenantFilter')?.value || 'all';
+  const tierFilter = document.getElementById('usersTierFilter')?.value || 'all';
+  const seatFilter = document.getElementById('usersSeatFilter')?.value || 'all';
+
+  return S.users.filter((u) => {
+    const userTenant = u.tenantId || 'satchida-master';
+    if (tenantFilter !== 'all' && userTenant !== tenantFilter) return false;
+
+    const userTier = (u.accountType || '').toLowerCase();
+    if (tierFilter === 'none') {
+      if (userTier && userTier !== 'none' && userTier !== 'null') return false;
+    } else if (tierFilter !== 'all') {
+      if (userTier !== tierFilter) return false;
+    }
+
+    if (seatFilter === 'assigned' && !u.seatAssigned) return false;
+    if (seatFilter === 'unassigned' && u.seatAssigned) return false;
+
+    return true;
+  });
+}
+
 /* ---------- per-tab renderers (with action buttons) ---------- */
 function renderUsers() {
   const el = document.getElementById('usersTable');
   if (!el) return;
-  if (!S.users.length) {
-    el.innerHTML = '<p class="empty">No users.</p>';
+  populateTenantFilter();
+  const filtered = getFilteredUsers();
+  if (!filtered.length) {
+    el.innerHTML = '<p class="empty">No matching users.</p>';
     return;
   }
   const head =
     '<tr><th>Email</th><th>Name</th><th>Role</th><th>Account type</th><th>Tenant</th><th>Family</th><th>Seat</th><th class="thActions">Actions</th></tr>';
-  const body = S.users
+  const body = filtered
     .map((u) => {
       const id = uid(u);
       const seat = u.seatAssigned
@@ -1290,74 +1518,70 @@ async function roleMembers(name) {
   /* fetch members for this role */
   const res = await apiAdmin('/roles/' + encodeURIComponent(name) + '/members');
   const members = normalizeList(res);
-  /* Render member list into the modal body directly */
-  const node = document.querySelector('#satchidaModalWrap .satchidaModalBody');
-  if (node) {
-    node.innerHTML = '';
-    if (!members.length) {
-      node.innerHTML = '<p class="empty">No members.</p>';
-    } else {
-      let html =
-        '<table class="dataTable"><thead><tr><th>User</th><th>Email</th><th class="thActions">Actions</th></tr></thead><tbody>';
-      html += members
-        .map((u) => {
-          const id = uid(u);
-          return (
-            '<tr data-uid="' +
-            escapeHtml(id) +
-            '">' +
-            '<td>' +
-            escapeHtml(uname(u)) +
-            '</td>' +
-            '<td>' +
-            escapeHtml(u.email || '') +
-            '</td>' +
-            '<td class="actions"><button type="button" data-op="removeRoleMember" data-name="' +
-            escapeHtml(name) +
-            '" data-uid="' +
-            escapeHtml(id) +
-            '" class="action actionDel">Remove</button></td></tr>'
-          );
-        })
-        .join('');
-      html += '</tbody></table>';
-      node.innerHTML = html;
-    }
-    const foot = document.querySelector('#satchidaModalWrap .satchidaModalFoot');
-    if (foot)
-      foot.innerHTML =
+
+  let html = '';
+  if (!members.length) {
+    html = '<p class="empty">No members assigned to role "' + escapeHtml(name) + '".</p>';
+  } else {
+    html =
+      '<table class="dataTable"><thead><tr><th>User</th><th>Email</th><th class="thActions">Actions</th></tr></thead><tbody>';
+    html += members
+      .map((u) => {
+        const id = uid(u);
+        return (
+          '<tr data-uid="' +
+          escapeHtml(id) +
+          '">' +
+          '<td>' +
+          escapeHtml(uname(u)) +
+          '</td>' +
+          '<td>' +
+          escapeHtml(u.email || '') +
+          '</td>' +
+          '<td class="actions"><button type="button" data-op="removeRoleMember" data-name="' +
+          escapeHtml(name) +
+          '" data-uid="' +
+          escapeHtml(id) +
+          '" class="action actionDel">Remove</button></td></tr>'
+        );
+      })
+      .join('');
+    html += '</tbody></table>';
+  }
+
+  Modal.show(
+    'Members of role "' + escapeHtml(name) + '"',
+    (b) => {
+      b.innerHTML = html;
+    },
+    (f) => {
+      f.innerHTML =
         '<button type="button" class="btn btn-ghost" onclick="closeModal()">Close</button>';
-    Modal.show(
-      'Members of role "' + escapeHtml(name) + '"',
-      () => {},
-      () => {},
-    );
-    // delegated listener for remove
-    const wrap = document.querySelector('#satchidaModalWrap .satchidaModalBody');
-    // attach once
-    if (wrap && !wrap.__bound) {
-      wrap.__bound = true;
-      wrap.addEventListener('click', (e) => {
-        const b = e.target.closest('button[data-op="removeRoleMember"]');
-        if (!b) return;
-        const n = b.dataset.name,
-          uidv = b.dataset.uid;
-        (async () => {
-          const res = await apiAdmin(
-            '/roles/' + encodeURIComponent(n) + '/members/' + encodeURIComponent(uidv),
-            { method: 'DELETE' },
-          );
-          if (res.ok) {
-            toast('Member removed.', 'ok');
-            await roleMembers(n);
-          } else
-            toast(
-              'Remove failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status),
-              'err',
-            );
-        })();
-      });
-    }
+    },
+  );
+
+  // delegated listener for remove
+  const wrap = document.querySelector('#satchidaModalWrap .satchidaModalBody');
+  if (wrap && !wrap.__boundRoleRemove) {
+    wrap.__boundRoleRemove = true;
+    wrap.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-op="removeRoleMember"]');
+      if (!b) return;
+      const n = b.dataset.name,
+        uidv = b.dataset.uid;
+      (async () => {
+        const res = await apiAdmin(
+          '/roles/' + encodeURIComponent(n) + '/members/' + encodeURIComponent(uidv),
+          { method: 'DELETE' },
+        );
+        if (res.ok) {
+          toast('Member removed.', 'ok');
+          await roleMembers(n);
+        } else {
+          toast('Remove failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status), 'err');
+        }
+      })();
+    });
   }
 }
 
@@ -1770,6 +1994,11 @@ function attachListeners() {
         if (!res.ok) toast(`Search failed (HTTP ${res.status})`, 'err');
       }, 350);
     });
+
+  // User filters: Tenant, Tier, Seat
+  document.getElementById('usersTenantFilter')?.addEventListener('change', renderUsers);
+  document.getElementById('usersTierFilter')?.addEventListener('change', renderUsers);
+  document.getElementById('usersSeatFilter')?.addEventListener('change', renderUsers);
 }
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {

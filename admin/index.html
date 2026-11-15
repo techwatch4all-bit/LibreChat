@@ -25,6 +25,25 @@
       <p class="count" id="usersCount"></p>
       <div class="actionBar">
         <input type="search" id="usersSearch" placeholder="Search users…" autocomplete="off" />
+        <select id="usersTenantFilter" title="Filter by Tenant">
+          <option value="all">All Tenants</option>
+        </select>
+        <select id="usersTierFilter" title="Filter by Licence / Tier">
+          <option value="all">All Tiers</option>
+          <option value="none">None / Free</option>
+          <option value="basic">Basic</option>
+          <option value="standard">Standard</option>
+          <option value="family">Family</option>
+          <option value="pro">Pro</option>
+          <option value="pro_family">Pro Family</option>
+          <option value="privacy">Privacy</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+        <select id="usersSeatFilter" title="Filter by Seat Status">
+          <option value="all">All Seats</option>
+          <option value="assigned">Seat Assigned</option>
+          <option value="unassigned">No Seat</option>
+        </select>
         <button type="button" id="usersCreateBtn" class="btn btn-primary">Create User</button>
         <button type="button" id="usersBulkImportBtn" class="btn btn-ghost">Bulk CSV Import</button>
         <button type="button" id="usersDownloadTemplateBtn" class="btn btn-ghost">Download Template</button>
@@ -99,6 +118,7 @@
     </section>
   </main>
   <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+  <script src="./qrcodegen.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

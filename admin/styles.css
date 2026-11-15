@@ -52,7 +52,8 @@ pre.json { background: #0b0e1f; border: 1px solid var(--border); border-radius: 
 .memberList { margin: 0; padding-left: 18px; }
 .memberList li { margin: 4px 0; }
 .actionBar .hint { color: var(--muted); font-size: 12px; flex: 1 1 auto; }
-#usersSearch { width: 220px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel2); color: var(--text); font-size: 13px; }
+#usersSearch { width: 200px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel2); color: var(--text); font-size: 13px; }
+#usersTenantFilter, #usersTierFilter, #usersSeatFilter { padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel2); color: var(--text); font-size: 13px; cursor: pointer; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel2); color: var(--text); font-size: 13px; cursor: pointer; }
 .btn:hover { background: var(--border); }
 .btn-ghost { background: transparent; }

@@ -7,7 +7,6 @@ const {
   extractChatContent,
   contentFilterBlockResponse,
 } = require('@librechat/api');
-const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const { hasOperatorControl } = require('~/server/middleware/roles/capabilities');
 const {
@@ -55,62 +54,6 @@ function inspectResolvedCurrentUser(req, promptPrefixTemplate) {
   return inspectContent(extractChatContent({ promptPrefix: String(req.user.name) }), {
     filters: req.config?.filters,
   });
-}
-
-/** Map a modelSpec name to the Satchida router mode label. */
-const SPEC_TO_MODE = {
-  Chat: 'Chat',
-  Work: 'Work',
-  VibeCoder: 'Work',
-  Vibecoding: 'Work',
-  Study: 'Study',
-  Privacy: 'Privacy',
-  Motion: 'Work',
-  SceneMosaic: 'Work',
-  DeepTutor: 'Study',
-  'Health-Wellness': 'Work',
-  'Panchang-Vedic': 'Work',
-  'Architect-Studio': 'Work',
-  'Maker-Hardware': 'Work',
-  'Document-Vault': 'Work',
-};
-
-/** Cached lookup: is the current user a member of the "Demo" group? */
-let demoMemberIds = null;
-let demoCacheTime = 0;
-const DEMO_CACHE_TTL = 60_000;
-
-function getGroupModel() {
-  try {
-    return mongoose.models?.Group || mongoose.model('Group');
-  } catch {
-    return null;
-  }
-}
-
-async function isDemoUser(userId) {
-  if (!userId) return false;
-  const now = Date.now();
-  if (demoMemberIds && now - demoCacheTime < DEMO_CACHE_TTL) {
-    return demoMemberIds.has(String(userId));
-  }
-  const Group = getGroupModel();
-  if (!Group) {
-    demoMemberIds = new Set();
-    demoCacheTime = now;
-    return false;
-  }
-  try {
-    const demoGroup = await Group.findOne({ name: 'Demo' }).select('memberIds').lean();
-    demoMemberIds = new Set((demoGroup?.memberIds || []).map(String));
-    demoCacheTime = now;
-    return demoMemberIds.has(String(userId));
-  } catch (e) {
-    logger.error('[buildEndpointOption] Failed to check Demo group membership', e);
-    demoMemberIds = new Set();
-    demoCacheTime = now;
-    return false;
-  }
 }
 
 async function buildEndpointOption(req, res, next) {
@@ -230,12 +173,6 @@ async function buildEndpointOption(req, res, next) {
       }
     }
   }
-
-  // Check demo group membership early; the redirect itself happens after
-  // modelSpec preset application to avoid endpoint-mismatch errors during
-  // resolveModelSpecForEndpoint (which checks spec.preset.endpoint against
-  // the current endpoint).
-  const isDemo = await isDemoUser(req.user?.id ?? req.user?._id?.toString());
 
   let { endpoint, endpointType } = req.body;
   const isAgents =
@@ -363,20 +300,6 @@ async function buildEndpointOption(req, res, next) {
     }
   }
 
-  // --- Demo group routing: keep demo users on Satchida-Gateway (:4000) ---
-  // Demo users stay on Satchida-Gateway (:4000) with the x-satchida-client: demo
-  // header, which One-API routes to the free/demo channels backed by Bifrost (:8700).
-  if (isDemo && endpoint === 'Satchida-Gateway') {
-    const modeLabel = SPEC_TO_MODE[req.body.spec] || req.body.spec || 'Chat';
-    req.body.model = modeLabel;
-    parsedBody.model = modeLabel;
-    logger.info('[buildEndpointOption] Demo user routed through Satchida-Gateway', {
-      spec: req.body.spec,
-      model: modeLabel,
-      userId: req.user?.id ?? req.user?._id?.toString(),
-    });
-  }
-
   if (!isAgents && appliedModelSpecPrivateFields.has('promptPrefix')) {
     const promptPrefixTemplate = parsedBody.promptPrefix;
     parsedBody = resolveModelSpecPromptPrefixVariables(
@@ -398,15 +321,6 @@ async function buildEndpointOption(req, res, next) {
     // TODO: use object params
     req.body = req.body || {}; // Express 5: ensure req.body exists
     req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
-
-    // Inject the per-client header so the Fleet Gateway routes demo users through
-    // the Satchida Router for free-first/local-fallback mode resolution.
-    if (isDemo) {
-      req.body.endpointOption.headers = {
-        ...(req.body.endpointOption.headers || {}),
-        'x-satchida-client': 'demo',
-      };
-    }
 
     if (req.body.files && !isAgents) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files, undefined, {

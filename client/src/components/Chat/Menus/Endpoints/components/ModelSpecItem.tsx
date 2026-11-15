@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pin, PinOff } from 'lucide';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Lock } from 'lucide-react';
 import { MorphIcon } from '@librechat/client';
 import { VisuallyHidden } from '@ariakit/react';
 import type { TModelSpec } from 'librechat-data-provider';
-import { useFavorites, useLocalize, useIsActiveItem } from '~/hooks';
+import { useFavorites, useLocalize, useIsActiveItem, useAuthContext } from '~/hooks';
 import { useModelSelectorContext } from '../ModelSelectorContext';
 import { CustomMenuItem as MenuItem } from '../CustomMenu';
 import { cn, getSpecAgentAvatarURL } from '~/utils';
 import SpecDescription from './SpecDescription';
 import SpecIcon from './SpecIcon';
+import SatchiUpgradeModal from '~/components/Chat/Input/SatchiUpgradeModal';
 
 interface ModelSpecItemProps {
   spec: TModelSpec;
@@ -110,8 +111,10 @@ const SPEC_META: Record<string, SpecMetadata> = {
 
 export function ModelSpecItem({ spec, isSelected, posInSet, setSize }: ModelSpecItemProps) {
   const localize = useLocalize();
+  const { user } = useAuthContext();
   const { handleSelectSpec, endpointsConfig, agentsMap } = useModelSelectorContext();
   const { isFavoriteSpec, toggleFavoriteSpec } = useFavorites();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { showIconInMenu = true } = spec;
   const agentAvatarURL = getSpecAgentAvatarURL(spec, agentsMap);
 
@@ -127,80 +130,142 @@ export function ModelSpecItem({ spec, isSelected, posInSet, setSize }: ModelSpec
   const specKey = spec.name?.toLowerCase?.() ?? '';
   const meta = SPEC_META[specKey];
 
+  // Studio and advanced tools paywall definition
+  const STUDIO_SPECS = new Set([
+    'motion',
+    'scenemosaic',
+    'deeptutor',
+    'health-wellness',
+    'panchang-vedic',
+    'architect-studio',
+    'maker-hardware',
+    'document-vault',
+    'office-suite',
+    'vibecoding',
+    'vibecoder',
+    'pro',
+  ]);
+
+  const userAccountType = (user?.accountType || '').toLowerCase();
+  // Tenant Admin does NOT automatically grant Pro studio access; requires Pro, Pro_Family, Enterprise, or Privacy tier
+  const isProTier = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
+  const isLocked = STUDIO_SPECS.has(specKey) && !isProTier;
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLocked) {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowUpgradeModal(true);
+      return;
+    }
+    handleSelectSpec(spec);
+  };
+
   return (
-    <MenuItem
-      ref={itemRef}
-      onClick={() => handleSelectSpec(spec)}
-      aria-selected={isSelected || undefined}
-      aria-posinset={posInSet}
-      aria-setsize={setSize}
-      className={cn(
-        'group relative my-1 flex w-full cursor-pointer items-start justify-between rounded-xl border p-2.5 text-sm transition-all duration-150',
-        isSelected
-          ? 'border-border-medium bg-surface-active/80 shadow-md ring-1 ring-border-light/40'
-          : cn(
-              'border-transparent hover:bg-surface-hover/70',
-              meta?.cardGlow ?? 'hover:border-border-light',
-            ),
-      )}
-    >
-      <div className="flex w-full min-w-0 items-start gap-3">
-        {showIconInMenu && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border-light/60 bg-surface-tertiary shadow-sm transition-all duration-200 group-hover:scale-105 group-hover:bg-surface-hover">
-            <SpecIcon
-              currentSpec={spec}
-              endpointsConfig={endpointsConfig}
-              agentAvatarURL={agentAvatarURL}
-              size={19}
-            />
-          </div>
+    <>
+      <MenuItem
+        ref={itemRef}
+        onClick={handleClick}
+        aria-selected={isSelected || undefined}
+        aria-posinset={posInSet}
+        aria-setsize={setSize}
+        className={cn(
+          'group relative my-1 flex w-full cursor-pointer items-start justify-between rounded-xl border p-2.5 text-sm transition-all duration-150',
+          isLocked
+            ? 'border-transparent opacity-85 hover:border-amber-500/30 hover:bg-surface-hover/50'
+            : isSelected
+              ? 'border-border-medium bg-surface-active/80 shadow-md ring-1 ring-border-light/40'
+              : cn(
+                  'border-transparent hover:bg-surface-hover/70',
+                  meta?.cardGlow ?? 'hover:border-border-light',
+                ),
         )}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold tracking-tight text-text-primary">
-              {spec.label}
-            </span>
-            {meta?.badge && (
-              <span
-                className={cn(
-                  'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
-                  meta.badgeClass,
-                )}
-              >
-                {meta.badge}
-              </span>
-            )}
-          </div>
-          {spec.description && (
-            <div className="line-clamp-2 text-xs leading-relaxed text-text-secondary">
-              <SpecDescription description={spec.description} />
+      >
+        <div className="flex w-full min-w-0 items-start gap-3">
+          {showIconInMenu && (
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border-light/60 bg-surface-tertiary shadow-sm transition-all duration-200 group-hover:scale-105 group-hover:bg-surface-hover">
+              <SpecIcon
+                currentSpec={spec}
+                endpointsConfig={endpointsConfig}
+                agentAvatarURL={agentAvatarURL}
+                size={19}
+              />
+              {isLocked && (
+                <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/90 text-surface-primary shadow">
+                  <Lock className="h-2.5 w-2.5" />
+                </div>
+              )}
             </div>
           )}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold tracking-tight text-text-primary">
+                {spec.label}
+              </span>
+              {isLocked ? (
+                <span className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                  <Lock className="h-2.5 w-2.5" />
+                  PRO
+                </span>
+              ) : (
+                meta?.badge && (
+                  <span
+                    className={cn(
+                      'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+                      meta.badgeClass,
+                    )}
+                  >
+                    {meta.badge}
+                  </span>
+                )
+              )}
+            </div>
+            {spec.description && (
+              <div className="line-clamp-2 text-xs leading-relaxed text-text-secondary">
+                <SpecDescription description={spec.description} />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="ml-2 flex shrink-0 items-center gap-1.5 self-center">
-        <button
-          type="button"
-          tabIndex={isActive ? 0 : -1}
-          onClick={handleFavoriteClick}
-          aria-label={isFavorite ? localize('com_ui_unpin') : localize('com_ui_pin')}
-          className={cn(
-            'rounded-lg p-1 text-text-tertiary hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring-primary',
-            isFavorite
-              ? 'visible text-amber-400'
-              : 'group-focus-within:visible group-hover:visible group-data-[active-item]:visible [@media(hover:hover)]:invisible',
+        <div className="ml-2 flex shrink-0 items-center gap-1.5 self-center">
+          {isLocked ? (
+            <div className="flex h-7 items-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 text-[10px] font-semibold text-amber-400">
+              Site Admin
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                tabIndex={isActive ? 0 : -1}
+                onClick={handleFavoriteClick}
+                aria-label={isFavorite ? localize('com_ui_unpin') : localize('com_ui_pin')}
+                className={cn(
+                  'rounded-lg p-1 text-text-tertiary hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring-primary',
+                  isFavorite
+                    ? 'visible text-amber-400'
+                    : 'group-focus-within:visible group-hover:visible group-data-[active-item]:visible [@media(hover:hover)]:invisible',
+                )}
+              >
+                <MorphIcon icon={isFavorite ? PinOff : Pin} className="h-4 w-4" />
+              </button>
+              {isSelected && (
+                <>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-text-primary" aria-hidden="true" />
+                  <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
+                </>
+              )}
+            </>
           )}
-        >
-          <MorphIcon icon={isFavorite ? PinOff : Pin} className="h-4 w-4" />
-        </button>
-        {isSelected && (
-          <>
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-text-primary" aria-hidden="true" />
-            <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
-          </>
-        )}
-      </div>
-    </MenuItem>
+        </div>
+      </MenuItem>
+      {showUpgradeModal && (
+        <SatchiUpgradeModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          featureName="studio"
+        />
+      )}
+    </>
   );
 }
 

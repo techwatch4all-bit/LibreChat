@@ -144,13 +144,41 @@ async function buildEndpointOption(req, res, next) {
     'Architect-Studio',
     'Maker-Hardware',
     'Document-Vault',
+    'Office-Suite',
     'Pro',
   ];
+
+  // Studio and advanced tools strictly require Pro, Pro_Family, Enterprise, or Privacy tier
+  const STUDIO_SPECS = new Set([
+    'motion',
+    'scenemosaic',
+    'deeptutor',
+    'health-wellness',
+    'panchang-vedic',
+    'architect-studio',
+    'maker-hardware',
+    'document-vault',
+    'office-suite',
+    'vibecoding',
+    'vibecoder',
+    'pro',
+  ]);
+
+  const userAccountType = String(req.user?.accountType || '').toLowerCase();
+  const isProTier = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
+
   const isByokOrAgent =
     req.body.endpoint === 'openAI' ||
     req.body.endpoint === 'anthropic' ||
     req.body.endpoint === 'agents' ||
     Boolean(req.body.agent_id);
+
+  // Tenant Admin and ordinary users cannot use BYOK keys to bypass paywalled Satchida tools
+  if (!isOperator && isByokOrAgent) {
+    return res.status(403).json({
+      error: 'External cloud API keys (BYOK) are restricted to super administrators.',
+    });
+  }
 
   if (!isOperator && !isByokOrAgent) {
     const requestedSpec = typeof req.body.spec === 'string' ? req.body.spec : undefined;
@@ -162,6 +190,14 @@ async function buildEndpointOption(req, res, next) {
         error: 'A Satchida mode (Chat, Work, VibeCoder, Study, Privacy, or Motion) is required',
       });
     }
+
+    // Backend paywall enforcement: block lower tiers from invoking studio tools
+    if (STUDIO_SPECS.has(spec.toLowerCase()) && !isProTier) {
+      return res.status(403).json({
+        error: `Satchida Studio tool '${spec}' requires a Pro, Pro_Family, or Privacy subscription. Upgrade your plan to access this studio.`,
+      });
+    }
+
     const configuredSpec = req.config?.modelSpecs?.list?.find((item) => item.name === spec);
     if (!configuredSpec?.preset) {
       return res.status(403).json({ error: 'This Satchida mode is not enabled for this tenant' });

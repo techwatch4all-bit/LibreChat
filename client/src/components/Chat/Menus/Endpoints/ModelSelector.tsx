@@ -14,12 +14,13 @@ import { ModelSelectorChatProvider } from './ModelSelectorChatContext';
 import { getSelectedIcon, getDisplayValue } from './utils';
 import { CustomMenu as Menu } from './CustomMenu';
 import DialogManager from './DialogManager';
-import { useLocalize } from '~/hooks';
+import { useLocalize, useAuthContext } from '~/hooks';
 
 const defaultInterface = getConfigDefaults().interface;
 
 function ModelSelectorContent() {
   const localize = useLocalize();
+  const { user } = useAuthContext();
   const modelSelectorHint = useShortcutHint('openModelSelector', localize('com_ui_select_model'));
   const modelSelectorAriaKey = useShortcutAriaKey('openModelSelector');
 
@@ -132,8 +133,8 @@ function ModelSelectorContent() {
               ) || [],
               selectedValues.modelSpec || '',
             )}
-            {/* Render endpoints (OpenAI, My Agents, Anthropic) */}
-            {mappedEndpoints && mappedEndpoints.length > 0 && (
+            {/* Render endpoints (OpenAI, My Agents, Anthropic) - Hidden for Tenant Admin and standard users to prevent BYOK paywall bypass */}
+            {user?.role === 'ADMIN' && mappedEndpoints && mappedEndpoints.length > 0 && (
               <>
                 <div className="my-2.5 flex items-center justify-between border-t border-border-light/60 px-3 pt-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">

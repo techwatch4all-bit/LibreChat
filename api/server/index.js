@@ -522,6 +522,110 @@ const startServer = async () => {
       }),
     );
   }
+
+  // Teacher Voice Masterclass Explainer endpoint with Neural Indian English TTS
+  const tempAudioDir = path.resolve('D:\\LAN-AI-Infra\\LibreChat\\client\\public\\temp_audio');
+  if (!fs.existsSync(tempAudioDir)) {
+    fs.mkdirSync(tempAudioDir, { recursive: true });
+  }
+  app.use('/temp_audio', express.static(tempAudioDir));
+
+  app.post('/api/explain', express.json(), async (req, res) => {
+    try {
+      const { query = '', response = '', voice = 'female' } = req.body || {};
+      const promptText = `You are a warm, engaging master tutor explaining a concept directly to a student.
+
+Conversation Context:
+User Prompt: "${query}"
+Lesson Content:
+${response.slice(0, 3000)}
+
+RULES FOR YOUR SPOKEN EXPLANATION:
+1. Identify the CORE EDUCATIONAL SUBJECT or CONCEPT being learned (e.g. Frequency Modulation vs Phase Modulation, Photosynthesis, Water Cycle, etc.).
+2. NEVER say "You asked for a PowerPoint", "You asked for a slide", "You asked for a presentation", "You asked for a PDF", "You asked for a document", or mention filenames/downloads.
+3. ALWAYS begin with: "You asked about [the core subject]..."
+4. Explain the key intuitive concept or analogy in 2 to 3 simple, conversational, spoken sentences so the student truly understands the underlying topic.
+5. Speak naturally like a real human teacher. No bullet points, no markdown, no emojis, no robotic jargon.`;
+
+      const http = require('http');
+      const gatewayKey = process.env.SATCHIDA_GATEWAY_VK || 'SPYfLW63OU6l04br13668aD230414eF2B2Ca38Ae8d35E9A7';
+      const payload = JSON.stringify({
+        model: 'Study',
+        messages: [
+          { role: 'system', content: 'You are an inspiring master teacher who explains concepts simply and intuitively.' },
+          { role: 'user', content: promptText }
+        ],
+        max_tokens: 180,
+        temperature: 0.4
+      });
+
+      const llmReq = http.request({
+        hostname: '127.0.0.1',
+        port: 4000,
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${gatewayKey}`,
+          'X-Bifrost-Mode': 'study',
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      }, (llmRes) => {
+        let body = '';
+        llmRes.on('data', chunk => body += chunk);
+        llmRes.on('end', async () => {
+          try {
+            const parsed = JSON.parse(body);
+            let speech = parsed.choices?.[0]?.message?.content?.trim() || '';
+
+            // Clean up any stray quotes or markdown
+            speech = speech.replace(/^["']|["']$/g, '').trim();
+
+            // Select Neural Indian English Voice: Neerja (Female) or Prabhat (Male)
+            const edgeVoice = voice === 'male' ? 'en-IN-PrabhatNeural' : 'en-IN-NeerjaExpressiveNeural';
+            const tempAudioName = `tts_teacher_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+            const tempAudioPath = path.join(tempAudioDir, tempAudioName);
+
+            // Synthesize high-quality Indian English voice via edge-tts helper
+            const { spawn } = require('child_process');
+            const pythonScript = path.resolve('D:\\LAN-AI-Infra\\LibreChat\\skill\\edge_tts_service.py');
+            const pyProc = spawn('python', [pythonScript, edgeVoice, tempAudioPath, speech]);
+
+            pyProc.on('close', (code) => {
+              if (code === 0 && fs.existsSync(tempAudioPath)) {
+                res.json({
+                  ok: true,
+                  explanation: speech,
+                  audioUrl: `/temp_audio/${tempAudioName}`
+                });
+              } else {
+                // Fallback to text explanation if edge-tts fails
+                res.json({ ok: true, explanation: speech, audioUrl: null });
+              }
+            });
+          } catch (e) {
+            res.status(500).json({ ok: false, error: 'Failed to parse LLM response' });
+          }
+        });
+      });
+
+      llmReq.on('error', (err) => {
+        logger.error('Explain LLM request error:', err);
+        res.status(500).json({ ok: false, error: err.message });
+      });
+
+      llmReq.setTimeout(8000, () => {
+        llmReq.destroy();
+        res.status(504).json({ ok: false, error: 'Explain LLM timeout' });
+      });
+
+      llmReq.write(payload);
+      llmReq.end();
+    } catch (err) {
+      logger.error('TTS explain route error:', err);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
   app.use(
     '/images/',
     createValidateImageRequest({

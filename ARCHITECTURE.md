@@ -1973,6 +1973,32 @@ Both delegates call through to `db.seedTenantAdmin` / `db.seedTenantUserAdmin`, 
 (`...methods`). Grants are tenant-scoped (`tenantId` set on every row), so a tenant admin's authority
 is invisible to platform checks and to every other tenant.
 
+### 2.2 Hardened Step-Up Authentication for Grants & Audit Logs (TOTP Gate)
+
+To prevent automated AI tools, compromised subagent processes, scraped session cookies, or local token
+theft from escalating administrative capabilities or altering compliance audit logs, **Grants** and **Audit Log**
+access is gated behind physical multi-factor step-up authentication:
+
+1. **Cryptographic Step-Up Token (`X-Admin-StepUp-Token`):**
+   * The backend middleware (`api/server/middleware/adminStepUp.js`) intercepts all accesses to `GET /api/admin/grants`,
+     `POST /api/admin/grants`, `DELETE /api/admin/grants/*`, and `GET /api/admin/audit-log/*`.
+   * Standard JWT bearer tokens or session cookies receive `403 STEP_UP_REQUIRED` unless accompanied by an active,
+     cryptographically signed `X-Admin-StepUp-Token`.
+   * Step-up tokens have a strict **10-minute maximum lifespan (`expiresIn: '10m'`)** and are stored exclusively in
+     tab-isolated `sessionStorage`. Closing the tab or exceeding 10 minutes immediately revokes access.
+
+2. **Per-Tenant Isolated TOTP (Rule #2 Physical Isolation):**
+   * Each tenant edge node (school, SMB, enterprise) maintains its own independent native MongoDB instance.
+   * Admin accounts (`admin@<tenant>`, `ADMIN` role) generate and store their own Base32 TOTP secret locally.
+   * No master key or cross-tenant authenticator exists: an authenticator credential for Tenant A cannot unlock Tenant B.
+
+3. **Inlined Standalone Enrollment & Challenge Workflow:**
+   * The administrative dashboard (`/admin`) features an inlined SVG QR code generator (`admin/qrcodegen.js`) that renders
+     an enrollment QR code (`otpauth://totp/...`) on first access without relying on external CDN scripts or remote dependencies.
+   * Enrolling or authenticating verifies the 6-digit TOTP against `user.pendingTotpSecret` / `user.totpSecret` with
+     `createTwoFactorManagementLimiter` rate-limiting to prevent automated brute-force attempts.
+   * A successful challenge mints the step-up token and transparently unblocks the view.
+
 ## 3. End-to-End User Lifecycle & Automated Bulk Provisioning
 
 
@@ -2902,3 +2928,73 @@ To ensure that older/inferior models (such as `dots-3-note-preview:free`) can **
    - A live test prompt (`POST http://127.0.0.1:4000/v1/chat/completions`) must be executed immediately following any cutover.
    - The test must confirm that `extra_fields.resolved_model_used` exactly matches the intended new model.
    - **Automated Tooling**: The script `D:\LAN-AI-Infra\ops-scripts\promote-model.py` enforces this 4-step atomic cutover with automated verification.
+
+
+---
+
+## 29. Satchida Unified Intelligence Hub & Extensible Tool Architecture
+
+### 29.1 The Problem: Stdio Process Explosion on Windows
+Prior to this enhancement, LibreChat configured 19+ distinct `type: stdio` MCP servers across Python, Node, and uvx. Under the Windows Console subsystem, spawning 19 individual child processes during boot creates 19 separate Console Window Host (`conhost.exe`) allocations. If LibreChat reloads or crashes, orphan child trees can lock sockets and cause PM2 restart loops, leading to visible terminal windows popping up on the user's desktop.
+
+### 29.2 Unified Hub Design (`skill/satchida-unified-hub.py`)
+To ensure **100% tenant-portability** and zero console window flashing:
+1. **Single-Process Daemon**:
+   All 19 local Python tools (86+ capabilities) are consolidated into a single background process managed by `skill/satchida-unified-hub.py`.
+2. **Self-Contained Discovery & Zero-Config Extensibility**:
+   The hub dynamically scans the local `skill/` directory inside the LibreChat repository tree for any script matching `*-server.py` or `*_mcp_server.py`.
+   
+   All tools and skill servers reside directly within the `LibreChat/skill/` folder so that cloning or packaging LibreChat for tenant PCs is 100% self-contained. Any new skill file dropped into `skill/` matching `*-server.py` is automatically registered and mounted into the `satchida-tools` catalog on the next startup—requiring **zero edits to `librechat.yaml`**.
+3. **Lazy-Loading for Heavy Secondary Transports**:
+   Non-essential external MCP servers (such as `web-fetch`, `arxiv-search`, `openfda-drugs`) are marked with `startup: false`. LibreChat connects to them on-demand when a user initiates a request that specifically requires them, rather than launching all 20+ processes eagerly on boot.
+
+### 29.3 Ecosystem Dependency & Tenant Distribution Topology
+When LibreChat is packaged and deployed onto tenant hardware (bare-metal Windows 11), it operates as a self-contained edge node.
+**Operator-Only Component Separation (Strict Invariant)**:
+- **Bifrost** (`D:\LAN-AI-Infra\Bifrost`) and **One-API** (`D:\LAN-AI-Infra\one-api\satchida-gateway.exe`) run **strictly on Operator Central HQ**. They NEVER exist or deploy on tenant hardware; tenants have zero access to or knowledge of them.
+- On tenant nodes, LibreChat routes cloud-bound model requests to a lightweight local edge proxy (`http://127.0.0.1:4000`), which tunnels outbound over Cloudflare Named Tunnels to `control.satchida.com` where master keys and upstream routing (One-API + Bifrost) reside.
+
+```mermaid
+flowchart TD
+    subgraph TENANT_NODE["Tenant Edge Node (Local Machine)"]
+      LC["LibreChat (Port 3080)"]
+      HUB["Unified MCP Hub (skill/satchida-unified-hub.py)"]
+      RAG["LibreChat Embedded RAG Service (Port 8010)"]
+      VAULT["AnythingLLM Vault (Port 3012 - LanceDB)"]
+      EDGE_PROXY["Local Edge Proxy (Port 4000)"]
+      LLAMA["Local Llama Fleet (:8080 - CUDA)"]
+      
+      LC -->|"1 Stdio Child Process (86 Tools)"| HUB
+      LC -->|"HTTP Loopback File Search"| RAG
+      HUB -->|"Knowledge Vault RAG / Citations"| VAULT
+      LC -->|"Local Inference"| LLAMA
+      LC -->|"Cloud / Hybrid Requests"| EDGE_PROXY
+    end
+    
+    subgraph OPERATOR_HQ["Operator Central HQ (control.satchida.com)"]
+      CF["Cloudflare Named Tunnel"]
+      ONE_API["One-API Gateway (Seat & Quota Tracking)"]
+      BIFROST["Bifrost Dynamic Multi-LLM Router"]
+      UPSTREAM["Upstream Providers (OpenAI, Gemini, Anthropic, OpenRouter)"]
+      
+      EDGE_PROXY -.->|"Outbound HTTPS Only (No Inbound Ports)"| CF
+      CF --> ONE_API
+      ONE_API --> BIFROST
+      BIFROST --> UPSTREAM
+    end
+```
+
+### 29.4 Local Repositories and Roles in Tenant Packaging
+1. **`LibreChat` (Primary UI, Agent Harness & Unified Skills)**:
+   - Front-end chat, persona routing, conversation history, and tool execution orchestration.
+   - **Self-Contained Skills**: All production skills and MCP tool definitions reside in `LibreChat/skill/` and are served via `satchida-unified-hub.py`.
+2. **`AnythingLLM` (`D:\LAN-AI-Infra\AnythingLLM`)**:
+   - Private vector database (LanceDB) providing multi-tenant knowledge vaults, document parsing, and file search. Accessed via `anythingllm_mcp_server.py` inside the unified hub.
+3. **`rag-service` (`LibreChat/rag-service`)**:
+   - Embedded native RAG service running locally on port 8010, implementing LibreChat's official `rag-api` specification for user attachment parsing and semantic search.
+4. **`prism-llama` / `Satchida-AI-Interface` (`llama-server.exe`)**:
+   - Bare-metal CUDA local model inference for offline chat and sensitive reasoning on port 8080.
+5. **Operator-Exclusive Components (Never Shipped to Tenants)**:
+   - `Bifrost` (`D:\LAN-AI-Infra\Bifrost`): Central dynamic model router with fallback cascades and caching.
+   - `One-API` (`D:\LAN-AI-Infra\one-api`): Enterprise seat caps, token quota tracking, and multi-tenant key management.
+   - External skill staging repositories (`D:\LAN-AI-Infra\skills`, `D:\LAN-AI-Infra\agents`): Staging and development libraries; all production tools are baked directly into `LibreChat/skill/`.

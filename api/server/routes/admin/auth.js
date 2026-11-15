@@ -42,6 +42,8 @@ const {
   verifyOTPOrBackupCode,
   generateTOTPSecret,
   generateBackupCodes,
+  getTOTPSecret,
+  verifyTOTP,
 } = require('~/server/services/twoFactorService');
 const { signStepUpToken } = require('~/server/middleware/adminStepUp');
 const { encryptV3 } = require('@librechat/data-schemas');
@@ -286,24 +288,28 @@ router.post(
         return res.status(400).json({ error: 'No 2FA setup in progress' });
       }
 
-      const result = await verifyOTPOrBackupCode({
-        user,
-        token,
-        persistBackupUse: false,
-      });
+      const secretSource = user.pendingTotpSecret || user.totpSecret;
+      const secret = await getTOTPSecret(secretSource);
+      if (!secret) {
+        return res.status(400).json({ error: '2FA secret is missing or corrupted' });
+      }
 
-      if (!result.verified) {
-        return res.status(400).json({ error: result.message || 'Invalid verification code' });
+      const verified = await verifyTOTP(secret, token);
+      if (!verified) {
+        return res.status(400).json({ error: 'Invalid verification code' });
       }
 
       // Activate 2FA
-      await updateUser(userId, {
+      const update = {
         totpSecret: user.pendingTotpSecret || user.totpSecret,
-        backupCodes: user.pendingBackupCodes || user.backupCodes,
         twoFactorEnabled: true,
         pendingTotpSecret: null,
-        pendingBackupCodes: null,
-      });
+        pendingBackupCodes: [],
+      };
+      if (user.pendingBackupCodes?.length) {
+        update.backupCodes = user.pendingBackupCodes;
+      }
+      await updateUser(userId, update);
 
       const stepUpToken = signStepUpToken(userId);
       return res.status(200).json({

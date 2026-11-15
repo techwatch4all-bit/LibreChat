@@ -45,6 +45,7 @@ function normalizeList(res) {
   if (Array.isArray(j?.groups)) return j.groups;
   if (Array.isArray(j?.grants)) return j.grants;
   if (Array.isArray(j?.items)) return j.items;
+  if (Array.isArray(j?.entries)) return j.entries;
   if (Array.isArray(j?.data)) return j.data;
   if (Array.isArray(j?.results)) return j.results;
   if (j && typeof j === 'object') return [j];
@@ -86,17 +87,20 @@ const CAPS = [
  * silently bypasses that side's MaxSeats cap. */
 const ACCOUNT_TYPES = [
   { label: '— none —', value: '' },
-  { label: 'basic', value: 'basic' },
-  { label: 'pro', value: 'pro' },
-  { label: 'family', value: 'family' },
-  { label: 'privacy', value: 'privacy' },
+  { label: 'Basic', value: 'basic' },
+  { label: 'Standard', value: 'standard' },
+  { label: 'Family (Pooled 4 Users)', value: 'family' },
+  { label: 'Pro', value: 'pro' },
+  { label: 'Pro_Family (Pooled 4 Users)', value: 'pro_family' },
+  { label: 'Enterprise', value: 'enterprise' },
+  { label: 'Privacy', value: 'privacy' },
 ];
 
 const FAMILY_ROLE_OPTIONS = [
-  { label: '— none —', value: '' },
-  { label: 'owner', value: 'owner' },
-  { label: 'adult', value: 'adult' },
-  { label: 'minor', value: 'minor' },
+  { label: '— not applicable (individual account) —', value: '' },
+  { label: 'Family Bundle Primary (Owner / Head)', value: 'owner' },
+  { label: 'Family Member (Adult)', value: 'adult' },
+  { label: 'Family Member (Minor / Student)', value: 'minor' },
 ];
 
 const S = {
@@ -248,16 +252,34 @@ function formModal(title, fields, submitLabel, defaults, onSubmit) {
           input.id = fld.key;
           input.name = fld.key;
           input.value = (defaults || {})[fld.key] ?? fld.value ?? '';
+          if (fld.placeholder) input.placeholder = fld.placeholder;
+          if (fld.disabled) {
+            input.disabled = true;
+            input.style.opacity = '0.6';
+            input.style.cursor = 'not-allowed';
+          }
           if (fld.type === 'checkbox') {
             delete input.value;
             input.checked = !!(defaults || {})[fld.key];
           }
           if (fld.required) input.required = true;
         }
+        if (fld.disabled) {
+          input.disabled = true;
+          input.style.opacity = '0.6';
+          input.style.cursor = 'not-allowed';
+        }
         fx.appendChild(lbl);
         fx.appendChild(input);
-        b.appendChild(fx);
+        if (fld.hint) {
+          const hint = document.createElement('small');
+          hint.textContent = fld.hint;
+          hint.style.cssText = 'font-size:11px;color:var(--muted);margin-top:2px;display:block';
+          fx.appendChild(hint);
+        }
+        form.appendChild(fx);
       });
+      b.appendChild(form);
     },
     (f) => {
       const err = document.createElement('span');
@@ -540,19 +562,7 @@ async function promptStepUpAuth() {
 }
 
 async function loadGrants() {
-  const authed = await promptStepUpAuth();
-  if (!authed) {
-    document.getElementById('grantsTable').innerHTML =
-      '<p class="empty">Step-up authentication required to view and manage security grants.</p>';
-    return;
-  }
   const res = await apiAdmin('/grants');
-  if (res.status === 403 && res.json?.stepUpRequired) {
-    sessionStorage.removeItem('stepUpToken');
-    const retry = await promptStepUpAuth();
-    if (retry) return loadGrants();
-    return;
-  }
   S.grants = normalizeList(res);
   renderGrants();
   const c = document.getElementById('grantsCount');
@@ -567,28 +577,55 @@ async function loadEffective() {
 }
 
 async function loadAudit() {
-  const authed = await promptStepUpAuth();
-  if (!authed) {
-    document.getElementById('auditTable').innerHTML =
-      '<p class="empty">Step-up authentication required to view audit log.</p>';
-    return;
-  }
   const res = await apiAdmin('/audit-log');
-  if (res.status === 403 && res.json?.stepUpRequired) {
-    sessionStorage.removeItem('stepUpToken');
-    const retry = await promptStepUpAuth();
-    if (retry) return loadAudit();
-    return;
-  }
   const list = normalizeList(res);
+  const total = Number.isFinite(res.json?.total) ? res.json.total : list.length;
   const c = document.getElementById('auditCount');
-  if (c) c.textContent = `${list.length} record(s)`;
+  if (c) c.textContent = `${total} record(s)`;
   if (!res.ok) {
     document.getElementById('auditTable').innerHTML =
       '<p class="empty">Could not load audit log (HTTP ' + res.status + ').</p>';
     return;
   }
-  renderTable('#auditTable', list, null, true);
+  const auditColumns = [
+    {
+      h: 'Timestamp',
+      v: (it) => {
+        const d = it.timestamp || it.createdAt;
+        return d ? new Date(d).toLocaleString() : '';
+      },
+    },
+    {
+      h: 'Actor',
+      v: (it) => {
+        const a = it.actor || {};
+        return (a.name || a.email || a.id || a.type || 'system') + (a.type ? ` (${a.type})` : '');
+      },
+    },
+    { h: 'Action', v: (it) => it.action || '' },
+    { h: 'Category', v: (it) => it.category || '' },
+    {
+      h: 'Outcome',
+      v: (it) => {
+        const out = it.outcome || 'success';
+        const isOk = out === 'success';
+        return `<span class="pill" style="${isOk ? 'color:#4ade80' : 'color:#f87171'}">${escapeHtml(out)}</span>`;
+      },
+      raw: true,
+    },
+    {
+      h: 'Target',
+      v: (it) => {
+        const t = it.target || {};
+        return (t.name || t.id || t.type || '—') + (t.type ? ` [${t.type}]` : '');
+      },
+    },
+    {
+      h: 'IP / Origin',
+      v: (it) => (it.context && it.context.ip) || '—',
+    },
+  ];
+  renderTable('#auditTable', list, auditColumns, false);
 }
 
 /* ---------- generic table renderer ---------- */
@@ -611,7 +648,10 @@ function renderTable(containerSel, rows, columns, allFields) {
       (it) =>
         '<tr>' +
         cols
-          .map((c) => '<td>' + escapeHtml(typeof c.v === 'function' ? c.v(it) : it[c.k]) + '</td>')
+          .map((c) => {
+            const val = typeof c.v === 'function' ? c.v(it) : it[c.k];
+            return '<td>' + (c.raw ? val : escapeHtml(val)) + '</td>';
+          })
           .join('') +
         '</tr>',
     )
@@ -683,7 +723,7 @@ function renderUsers() {
     return;
   }
   const head =
-    '<tr><th>Email</th><th>Name</th><th>Role</th><th>Account type</th><th>Tenant</th><th>Family</th><th>Seat</th><th class="thActions">Actions</th></tr>';
+    '<tr><th>Email</th><th>Name</th><th>Identifier</th><th>Role</th><th>Account type</th><th>Tenant</th><th>Family</th><th>Seat</th><th class="thActions">Actions</th></tr>';
   const body = filtered
     .map((u) => {
       const id = uid(u);
@@ -699,6 +739,9 @@ function renderUsers() {
         '</td>' +
         '<td>' +
         escapeHtml(uname(u)) +
+        '</td>' +
+        '<td>' +
+        escapeHtml(u.uniqueIdentifier || '—') +
         '</td>' +
         '<td>' +
         escapeHtml(u.role || u.roleName || '') +
@@ -1015,7 +1058,7 @@ async function deleteUser(u) {
   const res = await apiAdmin('/users/' + encodeURIComponent(id), { method: 'DELETE' });
   if (res.ok) {
     toast('User deleted.', 'ok');
-    await loadUsers();
+    await Promise.all([loadUsers(), loadGroups()]);
   } else {
     toast('Delete failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
   }
@@ -1025,8 +1068,9 @@ async function createUser() {
   await formModal(
     'Create User Account',
     [
-      { key: 'name', label: 'Full Name', type: 'text', required: true },
-      { key: 'email', label: 'Email / Identity', type: 'email', required: true },
+      { key: 'email', label: 'Email Address (Used for Login)', type: 'email', required: true, placeholder: 'user@example.com' },
+      { key: 'name', label: 'Full Name', type: 'text', placeholder: 'e.g. John Doe (Optional: defaults to email prefix)' },
+      { key: 'uniqueIdentifier', label: 'Unique Identifier (Flat / Roll No / Emp ID)', type: 'text', placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082' },
       {
         key: 'role',
         label: 'Role',
@@ -1036,19 +1080,35 @@ async function createUser() {
           { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
         ],
       },
-      { key: 'accountType', label: 'Account type', type: 'select', options: ACCOUNT_TYPES },
-      { key: 'familyRole', label: 'Family role', type: 'select', options: FAMILY_ROLE_OPTIONS },
-      { key: 'quota', label: 'Initial Token Quota', type: 'number', value: '100000' },
+      { key: 'accountType', label: 'Account Tier / License', type: 'select', options: ACCOUNT_TYPES },
+      {
+        key: 'familyRole',
+        label: 'Family Bundle Membership (For Family / Pro_Family Tier)',
+        type: 'select',
+        options: FAMILY_ROLE_OPTIONS,
+        hint: 'Select "Family Bundle Primary" for the main head account, or "Family Member" for pooled accounts.',
+      },
+      {
+        key: 'quota',
+        label: 'Initial Token Quota',
+        type: 'number',
+        value: '100000',
+        disabled: true,
+        hint: 'Managed automatically by One-API Seat Policy for the selected Tier.',
+      },
     ],
     'Provision Account',
     { quota: '100000' },
     async (v) => {
-      if (!v.email || !v.email.trim()) return { ok: false, error: 'Email is required.' };
+      if (!v.email || !v.email.trim()) return { ok: false, error: 'A valid email address is required.' };
+      const emailPattern = /^\S+@\S+\.\S+$/;
+      if (!emailPattern.test(v.email.trim())) return { ok: false, error: 'Please enter a valid email address (e.g. user@domain.com).' };
       const res = await apiAdmin('/users', {
         method: 'POST',
         body: JSON.stringify({
-          name: v.name,
-          email: v.email,
+          name: v.name?.trim() || undefined,
+          email: v.email.trim(),
+          uniqueIdentifier: v.uniqueIdentifier?.trim() || undefined,
           role: v.role,
           quota: v.quota,
           accountType: v.accountType || undefined,
@@ -1058,7 +1118,7 @@ async function createUser() {
       if (res.ok) {
         const u = res.json?.user;
         toast(`Account provisioned. Temporary password: ${u?.tempPassword}`, 'ok', 12000);
-        await loadUsers();
+        await Promise.all([loadUsers(), loadGroups()]);
         return { ok: true };
       }
       return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
@@ -1071,8 +1131,9 @@ async function editUser(u) {
   await formModal(
     'Edit ' + (u.email || uname(u)),
     [
+      { key: 'email', label: 'Email Address', type: 'email', value: u.email || '', required: true },
       { key: 'name', label: 'Full Name', type: 'text', value: u.name || '' },
-      { key: 'email', label: 'Email', type: 'email', value: u.email || '' },
+      { key: 'uniqueIdentifier', label: 'Unique Identifier (Flat / Roll No / Emp ID)', type: 'text', value: u.uniqueIdentifier || '', placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082' },
       {
         key: 'role',
         label: 'Role',
@@ -1085,14 +1146,14 @@ async function editUser(u) {
       },
       {
         key: 'accountType',
-        label: 'Account type',
+        label: 'Account Tier / License',
         type: 'select',
         value: u.accountType || '',
         options: ACCOUNT_TYPES,
       },
       {
         key: 'familyRole',
-        label: 'Family role',
+        label: 'Family Bundle Membership (For Family / Pro_Family Tier)',
         type: 'select',
         value: u.familyRole || '',
         options: FAMILY_ROLE_OPTIONS,
@@ -1116,6 +1177,7 @@ async function editUser(u) {
         body: JSON.stringify({
           name: v.name,
           email: v.email,
+          uniqueIdentifier: v.uniqueIdentifier?.trim() || null,
           role: v.role,
           accountType: v.accountType || null,
           familyRole: v.familyRole || null,
@@ -1124,7 +1186,7 @@ async function editUser(u) {
       });
       if (res.ok) {
         toast('Account updated.', 'ok');
-        await loadUsers();
+        await Promise.all([loadUsers(), loadGroups()]);
         return { ok: true };
       }
       return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
@@ -1153,7 +1215,7 @@ async function assignSeat(u) {
       });
       if (res.ok) {
         toast('Seat assigned: ' + v.accountType, 'ok');
-        await loadUsers();
+        await Promise.all([loadUsers(), loadGroups()]);
         return { ok: true };
       }
       return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
@@ -1171,7 +1233,7 @@ async function revokeSeat(u) {
   });
   if (res.ok) {
     toast('Seat revoked.', 'ok');
-    await loadUsers();
+    await Promise.all([loadUsers(), loadGroups()]);
   } else {
     toast((res.json && res.json.error) || `HTTP ${res.status}`, 'err');
   }
@@ -1757,9 +1819,8 @@ async function groupMembers(id) {
     },
   );
   const body = document.querySelector('#satchidaModalWrap .satchidaModalBody');
-  if (body && !body.__bound) {
-    body.__bound = true;
-    body.addEventListener('click', async (e) => {
+  if (body) {
+    body.onclick = async (e) => {
       const b = e.target.closest('button[data-op]');
       if (!b) return;
       const op = b.dataset.op;
@@ -1771,12 +1832,13 @@ async function groupMembers(id) {
         );
         if (res.ok) {
           toast('Member removed.', 'ok');
+          await loadGroups();
           await groupMembers(id);
         } else
           toast('Remove failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status), 'err');
       }
-    });
-    body.addEventListener('change', async (e) => {
+    };
+    body.onchange = async (e) => {
       if (e.target.id === 'addGroupMember' && e.target.value) {
         const sel = e.target;
         const val = sel.value;
@@ -1787,11 +1849,12 @@ async function groupMembers(id) {
         });
         if (res.ok) {
           toast('Member added.', 'ok');
+          await loadGroups();
           await groupMembers(id);
         } else
           toast('Add failed: ' + ((res.json && res.json.error) || 'HTTP ' + res.status), 'err');
       }
-    });
+    };
   }
 }
 
@@ -1863,10 +1926,10 @@ function setupTabs() {
       document.getElementById(btn.dataset.tab).classList.add('active');
       CURRENT = btn.dataset.tab;
       // lazy load tabs not yet loaded
-      if (CURRENT === 'users' && !S.users.length) loadUsers();
-      if (CURRENT === 'roles' && !S.roles.length) loadRoles();
-      if (CURRENT === 'groups' && !S.groups.length) loadGroups();
-      if (CURRENT === 'grants' && !S.grants.length) loadGrants();
+      if (CURRENT === 'users') loadUsers();
+      if (CURRENT === 'roles') loadRoles();
+      if (CURRENT === 'groups') loadGroups();
+      if (CURRENT === 'grants') loadGrants();
       if (CURRENT === 'audit') loadAudit();
     });
   });
@@ -2034,9 +2097,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
     loadUsers(),
     loadRoles(),
     loadGroups(),
-    loadGrants(),
     loadEffective(),
-    loadAudit(),
   ]);
 })();
 

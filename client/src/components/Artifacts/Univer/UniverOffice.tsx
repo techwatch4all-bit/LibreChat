@@ -175,7 +175,11 @@ export default function UniverOffice({
           const snapshot = await docxBufferToUniverDocSnapshot(buffer, name);
           if (api && isDoc) {
             try {
-              (api as any).createUniverDoc(snapshot);
+              if (typeof (api as any).createDocument === 'function') {
+                (api as any).createDocument(snapshot);
+              } else if (typeof (api as any).createUniverDoc === 'function') {
+                (api as any).createUniverDoc(snapshot);
+              }
             } catch (err) {
               console.error('Failed to mount document snapshot:', err);
             }
@@ -290,10 +294,19 @@ export default function UniverOffice({
         }
 
         if (isDoc) {
+          const createDoc = (data: any) => {
+            if (typeof (univerAPI as any).createDocument === 'function') {
+              return (univerAPI as any).createDocument(data);
+            }
+            if (typeof (univerAPI as any).createUniverDoc === 'function') {
+              return (univerAPI as any).createUniverDoc(data);
+            }
+          };
+
           if (initialData && typeof initialData === 'object') {
-            (univerAPI as any).createUniverDoc(initialData);
+            createDoc(initialData);
           } else {
-            (univerAPI as any).createUniverDoc({
+            createDoc({
               id: 'doc-1',
               title: artifact.title || 'Untitled Document',
               body: {

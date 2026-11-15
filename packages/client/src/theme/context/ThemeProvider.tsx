@@ -19,6 +19,7 @@ import applyTheme, { applyResolvedTheme, themeOwnedProperties } from '../utils/a
 import { satchidaTheme } from '../themes/satchida';
 import { defaultTheme } from '../themes/default';
 import { darkTheme } from '../themes/dark';
+import { darkBlackTheme } from '../themes/darkBlack';
 import '../highContrast.css';
 
 const THEME_KEY = 'color-theme';
@@ -30,6 +31,7 @@ const HIGH_CONTRAST_CLASS = 'high-contrast';
 const themeModes = [
   'light',
   'dark',
+  'dark-black',
   'system',
   'high-contrast-light',
   'high-contrast-dark',
@@ -130,6 +132,7 @@ export const isDark = (theme: string): boolean => {
   }
   return (
     theme === 'dark' ||
+    theme === 'dark-black' ||
     theme === 'high-contrast-dark' ||
     (theme.startsWith('satchida') && theme !== 'satchida-light')
   );
@@ -633,11 +636,14 @@ export function ThemeProvider({
       /** A contrast mode is an accessibility need, so it outranks both a
        *  deployment's custom definition and the legacy RGB colors. */
       const isSatchidaTheme = currentTheme.startsWith('satchida');
+      const isDarkBlack = currentTheme === 'dark-black';
       let definition = themeDefinition;
       if (highContrast) {
         definition = highContrastTheme;
       } else if (isSatchidaTheme) {
         definition = satchidaTheme;
+      } else if (isDarkBlack) {
+        definition = darkBlackTheme;
       }
 
       if (!definition) {
@@ -651,7 +657,7 @@ export function ThemeProvider({
         root.style.setProperty('color-scheme', mode);
       }
 
-      if (!highContrast && !isSatchidaTheme && legacyThemeRGB) {
+      if (!highContrast && !isSatchidaTheme && !isDarkBlack && legacyThemeRGB) {
         applyTheme(legacyThemeRGB, root, mode === 'dark' ? darkTheme : defaultTheme);
         root.dataset.theme = definition.name;
         root.removeAttribute('data-season');
@@ -669,6 +675,9 @@ export function ThemeProvider({
           } else {
             root.removeAttribute('data-season');
           }
+        } else if (isDarkBlack) {
+          root.dataset.theme = 'dark-black';
+          root.removeAttribute('data-season');
         } else {
           root.removeAttribute('data-theme');
           root.removeAttribute('data-season');

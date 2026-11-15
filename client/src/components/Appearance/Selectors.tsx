@@ -24,6 +24,7 @@ export const ThemeSelector = ({
   const themeOptions = [
     { value: 'satchida-dark', label: localize('com_nav_theme_satchida_dark') },
     { value: 'satchida-light', label: localize('com_nav_theme_satchida_light') },
+    { value: 'dark-black', label: localize('com_nav_theme_dark_black') },
     { value: 'dark', label: localize('com_nav_theme_dark') },
     { value: 'light', label: localize('com_nav_theme_light') },
     { value: 'system', label: localize('com_nav_theme_system') },

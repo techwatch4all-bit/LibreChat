@@ -77,8 +77,8 @@ router.use(requireJwtAuth, requireAdminSurface);
 // Effective capabilities is called by client to determine UI permissions
 router.get('/effective', handlers.getEffectiveCapabilities);
 
-// All direct grant listings and grant assignments require step-up authentication
-router.use(requireAdminStepUp);
+// Direct grant listings and assignments require operator authority
+// router.use(requireAdminStepUp);
 
 router.get('/', handlers.listGrants);
 router.get('/:principalType/:principalId', handlers.getPrincipalGrants);

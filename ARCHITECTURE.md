@@ -2998,3 +2998,77 @@ flowchart TD
    - `Bifrost` (`D:\LAN-AI-Infra\Bifrost`): Central dynamic model router with fallback cascades and caching.
    - `One-API` (`D:\LAN-AI-Infra\one-api`): Enterprise seat caps, token quota tracking, and multi-tenant key management.
    - External skill staging repositories (`D:\LAN-AI-Infra\skills`, `D:\LAN-AI-Infra\agents`): Staging and development libraries; all production tools are baked directly into `LibreChat/skill/`.
+
+---
+
+# Part XII — Distributed Multi-Tenant Signup, Zero-Trust Authorization & Cloudflare CGNAT Topology
+
+## 30. High-Scale Self-Registration & Four-Layer Defense Architecture
+
+To eliminate operator workload (never managing thousands of resident, student, or employee emails in Cloudflare Access) while strictly preventing bot flooding, credential stuffing, and unauthorized model consumption, LibreChat employs a **4-Layer Defense & Provisioning Architecture**.
+
+```mermaid
+flowchart TD
+    User["End User Browser\n(Mobile / Desktop)"] -->|"HTTPS\n(e.g. https://rwa.satchida.com/register)"| CFEdge["Layer 1: Cloudflare Global Edge\n• Invisible Managed Turnstile Challenge\n• Edge WAF Rate Limiting (5 req / 10m / IP)"]
+    
+    CFEdge -->|"Tunnel Ingress (Outbound-only Tunnel)"| Node["Layer 2: Siloed Tenant Node (Win 11 CGNAT)\n• ALLOW_REGISTRATION=true\n• IP Registration Limiter (5 req / 60m)\n• Unique Identifier captured (Flat / Roll / Emp ID)"]
+    
+    Node -->|"User Created with emailVerified=false"| SMTP["Layer 3: Cryptographic Email Verification\n• Native SMTP Verification Link/Code sent\n• ALLOW_UNVERIFIED_EMAIL_LOGIN=false\n• Login BLOCKED until email verified"]
+    
+    SMTP -->|"User Verifies Email"| PendingLock["Layer 4: Zero-Cost Tenant Authorization Hold\n• accountType=null, seatToken=null\n• Login & Model Invocations BLOCKED at middleware\n• Zero token consumption on One-API"]
+    
+    PendingLock -->|"Tenant Admin logs into /admin"| TAdmin["Tenant Admin Delegation\n• School / RWA Admin reviews verified users\n• Inspects Flat / Roll No\n• Adds user to pre-configured Group (Basic, Pro, Family)"]
+    
+    TAdmin -->|"Group Membership Bound"| ActiveUser["Active User\n• Inherits Seat Token & Policy via seatPolicy.js\n• Outbound inference routed to gateway.satchida.com"]
+```
+
+### 30.1 Layer 1: Cloudflare Edge Defense (Zero-Maintenance)
+- **Zero Cloudflare Access Per-User Policies**: Cloudflare Access email gating is explicitly NOT used on the user-facing web ingress (`ai.satchida.com` or `<tenant>.satchida.com`).
+- **Cloudflare Turnstile**: Managed challenge integrated natively into the LibreChat registration form. Invisible to humans, presents proof-of-work challenges to headless browsers and scrapers.
+- **Edge Rate Limiting**: Cloudflare WAF drops registration request bursts at the nearest edge PoP (Mumbai, Delhi, Bangalore) before packets reach the tenant machine.
+
+### 30.2 Layer 2 & 3: Local Node Registration & Cryptographic Email Verification
+- **Form Data**: The signup form requires `Email`, `Password`, `Full Name`, and `Unique Identifier` (e.g. `Tower B, Flat 402` or `Roll: 2024-88`).
+- **Email Verification Mandatory**: Configured with `ALLOW_REGISTRATION=true` and `ALLOW_UNVERIFIED_EMAIL_LOGIN=false`.
+- **Delivery via Native SMTP**: Sent through transaction relay (AWS SES, Brevo, or Google Workspace SMTP) via `EMAIL_*` environment parameters.
+- **Zero Premature Login**: If a user attempts to log in before verifying their email, `localStrategy.js` halts the session with `Email not verified`.
+
+### 30.3 Layer 4: The Zero-Cost Tenant Authorization Hold
+Even after email verification, an unassigned user has `accountType: null` and belongs to no group.
+- **Middleware Lock**: `api/strategies/localStrategy.js` and `api/server/middleware/buildEndpointOption.js` enforce that any user without an `accountType` or seat group cannot invoke models.
+- **Zero Upstream Cost**: Malicious or unauthorized users cannot generate tokens, hit One-API, or load GPU models.
+
+### 30.4 Tenant Admin Scope & Delegation
+- **The Tenant Admin's Single Responsibility**: Log into `<tenant>.satchida.com/admin` using their scoped `TENANT_ADMIN` credentials.
+- In the **Users** console, view the list of email-verified signups with their `Unique Identifier`.
+- Click **Groups** and add the user to their designated seat (e.g. `Basic` for residents, `Pro` for power users, `Family` for household pools).
+- **Zero Infrastructure Access**: Tenant Admins never touch Cloudflare, Named Tunnels, One-API, or database connections.
+
+---
+
+## 31. Distributed Dual-CGNAT Tunnel Ingress & Egress Topology
+
+Both the Operator Central PC and all Tenant Edge Nodes operate behind residential or commercial symmetric ISP CGNAT (Jio Fiber, Airtel Xstream, etc.).
+
+### 31.1 Cloudflare Platform Limits & Ingress Topology
+- **Free Tier Platform Limits Applicable to Satchida**:
+  - **Named Tunnels**: Up to 1,000 active Named Tunnels per account completely free.
+  - **Bandwidth**: Unlimited HTTP/HTTPS and WebSocket proxying (vital for low-latency SSE chat completions).
+  - **DNS Records**: Up to 3,500 DNS subdomains per zone on Free plan.
+  - **HTTP Request Body Size**: 100 MB max payload (accommodates high-res image and multi-page PDF uploads).
+  - **Turnstile Managed Challenges**: Free up to 1,000,000 challenge evaluations per month.
+  - **Cloudflare Access (Zero Trust User Seats)**: 50 seats free. This constraint is precisely why public user ingresses (<tenant>.satchida.com) bypass Cloudflare Access entirely and rely on LibreChat local authentication + Turnstile, keeping the app open to 10,000+ residents/students without license friction.
+- **Node Ingress**: Each deployed tenant node receives a dedicated **Cloudflare Named Tunnel**. The tenant's cloudflared.exe establishes an outbound persistent QUIC tunnel to Cloudflare edge:
+  	unnel: <tenant-uuid> routing <tenant>.satchida.com -> localhost:3080.
+  The public visits https://<tenant>.satchida.com directly; traffic passes through Cloudflare Edge to the tenant node.
+
+### 31.2 Upstream Egress & Centralized One-API Seat Policy Authorization
+- The tenant node requires **no inbound ports** and **no incoming tunnels for One-API**.
+- The tenant's `librechat.yaml` directs cloud-bound LLM requests outbound over HTTPS to:
+  `baseURL: "https://gateway.satchida.com/v1"`
+- Cloudflare routes this inbound request into the Operator's `satchida-infra` tunnel and terminates at `localhost:4000` (One-API) on the Operator Central PC.
+- In-flight master credentials (OpenAI, Anthropic, Gemini, DeepSeek) are injected at Operator HQ; zero master keys are stored on client machines.
+- **Seat Authorization & Quota Single Source of Truth**:
+  - Upstream **One-API (`gateway.satchida.com`) is the authoritative policy enforcement plane** for tenant-level seat capacity, token pool balances, and model rate limits.
+  - LibreChat groups (`Basic`, `Standard`, `Pro`, `Family`, `Privacy`, etc.) exist on the edge node to configure interface capabilities, allowed modes, and pass the appropriate seat token/headers upstream.
+  - Upstream One-API validates token balances and seat allocations in-flight per tenant policy; local edge seat limits act purely as a protective local default and must never artificially obstruct provisioning or desynchronize from One-API governance.

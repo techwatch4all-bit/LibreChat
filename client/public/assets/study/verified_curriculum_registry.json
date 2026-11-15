@@ -1,7 +1,15 @@
 {
   "verification_policy": {
     "language": "EN_ONLY",
-    "strict_rejection": ["ar", "ru", "zh", "fa", "ko", "ja", "multilingual_switch"],
+    "strict_rejection": [
+      "ar",
+      "ru",
+      "zh",
+      "fa",
+      "ko",
+      "ja",
+      "multilingual_switch"
+    ],
     "video_embed_verification": "YouTube oEmbed 200 OK required",
     "local_media_hosting": "/assets/study/media/"
   },
@@ -96,6 +104,20 @@
           "thumbnail": "https://i.ytimg.com/vi/ljRlB6TuMOU/hqdefault.jpg"
         }
       ]
+    },
+    "frequency_and_phase_modulation": {
+      "title": "Frequency Modulation (FM) vs Phase Modulation (PM)",
+      "animated_diagram": "/assets/study/media/6012_radio-frequency-modulation-300x72.gif",
+      "scientific_diagram": "/assets/study/media/am_and_fm_signal_modulation.png",
+      "phase_diagram": "/assets/study/media/illustration_of_phase_modulation.png",
+      "verified_videos": [
+        {
+          "id": "grgW9_frLIA",
+          "title": "Frequency Modulation vs Phase modulation",
+          "thumbnail": "https://i.ytimg.com/vi/grgW9_frLIA/hqdefault.jpg"
+        }
+      ],
+      "interactive_sim": "/assets/study/sims/wave-on-a-string.html"
     }
   }
 }

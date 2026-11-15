@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/extend-expect';
 import { Provider } from 'jotai';
+import { RecoilRoot } from 'recoil';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { Constants, Tools } from 'librechat-data-provider';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
@@ -8,6 +10,10 @@ import Breakdown from './Breakdown';
 
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) => key,
+}));
+
+jest.mock('~/data-provider', () => ({
+  useGetUserUsageStats: () => ({ data: undefined, isLoading: false }),
 }));
 
 const view = {

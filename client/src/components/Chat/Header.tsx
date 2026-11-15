@@ -14,10 +14,13 @@ import { BackgroundTasksButton } from './BackgroundTasks';
 import { TraceButton, useTraceControl } from './Trace';
 import { useGetStartupConfig } from '~/data-provider';
 import ExportAndShareMenu from './ExportAndShareMenu';
+import HeaderAudioSpeaker from './HeaderAudioSpeaker';
 import SubagentThreadLink from './SubagentThreadLink';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import AddMultiConvo from './AddMultiConvo';
 import { useHasAccess } from '~/hooks';
+import { useChatContext } from '~/Providers';
+import TokenUsage from './Input/TokenUsage';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -39,6 +42,7 @@ function Header({
   const { data: startupConfig } = useGetStartupConfig();
   const navVisible = useRecoilValue(store.sidebarExpanded);
   const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
+  const { conversation, index = 0 } = useChatContext() ?? {};
 
   /** The mobile row only offers a new chat when there is one to leave. Read
    *  from the route rather than the context conversation, which still holds the
@@ -124,6 +128,14 @@ function Header({
         <HeaderMenu startupConfig={startupConfig} trace={trace} className="md:hidden" />
         <div className="hidden items-center gap-2 md:flex">
           {trace.show && <TraceButton onClick={trace.open} />}
+          <TokenUsage
+            index={index}
+            conversation={conversation}
+            isSubmitting={isSubmitting}
+            placement="bottom"
+            alwaysShow={true}
+          />
+          <HeaderAudioSpeaker />
           <ExportAndShareMenu isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false} />
           {hasAccessToTemporaryChat === true && <TemporaryChat />}
         </div>

@@ -134,7 +134,7 @@ export default function useExportConversation({
     });
   };
 
-  const exportMarkdown = async () => {
+  const buildMarkdownData = async () => {
     let data =
       '# Conversation\n' +
       `- conversationId: ${conversation?.conversationId}\n` +
@@ -180,13 +180,137 @@ export default function useExportConversation({
         data += '*(This is an unfinished message)*\n';
       }
     }
+    return data;
+  };
 
+  const exportMarkdown = async () => {
+    const data = await buildMarkdownData();
     exportFromJSON({
       data: data,
       fileName: filename,
       extension: 'md',
       exportType: exportFromJSON.types.txt,
     });
+  };
+
+  const exportHTML = async () => {
+    const md = await buildMarkdownData();
+    const title = conversation?.title ?? 'Conversation Export';
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2937; background: #f9fafb; margin: 0; padding: 2rem; }
+  .container { max-width: 860px; margin: 0 auto; background: #ffffff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
+  h1, h2, h3 { color: #111827; }
+  h1 { border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+  h2 { border-bottom: 1px solid #e5e7eb; padding-bottom: 0.3rem; margin-top: 1.5rem; }
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9em; }
+  img { max-width: 100%; border-radius: 8px; margin: 1rem 0; }
+  blockquote { border-left: 4px solid #3b82f6; margin: 1rem 0; padding-left: 1rem; color: #4b5563; }
+  details { background: #f3f4f6; border-radius: 6px; padding: 0.75rem; margin: 1rem 0; }
+  summary { font-weight: 600; cursor: pointer; }
+  @media print { body { background: white; padding: 0; } .container { box-shadow: none; padding: 0; } }
+</style>
+<script src="${window.location.origin}/assets/vendor/marked-15.0.12.min.js"></script>
+</head>
+<body>
+<div class="container" id="content"></div>
+<script>
+  if (typeof marked !== 'undefined') {
+    document.getElementById('content').innerHTML = marked.parse(${JSON.stringify(md)});
+  } else {
+    document.getElementById('content').innerText = ${JSON.stringify(md)};
+  }
+</script>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    download(blob, `${filename}.html`, 'text/html');
+  };
+
+  const exportDoc = async () => {
+    const md = await buildMarkdownData();
+    const title = conversation?.title ?? 'Conversation';
+    const docHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; }
+  h1 { font-size: 20pt; color: #1e3a8a; border-bottom: 2pt solid #1e3a8a; padding-bottom: 4pt; margin-bottom: 12pt; }
+  h2 { font-size: 14pt; color: #1e40af; border-bottom: 1pt solid #cbd5e1; padding-bottom: 2pt; margin-top: 14pt; }
+  h3 { font-size: 12pt; color: #1e293b; }
+  pre { background-color: #f1f5f9; padding: 8pt; border: 1pt solid #cbd5e1; font-family: Consolas, monospace; font-size: 9.5pt; }
+  blockquote { border-left: 3pt solid #3b82f6; margin-left: 0; padding-left: 10pt; color: #475569; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10pt; }
+  th, td { border: 1pt solid #cbd5e1; padding: 6pt; text-align: left; }
+  th { background-color: #f8fafc; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <p><em>Exported on ${new Date().toLocaleString()}</em></p>
+  <hr/>
+  <div style="white-space: pre-wrap; font-family: Calibri, sans-serif;">
+${md.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([docHtml], { type: 'application/msword;charset=utf-8' });
+    download(blob, `${filename}.doc`, 'application/msword');
+  };
+
+  const exportPDF = async () => {
+    const md = await buildMarkdownData();
+    const title = conversation?.title ?? 'Conversation';
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      exportHTML();
+      return;
+    }
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>${title}</title>
+<meta charset="utf-8">
+<style>
+  @page { margin: 1.5cm; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; }
+  h1 { font-size: 18pt; border-bottom: 2px solid #2563eb; padding-bottom: 4px; color: #1e3a8a; }
+  h2 { font-size: 14pt; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; margin-top: 16px; color: #1d4ed8; }
+  pre { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px; border-radius: 4px; font-size: 9.5pt; white-space: pre-wrap; }
+  code { font-family: monospace; }
+  img { max-width: 100%; height: auto; }
+</style>
+<script src="${window.location.origin}/assets/vendor/marked-15.0.12.min.js"></script>
+</head>
+<body>
+<div id="content"></div>
+<script>
+  function render() {
+    if (typeof marked !== 'undefined') {
+      document.getElementById('content').innerHTML = marked.parse(${JSON.stringify(md)});
+    } else {
+      document.getElementById('content').innerText = ${JSON.stringify(md)};
+    }
+    setTimeout(() => {
+      window.print();
+    }, 500);
+  }
+  if (document.readyState === 'complete') {
+    render();
+  } else {
+    window.onload = render;
+  }
+</script>
+</body>
+</html>`);
+    printWindow.document.close();
   };
 
   const exportText = async () => {
@@ -282,13 +406,19 @@ export default function useExportConversation({
   const exportConversation = () => {
     if (type === 'json') {
       exportJSON();
-    } else if (type == 'text') {
+    } else if (type === 'text') {
       exportText();
-    } else if (type == 'markdown') {
+    } else if (type === 'markdown') {
       exportMarkdown();
-    } else if (type == 'csv') {
+    } else if (type === 'html') {
+      exportHTML();
+    } else if (type === 'doc') {
+      exportDoc();
+    } else if (type === 'pdf') {
+      exportPDF();
+    } else if (type === 'csv') {
       exportCSV();
-    } else if (type == 'screenshot') {
+    } else if (type === 'screenshot') {
       exportScreenshot();
     }
   };

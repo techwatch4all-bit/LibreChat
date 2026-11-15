@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, RefreshCw, BarChart2 } from 'lucide-react';
+import { Calendar, RefreshCw } from 'lucide-react';
 import { useGetUserUsageStats } from '~/data-provider';
+import { formatTokens } from '~/utils';
 import { useLocalize } from '~/hooks';
 
-type PresetRange = 'today' | 'week' | 'month' | 'quarter' | 'custom';
+type PresetRange = 'today' | 'week' | 'month' | 'quarter' | 'all' | 'custom';
 
 export default function UsageAnalytics() {
   const localize = useLocalize();
@@ -31,17 +32,23 @@ export default function UsageAnalytics() {
 
     if (preset === 'today') {
       start.setHours(0, 0, 0, 0);
-    } else if (preset === 'week') {
-      start.setDate(now.getDate() - 7);
-    } else if (preset === 'month') {
-      start.setDate(now.getDate() - 30);
-    } else if (preset === 'quarter') {
-      start.setDate(now.getDate() - 90);
-    }
-
-    if (preset !== 'custom') {
       setStartDate(start.toISOString().split('T')[0]);
       setEndDate(now.toISOString().split('T')[0]);
+    } else if (preset === 'week') {
+      start.setDate(now.getDate() - 7);
+      setStartDate(start.toISOString().split('T')[0]);
+      setEndDate(now.toISOString().split('T')[0]);
+    } else if (preset === 'month') {
+      start.setDate(now.getDate() - 30);
+      setStartDate(start.toISOString().split('T')[0]);
+      setEndDate(now.toISOString().split('T')[0]);
+    } else if (preset === 'quarter') {
+      start.setDate(now.getDate() - 90);
+      setStartDate(start.toISOString().split('T')[0]);
+      setEndDate(now.toISOString().split('T')[0]);
+    } else if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
     }
   };
 
@@ -54,7 +61,12 @@ export default function UsageAnalytics() {
 
   const { data: stats, isLoading, refetch, isFetching } = useGetUserUsageStats(queryParams);
 
-  const formatNumber = (num?: number) => {
+  const formatDisplay = (num?: number) => {
+    if (num == null) return '0';
+    return formatTokens(num);
+  };
+
+  const formatRaw = (num?: number) => {
     if (num == null) return '0';
     return num.toLocaleString();
   };
@@ -108,6 +120,17 @@ export default function UsageAnalytics() {
           >
             Last 90 Days
           </button>
+          <button
+            type="button"
+            onClick={() => setPreset('all')}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              activePreset === 'all'
+                ? 'bg-primary text-white'
+                : 'bg-surface-tertiary text-text-secondary hover:bg-surface-secondary'
+            }`}
+          >
+            All Time
+          </button>
         </div>
 
         <button
@@ -159,8 +182,13 @@ export default function UsageAnalytics() {
         {/* Total Tokens */}
         <div className="rounded-lg border border-border-light bg-surface-tertiary/40 p-3">
           <div className="text-xs text-text-tertiary font-medium">Total Tokens</div>
-          <div className="mt-1 text-lg font-bold text-text-primary">
-            {isLoading ? '...' : formatNumber(stats?.totalTokens)}
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-lg font-bold text-text-primary">
+              {isLoading ? '...' : formatDisplay(stats?.totalTokens)}
+            </span>
+            {stats?.totalTokens != null && stats.totalTokens >= 1000 && (
+              <span className="text-[11px] text-text-tertiary">({formatRaw(stats.totalTokens)})</span>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-text-secondary">
             {stats?.transactionCount ?? 0} total requests
@@ -170,8 +198,13 @@ export default function UsageAnalytics() {
         {/* Input Tokens */}
         <div className="rounded-lg border border-border-light bg-surface-tertiary/40 p-3">
           <div className="text-xs text-text-tertiary font-medium">Input (Prompt)</div>
-          <div className="mt-1 text-lg font-bold text-blue-500">
-            {isLoading ? '...' : formatNumber(stats?.inputTokens)}
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-lg font-bold text-blue-500">
+              {isLoading ? '...' : formatDisplay(stats?.inputTokens)}
+            </span>
+            {stats?.inputTokens != null && stats.inputTokens >= 1000 && (
+              <span className="text-[11px] text-text-tertiary">({formatRaw(stats.inputTokens)})</span>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-text-secondary">Sent to model</div>
         </div>
@@ -179,8 +212,13 @@ export default function UsageAnalytics() {
         {/* Output Tokens */}
         <div className="rounded-lg border border-border-light bg-surface-tertiary/40 p-3">
           <div className="text-xs text-text-tertiary font-medium">Output (Response)</div>
-          <div className="mt-1 text-lg font-bold text-green-500">
-            {isLoading ? '...' : formatNumber(stats?.outputTokens)}
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-lg font-bold text-green-500">
+              {isLoading ? '...' : formatDisplay(stats?.outputTokens)}
+            </span>
+            {stats?.outputTokens != null && stats.outputTokens >= 1000 && (
+              <span className="text-[11px] text-text-tertiary">({formatRaw(stats.outputTokens)})</span>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-text-secondary">Generated reply</div>
         </div>
@@ -188,8 +226,13 @@ export default function UsageAnalytics() {
         {/* Cached Read Tokens */}
         <div className="rounded-lg border border-border-light bg-surface-tertiary/40 p-3">
           <div className="text-xs text-text-tertiary font-medium">Cached Read</div>
-          <div className="mt-1 text-lg font-bold text-purple-500">
-            {isLoading ? '...' : formatNumber(stats?.cacheRead)}
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-lg font-bold text-purple-500">
+              {isLoading ? '...' : formatDisplay(stats?.cacheRead)}
+            </span>
+            {stats?.cacheRead != null && stats.cacheRead >= 1000 && (
+              <span className="text-[11px] text-text-tertiary">({formatRaw(stats.cacheRead)})</span>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-text-secondary">Discounted cache</div>
         </div>

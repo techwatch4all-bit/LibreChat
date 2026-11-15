@@ -251,6 +251,7 @@ export type AdminUserListItem = {
   id: string;
   name: string;
   username: string;
+  uniqueIdentifier?: string | null;
   email: string;
   avatar: string;
   role: string;

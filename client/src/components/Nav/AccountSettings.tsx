@@ -139,6 +139,13 @@ function ThemeSubmenu() {
           Standard
         </div>
         <Menu.MenuItem
+          onClick={() => setTheme('dark-black')}
+          className="select-item flex items-center justify-between text-sm"
+        >
+          <span>{localize('com_nav_theme_dark_black')}</span>
+          {theme === 'dark-black' && <Check className="h-4 w-4 text-text-primary" aria-hidden="true" />}
+        </Menu.MenuItem>
+        <Menu.MenuItem
           onClick={() => setTheme('dark')}
           className="select-item flex items-center justify-between text-sm"
         >

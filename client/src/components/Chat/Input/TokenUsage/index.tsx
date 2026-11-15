@@ -17,6 +17,8 @@ interface TokenUsageProps {
   index: number;
   conversation: TConversation | null;
   isSubmitting: boolean;
+  placement?: 'top' | 'bottom' | 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
+  alwaysShow?: boolean;
 }
 
 /** Hover pacing: a brief intent delay so sweeping past the gauge doesn't pop
@@ -28,6 +30,8 @@ function TokenUsageIndicator({
   index,
   conversation,
   isSubmitting,
+  placement = 'top',
+  alwaysShow = false,
   showCost,
   currency,
   langfuseConnectionAccess,
@@ -44,7 +48,7 @@ function TokenUsageIndicator({
    *  in-flight state the moment the pointer leaves. */
   const compaction = useCompactConversation();
   const compactionAvailable = compactionEnabled && supportsCompaction(conversation?.endpoint);
-  const popover = Ariakit.usePopoverStore({ placement: 'top' });
+  const popover = Ariakit.usePopoverStore({ placement });
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
   const disclosureRef = useRef<HTMLButtonElement>(null);
   const conversationId = conversation?.conversationId ?? '';
@@ -127,8 +131,8 @@ function TokenUsageIndicator({
   );
 
   /** Hide until the branch has data — keeps a fresh, message-less chat clean and
-   *  lets the indicator animate into view once the first tokens land. */
-  if (view.usedTokens <= 0) {
+   *  lets the indicator animate into view once the first tokens land (unless alwaysShow is true). */
+  if (!alwaysShow && view.usedTokens <= 0) {
     return null;
   }
 

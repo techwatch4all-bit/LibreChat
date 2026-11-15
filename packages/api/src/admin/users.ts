@@ -157,7 +157,7 @@ function firstString(...values: unknown[]): string | null {
 }
 
 const USER_LIST_FIELDS =
-  '_id name username email avatar role provider createdAt updatedAt ' +
+  '_id name username uniqueIdentifier email avatar role provider createdAt updatedAt ' +
   'tenantId accountType familyAccountId familyRole mustChangePassword seatToken suspended dailyMessageLimit assignedKnowledgeVaults';
 
 /**
@@ -437,6 +437,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       id: u._id?.toString() ?? '',
       name: u.name ?? '',
       username: u.username ?? '',
+      uniqueIdentifier: u.uniqueIdentifier ?? null,
       email: u.email ?? '',
       avatar: u.avatar ?? '',
       role: u.role ?? SystemRoles.USER,
@@ -737,11 +738,16 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           : email.split('@')[0];
       const role =
         typeof body.role === 'string' && body.role.trim() ? body.role.trim() : SystemRoles.USER;
+      const uniqueIdentifier =
+        typeof body.uniqueIdentifier === 'string' && body.uniqueIdentifier.trim()
+          ? body.uniqueIdentifier.trim()
+          : null;
 
       const created = await createUserRecord({
         email,
         name,
         username,
+        uniqueIdentifier,
         password,
         emailVerified: true,
         provider: 'local',
@@ -1178,6 +1184,12 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           return res.status(400).json({ error: 'Invalid role' });
         }
         update.role = body.role.trim();
+      }
+      if (body.uniqueIdentifier !== undefined) {
+        update.uniqueIdentifier =
+          typeof body.uniqueIdentifier === 'string' && body.uniqueIdentifier.trim()
+            ? body.uniqueIdentifier.trim()
+            : null;
       }
       if (body.mustChangePassword !== undefined) {
         if (typeof body.mustChangePassword !== 'boolean') {

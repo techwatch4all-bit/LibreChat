@@ -15,6 +15,9 @@ import { normalizeExportFilename } from '~/utils';
 
 const TYPE_OPTIONS = [
   { value: 'markdown', label: 'markdown (.md)' },
+  { value: 'html', label: 'HTML webpage (.html)' },
+  { value: 'doc', label: 'Word document (.doc)' },
+  { value: 'pdf', label: 'PDF document (.pdf)' },
   { value: 'text', label: 'text (.txt)' },
   { value: 'json', label: 'json (.json)' },
   { value: 'csv', label: 'csv (.csv)' },

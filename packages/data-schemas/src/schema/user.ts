@@ -33,6 +33,11 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       lowercase: true,
       default: '',
     },
+    uniqueIdentifier: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     email: {
       type: String,
       required: [true, "can't be blank"],

@@ -3,32 +3,38 @@
   "mcpServers": {
     "filesystem": {
       "type": "stdio",
-      "command": "npx.cmd",
+      "command": "node",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem@2026.8.31",
-        "${PLUGIN_DATA}/workspace"
+        "C:/Users/WinDiesel/AppData/Roaming/npm/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+        "D:/LAN-AI-Infra/SharedDocs"
       ],
       "env": {}
     },
     "memory": {
       "type": "stdio",
-      "command": "npx.cmd",
-      "args": ["-y", "@modelcontextprotocol/server-memory@2026.8.31"],
+      "command": "node",
+      "args": [
+        "C:/Users/WinDiesel/AppData/Roaming/npm/node_modules/@modelcontextprotocol/server-memory/dist/index.js"
+      ],
       "env": {
-        "MEMORY_FILE_PATH": "${PLUGIN_DATA}/memory/knowledge-graph.json"
+        "MEMORY_FILE_PATH": "/memory/knowledge-graph.json"
       }
     },
     "sequential-thinking": {
       "type": "stdio",
-      "command": "npx.cmd",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@2026.8.31"],
+      "command": "node",
+      "args": [
+        "C:/Users/WinDiesel/AppData/Roaming/npm/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"
+      ],
       "env": {}
     },
     "playwright": {
       "type": "stdio",
-      "command": "npx.cmd",
-      "args": ["-y", "@playwright/mcp@0.0.83", "--isolated"],
+      "command": "node",
+      "args": [
+        "C:/Users/WinDiesel/AppData/Roaming/npm/node_modules/@playwright/mcp/cli.js",
+        "--isolated"
+      ],
       "env": {}
     },
     "context7": {

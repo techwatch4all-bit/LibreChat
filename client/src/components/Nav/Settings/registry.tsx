@@ -748,7 +748,7 @@ export const registry: SettingEntry[] = [
     tab: ACCOUNT,
     section: 'billing',
     labelKey: 'com_ui_settings_label_usage_analytics',
-    show: (ctx) => ctx.balanceEnabled,
+    show: () => true,
     Component: UserUsageAnalytics,
   },
   // Account · Danger zone

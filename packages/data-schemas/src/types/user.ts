@@ -151,6 +151,7 @@ export interface CreateUserRequest extends Partial<IUser> {
 export interface UpdateUserRequest {
   name?: string;
   username?: string;
+  uniqueIdentifier?: string | null;
   email?: string;
   role?: string;
   emailVerified?: boolean;

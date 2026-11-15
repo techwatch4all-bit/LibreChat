@@ -1,6 +1,6 @@
 import { Fragment, useId, useMemo, useState } from 'react';
 import { useAtom } from 'jotai';
-import { ChevronDown, ExternalLink, Info, TriangleAlert } from 'lucide-react';
+import { ChevronDown, ExternalLink, Info, TriangleAlert, Activity } from 'lucide-react';
 import {
   Button,
   HoverCard,
@@ -18,6 +18,7 @@ import type { TokenUsageView } from '~/hooks/Chat/useTokenUsage';
 import type { CurrencyConfig } from '~/utils';
 import { groupToolTokens, formatTokens, formatCost, normalizeTokenCount, cn } from '~/utils';
 import { contextBreakdownExpandedAtom } from '~/store/usage';
+import { useGetUserUsageStats } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 
 interface RowProps {
@@ -156,6 +157,14 @@ export default function Breakdown({
     normalizeTokenCount(view.subagentUsage?.output) +
     normalizeTokenCount(view.subagentUsage?.cacheRead) +
     normalizeTokenCount(view.subagentUsage?.cacheWrite);
+
+  // Billing / Account Usage Analytics integration
+  const thirtyDaysAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString();
+  }, []);
+  const { data: billingStats } = useGetUserUsageStats({ startDate: thirtyDaysAgo });
 
   const breakdown = snapshotActive ? snapshot?.breakdown : undefined;
   const instructionTokens = normalizeTokenCount(
@@ -665,6 +674,28 @@ export default function Breakdown({
                         {formatCost(view.totalCost, currency)}
                       </span>
                     </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {billingStats && billingStats.totalTokens > 0 && (
+              <>
+                <div className="border-t border-border-light" role="separator" />
+                <div className="space-y-1.5" data-testid="token-usage-account-billing">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                      <Activity className="size-3 text-primary" />
+                      Account Billing (30D)
+                    </span>
+                    <span className="text-xs font-bold text-primary">
+                      {formatTokens(billingStats.totalTokens)}
+                    </span>
+                  </div>
+                  <Row label={localize('com_ui_input')} value={billingStats.inputTokens} />
+                  <Row label={localize('com_ui_output')} value={billingStats.outputTokens} />
+                  {billingStats.cacheRead > 0 && (
+                    <Row label={localize('com_ui_cache_read')} value={billingStats.cacheRead} />
                   )}
                 </div>
               </>

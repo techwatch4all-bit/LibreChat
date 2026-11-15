@@ -89,6 +89,16 @@ export default function LandingThemeSelector() {
             Standard Themes
           </div>
           <Menu.MenuItem
+            onClick={() => setTheme('dark-black')}
+            className="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:bg-surface-tertiary/70"
+          >
+            <span className="flex items-center gap-2">
+              <Moon className="h-3.5 w-3.5 text-zinc-100" />
+              {localize('com_nav_theme_dark_black')}
+            </span>
+            {theme === 'dark-black' && <Check className="h-3.5 w-3.5 text-accent-primary" />}
+          </Menu.MenuItem>
+          <Menu.MenuItem
             onClick={() => setTheme('dark')}
             className="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:bg-surface-tertiary/70"
           >

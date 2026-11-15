@@ -40,7 +40,7 @@ except ImportError:
 
 try:
     from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 except ImportError:
@@ -1088,6 +1088,72 @@ def fetch_web_content(url: str, max_chars: int = 4000) -> str:
 # HELPER GENERATORS FOR DOCUMENT CREATION (EXECUTIVE MULTI-ARCHETYPE ENGINE)
 # ============================================================================
 
+
+def _resolve_image_flowable(src: str, max_w: float = 516.0, max_h: float = 280.0):
+    """Resolves local public assets, downloaded media, or files to a scaled ReportLab Image flowable."""
+    import os
+    from PIL import Image as PILImage
+    
+    clean_src = src.strip()
+    disk_path = None
+    if clean_src.startswith('/assets/'):
+        base_dir = 'D:/LAN-AI-Infra/LibreChat/client/public'
+        rel = clean_src.lstrip('/')
+        disk_path = os.path.join(base_dir, rel.replace('/', os.sep))
+    elif os.path.exists(clean_src):
+        disk_path = clean_src
+        
+    if disk_path and os.path.exists(disk_path):
+        ext = os.path.splitext(disk_path)[1].lower()
+        if ext in ['.png', '.jpg', '.jpeg']:
+            try:
+                with PILImage.open(disk_path) as im:
+                    w, h = im.size
+                scale = min(1.0, max_w / float(w), max_h / float(h))
+                return RLImage(disk_path, width=w * scale, height=h * scale)
+            except Exception:
+                pass
+        elif ext == '.gif':
+            try:
+                with PILImage.open(disk_path) as im:
+                    im.seek(0)
+                    temp_png = disk_path + '.frame0.png'
+                    im.convert('RGB').save(temp_png)
+                    w, h = im.size
+                scale = min(1.0, max_w / float(w), max_h / float(h))
+                return RLImage(temp_png, width=w * scale, height=h * scale)
+            except Exception:
+                pass
+    return None
+
+def _resolve_image_for_docx(src: str):
+    """Resolves local public assets or media files to a valid image path for python-docx."""
+    import os
+    from PIL import Image as PILImage
+    clean_src = src.strip()
+    disk_path = None
+    if clean_src.startswith('/assets/'):
+        base_dir = 'D:/LAN-AI-Infra/LibreChat/client/public'
+        rel = clean_src.lstrip('/')
+        disk_path = os.path.join(base_dir, rel.replace('/', os.sep))
+    elif os.path.exists(clean_src):
+        disk_path = clean_src
+        
+    if disk_path and os.path.exists(disk_path):
+        ext = os.path.splitext(disk_path)[1].lower()
+        if ext in ['.png', '.jpg', '.jpeg']:
+            return disk_path
+        elif ext == '.gif':
+            try:
+                with PILImage.open(disk_path) as im:
+                    im.seek(0)
+                    temp_png = disk_path + '.frame0.png'
+                    im.convert('RGB').save(temp_png)
+                return temp_png
+            except Exception:
+                pass
+    return None
+
 def _generate_pdf(path: str, title: str, content: str, author: str = "Satchida Sovereign Platform"):
     """
     Renders publication-grade PDF documents with executive header banner,
@@ -1238,6 +1304,31 @@ def _generate_pdf(path: str, title: str, content: str, author: str = "Satchida S
             i += 1
             continue
 
+        # Markdown Image Detection: ![Caption](path)
+        img_match = re.search(r'!\[(.*?)\]\(([^\)\r\n]+)\)', line)
+        if img_match:
+            img_caption = img_match.group(1).strip()
+            img_src = img_match.group(2).strip()
+            img_flowable = _resolve_image_flowable(img_src)
+            if img_flowable:
+                elements.append(Spacer(1, 6))
+                elements.append(img_flowable)
+                if img_caption:
+                    caption_style = ParagraphStyle(
+                        'ImgCaption',
+                        parent=meta_style,
+                        fontSize=8.5,
+                        alignment=1, # Center
+                        textColor=colors.HexColor('#64748B'),
+                        spaceBefore=3,
+                        spaceAfter=8
+                    )
+                    elements.append(Paragraph(f"<i>Figure: {img_caption}</i>", caption_style))
+                else:
+                    elements.append(Spacer(1, 6))
+                i += 1
+                continue
+
         # Headings & Bullets
         if line.startswith("# "):
             elements.append(Paragraph(line[2:], h1_style))
@@ -1324,6 +1415,28 @@ def _generate_docx(path: str, title: str, content: str, author: str = "Satchida 
                                 cell._tc.get_or_add_tcPr().append(shd)
                 doc.add_paragraph()
             continue
+
+        # Image detection
+        img_match = re.search(r'!\[(.*?)\]\(([^\)\r\n]+)\)', line)
+        if img_match:
+            img_caption = img_match.group(1).strip()
+            img_src = img_match.group(2).strip()
+            docx_img_path = _resolve_image_for_docx(img_src)
+            if docx_img_path:
+                doc.add_paragraph()
+                p_img = doc.add_paragraph()
+                p_img.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+                run_img = p_img.add_run()
+                run_img.add_picture(docx_img_path, width=docx.shared.Inches(5.5))
+                if img_caption:
+                    p_cap = doc.add_paragraph()
+                    p_cap.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+                    r_cap = p_cap.add_run(f"Figure: {img_caption}")
+                    r_cap.font.size = DocxPt(8.5)
+                    r_cap.font.italic = True
+                    r_cap.font.color.rgb = DocxRGBColor(100, 116, 139)
+                i += 1
+                continue
 
         # Headings
         if line.startswith("# "):

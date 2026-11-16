@@ -8,6 +8,15 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
+## 2026-11-16 — Full Backup & Invariant Documentation
+
+- **Repository Backup Archive Created**:
+  - Saved to `D:\LAN-AI-Infra\LibreChat\backup\LibreChat_satchida_backup_20261116_0950.bundle` (273 MB).
+  - Contains complete commit history, branches, and tags up to commit `98d08b6d2` (`feat(admin, auth): fix tab activation, seat tier defaults, first-login claim, and tenant RBAC`).
+  - Recorded backup location invariant in `CONTEXT.md` §4 to enforce that all future backups reside strictly under `D:\LAN-AI-Infra\LibreChat\backup\`.
+
+---
+
 ## 2026-11-16 — Fix Audit Log HTTP 401 & Step-Up Lifecycle Recovery
 
 **Problem.**

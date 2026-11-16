@@ -13,6 +13,7 @@ import { globalAudioId, type TAskFunction } from '~/common';
 import { useChatFormContext } from '~/Providers';
 import store from '~/store';
 import SatchiUpgradeModal from './SatchiUpgradeModal';
+import LiveVoiceModal from './LiveVoiceModal';
 
 const isExternalSTT = (speechToTextEndpoint: string) => speechToTextEndpoint === 'external';
 export default memo(function AudioRecorder({
@@ -34,6 +35,7 @@ export default memo(function AudioRecorder({
   const speechSettingsInitialized = useRecoilValue(store.speechSettingsInitialized);
   const recorderDisabled = disabled || !speechSettingsInitialized;
   const [showVoiceUpgradeModal, setShowVoiceUpgradeModal] = useState(false);
+  const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
 
   const userAccountType = (user?.accountType || '').toLowerCase();
   const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
@@ -165,12 +167,7 @@ export default memo(function AudioRecorder({
           render={
             <button
               type="button"
-              onClick={() => {
-                showToast({
-                  message: 'Satchida Live Voice: Connecting full-duplex conversational session...',
-                  status: 'info',
-                });
-              }}
+              onClick={() => setShowLiveVoiceModal(true)}
               className="relative flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
               aria-label="Satchida Live Voice"
             >
@@ -208,6 +205,15 @@ export default memo(function AudioRecorder({
           open={showVoiceUpgradeModal}
           onOpenChange={setShowVoiceUpgradeModal}
           featureName="voice"
+        />
+      )}
+
+      {showLiveVoiceModal && (
+        <LiveVoiceModal
+          open={showLiveVoiceModal}
+          onOpenChange={setShowLiveVoiceModal}
+          ask={ask}
+          isSubmitting={isSubmitting}
         />
       )}
     </div>

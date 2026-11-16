@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { logger } = require('@librechat/data-schemas');
+const jwt = require('jsonwebtoken');
+const { logger, runAsSystem } = require('@librechat/data-schemas');
 const {
   limiterCache,
   createSetBalanceConfig,
@@ -24,7 +25,7 @@ const {
 const { verify2FAWithTempToken } = require('~/server/controllers/auth/TwoFactorAuthController');
 const { logoutController } = require('~/server/controllers/auth/LogoutController');
 const { loginController } = require('~/server/controllers/auth/LoginController');
-const { findBalanceByUser, upsertBalanceFields } = require('~/models');
+const { findBalanceByUser, upsertBalanceFields, updateUser } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const middleware = require('~/server/middleware');
 
@@ -121,19 +122,67 @@ router.post(
 router.get('/graph-token', middleware.requireJwtAuth, graphTokenController);
 
 /**
+ * Authentication middleware for first-login-claim.
+ * Supports standard Bearer Authorization header and gracefully falls back to
+ * session cookies (token / refreshToken) when fetch is used with credentials: 'include'.
+ */
+const claimAuthMiddleware = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    return middleware.requireJwtAuth(req, res, next);
+  }
+
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded?.id) {
+        req.user = decoded;
+        return next();
+      }
+    } catch {
+      // ignore invalid token and fall back
+    }
+  }
+
+  const refreshToken = req.cookies?.refreshToken;
+  if (refreshToken) {
+    try {
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      if (decoded?.id) {
+        req.user = decoded;
+        return next();
+      }
+    } catch {
+      // ignore invalid refresh token and fall back
+    }
+  }
+
+  return middleware.requireJwtAuth(req, res, next);
+};
+
+/**
  * POST /api/auth/first-login-claim
  * Allows a user provisioned with mustChangePassword: true to submit their new permanent
  * password and challenge question/answer, unlocking their account.
  */
-router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) => {
+router.post('/first-login-claim', claimAuthMiddleware, async (req, res) => {
   try {
     const bcrypt = require('bcryptjs');
     const { currentPassword, newPassword, challengeQuestion, challengeAnswer } = req.body ?? {};
     const userId = req.user?._id || req.user?.id;
 
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Unauthorized',
+        error_code: 'UNAUTHORIZED',
+      });
+    }
+
     if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
       return res.status(400).json({
         error: 'New password must be at least 8 characters long',
+        message: 'New password must be at least 8 characters long',
         error_code: 'WEAK_PASSWORD',
       });
     }
@@ -141,6 +190,7 @@ router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) =>
     if (!challengeQuestion || typeof challengeQuestion !== 'string' || !challengeQuestion.trim()) {
       return res.status(400).json({
         error: 'Security challenge question is required',
+        message: 'Security challenge question is required',
         error_code: 'MISSING_CHALLENGE',
       });
     }
@@ -148,14 +198,17 @@ router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) =>
     if (!challengeAnswer || typeof challengeAnswer !== 'string' || !challengeAnswer.trim()) {
       return res.status(400).json({
         error: 'Security challenge answer is required',
+        message: 'Security challenge answer is required',
         error_code: 'MISSING_CHALLENGE_ANSWER',
       });
     }
 
     // Load full user with password
-    const user = await mongoose.models.User.findById(userId).select('+password');
+    const user = await runAsSystem(() => mongoose.models.User.findById(userId).select('+password'));
     if (!user) {
-      return res.status(404).json({ error: 'User not found', error_code: 'USER_NOT_FOUND' });
+      return res
+        .status(404)
+        .json({ error: 'User not found', message: 'User not found', error_code: 'USER_NOT_FOUND' });
     }
 
     if (currentPassword) {
@@ -163,6 +216,7 @@ router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) =>
       if (!match) {
         return res.status(401).json({
           error: 'Current temporary password is incorrect',
+          message: 'Current temporary password is incorrect',
           error_code: 'INVALID_CREDENTIALS',
         });
       }
@@ -172,12 +226,15 @@ router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) =>
     const newHash = bcrypt.hashSync(newPassword, salt);
     const answerHash = bcrypt.hashSync(challengeAnswer.trim().toLowerCase(), salt);
 
-    user.password = newHash;
-    user.mustChangePassword = false;
-    user.challengeQuestion = challengeQuestion.trim();
-    user.challengeAnswerHash = answerHash;
-    user.passwordChangedAt = new Date();
-    await user.save();
+    await runAsSystem(() =>
+      updateUser(userId.toString(), {
+        password: newHash,
+        mustChangePassword: false,
+        challengeQuestion: challengeQuestion.trim(),
+        challengeAnswerHash: answerHash,
+        passwordChangedAt: new Date(),
+      }),
+    );
 
     logger.info(
       `[auth/first-login-claim] User completed first-login security claim [Id: ${user._id}] [Email: ${user.email}]`,
@@ -189,9 +246,11 @@ router.post('/first-login-claim', middleware.requireJwtAuth, async (req, res) =>
     });
   } catch (err) {
     logger.error('[auth/first-login-claim] Error:', err);
-    return res
-      .status(500)
-      .json({ error: 'Failed to process first-login claim', error_code: 'INTERNAL_ERROR' });
+    return res.status(500).json({
+      error: 'Failed to process first-login claim',
+      message: 'Failed to process first-login claim',
+      error_code: 'INTERNAL_ERROR',
+    });
   }
 });
 

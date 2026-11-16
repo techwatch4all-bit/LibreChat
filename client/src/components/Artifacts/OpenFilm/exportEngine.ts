@@ -64,7 +64,10 @@ export function getSupportedVideoMimeType(): { mimeType: string; extension: 'mp4
  * with standard ObjectURL trigger fallback on iOS Safari/Firefox/Android.
  * ZERO HTTP/network calls are made.
  */
-export async function saveVideoToDisk(blob: Blob, suggestedTitle = 'satchida_motion_video'): Promise<boolean> {
+export async function saveVideoToDisk(
+  blob: Blob,
+  suggestedTitle = 'satchida_motion_video',
+): Promise<boolean> {
   const { extension } = getSupportedVideoMimeType();
   const actualExt = blob.type.includes('mp4') ? 'mp4' : extension;
   const fileName = `${suggestedTitle.replace(/\.[^/.]+$/, '')}.${actualExt}`;
@@ -72,14 +75,16 @@ export async function saveVideoToDisk(blob: Blob, suggestedTitle = 'satchida_mot
   // Desktop Chromium / Edge: Direct native Save dialog
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
     try {
-      const handle = await (window as unknown as {
-        showSaveFilePicker: (options: unknown) => Promise<{
-          createWritable: () => Promise<{
-            write: (data: Blob) => Promise<void>;
-            close: () => Promise<void>;
+      const handle = await (
+        window as unknown as {
+          showSaveFilePicker: (options: unknown) => Promise<{
+            createWritable: () => Promise<{
+              write: (data: Blob) => Promise<void>;
+              close: () => Promise<void>;
+            }>;
           }>;
-        }>;
-      }).showSaveFilePicker({
+        }
+      ).showSaveFilePicker({
         suggestedName: fileName,
         types: [
           {
@@ -167,7 +172,9 @@ export async function renderFilmVideo({
   // Capture stream from canvas
   let stream: MediaStream;
   try {
-    stream = canvas.captureStream ? canvas.captureStream(fps) : (canvas as any).mozCaptureStream(fps);
+    stream = canvas.captureStream
+      ? canvas.captureStream(fps)
+      : (canvas as any).mozCaptureStream(fps);
   } catch (err) {
     throw new Error(`Browser canvas capture stream not supported: ${(err as Error)?.message}`);
   }
@@ -228,6 +235,7 @@ export async function renderFilmVideo({
       // Invoke deterministic frame calculation
       if (contentWin?.film && typeof contentWin.film.frame === 'function') {
         try {
+          contentWin.film._tick = contentWin.film._tick || function () {};
           contentWin.film.frame(t);
         } catch {
           // ignore frame computation errors during render

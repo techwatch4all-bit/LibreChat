@@ -77,8 +77,13 @@ router.use(requireJwtAuth, requireAdminSurface);
 // Effective capabilities is called by client to determine UI permissions
 router.get('/effective', handlers.getEffectiveCapabilities);
 
-// Direct grant listings and assignments require operator authority
-// router.use(requireAdminStepUp);
+/* ─────────────────────────────────────────────────────────────────────
+ * TOTP step-up gate for all sensitive grant operations.
+ * GET /effective above is exempt (safe, non-mutating, used for UI setup).
+ * Everything below (listing, assigning, revoking) requires a valid
+ * step-up token minted by POST /api/admin/step-up after TOTP verification.
+ * ───────────────────────────────────────────────────────────────────── */
+router.use(requireAdminStepUp);
 
 router.get('/', handlers.listGrants);
 router.get('/:principalType/:principalId', handlers.getPrincipalGrants);

@@ -186,30 +186,36 @@ const Modal = (() => {
 })();
 
 function confirmDialog(message) {
-  return Modal.wait(
-    'Confirm action',
-    (b) => {
-      const p = document.createElement('p');
-      p.textContent = message;
-      b.appendChild(p);
-    },
-    (f) => {
-      const cancel = document.createElement('button');
-      cancel.type = 'button';
-      cancel.textContent = 'Cancel';
-      cancel.className = 'btn btn-ghost';
-      cancel.onclick = () => Modal.close();
-      const ok = document.createElement('button');
-      ok.type = 'button';
-      ok.textContent = 'Confirm';
-      ok.className = 'btn btn-primary';
-      ok.onclick = () => {
-        Modal.close();
-      };
-      f.appendChild(cancel);
-      f.appendChild(ok);
-    },
-  );
+  return new Promise((resolve) => {
+    Modal.show(
+      'Confirm action',
+      (b) => {
+        const p = document.createElement('p');
+        p.textContent = message;
+        b.appendChild(p);
+      },
+      (f) => {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.textContent = 'Cancel';
+        cancel.className = 'btn btn-ghost';
+        cancel.onclick = () => {
+          Modal.close();
+          resolve(false);
+        };
+        const ok = document.createElement('button');
+        ok.type = 'button';
+        ok.textContent = 'Confirm';
+        ok.className = 'btn btn-primary';
+        ok.onclick = () => {
+          Modal.close();
+          resolve(true);
+        };
+        f.appendChild(cancel);
+        f.appendChild(ok);
+      },
+    );
+  });
 }
 
 /* formModal: fields [{key,label,type,value,required,options}], resolves with
@@ -727,6 +733,11 @@ function renderUsers() {
   const body = filtered
     .map((u) => {
       const id = uid(u);
+      const userRole = u.role || u.roleName || '';
+      /* Tenant admins must NOT be able to edit, reset, or delete ADMIN-role accounts.
+       * They also must not be able to add ADMIN-role accounts or see the Delete button for them. */
+      const isAdminUser = userRole === 'ADMIN';
+      const canManage = S.isOperator || !isAdminUser;
       const seat = u.seatAssigned
         ? '<span class="pill">' + escapeHtml(u.seatTokenHint || 'assigned') + '</span>'
         : '';
@@ -744,7 +755,10 @@ function renderUsers() {
         escapeHtml(u.uniqueIdentifier || '—') +
         '</td>' +
         '<td>' +
-        escapeHtml(u.role || u.roleName || '') +
+        escapeHtml(userRole) +
+        (isAdminUser
+          ? ' <span class="pill" style="color:var(--accent-2)">operator-managed</span>'
+          : '') +
         '</td>' +
         '<td>' +
         escapeHtml(u.accountType || '') +
@@ -759,13 +773,17 @@ function renderUsers() {
         seat +
         '</td>' +
         '<td class="actions">' +
-        '<button type="button" data-op="editUser" data-uid="' +
-        escapeHtml(id) +
-        '" class="action" title="Edit account">Edit</button>' +
-        '<button type="button" data-op="assignSeat" data-uid="' +
-        escapeHtml(id) +
-        '" class="action" title="Assign seat (licence) type">Seat</button>' +
-        (u.seatAssigned
+        (canManage
+          ? '<button type="button" data-op="editUser" data-uid="' +
+            escapeHtml(id) +
+            '" class="action" title="Edit account">Edit</button>'
+          : '') +
+        (canManage
+          ? '<button type="button" data-op="assignSeat" data-uid="' +
+            escapeHtml(id) +
+            '" class="action" title="Assign seat (licence) type">Seat</button>'
+          : '') +
+        (canManage && u.seatAssigned
           ? '<button type="button" data-op="revokeSeat" data-uid="' +
             escapeHtml(id) +
             '" class="action actionDel" title="Revoke seat token">Revoke seat</button>'
@@ -773,12 +791,16 @@ function renderUsers() {
         '<button type="button" data-op="userGroups" data-uid="' +
         escapeHtml(id) +
         '" class="action" title="Group memberships">Groups</button>' +
-        '<button type="button" data-op="resetUser" data-uid="' +
-        escapeHtml(id) +
-        '" class="action" title="Reset password">Reset</button>' +
-        '<button type="button" data-op="delUser" data-uid="' +
-        escapeHtml(id) +
-        '" class="action actionDel" title="Delete account">Delete</button>' +
+        (canManage
+          ? '<button type="button" data-op="resetUser" data-uid="' +
+            escapeHtml(id) +
+            '" class="action" title="Reset password">Reset</button>'
+          : '') +
+        (canManage
+          ? '<button type="button" data-op="delUser" data-uid="' +
+            escapeHtml(id) +
+            '" class="action actionDel" title="Delete account">Delete</button>'
+          : '') +
         '</td></tr>'
       );
     })
@@ -790,6 +812,9 @@ function renderUsers() {
 function renderRoles() {
   const el = document.getElementById('rolesTable');
   if (!el) return;
+  /* Only operators may create or modify roles */
+  const createBtn = document.getElementById('rolesCreateBtn');
+  if (createBtn) createBtn.style.display = S.isOperator ? '' : 'none';
   if (!S.roles.length) {
     el.innerHTML = '<p class="empty">No roles.</p>';
     return;
@@ -800,6 +825,17 @@ function renderRoles() {
       const name = r.name || r._id || '';
       const desc = r.description || '';
       const sys = name === 'ADMIN' || name === 'USER' || name === 'ERROR';
+      /* Tenant admins see only the Members button; operators get Edit and Delete */
+      const manageButtons = S.isOperator
+        ? '<button type="button" data-op="editRole" data-role="' +
+          escapeHtml(name) +
+          '" class="action" title="Edit">Edit</button>' +
+          (sys
+            ? ''
+            : '<button type="button" data-op="delRole" data-role="' +
+              escapeHtml(name) +
+              '" class="action actionDel" title="Delete">Delete</button>')
+        : '';
       return (
         '<tr data-role="' +
         escapeHtml(name) +
@@ -812,17 +848,10 @@ function renderRoles() {
         escapeHtml(truncate(desc, 70)) +
         '</td>' +
         '<td class="actions">' +
-        '<button type="button" data-op="editRole" data-role="' +
-        escapeHtml(name) +
-        '" class="action" title="Edit">Edit</button>' +
+        manageButtons +
         '<button type="button" data-op="roleMembers" data-role="' +
         escapeHtml(name) +
         '" class="action" title="Members">Members</button>' +
-        (sys
-          ? ''
-          : '<button type="button" data-op="delRole" data-role="' +
-            escapeHtml(name) +
-            '" class="action actionDel" title="Delete">Delete</button>') +
         '</td></tr>'
       );
     })
@@ -834,6 +863,9 @@ function renderRoles() {
 function renderGroups() {
   const el = document.getElementById('groupsTable');
   if (!el) return;
+  /* Hide "Create group" for tenant admins — only operators may create groups */
+  const createBtn = document.getElementById('groupsCreateBtn');
+  if (createBtn) createBtn.style.display = S.isOperator ? '' : 'none';
   if (!S.groups.length) {
     el.innerHTML = '<p class="empty">No groups.</p>';
     return;
@@ -843,6 +875,15 @@ function renderGroups() {
   const body = S.groups
     .map((g) => {
       const id = g._id || g.id || '';
+      /* Tenant admins may only view member lists, not edit/delete groups */
+      const manageButtons = S.isOperator
+        ? '<button type="button" data-op="editGroup" data-gid="' +
+          escapeHtml(id) +
+          '" class="action" title="Edit">Edit</button>' +
+          '<button type="button" data-op="delGroup" data-gid="' +
+          escapeHtml(id) +
+          '" class="action actionDel" title="Delete">Delete</button>'
+        : '';
       return (
         '<tr data-gid="' +
         escapeHtml(id) +
@@ -865,15 +906,10 @@ function renderGroups() {
         escapeHtml(String((g.memberIds || []).length || g.memberCount || 0)) +
         '</td>' +
         '<td class="actions">' +
-        '<button type="button" data-op="editGroup" data-gid="' +
-        escapeHtml(id) +
-        '" class="action" title="Edit">Edit</button>' +
+        manageButtons +
         '<button type="button" data-op="groupMembers" data-gid="' +
         escapeHtml(id) +
         '" class="action" title="Members">Members</button>' +
-        '<button type="button" data-op="delGroup" data-gid="' +
-        escapeHtml(id) +
-        '" class="action actionDel" title="Delete">Delete</button>' +
         '</td></tr>'
       );
     })
@@ -1065,28 +1101,70 @@ async function deleteUser(u) {
 }
 
 async function createUser() {
+  /* Tenant admins may only create USER-role accounts — ADMIN is operator-only */
+  const roleOptions = S.isOperator
+    ? [
+        { label: 'USER (Standard)', value: 'USER' },
+        { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
+      ]
+    : [{ label: 'USER (Standard)', value: 'USER' }];
+
   await formModal(
     'Create User Account',
     [
-      { key: 'email', label: 'Email Address (Used for Login)', type: 'email', required: true, placeholder: 'user@example.com' },
-      { key: 'name', label: 'Full Name', type: 'text', placeholder: 'e.g. John Doe (Optional: defaults to email prefix)' },
-      { key: 'uniqueIdentifier', label: 'Unique Identifier (Flat / Roll No / Emp ID)', type: 'text', placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082' },
+      {
+        key: 'email',
+        label: 'Email Address (Used for Login)',
+        type: 'email',
+        required: true,
+        placeholder: 'user@example.com',
+      },
+      {
+        key: 'password',
+        label: 'Initial Password (Leave blank to auto-generate temporary password)',
+        type: 'password',
+        placeholder: 'Min. 8 characters (or leave blank for auto-generated)',
+      },
+      {
+        key: 'name',
+        label: 'Full Name',
+        type: 'text',
+        placeholder: 'e.g. John Doe (Optional: defaults to email prefix)',
+      },
+      {
+        key: 'uniqueIdentifier',
+        label: 'Unique Identifier (Flat / Roll No / Emp ID)',
+        type: 'text',
+        placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082',
+      },
       {
         key: 'role',
         label: 'Role',
         type: 'select',
-        options: [
-          { label: 'USER (Standard)', value: 'USER' },
-          { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
-        ],
+        options: roleOptions,
       },
-      { key: 'accountType', label: 'Account Tier / License', type: 'select', options: ACCOUNT_TYPES },
+      {
+        key: 'accountType',
+        label: 'Account Tier / License',
+        type: 'select',
+        options: ACCOUNT_TYPES,
+      },
       {
         key: 'familyRole',
         label: 'Family Bundle Membership (For Family / Pro_Family Tier)',
         type: 'select',
         options: FAMILY_ROLE_OPTIONS,
         hint: 'Select "Family Bundle Primary" for the main head account, or "Family Member" for pooled accounts.',
+      },
+      {
+        key: 'mustChangePassword',
+        label: 'Require password change at first sign-in',
+        type: 'select',
+        value: 'true',
+        options: [
+          { label: 'yes (recommended when using temporary passwords)', value: 'true' },
+          { label: 'no (permanent password)', value: 'false' },
+        ],
       },
       {
         key: 'quota',
@@ -1098,26 +1176,40 @@ async function createUser() {
       },
     ],
     'Provision Account',
-    { quota: '100000' },
+    { quota: '100000', mustChangePassword: 'true' },
     async (v) => {
-      if (!v.email || !v.email.trim()) return { ok: false, error: 'A valid email address is required.' };
+      if (!v.email || !v.email.trim())
+        return { ok: false, error: 'A valid email address is required.' };
       const emailPattern = /^\S+@\S+\.\S+$/;
-      if (!emailPattern.test(v.email.trim())) return { ok: false, error: 'Please enter a valid email address (e.g. user@domain.com).' };
+      if (!emailPattern.test(v.email.trim()))
+        return { ok: false, error: 'Please enter a valid email address (e.g. user@domain.com).' };
+      if (v.password && v.password.trim() && v.password.trim().length < 8) {
+        return { ok: false, error: 'Password must be at least 8 characters long.' };
+      }
+      const payload = {
+        name: v.name?.trim() || undefined,
+        email: v.email.trim(),
+        uniqueIdentifier: v.uniqueIdentifier?.trim() || undefined,
+        role: v.role,
+        quota: v.quota,
+        accountType: v.accountType || undefined,
+        familyRole: v.familyRole || undefined,
+        mustChangePassword: v.mustChangePassword === 'true',
+      };
+      if (v.password && v.password.trim()) {
+        payload.password = v.password.trim();
+      }
       const res = await apiAdmin('/users', {
         method: 'POST',
-        body: JSON.stringify({
-          name: v.name?.trim() || undefined,
-          email: v.email.trim(),
-          uniqueIdentifier: v.uniqueIdentifier?.trim() || undefined,
-          role: v.role,
-          quota: v.quota,
-          accountType: v.accountType || undefined,
-          familyRole: v.familyRole || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         const u = res.json?.user;
-        toast(`Account provisioned. Temporary password: ${u?.tempPassword}`, 'ok', 12000);
+        const tempPwd = u?.tempPassword || res.json?.temporaryPassword;
+        const msg = payload.password
+          ? `Account provisioned for ${v.email.trim()} with specified password.`
+          : `Account provisioned. Temporary password: ${tempPwd}`;
+        toast(msg, 'ok', 12000);
         await Promise.all([loadUsers(), loadGroups()]);
         return { ok: true };
       }
@@ -1128,21 +1220,38 @@ async function createUser() {
 
 async function editUser(u) {
   const id = uid(u);
+  /* Tenant admins can only assign USER role — ADMIN role changes are operator-only */
+  const editRoleOptions = S.isOperator
+    ? [
+        { label: 'USER (Standard)', value: 'USER' },
+        { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
+      ]
+    : [{ label: 'USER (Standard)', value: 'USER' }];
+
   await formModal(
     'Edit ' + (u.email || uname(u)),
     [
       { key: 'email', label: 'Email Address', type: 'email', value: u.email || '', required: true },
+      {
+        key: 'password',
+        label: 'New Password (Leave blank to keep current password)',
+        type: 'password',
+        placeholder: 'Min. 8 characters (or leave empty to keep existing)',
+      },
       { key: 'name', label: 'Full Name', type: 'text', value: u.name || '' },
-      { key: 'uniqueIdentifier', label: 'Unique Identifier (Flat / Roll No / Emp ID)', type: 'text', value: u.uniqueIdentifier || '', placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082' },
+      {
+        key: 'uniqueIdentifier',
+        label: 'Unique Identifier (Flat / Roll No / Emp ID)',
+        type: 'text',
+        value: u.uniqueIdentifier || '',
+        placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082',
+      },
       {
         key: 'role',
         label: 'Role',
         type: 'select',
         value: u.role || 'USER',
-        options: [
-          { label: 'USER (Standard)', value: 'USER' },
-          { label: 'ADMIN (Tenant Admin)', value: 'ADMIN' },
-        ],
+        options: editRoleOptions,
       },
       {
         key: 'accountType',
@@ -1172,21 +1281,28 @@ async function editUser(u) {
     'Save changes',
     {},
     async (v) => {
+      if (v.password && v.password.trim() && v.password.trim().length < 8) {
+        return { ok: false, error: 'New password must be at least 8 characters long.' };
+      }
+      const payload = {
+        name: v.name,
+        email: v.email,
+        uniqueIdentifier: v.uniqueIdentifier?.trim() || null,
+        role: v.role,
+        accountType: v.accountType || null,
+        familyRole: v.familyRole || null,
+        mustChangePassword: v.mustChangePassword === 'true',
+      };
+      if (v.password && v.password.trim()) {
+        payload.password = v.password.trim();
+      }
       const res = await apiAdmin('/users/' + encodeURIComponent(id), {
         method: 'PATCH',
-        body: JSON.stringify({
-          name: v.name,
-          email: v.email,
-          uniqueIdentifier: v.uniqueIdentifier?.trim() || null,
-          role: v.role,
-          accountType: v.accountType || null,
-          familyRole: v.familyRole || null,
-          mustChangePassword: v.mustChangePassword === 'true',
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast('Account updated.', 'ok');
-        await Promise.all([loadUsers(), loadGroups()]);
+        toast('User updated successfully' + (payload.password ? ' (password changed)' : ''), 'ok');
+        await loadUsers();
         return { ok: true };
       }
       return { ok: false, error: (res.json && res.json.error) || `HTTP ${res.status}` };
@@ -1790,23 +1906,36 @@ async function groupMembers(id) {
     html += '<tr><td colspan="3" class="empty">No members.</td></tr>';
   }
   html += '</tbody></table>';
-  // add member form row
-  html +=
-    '<div class="modalField" style="margin-top:12px"><label for="addGroupMember">Add member</label>' +
-    '<select id="addGroupMember"><option value="">select a user…</option>' +
-    S.users
-      .map(
-        (u) =>
-          '<option value="' +
-          escapeHtml(uid(u)) +
-          '">' +
-          escapeHtml(uname(u) + ' (' + (u.email || '') + ')') +
-          '</option>',
-      )
-      .join('') +
-    '</select></div>';
+  // add member form row — tenant admins only see USER-role users (not ADMIN-role)
+  const eligibleUsers = S.isOperator
+    ? S.users
+    : S.users.filter((u) => (u.role || u.roleName || '') !== 'ADMIN');
+  // also check if this is the admin group — tenant admins must NOT add users to it
   const grp = S.groups.find((x) => (x._id || x.id) === id);
   const groupName = grp?.name ? `"${grp.name}"` : id;
+  const isAdminGroup = (grp?.name || '').toLowerCase() === 'admin';
+  const canAddMembers = S.isOperator || !isAdminGroup;
+
+  if (canAddMembers) {
+    html +=
+      '<div class="modalField" style="margin-top:12px"><label for="addGroupMember">Add member</label>' +
+      '<select id="addGroupMember"><option value="">select a user…</option>' +
+      eligibleUsers
+        .map(
+          (u) =>
+            '<option value="' +
+            escapeHtml(uid(u)) +
+            '">' +
+            escapeHtml(uname(u) + ' (' + (u.email || '') + ')') +
+            '</option>',
+        )
+        .join('') +
+      '</select></div>';
+  } else {
+    html +=
+      '<p class="hint" style="margin-top:12px;color:var(--accent-2)">⚠ Adding members to the admin group requires operator access.</p>';
+  }
+
   const title = 'Members of group ' + groupName;
   Modal.show(
     title,
@@ -1919,13 +2048,23 @@ async function revokeGrant(pt, pid, cap) {
 /* ---------- wiring ---------- */
 function setupTabs() {
   document.querySelectorAll('.tab').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      const tab = btn.dataset.tab;
+
+      /* Grants and Audit log require offline TOTP step-up before ANY data loads.
+       * promptStepUpAuth() returns false if the user cancels or enrollment fails. */
+      if (tab === 'grants' || tab === 'audit') {
+        const ok = await promptStepUpAuth();
+        if (!ok) return; // stay on current tab
+      }
+
       document.querySelectorAll('.tab').forEach((b) => b.classList.remove('active'));
       document.querySelectorAll('.tabpanel').forEach((p) => p.classList.remove('active'));
       btn.classList.add('active');
-      document.getElementById(btn.dataset.tab).classList.add('active');
-      CURRENT = btn.dataset.tab;
-      // lazy load tabs not yet loaded
+      document.getElementById(tab).classList.add('active');
+      CURRENT = tab;
+
+      // lazy load tabs
       if (CURRENT === 'users') loadUsers();
       if (CURRENT === 'roles') loadRoles();
       if (CURRENT === 'groups') loadGroups();
@@ -2093,12 +2232,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 
   setupTabs();
   attachListeners();
-  await Promise.all([
-    loadUsers(),
-    loadRoles(),
-    loadGroups(),
-    loadEffective(),
-  ]);
+  await Promise.all([loadUsers(), loadRoles(), loadGroups(), loadEffective()]);
 })();
 
 function authUserEmail(json) {

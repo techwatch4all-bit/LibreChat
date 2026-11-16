@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Play,
@@ -18,13 +19,9 @@ import {
   Rewind,
 } from 'lucide-react';
 import type { Artifact } from '~/common';
+import { renderFilmVideo, saveVideoToDisk, type ExportProgress } from './exportEngine';
 import { useCodeState } from '~/Providers/EditorContext';
 import { useLocalize } from '~/hooks';
-import {
-  renderFilmVideo,
-  saveVideoToDisk,
-  type ExportProgress,
-} from './exportEngine';
 
 export const SATCHIDA_FILM_MIME = 'application/vnd.satchida.film' as const;
 
@@ -51,11 +48,13 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   const [fps, setFps] = useState<FPS>(30);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(10);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isLooping, setIsLooping] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
-  const [exportPhase, setExportPhase] = useState<'preparing' | 'rendering' | 'encoding' | 'done'>('preparing');
+  const [exportPhase, setExportPhase] = useState<'preparing' | 'rendering' | 'encoding' | 'done'>(
+    'preparing',
+  );
   const [showBrowserNotice, setShowBrowserNotice] = useState<boolean>(() => {
     if (typeof navigator === 'undefined') return false;
     return navigator.userAgent.toLowerCase().includes('firefox');
@@ -80,131 +79,232 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 <head>
   <meta charset="utf-8">
   <style>
-    body {
+    html, body {
       margin: 0;
-      background: radial-gradient(circle at center, #111827 0%, #030712 100%);
-      color: #f9fafb;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020617;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      overflow: hidden;
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 9999px;
-      background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.4);
-      color: #c084fc;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
-    h1 {
-      font-size: 44px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0 0 12px 0;
-      background: linear-gradient(135deg, #ffffff 0%, #9ca3af 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-align: center;
-    }
-    p {
-      font-size: 16px;
-      color: #9ca3af;
-      margin: 0;
-      max-width: 500px;
-      text-align: center;
-      line-height: 1.5;
-    }
-    .orb {
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
-      background: conic-gradient(from 180deg at 50% 50%, #8b5cf6 0deg, #ec4899 180deg, #3b82f6 360deg);
-      filter: blur(40px);
-      opacity: 0.45;
-      position: absolute;
-      z-index: -1;
-    }
-    .hud {
-      position: absolute;
-      bottom: 24px;
-      font-family: ui-monospace, monospace;
-      font-size: 12px;
-      color: #6b7280;
+    canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
     }
   </style>
 </head>
 <body>
-  <div class="orb" id="orb"></div>
-  <div class="badge">🎬 Satchida Studio Engine</div>
-  <h1 id="title">Motion Video Synthesis</h1>
-  <p id="sub">100% Client-Side WebGL / Canvas / GSAP Playhead with Zero Server Compute.</p>
-  <div class="hud" id="hud">t = 0.00s</div>
-
+  <canvas id="film" width="1920" height="1080"></canvas>
   <script>
-    window.film = {
-      duration: 10,
-      width: 1920,
-      height: 1080,
-      frame: function(t) {
-        var orb = document.getElementById('orb');
-        var hud = document.getElementById('hud');
-        var title = document.getElementById('title');
-        
-        if (hud) hud.textContent = 'FRAME TIME: ' + t.toFixed(2) + 's / 10.00s';
-        if (orb) {
-          var angle = (t * 72) % 360;
-          var scale = 1 + Math.sin(t * 2) * 0.15;
-          orb.style.transform = 'rotate(' + angle + 'deg) scale(' + scale + ')';
-        }
-        if (title) {
-          var alpha = Math.min(1, Math.max(0.2, Math.sin(t * 1.5) * 0.5 + 0.5));
-          title.style.opacity = alpha;
-        }
+    (function() {
+      var canvas = document.getElementById('film');
+      var ctx = canvas.getContext('2d');
+      var W = 1920, H = 1080;
+      
+      var stars = [];
+      for (var i = 0; i < 160; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: Math.random() * 2.5 + 0.5,
+          color: i % 3 === 0 ? '#8b5cf6' : (i % 3 === 1 ? '#06b6d4' : '#ffffff'),
+          speed: Math.random() * 0.8 + 0.2
+        });
       }
-    };
+
+      window.film = {
+        duration: 10,
+        width: W,
+        height: H,
+        frame: function(t) {
+          ctx.clearRect(0, 0, W, H);
+          
+          var grad = ctx.createRadialGradient(W/2, H/2, 100, W/2, H/2, W * 0.7);
+          grad.addColorStop(0, '#090d1f');
+          grad.addColorStop(1, '#020617');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, W, H);
+
+          var orbGlow = ctx.createRadialGradient(
+            W/2 + Math.cos(t * 1.5) * 80, 
+            H/2 + Math.sin(t * 1.2) * 40, 
+            20, 
+            W/2, 
+            H/2, 
+            480 + Math.sin(t * 3) * 60
+          );
+          orbGlow.addColorStop(0, 'rgba(139, 92, 246, 0.45)');
+          orbGlow.addColorStop(0.5, 'rgba(6, 182, 212, 0.2)');
+          orbGlow.addColorStop(1, 'rgba(2, 6, 23, 0)');
+          ctx.fillStyle = orbGlow;
+          ctx.fillRect(0, 0, W, H);
+
+          for (var i = 0; i < stars.length; i++) {
+            var s = stars[i];
+            var sx = (s.x + Math.sin(t * s.speed + i) * 60) % W;
+            var sy = (s.y + Math.cos(t * s.speed + i) * 30) % H;
+            ctx.beginPath();
+            ctx.arc(sx, sy, s.r * (1 + Math.sin(t * 4 + i) * 0.3), 0, Math.PI * 2);
+            ctx.fillStyle = s.color;
+            ctx.globalAlpha = Math.min(1, Math.max(0.2, Math.sin(t * 2 + i) * 0.5 + 0.5));
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1.0;
+
+          for (var r = 1; r <= 4; r++) {
+            var pulseR = 140 * r + Math.sin(t * 4 + r) * 20;
+            ctx.beginPath();
+            ctx.arc(W/2, H/2, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = r % 2 === 0 ? 'rgba(139, 92, 246, 0.25)' : 'rgba(6, 182, 212, 0.2)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+
+          var barCount = 36;
+          var barWidth = W / (barCount * 1.6);
+          var barGap = barWidth * 0.6;
+          var startX = (W - (barCount * (barWidth + barGap))) / 2;
+          for (var b = 0; b < barCount; b++) {
+            var freq = Math.sin(t * 6 + b * 0.4) * 0.5 + 0.5;
+            var barHeight = 20 + freq * 140;
+            var bx = startX + b * (barWidth + barGap);
+            var by = H - 120 - barHeight;
+            
+            var barGrad = ctx.createLinearGradient(bx, by, bx, by + barHeight);
+            barGrad.addColorStop(0, '#c084fc');
+            barGrad.addColorStop(1, '#3b82f6');
+            ctx.fillStyle = barGrad;
+            ctx.fillRect(bx, by, barWidth, barHeight);
+          }
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          if (t < 3.5) {
+            var p1 = Math.min(1, t / 1.2);
+            var scale1 = 0.8 + p1 * 0.2;
+            ctx.save();
+            ctx.translate(W/2, H/2 - 40);
+            ctx.scale(scale1, scale1);
+            ctx.font = '900 96px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = '#8b5cf6';
+            ctx.shadowBlur = 35;
+            ctx.fillText('SATCHIDA STUDIO', 0, 0);
+
+            ctx.font = '600 28px system-ui, sans-serif';
+            ctx.fillStyle = '#a855f7';
+            ctx.shadowBlur = 15;
+            ctx.fillText('CINEMA-GRADE MOTION GRAPHICS ENGINE', 0, 75);
+            ctx.restore();
+          } else if (t < 7.0) {
+            var p2 = Math.min(1, (t - 3.5) / 1.0);
+            var scale2 = 0.85 + p2 * 0.15;
+            ctx.save();
+            ctx.translate(W/2, H/2 - 40);
+            ctx.scale(scale2, scale2);
+            ctx.font = '900 84px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = '#06b6d4';
+            ctx.shadowBlur = 30;
+            ctx.fillText('DETERMINISTIC 60 FPS', 0, 0);
+
+            ctx.font = '600 26px system-ui, sans-serif';
+            ctx.fillStyle = '#94a3b8';
+            ctx.shadowBlur = 10;
+            ctx.fillText('PURE FUNCTION MATHEMATICAL PLAYHEAD', 0, 70);
+            ctx.restore();
+          } else {
+            var p3 = Math.min(1, (t - 7.0) / 1.0);
+            var scale3 = 0.85 + p3 * 0.15;
+            ctx.save();
+            ctx.translate(W/2, H/2 - 40);
+            ctx.scale(scale3, scale3);
+            ctx.font = '900 84px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = '#a855f7';
+            ctx.shadowColor = '#d946ef';
+            ctx.shadowBlur = 30;
+            ctx.fillText('100% CLIENT-SIDE WEBGL', 0, 0);
+
+            ctx.font = '600 26px system-ui, sans-serif';
+            ctx.fillStyle = '#cbd5e1';
+            ctx.shadowBlur = 10;
+            ctx.fillText('ZERO SERVER COMPUTE • DIRECT DEVICE MP4 EXPORT', 0, 70);
+            ctx.restore();
+          }
+
+          ctx.font = '500 18px ui-monospace, monospace';
+          ctx.fillStyle = '#64748b';
+          ctx.shadowBlur = 0;
+          ctx.fillText('PLAYHEAD: ' + t.toFixed(2) + 's / 10.00s  •  FPS: 60', W/2, H - 40);
+        }
+      };
+      
+      window.film.frame(0);
+    })();
   </script>
 </body>
 </html>`;
   }, [currentCode, artifact.content]);
 
-  // Prepared srcDoc embedding the deterministic listener
+  // Prepared srcDoc embedding the deterministic listener and defensive polyfills
   const srcDoc = useMemo(() => {
-    const wrappedContent = rawFilmContent.includes('window.film')
-      ? rawFilmContent
-      : `<!DOCTYPE html><html><body>${rawFilmContent}</body></html>`;
+    let content = rawFilmContent.trim();
+    if (!content.includes('window.film')) {
+      content = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${content}</body></html>`;
+    }
 
-    // Inject seeker and metadata listeners
-    const injection = `
+    const headInjection = `
+      <style>
+        html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; height: 100% !important; overflow: hidden !important; background: #000 !important; }
+        canvas { width: 100% !important; height: 100% !important; object-fit: contain !important; }
+        #controls, #scrubber, .hint, #satchida-controls, #btn-play, #btn-restart, .playback-bar { display: none !important; }
+      </style>
+      <script>
+        window.film = window.film || {};
+        window.film._tick = function() {};
+      </script>
+    `;
+
+    const bodyInjection = `
       <script>
         (function() {
+          window.film = window.film || {};
+          window.film._tick = window.film._tick || function() {};
+
           window.addEventListener('message', function(e) {
             if (e.data && e.data.type === 'SEEK_FRAME') {
               if (window.film && typeof window.film.frame === 'function') {
-                window.film.frame(e.data.time);
+                try {
+                  window.film._tick = window.film._tick || function() {};
+                  window.film.frame(e.data.time);
+                } catch (err) {
+                  console.warn('Frame render error at t=' + e.data.time, err);
+                }
               }
             }
           });
+
           window.addEventListener('load', function() {
             if (window.film) {
+              window.film._tick = window.film._tick || function() {};
               window.parent.postMessage({
                 type: 'FILM_METADATA',
                 duration: window.film.duration || 10,
-                width: window.film.width,
-                height: window.film.height,
+                width: window.film.width || 1920,
+                height: window.film.height || 1080,
               }, '*');
               if (typeof window.film.frame === 'function') {
-                window.film.frame(0);
+                try {
+                  window.film.frame(0);
+                } catch (err) {
+                  console.warn('Initial frame render error:', err);
+                }
               }
             }
           });
@@ -212,10 +312,19 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       </script>
     `;
 
-    if (wrappedContent.includes('</body>')) {
-      return wrappedContent.replace('</body>', `${injection}</body>`);
+    if (content.includes('<head>')) {
+      content = content.replace('<head>', `<head>${headInjection}`);
+    } else {
+      content = `${headInjection}${content}`;
     }
-    return `${wrappedContent}${injection}`;
+
+    if (content.includes('</body>')) {
+      content = content.replace('</body>', `${bodyInjection}</body>`);
+    } else {
+      content = `${content}${bodyInjection}`;
+    }
+
+    return content;
   }, [rawFilmContent]);
 
   // Sync seek position into iframe
@@ -362,14 +471,16 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
     if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
       try {
-        const handle = await (window as unknown as {
-          showSaveFilePicker: (options: unknown) => Promise<{
-            createWritable: () => Promise<{
-              write: (data: Blob) => Promise<void>;
-              close: () => Promise<void>;
+        const handle = await (
+          window as unknown as {
+            showSaveFilePicker: (options: unknown) => Promise<{
+              createWritable: () => Promise<{
+                write: (data: Blob) => Promise<void>;
+                close: () => Promise<void>;
+              }>;
             }>;
-          }>;
-        }).showSaveFilePicker({
+          }
+        ).showSaveFilePicker({
           suggestedName: filename,
           types: [
             {
@@ -464,28 +575,28 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   }, [aspectRatio]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#0a0f1d] text-slate-100 select-none">
+    <div className="relative flex h-full w-full select-none flex-col overflow-hidden bg-[#0a0f1d] text-slate-100">
       {/* Top Header & Toolbar */}
       <div className="flex h-11 items-center justify-between border-b border-slate-800 bg-[#0d1326] px-3 text-xs">
         {/* Left: Studio Branding & Title */}
         <div className="flex items-center space-x-2.5">
-          <div className="flex items-center gap-1.5 rounded-md bg-purple-600/20 px-2 py-1 text-purple-400 font-semibold border border-purple-500/30">
+          <div className="flex items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-600/20 px-2 py-1 font-semibold text-purple-400">
             <Film className="h-3.5 w-3.5" />
             <span>Satchida Studio</span>
           </div>
-          <span className="font-medium text-slate-300 truncate max-w-[180px] sm:max-w-xs">
+          <span className="max-w-[180px] truncate font-medium text-slate-300 sm:max-w-xs">
             {artifact.title || 'Motion Project'}
           </span>
         </div>
 
         {/* Center: Aspect Ratio & FPS Selectors */}
-        <div className="hidden sm:flex items-center space-x-1.5 bg-slate-900/80 p-0.5 rounded-lg border border-slate-800">
+        <div className="hidden items-center space-x-1.5 rounded-lg border border-slate-800 bg-slate-900/80 p-0.5 sm:flex">
           <button
             type="button"
             onClick={() => setAspectRatio('16:9')}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
               aspectRatio === '16:9'
-                ? 'bg-purple-600 text-white shadow-xs'
+                ? 'shadow-xs bg-purple-600 text-white'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="16:9 Widescreen (1920x1080)"
@@ -496,9 +607,9 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           <button
             type="button"
             onClick={() => setAspectRatio('9:16')}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
               aspectRatio === '9:16'
-                ? 'bg-purple-600 text-white shadow-xs'
+                ? 'shadow-xs bg-purple-600 text-white'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="9:16 Vertical Reels / Shorts (1080x1920)"
@@ -509,9 +620,9 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           <button
             type="button"
             onClick={() => setAspectRatio('1:1')}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
               aspectRatio === '1:1'
-                ? 'bg-purple-600 text-white shadow-xs'
+                ? 'shadow-xs bg-purple-600 text-white'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="1:1 Square (1080x1080)"
@@ -523,11 +634,11 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
         {/* Right: FPS & Save / Export */}
         <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-slate-900/80 rounded border border-slate-800 text-[10px] font-mono text-slate-300">
+          <div className="flex items-center rounded border border-slate-800 bg-slate-900/80 font-mono text-[10px] text-slate-300">
             <button
               type="button"
               onClick={() => setFps(24)}
-              className={`px-1.5 py-1 rounded-l ${fps === 24 ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'}`}
+              className={`rounded-l px-1.5 py-1 ${fps === 24 ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'}`}
             >
               24
             </button>
@@ -541,7 +652,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             <button
               type="button"
               onClick={() => setFps(60)}
-              className={`px-1.5 py-1 rounded-r ${fps === 60 ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'}`}
+              className={`rounded-r px-1.5 py-1 ${fps === 60 ? 'bg-slate-700 text-white' : 'hover:bg-slate-800'}`}
             >
               60fps
             </button>
@@ -550,7 +661,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           <button
             type="button"
             onClick={handleSaveProject}
-            className="flex items-center space-x-1 rounded bg-slate-800 px-2 py-1 font-medium text-slate-200 hover:bg-slate-700 transition-colors border border-slate-700/60"
+            className="flex items-center space-x-1 rounded border border-slate-700/60 bg-slate-800 px-2 py-1 font-medium text-slate-200 transition-colors hover:bg-slate-700"
             title="Save film project source (.html) to your local device"
           >
             <Download className="h-3 w-3" />
@@ -561,7 +672,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             type="button"
             onClick={handleStartExport}
             disabled={isExporting}
-            className="flex items-center space-x-1 rounded bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-2.5 py-1 font-semibold text-white transition-colors shadow-xs"
+            className="shadow-xs flex items-center space-x-1 rounded bg-purple-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50"
             title="Client-Side Hardware Accelerated Video Render"
           >
             <Video className="h-3 w-3" />
@@ -572,7 +683,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
       {/* Browser Compatibility Notice for Firefox */}
       {showBrowserNotice && (
-        <div className="flex items-center justify-between bg-amber-950/40 border-b border-amber-600/30 px-3 py-1.5 text-[11px] text-amber-200">
+        <div className="flex items-center justify-between border-b border-amber-600/30 bg-amber-950/40 px-3 py-1.5 text-[11px] text-amber-200">
           <div className="flex items-center space-x-1.5">
             <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
             <span>
@@ -583,7 +694,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           <button
             type="button"
             onClick={() => setShowBrowserNotice(false)}
-            className="text-amber-400 hover:text-amber-100 ml-2"
+            className="ml-2 text-amber-400 hover:text-amber-100"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -593,7 +704,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       {/* Center Viewport Stage */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[#070b16] p-3">
         <div
-          className={`relative shadow-2xl rounded-lg overflow-hidden border border-slate-800/80 bg-black flex items-center justify-center transition-all ${aspectClass}`}
+          className={`relative flex items-center justify-center overflow-hidden rounded-lg border border-slate-800/80 bg-black shadow-2xl transition-all ${aspectClass}`}
           style={{ width: aspectRatio === '16:9' ? '100%' : undefined }}
         >
           <iframe
@@ -607,14 +718,14 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       </div>
 
       {/* Bottom Timeline & Scrubber Panel */}
-      <div className="border-t border-slate-800 bg-[#0d1326] p-2.5 flex flex-col space-y-2">
+      <div className="flex flex-col space-y-2 border-t border-slate-800 bg-[#0d1326] p-2.5">
         {/* Transport Controls & Timecode */}
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center space-x-1.5">
             <button
               type="button"
               onClick={handleReset}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-300 transition-colors"
+              className="rounded p-1.5 text-slate-300 transition-colors hover:bg-slate-800"
               title="Reset to 0s"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -622,7 +733,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             <button
               type="button"
               onClick={() => stepTime(-1)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-300 transition-colors"
+              className="rounded p-1.5 text-slate-300 transition-colors hover:bg-slate-800"
               title="Step -1s"
             >
               <Rewind className="h-3.5 w-3.5" />
@@ -630,15 +741,15 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             <button
               type="button"
               onClick={togglePlay}
-              className="p-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white transition-colors shadow-xs"
+              className="shadow-xs rounded-full bg-purple-600 p-1.5 text-white transition-colors hover:bg-purple-500"
               title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
             >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
             </button>
             <button
               type="button"
               onClick={() => stepTime(1)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-300 transition-colors"
+              className="rounded p-1.5 text-slate-300 transition-colors hover:bg-slate-800"
               title="Step +1s"
             >
               <FastForward className="h-3.5 w-3.5" />
@@ -646,8 +757,8 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             <button
               type="button"
               onClick={() => setIsLooping(!isLooping)}
-              className={`p-1.5 rounded transition-colors ${
-                isLooping ? 'text-purple-400 bg-purple-950/40' : 'text-slate-400 hover:bg-slate-800'
+              className={`rounded p-1.5 transition-colors ${
+                isLooping ? 'bg-purple-950/40 text-purple-400' : 'text-slate-400 hover:bg-slate-800'
               }`}
               title={isLooping ? 'Loop Enabled' : 'Loop Disabled'}
             >
@@ -656,15 +767,15 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           </div>
 
           {/* Precise Timecode display */}
-          <div className="font-mono text-xs text-purple-300 bg-slate-900 px-2.5 py-1 rounded border border-slate-800 font-semibold tracking-wider">
+          <div className="rounded border border-slate-800 bg-slate-900 px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-purple-300">
             <span>{formatTime(currentTime)}</span>
-            <span className="text-slate-500 mx-1">/</span>
+            <span className="mx-1 text-slate-500">/</span>
             <span className="text-slate-400">{formatTime(duration)}</span>
           </div>
 
           <div className="flex items-center space-x-2 text-[11px] text-slate-400">
             <span className="hidden sm:inline">Active Tracks: 3</span>
-            <span className="rounded bg-emerald-950/60 text-emerald-400 border border-emerald-600/30 px-1.5 py-0.5 text-[10px] font-medium">
+            <span className="rounded border border-emerald-600/30 bg-emerald-950/60 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
               Deterministic 60fps
             </span>
           </div>
@@ -674,20 +785,20 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
         <div
           ref={timelineRef}
           onMouseDown={handleMouseDown}
-          className="relative h-16 w-full cursor-pointer select-none rounded border border-slate-800 bg-slate-950 overflow-hidden flex flex-col justify-between py-1"
+          className="relative flex h-16 w-full cursor-pointer select-none flex-col justify-between overflow-hidden rounded border border-slate-800 bg-slate-950 py-1"
         >
           {/* Time Ruler Ticks */}
-          <div className="relative h-3 w-full border-b border-slate-800/80 flex items-center">
+          <div className="relative flex h-3 w-full items-center border-b border-slate-800/80">
             {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => {
               const posPercent = (i / duration) * 100;
               return (
                 <div
                   key={i}
-                  className="absolute -top-1 transform -translate-x-1/2 flex flex-col items-center pointer-events-none"
+                  className="pointer-events-none absolute -top-1 flex -translate-x-1/2 transform flex-col items-center"
                   style={{ left: `${posPercent}%` }}
                 >
                   <div className="h-1.5 w-px bg-slate-700" />
-                  <span className="text-[8px] font-mono text-slate-500 leading-none mt-0.5">
+                  <span className="mt-0.5 font-mono text-[8px] leading-none text-slate-500">
                     {i}s
                   </span>
                 </div>
@@ -696,8 +807,8 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           </div>
 
           {/* Track 1: 🎬 Video & Shot Keyframes */}
-          <div className="relative h-3.5 w-full bg-slate-900/60 rounded-xs mx-0.5 flex items-center px-1 overflow-hidden">
-            <div className="flex items-center gap-1 text-[9px] text-purple-300 font-medium">
+          <div className="rounded-xs relative mx-0.5 flex h-3.5 w-full items-center overflow-hidden bg-slate-900/60 px-1">
+            <div className="flex items-center gap-1 text-[9px] font-medium text-purple-300">
               <Film className="h-2.5 w-2.5 shrink-0" />
               <span>Shot 1 (Intro)</span>
             </div>
@@ -712,16 +823,16 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           </div>
 
           {/* Track 2: ⚡ Kinetic & Motion Elements */}
-          <div className="relative h-3.5 w-full bg-slate-900/40 rounded-xs mx-0.5 flex items-center px-1 overflow-hidden">
-            <div className="flex items-center gap-1 text-[9px] text-cyan-300 font-medium">
+          <div className="rounded-xs relative mx-0.5 flex h-3.5 w-full items-center overflow-hidden bg-slate-900/40 px-1">
+            <div className="flex items-center gap-1 text-[9px] font-medium text-cyan-300">
               <Sparkles className="h-2.5 w-2.5 shrink-0" />
               <span>Kinetic Typography & SVG Canvas</span>
             </div>
           </div>
 
           {/* Track 3: 🎵 Audio Rhythm */}
-          <div className="relative h-3 w-full bg-slate-900/20 rounded-xs mx-0.5 flex items-center px-1 overflow-hidden">
-            <div className="flex items-center gap-1 text-[9px] text-amber-300/80 font-medium">
+          <div className="rounded-xs relative mx-0.5 flex h-3 w-full items-center overflow-hidden bg-slate-900/20 px-1">
+            <div className="flex items-center gap-1 text-[9px] font-medium text-amber-300/80">
               <Volume2 className="h-2.5 w-2.5 shrink-0" />
               <span>Audio Sync Beat (128 BPM)</span>
             </div>
@@ -729,10 +840,10 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
           {/* Red Playhead Needle Cursor */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-10 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+            className="pointer-events-none absolute bottom-0 top-0 z-10 w-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
             style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
           >
-            <div className="absolute -top-1 -left-1.5 h-3 w-3 bg-red-500 rotate-45 rounded-xs" />
+            <div className="rounded-xs absolute -left-1.5 -top-1 h-3 w-3 rotate-45 bg-red-500" />
           </div>
         </div>
       </div>
@@ -760,11 +871,11 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           role="dialog"
           aria-modal="true"
           aria-label="Exporting Video"
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
+          className="backdrop-blur-xs absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
         >
           <div className="w-full max-w-sm rounded-xl border border-slate-700 bg-[#0d1326] p-5 shadow-2xl">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-600/20 text-purple-400 border border-purple-500/30">
+            <div className="mb-4 flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-purple-500/30 bg-purple-600/20 text-purple-400">
                 <Video className="h-5 w-5 animate-pulse" />
               </div>
               <div>
@@ -773,14 +884,14 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
               </div>
             </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-slate-300 capitalize">{exportPhase}...</span>
-                <span className="text-purple-400 font-bold">{exportProgress}%</span>
+            <div className="mb-4 space-y-2">
+              <div className="flex justify-between font-mono text-xs">
+                <span className="capitalize text-slate-300">{exportPhase}...</span>
+                <span className="font-bold text-purple-400">{exportProgress}%</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 transition-all duration-150 rounded-full"
+                  className="h-full rounded-full bg-gradient-to-r from-purple-600 to-indigo-500 transition-all duration-150"
                   style={{ width: `${exportProgress}%` }}
                 />
               </div>
@@ -793,7 +904,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
               <button
                 type="button"
                 onClick={handleCancelExport}
-                className="rounded px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 border border-slate-700 transition-colors"
+                className="rounded border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800"
               >
                 Cancel Render
               </button>

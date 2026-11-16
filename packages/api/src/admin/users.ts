@@ -704,6 +704,17 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         return res.status(400).json({ error: 'Invalid role' });
       }
 
+      /* Tenant admin RBAC: tenant admins may not create ADMIN-role accounts. */
+      if (typeof body.role === 'string' && body.role.trim() === SystemRoles.ADMIN) {
+        const callerIsOperator = await isPlatformOperator(req.user as IUser);
+        if (!callerIsOperator) {
+          return res.status(403).json({
+            error:
+              'Tenant admins may not create ADMIN-role accounts. Contact your platform operator.',
+          });
+        }
+      }
+
       const accountType = parseAccountType(body.accountType);
       if (!accountType.ok) {
         return res.status(400).json({ error: accountType.error });
@@ -753,7 +764,8 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         provider: 'local',
         role,
         tenantId: caller.tenantId,
-        mustChangePassword: true,
+        mustChangePassword:
+          body.mustChangePassword !== undefined ? Boolean(body.mustChangePassword) : true,
         termsAccepted: false,
         accountType: accountType.value,
         familyRole: familyRole.value,
@@ -1154,6 +1166,28 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         return res.status(400).json({ error: 'Invalid user ID format' });
       }
       const body = (req.body ?? {}) as Record<string, unknown>;
+
+      /* Tenant admin RBAC enforcement:
+       * - Tenant admins (non-operators) must NOT be able to edit ADMIN-role users.
+       * - Tenant admins must NOT be able to elevate any user to the ADMIN role. */
+      const callerIsOperator = await isPlatformOperator(req.user as IUser);
+      if (!callerIsOperator) {
+        // Block elevating to ADMIN role
+        if (typeof body.role === 'string' && body.role.trim() === 'ADMIN') {
+          return res.status(403).json({
+            error: 'Tenant admins may not assign the ADMIN role. Contact your platform operator.',
+          });
+        }
+        // Block editing an existing ADMIN-role user — findUsers respects tenant isolation.
+        const existing = await findUsers({ _id: id } as FilterQuery<IUser>, 'role', { limit: 1 });
+        if (existing.length > 0 && existing[0].role === SystemRoles.ADMIN) {
+          return res.status(403).json({
+            error:
+              'Tenant admins may not modify ADMIN-role accounts. Contact your platform operator.',
+          });
+        }
+      }
+
       const update: Partial<IUser> = {};
 
       if (body.name !== undefined) {
@@ -1196,6 +1230,12 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           return res.status(400).json({ error: 'Invalid mustChangePassword' });
         }
         update.mustChangePassword = body.mustChangePassword;
+      }
+      if (body.password !== undefined && body.password !== null && body.password !== '') {
+        if (typeof body.password !== 'string' || body.password.length < 8) {
+          return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+        update.password = await hashPassword(body.password);
       }
       if (body.suspended !== undefined) {
         if (typeof body.suspended !== 'boolean') {

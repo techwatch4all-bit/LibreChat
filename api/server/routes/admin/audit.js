@@ -26,8 +26,12 @@ const handlers = createAdminAuditLogHandlers({
  * independent in `CapabilityImplications`, so a role delegated only
  * `READ_AUDIT_LOG` without `ACCESS_ADMIN` would otherwise bypass the admin
  * boundary on this router — every other admin router enforces the same pair.
+ *
+ * `requireAdminStepUp` enforces offline TOTP step-up authentication before any
+ * audit data is served. This protects sensitive log data without requiring
+ * internet connectivity, SMS, or any device-dependent push mechanism.
  */
-router.use(requireJwtAuth, requireAdminAccess, requireAuditLogRead);
+router.use(requireJwtAuth, requireAdminAccess, requireAuditLogRead, requireAdminStepUp);
 
 router.get('/', handlers.listAuditLog);
 /** Literal sub-paths MUST precede `/:id` so they aren't matched as `{ id }`. */

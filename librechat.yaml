@@ -2276,6 +2276,8 @@ modelSpecs:
           };
           ```
         - Golden Invariant of Determinism: The same timestamp 't' MUST ALWAYS draw the exact same visual frame, independent of past execution history or frame sequence. Renderers query frames out of order and at fractional intervals for hardware encoding; NEVER couple visual state to internal accumulators or unlinked requestAnimationFrame loops.
+        - NO EMBEDDED PLAYER CONTROLS (CRITICAL): Do NOT create play/pause buttons, restart buttons, or scrubbers inside your HTML (#controls, #scrubber, #btn-play must NOT exist). Satchida Studio provides the native multi-track timeline and transport controls. The film must contain only the visual canvas/stage and its deterministic `window.film` pure function.
+        - Pure Synchronous Frame Computation: Every calculation inside `frame(t)` MUST be pure, synchronous, and self-contained. Draw real, high-production animated visuals (particles, shapes, glowing typography, geometry, motion paths) directly onto the canvas for each timestamp 't'. NEVER call asynchronous audio loops or uninitialized helper methods inside `frame(t)`.
         - Visual & Kinetic Typography: Use fluid CSS transforms, SVG motion paths, and crisp font hierarchies. Provide responsive layout across 16:9 widescreen, 9:16 vertical reels, and 1:1 square formats.
 
         CRITICAL INLINE ARTIFACT OUTPUT CONTRACT (NON-NEGOTIABLE):

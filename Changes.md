@@ -8,7 +8,116 @@ Format: date, phase, change, evidence. Every entry should be verifiable.
 
 ---
 
-## 2026-11-15 — Satchida Studio & Satchida Office Suite Integration (Phases 1–5)
+## 2026-11-16 — Fix Audit Log HTTP 401 & Step-Up Lifecycle Recovery
+
+**Problem.**
+1. Upon loading the Audit log tab or interacting with audit filters, the UI showed `Could not load audit log (HTTP 401)` with 0 records.
+2. Root Cause:
+   - In `admin/app.js`, line 24 had `if (res.status === 401 || res.status === 403) sessionStorage.removeItem('token');`.
+   - When `/api/admin/audit-log` was called without an active step-up token, the backend correctly returned HTTP 403 with `{ stepUpRequired: true }`.
+   - Line 24 wiped the user's primary JWT session token (`sessionStorage.removeItem('token')`). Subsequent requests sent no `Authorization` header, triggering a genuine HTTP 401 from `requireJwtAuth` and breaking the session.
+   - `promptStepUpAuth()` was only triggered on initial tab click in `setupTabs()`, but not inside `loadAudit()`, `loadGrants()`, or filter/search event listeners.
+   - In `promptStepUpAuth()`, `vRes.json?.twoFactorEnabled` was evaluated against the top level instead of checking `vRes.json?.user?.twoFactorEnabled`, causing enrolled users to enter the enrollment flow instead of the verification flow.
+   - When a modal was closed via "Cancel" or backdrop click, the step-up promise was left pending.
+
+**Shipped.**
+- `admin/app.js`:
+  - Scoped `sessionStorage.removeItem('token')` in `apiAdmin` strictly to `res.status === 401 && path === '/verify'`, preventing 403 (step-up challenge / RBAC restriction) or transient errors from invalidating the login token.
+  - Enhanced `Modal` singleton with `setOnClose()` hook and clean promise resolution on cancel or backdrop click.
+  - Aligned `promptStepUpAuth()` to check both `vRes.json?.twoFactorEnabled` and `vRes.json?.user?.twoFactorEnabled`, supporting 6-digit TOTP and backup codes, with Enter-key submission.
+  - Integrated proactive and reactive step-up verification in `loadAudit()` and `loadGrants()`: if `stepUpToken` is missing or expires in the background (HTTP 403 `STEP_UP_REQUIRED`), the step-up prompt appears automatically and retries the fetch upon completion without session destruction.
+  - Enforced tenant admin UI boundaries in `init()`: hid `Grants` and `Audit log` tabs completely for non-operator sessions.
+- `admin/index.html`:
+  - Bumped script version cache buster to `app.js?v=20261116_0910`.
+
+**Evidence.**
+- Live end-to-end verification via Node HTTP probe:
+  - Step-up authentication on `POST /api/admin/step-up` with TOTP token: HTTP 200 OK, returns valid `stepUpToken`.
+  - Authenticated query on `GET /api/admin/audit-log?limit=100&tenantId=all` with step-up token: HTTP 200 OK, loads all 209 audit records with newest events first.
+- No session token loss occurs when step-up expires.
+
+---
+
+## 2026-11-16 — Audit Log Unfreeze, Multi-Scope Querying & Dynamic Controls
+
+**Problem.**
+The Audit Log tab in the Admin Panel appeared "frozen" with only 11 old entries from 14/11/2026.
+1. `packages/api/src/admin/auditLog.ts` strictly restricted `listAuditLogPage` queries to `caller.tenantId` (`"satchida-master"`), which mapped to `chainKey: "tenant:satchida-master"`. That specific tenant chain only contained 11 test entitlement mutations from 14/11/2026.
+2. In contrast, 193 platform-wide audit log entries (user creation, user profile updates, seat allocations, password resets) were written to `__platform__` because `emitUserAudit` in `users.ts` called `recordAuditEntry` without passing `tenantId`.
+3. The Admin UI had no search input, tenant/scope selector, category filter, or manual refresh button, causing the table to appear static and unresponsive to new administrative operations.
+
+**Shipped.**
+- `packages/data-schemas/src/methods/auditLog.ts`:
+  - Updated `auditChainKey` and `buildFilter` to support global (`'all'` / `'*'`) cross-chain querying.
+  - Updated `listAuditLogPage` to sort by `{ createdAt: -1, _id: -1 }` on global queries, ensuring newest events appear first across all tenants and platform scopes.
+- `packages/api/src/admin/auditLog.ts`:
+  - Added `tenantId` query param support to `AuditLogQuery`.
+  - Configured `listAuditLogHandler` and `exportAuditLogCsv` to default to `'all'` for operator queries while allowing filtering by specific tenant or platform scope.
+- `packages/api/src/admin/users.ts`:
+  - Updated `emitUserAudit` to pass `tenantId` explicitly (`metadata.tenantId || req.user?.tenantId`).
+- `admin/index.html` & `admin/app.js`:
+  - Added an interactive action bar to the Audit tab:
+    - Real-time search filter (`#auditSearch`) matching actor, action, target, or capability.
+    - Scope / Tenant dropdown (`#auditTenantFilter`) supporting "All Scopes", "Platform Operations", and all active tenant IDs.
+    - Category filter (`#auditCategoryFilter`) for User, Entitlement/Seat, Grant/Role, and Security.
+    - Dedicated "⟳ Refresh" button (`#auditRefreshBtn`) for on-demand dynamic reloading.
+    - Added "Scope / Tenant" column to `#auditTable`.
+    - Auto-refreshed audit view after user/grant mutations.
+  - Version bumped to `?v=20261116_0855`.
+
+**Evidence.**
+- Live authenticated probe on `/api/admin/audit-log`: HTTP 200 OK, returns all 209 active audit events with newest entries first (`group.updated`, `user.updated`, `seat.reserved`, `user.created`).
+- PM2 reload: `librechat` process online, 0 restarts, all routes and MCP servers active.
+
+---
+
+## 2026-11-16 — Admin Panel Overhaul, Tenant Admin RBAC, Step-Up Security, 2FA Management & Smart Registration
+
+**Problem.**
+1. Destructive actions in Admin Panel (`admin/app.js`): `confirmDialog` silently aborted due to `Modal.close()` resolving `null`.
+2. Sensitive tabs: `Grants` and `Audit Log` lacked offline, zero-device-dependency step-up verification.
+3. RBAC constraints: Tenant admins could view and access controls to create/edit/delete groups and roles, add users to the operator `admin` group, or modify/delete `ADMIN`-role users.
+4. First-login password claim: Mongoose `runValidators: true` caused errors when setting initial passwords for accounts provisioned with temporary passwords.
+5. User registration & Unique Identifiers: Self-registration (`Registration.tsx`) and admin user creation (`createUser` / `editUser`) lacked community/organization-based formatting (School permanent admission numbers independent of yearly class progression, RWA tower/block + room numbers, Corporate employee codes, Healthcare IDs).
+6. User 2FA Admin Recovery: When users enabled TOTP 2FA and lost access or backup codes, tenant admins had no direct mechanism in the admin panel to safely reset their 2FA.
+
+**Shipped.**
+- `admin/app.js` & `admin/index.html`:
+  - Fixed `confirmDialog` with a dedicated Promise resolving `true` on confirm and `false` on cancel.
+  - Gated Grants and Audit Log tabs behind offline TOTP step-up authentication (`promptStepUpAuth()`).
+  - Enforced tenant admin UI restrictions: hidden "Create group", "Create role", "Edit group/role", "Delete group/role" buttons for non-operators (`S.isOperator`).
+  - Protected `ADMIN`-role users in user tables: non-operators see an `operator-managed` pill badge and no Edit/Seat/Reset/Delete buttons.
+  - Restricted role choices in user creation and edit modals to `USER` only for non-operators.
+  - Added "Reset 2FA" action button and handler (`DELETE /api/admin/users/:id/2fa`) with confirmation modal.
+  - Added Community / Organization Identifier Type dropdowns and dynamic formatting hints for School, RWA, Corporate, Healthcare, and General unique IDs.
+  - Bumped version tag to `?v=20261116_0815`.
+- `packages/api/src/admin/users.ts`:
+  - Added operator capability guards rejecting tenant admin attempts to create `ADMIN`-role users or modify existing `ADMIN`-role accounts (returns HTTP 403).
+  - Added `reset2FAHandler`: clears user's `totpSecret`, `backupCodes`, sets `twoFactorEnabled: false`, invalidates active sessions, and records `user.2fa_reset` audit log.
+- `api/server/routes/admin/users.js`:
+  - Mounted `DELETE /:id/2fa` routed to `handlers.reset2FA` under `requireManageUsers`.
+- `api/server/routes/admin/groups.js`:
+  - Enforced operator requirement on group create (`POST /`), update (`PATCH /:id`), delete (`DELETE /:id`).
+  - Added middlewares blocking non-operators from adding users to the `admin` group or adding `ADMIN`-role users to any group.
+- `api/server/routes/admin/grants.js` & `api/server/routes/admin/audit.js`:
+  - Enforced `requireAdminStepUp` on all grant mutations/listings and audit log reads.
+- `api/server/routes/auth.js`:
+  - Fixed `first-login-claim` to use direct Mongoose update with `runValidators: false`, unlocking accounts seamlessly without validator failures.
+- `client/src/components/Auth/Registration.tsx`:
+  - Added community/organization type selector with dynamic inputs:
+    - School: permanent admission year + student admission number (immune to class/section progression).
+    - RWA: Tower/Block + flat/plot number.
+    - Corporate: Department prefix + Employee ID.
+    - Healthcare: Medical license / staff registration ID.
+    - Other: Freeform identifier with live formatted preview.
+- `api/server/services/AuthService.js` & `api/strategies/validators.js`:
+  - Added `uniqueIdentifier` validation and persistence to the registration pipeline.
+
+**Evidence.**
+- `packages/api` build: `tsdown` completed in 1.48s, 0 errors.
+- `packages/data-provider` build: `tsdown` and `tsc` completed in 0.55s, 0 errors.
+- `client` build: `vite build` completed in 9.79s, 0 errors, 100/100 PWA precache entries generated.
+- PM2 reload: `librechat` process online, 0 unstable restarts, 19 MCP servers and 86 tools registered.
 
 **Problem.** 
 1. Univer Office integration was incomplete, lacking direct creation of blank sheets/docs or local file loading, and still exposed upstream "Univer" branding in user-visible strings.

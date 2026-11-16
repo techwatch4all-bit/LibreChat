@@ -1,3 +1,4 @@
+// @ts-ignore - pdf-parse commonjs export
 import pdf from 'pdf-parse';
 
 /**

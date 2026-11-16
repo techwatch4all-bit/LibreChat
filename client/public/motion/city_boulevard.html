@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satchida Studio — Photorealistic Metropolis Night Motion</title>
+  <style>
+    :root {
+      --bg: #090a0f;
+      --panel-bg: rgba(15, 17, 26, 0.85);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.4);
+      --gold: #f59e0b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Main Video Stage */
+    #stage-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+    }
+
+    #cam1-video {
+      z-index: 10;
+      opacity: 1;
+    }
+
+    #cam2-video {
+      z-index: 9;
+      opacity: 0;
+    }
+
+    /* Split Screen Mode */
+    .split-mode #cam1-video {
+      width: 50% !important;
+      right: 50% !important;
+      opacity: 1 !important;
+      border-right: 2px solid var(--accent);
+    }
+    .split-mode #cam2-video {
+      width: 50% !important;
+      left: 50% !important;
+      opacity: 1 !important;
+    }
+
+    /* Overlays & Cinema Letterbox */
+    .cinema-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.6) 90%),
+                  linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.85) 100%);
+    }
+
+    /* Header Bar */
+    header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(9, 10, 15, 0.95), transparent);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .title-group h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .title-group p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Audio Banner Hero (Unmute Call to Action) */
+    #audio-callout {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 35;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      animation: bounce 2s infinite;
+    }
+    #audio-callout:hover {
+      transform: translateX(-50%) scale(1.03);
+      border-color: #38bdf8;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-6px); }
+    }
+    #audio-callout .sound-icon {
+      font-size: 24px;
+      animation: wobble 1s infinite alternate ease-in-out;
+    }
+    @keyframes wobble {
+      0% { transform: rotate(-8deg); }
+      100% { transform: rotate(8deg); }
+    }
+    #audio-callout .sound-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+    #audio-callout .sound-sub {
+      font-size: 11px;
+      color: #38bdf8;
+    }
+
+    /* Floating Camera Selector & HUD */
+    .camera-switcher {
+      position: absolute;
+      top: 80px;
+      right: 24px;
+      z-index: 30;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cam-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .cam-btn:hover {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+    }
+    .cam-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+    }
+
+    /* Audio Visualizer Equalizer Bar */
+    .audio-eq-hud {
+      position: absolute;
+      bottom: 100px;
+      left: 24px;
+      z-index: 30;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 70px;
+      width: 220px;
+    }
+    .eq-bar {
+      flex: 1;
+      background: linear-gradient(to top, #38bdf8, #818cf8);
+      border-radius: 2px;
+      min-height: 4px;
+      transition: height 0.08s ease;
+    }
+    .eq-meta {
+      position: absolute;
+      top: 8px;
+      left: 16px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+    }
+
+    /* Bottom Control Deck */
+    footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: linear-gradient(to top, rgba(9, 10, 15, 0.98), rgba(9, 10, 15, 0.8) 70%, transparent);
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .timeline-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+    .progress-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #38bdf8, #818cf8);
+      border-radius: 3px;
+    }
+    .time-badge {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      min-width: 130px;
+      text-align: right;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .left-controls, .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.3);
+    }
+    .btn-primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+    }
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+    .vol-slider {
+      width: 90px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .specs-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="title-group">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+        <span class="badge"><span class="badge-dot"></span> LIVE 4K MASTER</span>
+        <span class="specs-tag">60.0 FPS</span>
+        <span class="specs-tag">1080p FHD</span>
+        <span class="specs-tag">SURROUND AUDIO 48kHz</span>
+      </div>
+      <h1>Satchida Studio — Photorealistic Metropolis Motion Graphics</h1>
+      <p>Two-Way Traffic Boulevard, Dense Neon Skyscrapers, Articulated Walking Pedestrians & Lo-Fi City Beat</p>
+    </div>
+    <div>
+      <button class="btn btn-primary" id="export-mp4-btn" onclick="alert('Export ready: 1080p 60fps MP4 master rendering stream active.')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Render MP4 Master
+      </button>
+    </div>
+  </header>
+
+  <!-- Sound Callout Banner -->
+  <div id="audio-callout" onclick="toggleAudioExplicit()">
+    <span class="sound-icon">🔊</span>
+    <div>
+      <div class="sound-text">CLICK TO PLAY STUDIO MUSIC SOUNDTRACK</div>
+      <div class="sound-sub">Lo-Fi Sunset Beat (Caden Currie) + 32-Band Spectrum Equalizer</div>
+    </div>
+  </div>
+
+  <!-- Multi-Camera Angle Selector -->
+  <div class="camera-switcher">
+    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); padding: 4px 8px; letter-spacing: 0.05em;">CAMERA FEEDS</div>
+    <button class="cam-btn active" id="btn-cam1" onclick="switchCam('cam1')">
+      <span>🏙️</span> Cam 1: Shibuya Crossing (Pedestrians & Neon)
+    </button>
+    <button class="cam-btn" id="btn-cam2" onclick="switchCam('cam2')">
+      <span>🚗</span> Cam 2: Two-Way Traffic Boulevard (Cars & Headlights)
+    </button>
+    <button class="cam-btn" id="btn-split" onclick="switchCam('split')">
+      <span>🔲</span> Dual Synchronized Multicam
+    </button>
+  </div>
+
+  <!-- Audio Equalizer Spectrum Display -->
+  <div class="audio-eq-hud">
+    <div class="eq-meta">AUDIO SPECTRUM (32-BAND)</div>
+    <div class="eq-bar" id="eq-0"></div>
+    <div class="eq-bar" id="eq-1"></div>
+    <div class="eq-bar" id="eq-2"></div>
+    <div class="eq-bar" id="eq-3"></div>
+    <div class="eq-bar" id="eq-4"></div>
+    <div class="eq-bar" id="eq-5"></div>
+    <div class="eq-bar" id="eq-6"></div>
+    <div class="eq-bar" id="eq-7"></div>
+    <div class="eq-bar" id="eq-8"></div>
+    <div class="eq-bar" id="eq-9"></div>
+    <div class="eq-bar" id="eq-10"></div>
+    <div class="eq-bar" id="eq-11"></div>
+    <div class="eq-bar" id="eq-12"></div>
+    <div class="eq-bar" id="eq-13"></div>
+    <div class="eq-bar" id="eq-14"></div>
+    <div class="eq-bar" id="eq-15"></div>
+    <div class="eq-bar" id="eq-16"></div>
+    <div class="eq-bar" id="eq-17"></div>
+    <div class="eq-bar" id="eq-18"></div>
+    <div class="eq-bar" id="eq-19"></div>
+    <div class="eq-bar" id="eq-20"></div>
+    <div class="eq-bar" id="eq-21"></div>
+    <div class="eq-bar" id="eq-22"></div>
+    <div class="eq-bar" id="eq-23"></div>
+  </div>
+
+  <!-- Stage Container -->
+  <div id="stage-container">
+    <div class="cinema-vignette"></div>
+
+    <!-- Cam 1: Shibuya Pedestrians & Skyscrapers (WebM) -->
+    <video id="cam1-video" class="video-viewport" autoplay loop muted playsinline preload="auto">
+      <source src="/motion/shibuya_night_city.webm" type="video/webm">
+      <source src="shibuya_night_city.webm" type="video/webm">
+    </video>
+
+    <!-- Cam 2: Night Traffic Boulevard (WebM) -->
+    <video id="cam2-video" class="video-viewport" autoplay loop muted playsinline preload="auto">
+      <source src="/motion/night_traffic_boulevard.webm" type="video/webm">
+      <source src="night_traffic_boulevard.webm" type="video/webm">
+    </video>
+
+    <!-- Background Music Audio Element -->
+    <audio id="soundtrack" loop preload="auto">
+      <source src="/motion/city_lofi_beat.mp3" type="audio/mp3">
+      <source src="city_lofi_beat.mp3" type="audio/mp3">
+    </audio>
+  </div>
+
+  <!-- Bottom Playback Deck -->
+  <footer>
+    <div class="timeline-container">
+      <div class="progress-bar-bg" id="progress-bar-bg" onclick="seekTimeline(event)">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="time-badge" id="timecode">00:00.00 / 00:34.63</div>
+    </div>
+
+    <div class="controls-row">
+      <div class="left-controls">
+        <button class="btn btn-primary" id="play-btn" onclick="togglePlay()">
+          <span id="play-icon">⏸ Pause</span>
+        </button>
+        <button class="btn" id="audio-toggle-btn" onclick="toggleAudioExplicit()">
+          <span id="audio-btn-icon">🔇 Audio Muted</span>
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; color: var(--text-muted);">VOL</span>
+          <input type="range" id="vol-slider" class="vol-slider" min="0" max="1" step="0.05" value="0.8" oninput="setVolume(this.value)">
+        </div>
+      </div>
+
+      <div class="right-controls">
+        <span class="specs-tag" id="active-feed-label">FEED: CAM 1 (SHIBUYA)</span>
+        <button class="btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const cam1 = document.getElementById('cam1-video');
+    const cam2 = document.getElementById('cam2-video');
+    const stage = document.getElementById('stage-container');
+    const audio = document.getElementById('soundtrack');
+    const callout = document.getElementById('audio-callout');
+    const audioBtn = document.getElementById('audio-toggle-btn');
+    const audioBtnIcon = document.getElementById('audio-btn-icon');
+    const playBtn = document.getElementById('play-btn');
+    const playIcon = document.getElementById('play-icon');
+    const progressFill = document.getElementById('progress-fill');
+    const timecode = document.getElementById('timecode');
+    const feedLabel = document.getElementById('active-feed-label');
+
+    let currentMode = 'cam1';
+    let isPlaying = true;
+    let audioContext = null;
+    let analyser = null;
+    let sourceNode = null;
+    let audioActive = false;
+
+    // Multi-Camera Switching
+    function switchCam(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+
+      if (mode === 'cam1') {
+        stage.classList.remove('split-mode');
+        cam1.style.opacity = '1';
+        cam2.style.opacity = '0';
+        document.getElementById('btn-cam1').classList.add('active');
+        feedLabel.innerText = 'FEED: CAM 1 (SHIBUYA CROSSING)';
+      } else if (mode === 'cam2') {
+        stage.classList.remove('split-mode');
+        cam1.style.opacity = '0';
+        cam2.style.opacity = '1';
+        document.getElementById('btn-cam2').classList.add('active');
+        feedLabel.innerText = 'FEED: CAM 2 (NIGHT TRAFFIC)';
+      } else if (mode === 'split') {
+        stage.classList.add('split-mode');
+        document.getElementById('btn-split').classList.add('active');
+        feedLabel.innerText = 'FEED: DUAL MULTICAM VIEW';
+      }
+    }
+
+    // Audio Engine Initialization with Web Audio Spectrum Analyzer
+    function initWebAudio() {
+      if (audioContext) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        sourceNode = audioContext.createMediaElementSource(audio);
+        sourceNode.connect(analyser);
+        analyser.connect(audioContext.destination);
+      } catch (e) {
+        console.warn('Web Audio Analyzer fallback', e);
+      }
+    }
+
+    function toggleAudioExplicit() {
+      initWebAudio();
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
+      if (!audioActive) {
+        audio.volume = parseFloat(document.getElementById('vol-slider').value) || 0.8;
+        audio.play().then(() => {
+          audioActive = true;
+          audioBtnIcon.innerText = '🔊 Audio Playing';
+          audioBtn.style.background = 'rgba(56, 189, 248, 0.2)';
+          audioBtn.style.borderColor = '#38bdf8';
+          callout.style.display = 'none';
+        }).catch(err => console.error('Play prevented', err));
+      } else {
+        audio.pause();
+        audioActive = false;
+        audioBtnIcon.innerText = '🔇 Audio Muted';
+        audioBtn.style.background = '';
+        audioBtn.style.borderColor = '';
+      }
+    }
+
+    function setVolume(v) {
+      if (audio) audio.volume = v;
+      if (v > 0 && !audioActive) {
+        toggleAudioExplicit();
+      }
+    }
+
+    // Playback Controls
+    function togglePlay() {
+      if (isPlaying) {
+        cam1.pause();
+        cam2.pause();
+        if (audioActive) audio.pause();
+        isPlaying = false;
+        playIcon.innerText = '▶ Play';
+        playBtn.classList.remove('btn-primary');
+      } else {
+        cam1.play();
+        cam2.play();
+        if (audioActive) audio.play();
+        isPlaying = true;
+        playIcon.innerText = '⏸ Pause';
+        playBtn.classList.add('btn-primary');
+      }
+    }
+
+    function seekTimeline(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      const targetTime = pos * (cam1.duration || 34.6);
+      cam1.currentTime = targetTime;
+      cam2.currentTime = targetTime % (cam2.duration || 15.5);
+      if (audioActive) audio.currentTime = targetTime % (audio.duration || 88);
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      const ms = Math.floor((s % 1) * 100);
+      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(2,'0')}`;
+    }
+
+    // Main Update Loop
+    function updateLoop() {
+      const t = cam1.currentTime || 0;
+      const dur = cam1.duration || 34.63;
+      progressFill.style.width = `${(t / dur) * 100}%`;
+      timecode.innerText = `${formatTime(t)} / ${formatTime(dur)}`;
+
+      // Update Audio Equalizer Bars
+      if (analyser && audioActive) {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        for (let i = 0; i < 24; i++) {
+          const bar = document.getElementById(`eq-${i}`);
+          if (bar) {
+            const h = Math.max(4, (data[i] / 255) * 54);
+            bar.style.height = `${h}px`;
+          }
+        }
+      } else {
+        // Simulated ambient visualizer when muted
+        for (let i = 0; i < 24; i++) {
+          const bar = document.getElementById(`eq-${i}`);
+          if (bar) {
+            const h = 4 + Math.sin(Date.now() * 0.005 + i * 0.3) * 3 + 3;
+            bar.style.height = `${h}px`;
+          }
+        }
+      }
+
+      requestAnimationFrame(updateLoop);
+    }
+    requestAnimationFrame(updateLoop);
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    // Global Automation / Test API
+    window.film = {
+      duration: 34.63,
+      width: 1920,
+      height: 1080,
+      frame: function(f) {
+        const t = (f / 60);
+        cam1.currentTime = t;
+        cam2.currentTime = t % (cam2.duration || 15.5);
+      },
+      switchCam: switchCam,
+      unmute: toggleAudioExplicit,
+      play: () => { if (!isPlaying) togglePlay(); },
+      pause: () => { if (isPlaying) togglePlay(); }
+    };
+
+    // Auto-attempt playback with click listener anywhere on document
+    document.addEventListener('click', () => {
+      if (!audioActive) {
+        // user clicked once, start audio automatically
+        toggleAudioExplicit();
+      }
+    }, { once: true });
+  </script>
+</body>
+</html>

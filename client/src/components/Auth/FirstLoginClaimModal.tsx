@@ -63,7 +63,7 @@ export default function FirstLoginClaimModal({ open, onSuccess }: FirstLoginClai
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || data.message || 'Failed to update credentials.');
+        throw new Error(data.message || data.error || 'Failed to update credentials.');
       }
 
       showToast({ message: 'Security credentials updated successfully!', status: 'success' });
@@ -98,11 +98,10 @@ export default function FirstLoginClaimModal({ open, onSuccess }: FirstLoginClai
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-text-secondary">
-                Current Temporary Password
+                Current Temporary Password (Optional if already logged in)
               </label>
               <input
                 type="password"
-                required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="focus:border-primary w-full rounded border border-border-light bg-surface-primary px-3 py-2 text-sm focus:outline-none"

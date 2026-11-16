@@ -21,7 +21,11 @@ async function apiAdmin(path, opts = {}) {
     return { ok: false, status: 0, statusText: 'network', json: null };
   }
   const json = res.status === 204 ? null : await res.json().catch(() => null);
-  if (res.status === 401 || res.status === 403) sessionStorage.removeItem('token');
+  // Only remove token if the primary session verification explicitly failed,
+  // NEVER on 403 (step-up required / RBAC restriction) or endpoint-specific 401s.
+  if (res.status === 401 && path === '/verify') {
+    sessionStorage.removeItem('token');
+  }
   return { ok: res.ok, status: res.status, statusText: res.statusText, json };
 }
 
@@ -137,7 +141,7 @@ function toast(msg, kind = 'info', ms = 3600) {
 
 /* ---------- modal singleton ---------- */
 const Modal = (() => {
-  let node, titleEl, bodyEl, footEl, resolveFn;
+  let node, titleEl, bodyEl, footEl, resolveFn, closeHook;
   function ensure() {
     if (node) return;
     node = document.createElement('div');
@@ -159,13 +163,22 @@ const Modal = (() => {
   }
   function close() {
     if (node) node.style.display = 'none';
+    if (closeHook) {
+      const h = closeHook;
+      closeHook = null;
+      try { h(); } catch {}
+    }
     if (resolveFn) {
       const r = resolveFn;
       resolveFn = null;
       r(null);
     }
   }
+  function setOnClose(fn) {
+    closeHook = fn;
+  }
   function show(title, renderBody, renderFoot) {
+    closeHook = null;
     ensure();
     titleEl.textContent = title;
     bodyEl.innerHTML = '';
@@ -182,7 +195,7 @@ const Modal = (() => {
       show(title, renderBody, renderFoot);
     });
   }
-  return { show, close, wait };
+  return { show, close, wait, setOnClose };
 })();
 
 function confirmDialog(message) {
@@ -286,6 +299,23 @@ function formModal(title, fields, submitLabel, defaults, onSubmit) {
         form.appendChild(fx);
       });
       b.appendChild(form);
+      const idCat = form.querySelector('#idCategory');
+      const uidInput = form.querySelector('#uniqueIdentifier');
+      if (idCat && uidInput) {
+        idCat.addEventListener('change', () => {
+          if (idCat.value === 'school') {
+            uidInput.placeholder = 'e.g. SCH-2024-0482 (Permanent Admission/GR No. across years)';
+          } else if (idCat.value === 'rwa') {
+            uidInput.placeholder = 'e.g. Tower B - Flat 402 (or Block C - Plot 14)';
+          } else if (idCat.value === 'corporate') {
+            uidInput.placeholder = 'e.g. EMP-1082 or ENG-402';
+          } else if (idCat.value === 'healthcare') {
+            uidInput.placeholder = 'e.g. MED-3042 or DOC-108';
+          } else {
+            uidInput.placeholder = 'e.g. Freeform Unique Reference ID';
+          }
+        });
+      }
     },
     (f) => {
       const err = document.createElement('span');
@@ -463,7 +493,7 @@ async function promptStepUpAuth() {
   }
 
   const vRes = await apiAdmin('/verify');
-  const twoFactorEnabled = vRes.json?.twoFactorEnabled === true;
+  const twoFactorEnabled = vRes.json?.twoFactorEnabled === true || vRes.json?.user?.twoFactorEnabled === true;
 
   if (!twoFactorEnabled) {
     // Initiate 2FA enrollment wizard
@@ -491,6 +521,14 @@ async function promptStepUpAuth() {
       '</div>';
 
     return new Promise((resolve) => {
+      let resolved = false;
+      const done = (val) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(val);
+        }
+      };
+      Modal.setOnClose(() => done(false));
       Modal.show(
         'Enroll Two-Factor Authentication',
         (b) => {
@@ -498,10 +536,22 @@ async function promptStepUpAuth() {
         },
         (f) => {
           f.innerHTML =
-            '<button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+            '<button type="button" id="cancelEnrollBtn" class="btn btn-ghost">Cancel</button>' +
             '<button type="button" id="confirmEnrollBtn" class="btn btn-primary">Verify & Continue</button>';
         },
       );
+      document.getElementById('cancelEnrollBtn')?.addEventListener('click', () => {
+        Modal.close();
+        done(false);
+      });
+      const input = document.getElementById('stepUpVerifyCode');
+      input?.focus();
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('confirmEnrollBtn')?.click();
+        }
+      });
       document.getElementById('confirmEnrollBtn')?.addEventListener('click', async () => {
         const code = document.getElementById('stepUpVerifyCode')?.value?.trim();
         if (!code || code.length < 6) {
@@ -516,7 +566,7 @@ async function promptStepUpAuth() {
           sessionStorage.setItem('stepUpToken', cRes.json.stepUpToken);
           toast('2FA enrolled and verified successfully!', 'ok');
           Modal.close();
-          resolve(true);
+          done(true);
         } else {
           toast('Verification failed: ' + (cRes.json?.error || 'Invalid code'), 'err');
         }
@@ -524,16 +574,24 @@ async function promptStepUpAuth() {
     });
   }
 
-  // Already enrolled, prompt for 6-digit TOTP
+  // Already enrolled, prompt for 6-digit TOTP (or backup code)
   const bodyHtml =
     '<div style="text-align:center">' +
     '<p style="color:var(--text);font-size:14px;margin-bottom:8px"><strong>Protected Security Gate</strong></p>' +
-    '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Grants & Audit Log access requires active TOTP step-up authentication. Please enter the current 6-digit code from your authenticator app:</p>' +
-    '<div class="modalField" style="text-align:left"><label for="stepUpCode">Authenticator Code</label>' +
-    '<input id="stepUpCode" type="text" placeholder="123456" maxlength="6" autocomplete="off" style="font-size:18px;letter-spacing:4px;text-align:center" /></div>' +
+    '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Grants & Audit Log access requires active offline TOTP step-up authentication. Enter the current 6-digit code from your authenticator app (or a backup code):</p>' +
+    '<div class="modalField" style="text-align:left"><label for="stepUpCode">Authenticator or Backup Code</label>' +
+    '<input id="stepUpCode" type="text" placeholder="123456" maxlength="16" autocomplete="off" style="font-size:18px;letter-spacing:4px;text-align:center" /></div>' +
     '</div>';
 
   return new Promise((resolve) => {
+    let resolved = false;
+    const done = (val) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(val);
+      }
+    };
+    Modal.setOnClose(() => done(false));
     Modal.show(
       'Security Verification Required',
       (b) => {
@@ -541,25 +599,39 @@ async function promptStepUpAuth() {
       },
       (f) => {
         f.innerHTML =
-          '<button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+          '<button type="button" id="cancelStepUpBtn" class="btn btn-ghost">Cancel</button>' +
           '<button type="button" id="verifyStepUpBtn" class="btn btn-primary">Authenticate</button>';
       },
     );
+    document.getElementById('cancelStepUpBtn')?.addEventListener('click', () => {
+      Modal.close();
+      done(false);
+    });
+    const input = document.getElementById('stepUpCode');
+    input?.focus();
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('verifyStepUpBtn')?.click();
+      }
+    });
     document.getElementById('verifyStepUpBtn')?.addEventListener('click', async () => {
-      const code = document.getElementById('stepUpCode')?.value?.trim();
-      if (!code || code.length < 6) {
-        toast('Please enter a valid 6-digit code.', 'err');
+      const rawCode = document.getElementById('stepUpCode')?.value?.trim();
+      if (!rawCode) {
+        toast('Please enter your 6-digit code or backup code.', 'err');
         return;
       }
+      const isOtp = /^\d{6}$/.test(rawCode);
+      const payload = isOtp ? { token: rawCode } : { backupCode: rawCode };
       const res = await apiAdmin('/step-up', {
         method: 'POST',
-        body: JSON.stringify({ token: code }),
+        body: JSON.stringify(payload),
       });
       if (res.ok && res.json?.stepUpToken) {
         sessionStorage.setItem('stepUpToken', res.json.stepUpToken);
         toast('Step-up verification approved.', 'ok');
         Modal.close();
-        resolve(true);
+        done(true);
       } else {
         toast('Verification failed: ' + (res.json?.error || 'Invalid code'), 'err');
       }
@@ -568,7 +640,26 @@ async function promptStepUpAuth() {
 }
 
 async function loadGrants() {
-  const res = await apiAdmin('/grants');
+  if (!sessionStorage.getItem('stepUpToken')) {
+    const ok = await promptStepUpAuth();
+    if (!ok) {
+      const el = document.getElementById('grantsTable');
+      if (el) el.innerHTML = '<p class="empty">Step-up verification required to view grants. <button type="button" class="btn btn-sm btn-ghost" onclick="loadGrants()" style="margin-left:8px">Verify & Unlock</button></p>';
+      return;
+    }
+  }
+  let res = await apiAdmin('/grants');
+  if (res.status === 403 && res.json?.stepUpRequired) {
+    sessionStorage.removeItem('stepUpToken');
+    const ok = await promptStepUpAuth();
+    if (ok) {
+      res = await apiAdmin('/grants');
+    } else {
+      const el = document.getElementById('grantsTable');
+      if (el) el.innerHTML = '<p class="empty">Step-up verification required to view grants. <button type="button" class="btn btn-sm btn-ghost" onclick="loadGrants()" style="margin-left:8px">Verify & Unlock</button></p>';
+      return;
+    }
+  }
   S.grants = normalizeList(res);
   renderGrants();
   const c = document.getElementById('grantsCount');
@@ -582,15 +673,82 @@ async function loadEffective() {
   renderEffective();
 }
 
+function populateAuditTenantFilter() {
+  const sel = document.getElementById('auditTenantFilter');
+  if (!sel) return;
+  const current = sel.value;
+  const tenants = new Set();
+  (S.users || []).forEach((u) => {
+    if (u.tenantId) tenants.add(u.tenantId);
+  });
+  tenants.add('satchida-master');
+
+  const options = [
+    '<option value="all">All Scopes (Platform & Tenants)</option>',
+    '<option value="__platform__">Platform Operations</option>',
+  ];
+  Array.from(tenants)
+    .sort()
+    .forEach((t) => {
+      options.push(`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`);
+    });
+  sel.innerHTML = options.join('');
+  if (current && Array.from(sel.options).some((o) => o.value === current)) {
+    sel.value = current;
+  }
+}
+
 async function loadAudit() {
-  const res = await apiAdmin('/audit-log');
+  if (!sessionStorage.getItem('stepUpToken')) {
+    const ok = await promptStepUpAuth();
+    if (!ok) {
+      document.getElementById('auditTable').innerHTML =
+        '<p class="empty">Step-up verification required to view audit logs. <button type="button" class="btn btn-sm btn-ghost" onclick="loadAudit()" style="margin-left:8px">Verify & Unlock</button></p>';
+      return;
+    }
+  }
+
+  populateAuditTenantFilter();
+  const searchInput = document.getElementById('auditSearch');
+  const tenantSel = document.getElementById('auditTenantFilter');
+  const catSel = document.getElementById('auditCategoryFilter');
+
+  const params = new URLSearchParams({ limit: '100' });
+  const tenantVal = tenantSel ? tenantSel.value : 'all';
+  if (tenantVal && tenantVal !== 'all') {
+    params.set('tenantId', tenantVal);
+  } else {
+    params.set('tenantId', 'all');
+  }
+
+  const searchVal = searchInput ? searchInput.value.trim() : '';
+  if (searchVal) params.set('search', searchVal);
+
+  const catVal = catSel ? catSel.value : 'all';
+  if (catVal && catVal !== 'all') params.set('category', catVal);
+
+  let res = await apiAdmin('/audit-log?' + params.toString());
+  if (res.status === 403 && res.json?.stepUpRequired) {
+    sessionStorage.removeItem('stepUpToken');
+    const ok = await promptStepUpAuth();
+    if (ok) {
+      res = await apiAdmin('/audit-log?' + params.toString());
+    } else {
+      document.getElementById('auditTable').innerHTML =
+        '<p class="empty">Step-up verification required to view audit logs. <button type="button" class="btn btn-sm btn-ghost" onclick="loadAudit()" style="margin-left:8px">Verify & Unlock</button></p>';
+      return;
+    }
+  }
+
   const list = normalizeList(res);
   const total = Number.isFinite(res.json?.total) ? res.json.total : list.length;
   const c = document.getElementById('auditCount');
-  if (c) c.textContent = `${total} record(s)`;
+  if (c) c.textContent = `${total} record(s)${list.length < total ? ` (showing latest ${list.length})` : ''}`;
   if (!res.ok) {
     document.getElementById('auditTable').innerHTML =
-      '<p class="empty">Could not load audit log (HTTP ' + res.status + ').</p>';
+      '<p class="empty">Could not load audit log (HTTP ' + res.status + '). ' +
+      (res.json?.error ? escapeHtml(res.json.error) : '') +
+      ' <button type="button" class="btn btn-sm btn-ghost" onclick="loadAudit()" style="margin-left:8px">Retry</button></p>';
     return;
   }
   const auditColumns = [
@@ -625,6 +783,10 @@ async function loadAudit() {
         const t = it.target || {};
         return (t.name || t.id || t.type || '—') + (t.type ? ` [${t.type}]` : '');
       },
+    },
+    {
+      h: 'Scope / Tenant',
+      v: (it) => it.tenantId || (it.chainKey === '__platform__' ? 'platform' : it.chainKey || '—'),
     },
     {
       h: 'IP / Origin',
@@ -794,7 +956,12 @@ function renderUsers() {
         (canManage
           ? '<button type="button" data-op="resetUser" data-uid="' +
             escapeHtml(id) +
-            '" class="action" title="Reset password">Reset</button>'
+            '" class="action" title="Reset password">Reset pwd</button>'
+          : '') +
+        (canManage
+          ? '<button type="button" data-op="reset2FA" data-uid="' +
+            escapeHtml(id) +
+            '" class="action" title="Clear user\'s 2FA so they can re-enroll">Reset 2FA</button>'
           : '') +
         (canManage
           ? '<button type="button" data-op="delUser" data-uid="' +
@@ -1100,8 +1267,27 @@ async function deleteUser(u) {
   }
 }
 
-async function createUser() {
-  /* Tenant admins may only create USER-role accounts — ADMIN is operator-only */
+async function reset2FA(u) {
+  const id = uid(u);
+  const label = escapeHtml(u.email || uname(u));
+  if (!u.twoFactorEnabled) {
+    toast(label + ' does not have 2FA enabled — nothing to reset.', 'info');
+    return;
+  }
+  const ok = await confirmDialog(
+    'Clear 2FA for ' + label + '? They will be prompted to re-enroll on next login.',
+  );
+  if (!ok) return;
+  const res = await apiAdmin('/users/' + encodeURIComponent(id) + '/2fa', { method: 'DELETE' });
+  if (res.ok) {
+    toast('2FA cleared for ' + label + '. User must re-enroll.', 'ok');
+    await loadUsers();
+  } else {
+    toast('Reset 2FA failed: ' + ((res.json && res.json.error) || `HTTP ${res.status}`), 'err');
+  }
+}
+
+async function createUser() {  /* Tenant admins may only create USER-role accounts — ADMIN is operator-only */
   const roleOptions = S.isOperator
     ? [
         { label: 'USER (Standard)', value: 'USER' },
@@ -1132,10 +1318,24 @@ async function createUser() {
         placeholder: 'e.g. John Doe (Optional: defaults to email prefix)',
       },
       {
+        key: 'idCategory',
+        label: 'Community / Organization Identifier Type',
+        type: 'select',
+        options: [
+          { label: 'School / University (Permanent Student ID / Admission No.)', value: 'school' },
+          { label: 'Residential Society / RWA (Tower & Flat / Plot No.)', value: 'rwa' },
+          { label: 'Corporate / Business (Employee ID)', value: 'corporate' },
+          { label: 'Hospital / Healthcare (Staff / Medical ID)', value: 'healthcare' },
+          { label: 'Other / General Unique Reference', value: 'other' },
+        ],
+        hint: 'Select the identifier format pattern appropriate for your organization or community.',
+      },
+      {
         key: 'uniqueIdentifier',
-        label: 'Unique Identifier (Flat / Roll No / Emp ID)',
+        label: 'Unique Identifier',
         type: 'text',
-        placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082',
+        placeholder: 'e.g. SCH-2024-0482 (School) | Tower A - Flat 402 (RWA) | EMP-1082 (Corporate)',
+        hint: 'For schools: use permanent admission ID (independent of yearly class/division progression). For RWA: Tower/Block + Flat.',
       },
       {
         key: 'role',
@@ -1240,11 +1440,24 @@ async function editUser(u) {
       },
       { key: 'name', label: 'Full Name', type: 'text', value: u.name || '' },
       {
+        key: 'idCategory',
+        label: 'Community / Organization Identifier Type',
+        type: 'select',
+        options: [
+          { label: 'School / University (Permanent Student ID / Admission No.)', value: 'school' },
+          { label: 'Residential Society / RWA (Tower & Flat / Plot No.)', value: 'rwa' },
+          { label: 'Corporate / Business (Employee ID)', value: 'corporate' },
+          { label: 'Hospital / Healthcare (Staff / Medical ID)', value: 'healthcare' },
+          { label: 'Other / General Unique Reference', value: 'other' },
+        ],
+      },
+      {
         key: 'uniqueIdentifier',
-        label: 'Unique Identifier (Flat / Roll No / Emp ID)',
+        label: 'Unique Identifier',
         type: 'text',
         value: u.uniqueIdentifier || '',
-        placeholder: 'e.g. Tower A - 402, 10-B-24, EMP-1082',
+        placeholder: 'e.g. SCH-2024-0482 (School) | Tower A - Flat 402 (RWA) | EMP-1082 (Corporate)',
+        hint: 'Permanent student admission number across years, Tower/Flat, or Employee ID.',
       },
       {
         key: 'role',
@@ -1791,26 +2004,32 @@ function seatTypeOptions(current) {
 }
 
 async function createGroup() {
+  const fields = [
+    { key: 'name', label: 'Name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+  ];
+  if (S.isOperator) {
+    fields.push({
+      key: 'accountType',
+      label: 'Seat type (licence)',
+      type: 'select',
+      options: seatTypeOptions(''),
+    });
+  }
+  fields.push(
+    { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
+    { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
+  );
+
   await formModal(
     'Create group',
-    [
-      { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'description', label: 'Description', type: 'textarea' },
-      {
-        key: 'accountType',
-        label: 'Seat type (licence)',
-        type: 'select',
-        options: seatTypeOptions(''),
-      },
-      { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
-      { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
-    ],
+    fields,
     'Create',
     {},
     async (v) => {
       if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
       const body = { name: v.name.trim(), description: v.description || '' };
-      if (v.accountType) body.accountType = v.accountType;
+      if (S.isOperator && v.accountType) body.accountType = v.accountType;
       body.shared = v.shared === 'on';
       body.localPrivacyEnabled = v.localPrivacyEnabled === 'on';
       const res = await apiAdmin('/groups', { method: 'POST', body: JSON.stringify(body) });
@@ -1825,31 +2044,49 @@ async function createGroup() {
 
 function editGroup(id) {
   const g = S.groups.find((x) => (x._id || x.id) === id) || { name: '', description: '' };
+  const fields = [
+    { key: 'name', label: 'Name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+  ];
+  if (S.isOperator) {
+    fields.push({
+      key: 'accountType',
+      label: 'Seat type (licence)',
+      type: 'select',
+      options: seatTypeOptions(g.accountType || ''),
+    });
+  } else {
+    fields.push({
+      key: 'accountType',
+      label: 'Seat type (licence) — Operator managed',
+      type: 'text',
+      value: g.accountType || 'none',
+      disabled: true,
+      hint: 'Only the platform operator may modify seat licence types on groups.',
+    });
+  }
+  fields.push(
+    { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
+    { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
+  );
+
   formModal(
     'Edit group',
-    [
-      { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'description', label: 'Description', type: 'textarea' },
-      {
-        key: 'accountType',
-        label: 'Seat type (licence)',
-        type: 'select',
-        options: seatTypeOptions(g.accountType || ''),
-      },
-      { key: 'shared', label: 'Shared seat budget (family-style pooling)', type: 'checkbox' },
-      { key: 'localPrivacyEnabled', label: 'Local Privacy mode allowed', type: 'checkbox' },
-    ],
+    fields,
     'Save',
     {
       name: g.name || '',
       description: g.description || '',
+      accountType: g.accountType || '',
       shared: !!g.shared,
       localPrivacyEnabled: !!g.localPrivacyEnabled,
     },
     async (v) => {
       if (!v.name || !v.name.trim()) return { ok: false, error: 'Name is required.' };
       const body = { name: v.name.trim(), description: v.description || '' };
-      body.accountType = v.accountType || null;
+      if (S.isOperator) {
+        body.accountType = v.accountType || null;
+      }
       body.shared = v.shared === 'on';
       body.localPrivacyEnabled = v.localPrivacyEnabled === 'on';
       const res = await apiAdmin('/groups/' + encodeURIComponent(id), {
@@ -2086,6 +2323,7 @@ function attachListeners() {
     else if (b.dataset.op === 'revokeSeat') revokeSeat(u);
     else if (b.dataset.op === 'userGroups') userGroups(u);
     else if (b.dataset.op === 'resetUser') resetUserPassword(u);
+    else if (b.dataset.op === 'reset2FA') reset2FA(u);
     else if (b.dataset.op === 'delUser') deleteUser(u);
   });
   document.getElementById('rolesTable').addEventListener('click', (e) => {
@@ -2201,6 +2439,19 @@ function attachListeners() {
   document.getElementById('usersTenantFilter')?.addEventListener('change', renderUsers);
   document.getElementById('usersTierFilter')?.addEventListener('change', renderUsers);
   document.getElementById('usersSeatFilter')?.addEventListener('change', renderUsers);
+
+  // Audit log filters & refresh
+  let auditDebounce;
+  document.getElementById('auditSearch')?.addEventListener('input', () => {
+    clearTimeout(auditDebounce);
+    auditDebounce = setTimeout(loadAudit, 350);
+  });
+  document.getElementById('auditTenantFilter')?.addEventListener('change', loadAudit);
+  document.getElementById('auditCategoryFilter')?.addEventListener('change', loadAudit);
+  document.getElementById('auditRefreshBtn')?.addEventListener('click', () => {
+    toast('Refreshing audit log…', 'info');
+    loadAudit();
+  });
 }
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -2230,8 +2481,23 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
     info.textContent += ` — tenant ${S.tenantId}`;
   }
 
+  /* Tenant admins must only manage users and group memberships —
+   * Grants and Audit log are Operator-only security surfaces. */
+  if (!S.isOperator) {
+    const grantsTab = document.querySelector('[data-tab="grants"]');
+    if (grantsTab) grantsTab.style.display = 'none';
+    const auditTab = document.querySelector('[data-tab="audit"]');
+    if (auditTab) auditTab.style.display = 'none';
+  }
+
   setupTabs();
   attachListeners();
+
+  // Ensure default active tab is explicitly set
+  const initialTab = document.querySelector('.tab.active')?.dataset?.tab || 'users';
+  document.querySelectorAll('.tabpanel').forEach((p) => p.classList.remove('active'));
+  document.getElementById(initialTab)?.classList.add('active');
+
   await Promise.all([loadUsers(), loadRoles(), loadGroups(), loadEffective()]);
 })();
 

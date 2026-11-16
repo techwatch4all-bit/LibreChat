@@ -328,6 +328,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
   getUserGroups: (req: ServerRequest, res: Response) => Promise<Response>;
   deleteUser: (req: ServerRequest, res: Response) => Promise<Response>;
   resetPassword: (req: ServerRequest, res: Response) => Promise<Response>;
+  reset2FA: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
   const {
     findUsers,
@@ -391,6 +392,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           name: user.name || user.username || user.email || userId,
         },
         target: { type: PrincipalType.USER, id: target.id, name: target.name ?? target.email },
+        tenantId: (metadata.tenantId as string) || (req.user as any)?.tenantId,
         metadata,
         context: buildAuditContext(req),
       });
@@ -1358,6 +1360,55 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     }
   }
 
+  /**
+   * DELETE /api/admin/users/:id/2fa
+   * Admin-initiated reset of a user's TOTP 2FA. Wipes totpSecret, backupCodes, and
+   * sets twoFactorEnabled: false so the user re-enrolls on next login.
+   * Requires MANAGE_USERS capability; tenant admins cannot reset ADMIN-role users.
+   */
+  async function reset2FAHandler(req: ServerRequest, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+
+      /* Tenant admin RBAC: cannot reset ADMIN-role user 2FA */
+      const callerIsOperator = await isPlatformOperator(req.user as IUser);
+      if (!callerIsOperator) {
+        const existing = await findUsers({ _id: id } as FilterQuery<IUser>, 'role', { limit: 1 });
+        if (existing.length > 0 && existing[0].role === SystemRoles.ADMIN) {
+          return res.status(403).json({
+            error: 'Tenant admins may not reset ADMIN-role account 2FA. Contact your platform operator.',
+          });
+        }
+      }
+
+      const user = await updateUserRecord(id, {
+        twoFactorEnabled: false,
+        totpSecret: undefined as unknown as string,
+        backupCodes: [],
+      } as Partial<IUser>);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found', error_code: 'USER_NOT_FOUND' });
+      }
+
+      await deleteAllUserSessions({ userId: id });
+      await emitUserAudit(
+        req,
+        'user.2fa_reset',
+        { id, name: user.name, email: user.email },
+        {},
+      );
+      logger.info(`[adminUsers] 2FA reset performed for user [Id: ${id}] by admin [IP: ${req.ip}]`);
+      return res.status(200).json({
+        ok: true,
+        message: '2FA has been cleared. The user must re-enroll on next login.',
+      });
+    } catch (error) {
+      logger.error('[adminUsers] reset2FA error:', error);
+      return res.status(500).json({ error: 'Internal server error', error_code: 'INTERNAL_ERROR' });
+    }
+  }
+
   return {
     listUsers: listUsersHandler,
     searchUsers: searchUsersHandler,
@@ -1367,5 +1418,6 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     getUserGroups: getUserGroupsHandler,
     deleteUser: deleteUserHandler,
     resetPassword: resetPasswordHandler,
+    reset2FA: reset2FAHandler,
   };
 }

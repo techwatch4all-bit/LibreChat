@@ -20,7 +20,7 @@
     <button data-tab="audit" class="tab">Audit log</button>
   </nav>
   <main class="content">
-    <section id="users" class="tabpanel">
+    <section id="users" class="tabpanel active">
       <h2>Users</h2>
       <p class="count" id="usersCount"></p>
       <div class="actionBar">
@@ -114,11 +114,26 @@
     <section id="audit" class="tabpanel" hidden>
       <h2>Audit log</h2>
       <p class="count" id="auditCount"></p>
+      <div class="actionBar">
+        <input type="search" id="auditSearch" placeholder="Search audit logs (actor, action, target)…" autocomplete="off" />
+        <select id="auditTenantFilter" title="Filter by Tenant / Scope">
+          <option value="all">All Scopes (Platform & Tenants)</option>
+          <option value="__platform__">Platform Operations</option>
+        </select>
+        <select id="auditCategoryFilter" title="Filter by Category">
+          <option value="all">All Categories</option>
+          <option value="user">User</option>
+          <option value="entitlement">Entitlement / Seat</option>
+          <option value="grant">Grant / Role</option>
+          <option value="security">Security</option>
+        </select>
+        <button type="button" id="auditRefreshBtn" class="btn btn-ghost" title="Refresh Audit Log">⟳ Refresh</button>
+      </div>
       <div class="tablewrap" id="auditTable"></div>
     </section>
   </main>
   <div id="toast" class="toast" role="alert" aria-live="polite"></div>
   <script src="./qrcodegen.js"></script>
-  <script src="./app.js?v=20261116_0750"></script>
+  <script src="./app.js?v=20261116_0934"></script>
 </body>
 </html>

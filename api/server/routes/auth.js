@@ -211,12 +211,15 @@ router.post('/first-login-claim', claimAuthMiddleware, async (req, res) => {
         .json({ error: 'User not found', message: 'User not found', error_code: 'USER_NOT_FOUND' });
     }
 
-    if (currentPassword) {
-      const match = await bcrypt.compare(currentPassword, user.password);
+    // If currentPassword is provided by the user, verify it against their existing hash.
+    // However, if omitted or if user is already authenticated via valid session token,
+    // do not block them if mustChangePassword is true.
+    if (currentPassword && currentPassword.trim()) {
+      const match = await bcrypt.compare(currentPassword.trim(), user.password);
       if (!match) {
         return res.status(401).json({
-          error: 'Current temporary password is incorrect',
-          message: 'Current temporary password is incorrect',
+          error: 'Current temporary password does not match.',
+          message: 'Current temporary password does not match.',
           error_code: 'INVALID_CREDENTIALS',
         });
       }
@@ -226,15 +229,34 @@ router.post('/first-login-claim', claimAuthMiddleware, async (req, res) => {
     const newHash = bcrypt.hashSync(newPassword, salt);
     const answerHash = bcrypt.hashSync(challengeAnswer.trim().toLowerCase(), salt);
 
-    await runAsSystem(() =>
-      updateUser(userId.toString(), {
-        password: newHash,
-        mustChangePassword: false,
-        challengeQuestion: challengeQuestion.trim(),
-        challengeAnswerHash: answerHash,
-        passwordChangedAt: new Date(),
-      }),
+    // Use direct Mongoose update with runValidators: false to avoid schema validators
+    // firing on fields we're not changing (e.g. email required, provider required).
+    const updateResult = await runAsSystem(() =>
+      mongoose.models.User.findByIdAndUpdate(
+        userId.toString(),
+        {
+          $set: {
+            password: newHash,
+            mustChangePassword: false,
+            challengeQuestion: challengeQuestion.trim(),
+            challengeAnswerHash: answerHash,
+            passwordChangedAt: new Date(),
+            provider: 'local',
+          },
+          $unset: { expiresAt: '' },
+        },
+        { new: true, runValidators: false },
+      ).lean(),
     );
+
+    if (!updateResult) {
+      logger.error(`[auth/first-login-claim] User not found after update [Id: ${userId}]`);
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'User not found',
+        error_code: 'USER_NOT_FOUND',
+      });
+    }
 
     logger.info(
       `[auth/first-login-claim] User completed first-login security claim [Id: ${user._id}] [Email: ${user.email}]`,

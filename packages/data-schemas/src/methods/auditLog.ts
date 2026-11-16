@@ -106,8 +106,15 @@ function isDuplicateKeyError(err: unknown): boolean {
 const TENANT_CHAIN_PREFIX = 'tenant:';
 
 /** Tenant scope → chain key. Blank/whitespace tenant is the platform chain;
- * tenant ids are namespaced so they can never collide with `PLATFORM_CHAIN_KEY`. */
+ * tenant ids are namespaced so they can never collide with `PLATFORM_CHAIN_KEY`.
+ * Special values 'all' and '*' indicate global querying across all chains. */
 export function auditChainKey(tenantId?: string): string {
+  if (!tenantId || tenantId === '__platform__' || tenantId === 'platform') {
+    return PLATFORM_CHAIN_KEY;
+  }
+  if (tenantId === 'all' || tenantId === '*') {
+    return 'all';
+  }
   return typeof tenantId === 'string' && tenantId.trim().length > 0
     ? `${TENANT_CHAIN_PREFIX}${tenantId}`
     : PLATFORM_CHAIN_KEY;
@@ -244,7 +251,10 @@ function clampLimit(limit?: number): number {
  * `seq`/`createdAt` pagination, so the scan stays bounded by the date window.
  */
 function buildFilter(chainKey: string, filters: AuditLogFilters): FilterQuery<IAuditLog> {
-  const query: FilterQuery<IAuditLog> = { chainKey };
+  const query: FilterQuery<IAuditLog> = {};
+  if (chainKey && chainKey !== 'all' && chainKey !== '*') {
+    query.chainKey = chainKey;
+  }
 
   if (filters.category && filters.category.length > 0) {
     query.category = oneOrIn(filters.category);
@@ -458,8 +468,10 @@ export function createAuditLogMethods(
         ? Math.floor(filters.offset)
         : 0;
 
+    const isGlobal = chainKey === 'all' || chainKey === '*';
+
     let pageQuery = AuditLog.find(paged)
-      .sort({ seq: -1 })
+      .sort(isGlobal ? { createdAt: -1, _id: -1 } : { seq: -1 })
       .limit(limit + 1);
     if (offset > 0) pageQuery = pageQuery.skip(offset);
 

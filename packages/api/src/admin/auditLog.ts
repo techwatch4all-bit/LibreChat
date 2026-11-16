@@ -229,6 +229,7 @@ interface AuditLogQuery {
   limit?: string;
   offset?: string;
   cursor?: string;
+  tenantId?: string;
 }
 
 function parseFilters(query: AuditLogQuery): ParseResult<ParsedFilters> {
@@ -294,7 +295,12 @@ export function createAdminAuditLogHandlers(deps: AdminAuditLogDeps): {
       const cursor = parseIntInRange(query.cursor, 'cursor', 1);
       if (!cursor.ok) return res.status(400).json({ error: cursor.error });
 
-      const page = await listAuditLogPage(caller.tenantId, {
+      const targetTenantId =
+        typeof query.tenantId === 'string' && query.tenantId.trim() !== ''
+          ? query.tenantId.trim()
+          : 'all';
+
+      const page = await listAuditLogPage(targetTenantId, {
         ...filters.value,
         offset: offset.value,
         limit: limit.value,
@@ -362,7 +368,8 @@ export function createAdminAuditLogHandlers(deps: AdminAuditLogDeps): {
       const caller = resolveCaller(req);
       if (!caller) return res.status(401).json({ error: 'Authentication required' });
 
-      const filters = parseFilters(req.query as AuditLogQuery);
+      const query = req.query as AuditLogQuery;
+      const filters = parseFilters(query);
       if (!filters.ok) return res.status(400).json({ error: filters.error });
 
       const filenameStamp = new Date().toISOString().slice(0, 10);
@@ -411,8 +418,13 @@ export function createAdminAuditLogHandlers(deps: AdminAuditLogDeps): {
       await writeChunk(formatCsvHeader());
       await writeChunk('\r\n');
 
+      const targetTenantId =
+        typeof query.tenantId === 'string' && query.tenantId.trim() !== ''
+          ? query.tenantId.trim()
+          : 'all';
+
       const { truncated } = await streamAuditLogEntries(
-        caller.tenantId,
+        targetTenantId,
         filters.value,
         async (entry) => {
           if (clientAborted) return;

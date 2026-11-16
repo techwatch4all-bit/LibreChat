@@ -101,6 +101,7 @@ export interface IUser extends Document {
   seatToken?: string;
   /** Operator-provisioned opaque seat alias; not a person identifier. */
   satchidaSeatAlias?: string;
+  satchidaSeatTokenId?: number;
   /** Local router assertion, kept server-side and never returned to clients. */
   privacyAssertion?: string;
   /** True only when the current local seat policy grants the Privacy add-on. */
@@ -122,6 +123,8 @@ export interface IUser extends Document {
   updatedAt?: Date;
   /** Field for external source identification (for consistency with TPrincipal schema) */
   idOnTheSource?: string;
+  uniqueIdentifier?: string | null;
+  idCategory?: string | null;
   tenantId?: string;
   federatedTokens?: OIDCTokens;
   openidTokens?: OIDCTokens;

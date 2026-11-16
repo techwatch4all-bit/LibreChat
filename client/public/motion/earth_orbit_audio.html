@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satchida Studio — Planetary Orbit & Solar Dawn (Cinematic Motion Graphics with Audio)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; }
+  canvas { width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+  #audio-prompt {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(168, 85, 247, 0.6);
+    color: #e2e8f0;
+    padding: 10px 20px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.8);
+    transition: opacity 0.5s ease;
+    cursor: pointer;
+    z-index: 50;
+  }
+  #audio-prompt.hidden { opacity: 0; pointer-events: none; }
+  .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 10px #a855f7; animation: pdot 1s infinite alternate; }
+  @keyframes pdot { from { transform: scale(0.8); opacity: 0.6; } to { transform: scale(1.4); opacity: 1; } }
+  #controls {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 16px;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    color: #e2e8f0;
+    font-size: 12px;
+    z-index: 50;
+  }
+  #controls button {
+    background: #7c3aed;
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  #controls button:hover { background: #6d28d9; }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="controls">
+    <button id="btn-toggle">Pause</button>
+    <button id="btn-audio">Mute</button>
+    <span id="timecode" style="font-family: monospace; font-size: 13px; color: #a855f7;">00:00.00 / 00:10.00</span>
+  </div>
+  <canvas id="film" width="1920" height="1080"></canvas>
+  <div id="audio-prompt"><span class="pulse-dot"></span><span>CLICK TO UNMUTE 128 BPM STEREO AUDIO & MUSIC</span></div>
+</div>
+<script>
+(function() {
+  const canvas = document.getElementById('film');
+  const ctx = canvas.getContext('2d');
+  const promptEl = document.getElementById('audio-prompt');
+  const timecodeEl = document.getElementById('timecode');
+  const btnToggle = document.getElementById('btn-toggle');
+  const btnAudio = document.getElementById('btn-audio');
+  const W = 1920, H = 1080, DURATION = 10;
+
+  let isPlaying = true;
+  let isMuted = false;
+  let currentTime = 0;
+  let lastTimestamp = performance.now();
+
+  // -------------------------------------------------------------
+  // 1. Synthesized Web Audio & Music Engine (128 BPM Cinematic)
+  // -------------------------------------------------------------
+  let audioCtx = null;
+  let masterGain = null;
+  let lastBeatIndex = -1;
+  let lastChordBar = -1;
+
+  function initAudio() {
+    if (audioCtx) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (promptEl) promptEl.classList.add('hidden');
+      return;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = new AC();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+      masterGain.connect(audioCtx.destination);
+      if (promptEl) promptEl.classList.add('hidden');
+    } catch (e) {
+      console.warn('AudioContext error:', e);
+    }
+  }
+
+  window.addEventListener('click', initAudio);
+  window.addEventListener('keydown', initAudio);
+  canvas.addEventListener('pointerdown', initAudio);
+  if (promptEl) promptEl.addEventListener('click', initAudio);
+
+  btnToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isPlaying = !isPlaying;
+    btnToggle.textContent = isPlaying ? 'Pause' : 'Play';
+  });
+
+  btnAudio.addEventListener('click', (e) => {
+    e.stopPropagation();
+    initAudio();
+    isMuted = !isMuted;
+    if (masterGain && audioCtx) {
+      masterGain.gain.setValueAtTime(isMuted ? 0 : 0.35, audioCtx.currentTime);
+    }
+    btnAudio.textContent = isMuted ? 'Unmute' : 'Mute';
+  });
+
+  function playKick(time) {
+    if (!audioCtx || isMuted) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, time);
+      osc.frequency.exponentialRampToValueAtTime(38, time + 0.12);
+      gain.gain.setValueAtTime(1.0, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(time);
+      osc.stop(time + 0.36);
+    } catch(e) {}
+  }
+
+  function playSnare(time) {
+    if (!audioCtx || isMuted) return;
+    try {
+      const bufferSize = audioCtx.sampleRate * 0.15;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 1000;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.7, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+      noise.start(time);
+      noise.stop(time + 0.2);
+    } catch(e) {}
+  }
+
+  function playHiHat(time) {
+    if (!audioCtx || isMuted) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'highpass';
+      osc.frequency.value = 8500;
+      gain.gain.setValueAtTime(0.25, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(time);
+      osc.stop(time + 0.06);
+    } catch(e) {}
+  }
+
+  function playPadChord(freqs, time, dur) {
+    if (!audioCtx || isMuted) return;
+    freqs.forEach(freq => {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, time);
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, time);
+        filter.frequency.exponentialRampToValueAtTime(1400, time + dur * 0.5);
+        filter.frequency.exponentialRampToValueAtTime(500, time + dur);
+        gain.gain.setValueAtTime(0.01, time);
+        gain.gain.linearRampToValueAtTime(0.12, time + 0.4);
+        gain.gain.linearRampToValueAtTime(0.08, time + dur * 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        osc.start(time);
+        osc.stop(time + dur + 0.1);
+      } catch(e) {}
+    });
+  }
+
+  function playSolarWhoosh(time) {
+    if (!audioCtx || isMuted) return;
+    try {
+      const bufferSize = audioCtx.sampleRate * 2.0;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(200, time);
+      filter.frequency.exponentialRampToValueAtTime(3500, time + 1.2);
+      filter.frequency.exponentialRampToValueAtTime(800, time + 2.0);
+      filter.Q.value = 4.0;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.05, time);
+      gain.gain.linearRampToValueAtTime(0.5, time + 1.0);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 2.0);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+      noise.start(time);
+      noise.stop(time + 2.1);
+    } catch(e) {}
+  }
+
+  // -------------------------------------------------------------
+  // 2. Pre-generate procedural starfield & planet textures
+  // -------------------------------------------------------------
+  const stars = [];
+  for (let i = 0; i < 450; i++) {
+    stars.push({
+      x: (Math.sin(i * 997.1) * 0.5 + 0.5) * W,
+      y: (Math.cos(i * 613.7) * 0.5 + 0.5) * H,
+      r: (i % 7 === 0) ? 2.4 : ((i % 3 === 0) ? 1.5 : 0.8),
+      alpha: (i % 5 === 0) ? 0.9 : 0.5,
+      hue: (i % 4 === 0) ? '210' : ((i % 6 === 0) ? '40' : '0')
+    });
+  }
+
+  const mapCanvas = document.createElement('canvas');
+  mapCanvas.width = 1024;
+  mapCanvas.height = 512;
+  const mctx = mapCanvas.getContext('2d');
+  mctx.fillStyle = '#0a192f';
+  mctx.fillRect(0, 0, 1024, 512);
+
+  mctx.fillStyle = '#1e3a2f';
+  function drawLand(cx, cy, rx, ry, seed) {
+    mctx.beginPath();
+    for (let a = 0; a < Math.PI * 2; a += 0.1) {
+      const r = 1 + Math.sin(a * 4 + seed) * 0.25 + Math.cos(a * 7 - seed) * 0.15;
+      const x = cx + Math.cos(a) * rx * r;
+      const y = cy + Math.sin(a) * ry * r;
+      if (a === 0) mctx.moveTo(x, y); else mctx.lineTo(x, y);
+    }
+    mctx.closePath();
+    mctx.fill();
+  }
+  drawLand(280, 180, 120, 80, 1.2);
+  drawLand(360, 340, 70, 110, 2.4);
+  drawLand(520, 210, 90, 80, 3.1);
+  drawLand(540, 320, 90, 100, 4.5);
+  drawLand(720, 200, 170, 100, 5.7);
+  drawLand(800, 370, 70, 50, 6.2);
+
+  const nightCanvas = document.createElement('canvas');
+  nightCanvas.width = 1024;
+  nightCanvas.height = 512;
+  const nctx = nightCanvas.getContext('2d');
+  nctx.fillStyle = '#000000';
+  nctx.fillRect(0, 0, 1024, 512);
+  nctx.fillStyle = '#fbbf24';
+  for (let i = 0; i < 300; i++) {
+    const lx = (Math.sin(i * 43.1) * 0.5 + 0.5) * 1024;
+    const ly = (Math.cos(i * 89.7) * 0.5 + 0.5) * 512;
+    const p = mctx.getImageData(lx | 0, ly | 0, 1, 1).data;
+    if (p[1] > 35) {
+      nctx.beginPath();
+      nctx.arc(lx, ly, Math.random() * 1.5 + 0.5, 0, Math.PI * 2);
+      nctx.fill();
+    }
+  }
+
+  const shockwaves = [];
+
+  // -------------------------------------------------------------
+  // 3. Deterministic Frame Pure Function with Audio Sync
+  // -------------------------------------------------------------
+  function frame(t) {
+    t = Math.max(0, Math.min(DURATION, t));
+    ctx.clearRect(0, 0, W, H);
+
+    const BPM = 128;
+    const beatDur = 60 / BPM;
+    const beatIndex = Math.floor(t / beatDur);
+
+    if (beatIndex !== lastBeatIndex && audioCtx && audioCtx.state === 'running') {
+      lastBeatIndex = beatIndex;
+      const now = audioCtx.currentTime;
+
+      if (beatIndex % 2 === 0) {
+        playKick(now);
+      } else {
+        playSnare(now);
+      }
+      playHiHat(now);
+
+      shockwaves.push({ t0: t, r0: 520, life: 1.0 });
+
+      const chordBar = Math.floor(beatIndex / 8);
+      if (chordBar !== lastChordBar) {
+        lastChordBar = chordBar;
+        if (chordBar === 0) {
+          playPadChord([130.81, 155.56, 196.00], now, 3.6);
+        } else if (chordBar === 1) {
+          playPadChord([103.83, 130.81, 155.56], now, 3.6);
+          playSolarWhoosh(now + 0.5);
+        } else {
+          playPadChord([116.54, 146.83, 174.61], now, 3.6);
+        }
+      }
+    }
+
+    // Deep space
+    const nebulaGrad = ctx.createRadialGradient(W * 0.3, H * 0.4, 100, W * 0.5, H * 0.5, W * 0.8);
+    nebulaGrad.addColorStop(0, '#0d091a');
+    nebulaGrad.addColorStop(0.5, '#050814');
+    nebulaGrad.addColorStop(1, '#000002');
+    ctx.fillStyle = nebulaGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    const camPanX = (t / DURATION) * 80;
+    const camPanY = Math.sin((t / DURATION) * Math.PI) * 40;
+
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const sx = (s.x - camPanX * (s.r * 0.3) + W) % W;
+      const sy = (s.y - camPanY * (s.r * 0.3) + H) % H;
+      const twinkle = s.alpha * (0.8 + Math.sin(t * 3 + i) * 0.2);
+      ctx.fillStyle = s.hue === '0' ? 'rgba(255,255,255,' + twinkle + ')' :
+                      (s.hue === '210' ? 'rgba(186,230,253,' + twinkle + ')' : 'rgba(254,240,138,' + twinkle + ')');
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Moon
+    const moonP = t / DURATION;
+    const moonX = W * 0.15 + moonP * 60;
+    const moonY = H * 0.28 - moonP * 20;
+    const moonR = 34;
+    const moonGrad = ctx.createRadialGradient(moonX - moonR * 0.3, moonY - moonR * 0.3, 4, moonX, moonY, moonR);
+    moonGrad.addColorStop(0, '#e2e8f0');
+    moonGrad.addColorStop(0.7, '#94a3b8');
+    moonGrad.addColorStop(1, '#475569');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fillStyle = moonGrad;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(moonX + 10, moonY - 5, moonR * 0.95, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+    ctx.fill();
+    ctx.restore();
+
+    let earthX, earthY, earthR, sunX, sunY, sunIntensity;
+    if (t < 3.5) {
+      const p1 = t / 3.5;
+      earthX = W * 0.55 - p1 * 40;
+      earthY = H * 0.85 + (1 - p1) * 80;
+      earthR = 520 + p1 * 30;
+      sunX = earthX - earthR * 0.7;
+      sunY = earthY - earthR * 0.75;
+      sunIntensity = Math.max(0, (p1 - 0.5) * 2);
+    } else if (t < 7.0) {
+      const p2 = (t - 3.5) / 3.5;
+      earthX = W * 0.51 - p2 * 30;
+      earthY = H * 0.85;
+      earthR = 550 - p2 * 20;
+      sunX = earthX - earthR * 0.72 + p2 * 40;
+      sunY = earthY - earthR * 0.76 - p2 * 30;
+      sunIntensity = 1.0;
+    } else {
+      const p3 = (t - 7.0) / 3.0;
+      earthX = W * 0.48 - p3 * 50;
+      earthY = H * 0.85 + p3 * 40;
+      earthR = 530 - p3 * 70;
+      sunX = earthX - earthR * 0.70 + 40;
+      sunY = earthY - earthR * 0.78 - 30;
+      sunIntensity = 1.0 - p3 * 0.15;
+    }
+
+    for (let sw = shockwaves.length - 1; sw >= 0; sw--) {
+      const wave = shockwaves[sw];
+      const age = t - wave.t0;
+      if (age < 0 || age > wave.life) {
+        shockwaves.splice(sw, 1);
+        continue;
+      }
+      const waveProgress = age / wave.life;
+      const waveRadius = wave.r0 + waveProgress * 220;
+      const waveAlpha = (1 - waveProgress) * 0.4;
+      ctx.beginPath();
+      ctx.arc(earthX, earthY, waveRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(168, 85, 247, ' + waveAlpha + ')';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    if (sunIntensity > 0.05) {
+      const flareAlpha = Math.min(1, sunIntensity);
+      const corona = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 400);
+      corona.addColorStop(0, 'rgba(255, 255, 255, ' + flareAlpha + ')');
+      corona.addColorStop(0.15, 'rgba(254, 240, 138, ' + (flareAlpha * 0.8) + ')');
+      corona.addColorStop(0.4, 'rgba(251, 146, 60, ' + (flareAlpha * 0.4) + ')');
+      corona.addColorStop(0.7, 'rgba(147, 51, 234, ' + (flareAlpha * 0.15) + ')');
+      corona.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = corona;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 400, 0, Math.PI * 2);
+      ctx.fill();
+
+      const streakGrad = ctx.createLinearGradient(sunX - 700, sunY, sunX + 700, sunY);
+      streakGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+      streakGrad.addColorStop(0.35, 'rgba(56, 189, 248, ' + (flareAlpha * 0.4) + ')');
+      streakGrad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (flareAlpha * 0.9) + ')');
+      streakGrad.addColorStop(0.65, 'rgba(56, 189, 248, ' + (flareAlpha * 0.4) + ')');
+      streakGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = streakGrad;
+      ctx.fillRect(sunX - 700, sunY - 4, 1400, 8);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 26, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+    ctx.clip();
+
+    const rotSpeed = 0.04;
+    const rotOffset = (t * rotSpeed * 1024) % 1024;
+    ctx.drawImage(mapCanvas, rotOffset, 0, 1024 - rotOffset, 512, earthX - earthR, earthY - earthR, earthR * 2 * ((1024 - rotOffset) / 1024), earthR * 2);
+    if (rotOffset > 0) {
+      ctx.drawImage(mapCanvas, 0, 0, rotOffset, 512, earthX - earthR + earthR * 2 * ((1024 - rotOffset) / 1024), earthY - earthR, earthR * 2 * (rotOffset / 1024), earthR * 2);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    for (let c = 0; c < 8; c++) {
+      const cy = earthY - earthR * 0.7 + c * (earthR * 1.4 / 8);
+      ctx.beginPath();
+      ctx.ellipse(earthX, cy, earthR * 0.95, 24 + Math.sin(t + c) * 6, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 18;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const shadowGrad = ctx.createRadialGradient(
+      sunX, sunY, earthR * 0.2,
+      earthX + earthR * 0.4, earthY + earthR * 0.4, earthR * 1.3
+    );
+    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    shadowGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.15)');
+    shadowGrad.addColorStop(0.65, 'rgba(2, 6, 23, 0.85)');
+    shadowGrad.addColorStop(0.85, 'rgba(1, 3, 12, 0.98)');
+    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(earthX - earthR, earthY - earthR, earthR * 2, earthR * 2);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.75 * (1 - sunIntensity * 0.5);
+    ctx.drawImage(nightCanvas, rotOffset, 0, 1024 - rotOffset, 512, earthX - earthR, earthY - earthR, earthR * 2 * ((1024 - rotOffset) / 1024), earthR * 2);
+    ctx.restore();
+
+    ctx.restore();
+
+    const atmoGrad = ctx.createRadialGradient(earthX, earthY, earthR - 4, earthX, earthY, earthR + 42);
+    atmoGrad.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
+    atmoGrad.addColorStop(0.2, 'rgba(56, 189, 248, 0.5)');
+    atmoGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.25)');
+    atmoGrad.addColorStop(0.8, 'rgba(147, 51, 234, 0.08)');
+    atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(earthX, earthY, earthR + 42, 0, Math.PI * 2);
+    ctx.arc(earthX, earthY, earthR - 2, Math.PI * 2, 0, true);
+    ctx.fillStyle = atmoGrad;
+    ctx.fill();
+    ctx.restore();
+
+    if (sunIntensity > 0.1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(earthX, earthY, earthR + 2, Math.PI * 1.15, Math.PI * 1.55);
+      ctx.strokeStyle = 'rgba(255, 255, 255, ' + (sunIntensity * 0.95) + ')';
+      ctx.lineWidth = 6;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 25;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 48-Band Audio Spectrum Visualizer
+    const barCount = 48;
+    const barW = 8;
+    const barGap = 4;
+    const startX = (W - (barCount * (barW + barGap))) / 2;
+    const spectrumY = H - 90;
+    
+    for (let b = 0; b < barCount; b++) {
+      const freq1 = Math.sin(t * 14 + b * 0.3) * 0.5 + 0.5;
+      const freq2 = Math.cos(t * 8 - b * 0.15) * 0.5 + 0.5;
+      const beatPulse = (1 - (t % beatDur) / beatDur);
+      const h = 8 + (freq1 * 0.6 + freq2 * 0.4) * 65 * (0.6 + beatPulse * 0.4);
+      const bx = startX + b * (barW + barGap);
+
+      const barGrad = ctx.createLinearGradient(bx, spectrumY - h, bx, spectrumY);
+      barGrad.addColorStop(0, '#38bdf8');
+      barGrad.addColorStop(0.5, '#a855f7');
+      barGrad.addColorStop(1, '#6366f1');
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(bx, spectrumY - h, barW, h);
+    }
+
+    // Floating Audio HUD
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(40, H - 110, 320, 48, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    const vu = 0.4 + Math.sin(t * 12) * 0.3 + (1 - (t % beatDur) / beatDur) * 0.3;
+    ctx.fillStyle = '#10b981';
+    ctx.fillRect(52, H - 85, Math.min(296, vu * 296), 4);
+
+    ctx.font = '600 13px ui-monospace, SFMono-Regular, monospace';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText('♫ 128 BPM • C-MIN STEREO AUDIO', 52, H - 94);
+    ctx.restore();
+
+    // Letterbox
+    const letterboxHeight = (H - (W / 2.39)) / 2;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, W, letterboxHeight);
+    ctx.fillRect(0, H - letterboxHeight, W, letterboxHeight);
+
+    // Vignette
+    const vigGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.35, W / 2, H / 2, W * 0.7);
+    vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+    ctx.fillStyle = vigGrad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function loop(now) {
+    const dt = (now - lastTimestamp) / 1000;
+    lastTimestamp = now;
+
+    if (isPlaying) {
+      currentTime += dt;
+      if (currentTime >= DURATION) {
+        currentTime = 0;
+        lastBeatIndex = -1;
+        lastChordBar = -1;
+      }
+    }
+
+    frame(currentTime);
+
+    const m = Math.floor(currentTime / 60);
+    const s = Math.floor(currentTime % 60);
+    const cs = Math.floor((currentTime % 1) * 100);
+    timecodeEl.textContent = 
+      String(m).padStart(2, '0') + ':' + 
+      String(s).padStart(2, '0') + '.' + 
+      String(cs).padStart(2, '0') + ' / 00:10.00';
+
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

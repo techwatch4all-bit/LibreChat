@@ -473,6 +473,15 @@ router.delete('/:id', requireManageUsers, handlers.deleteUser);
  */
 router.post('/:id/reset-password', requireManageUsers, handlers.resetPassword);
 
+/**
+ * Admin-initiated 2FA reset for a user.
+ * Clears totpSecret, backupCodes, and twoFactorEnabled so the user re-enrolls.
+ * Tenant admins cannot reset ADMIN-role user 2FA (enforced in handler).
+ *
+ * DELETE /api/admin/users/:id/2fa
+ */
+router.delete('/:id/2fa', requireManageUsers, handlers.reset2FA);
+
 function generateSecureTempPassword(length = 12) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
   const bytes = crypto.randomBytes(length);

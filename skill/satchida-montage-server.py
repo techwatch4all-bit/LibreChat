@@ -350,6 +350,9 @@ def _ci_video_direct(
             "prompt": prompt,
             "duration_seconds": seconds,
             "aspect_ratio": aspect_ratio,
+            # CI requires a priced resolution on some models (grok-imagine-video
+            # rejects without one): 480p on the cheap chain, 720p on hd.
+            "resolution": "720p" if quality == "hd" else "480p",
         }
         if native_audio and not image_url:
             body["audio"] = True

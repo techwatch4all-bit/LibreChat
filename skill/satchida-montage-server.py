@@ -571,11 +571,13 @@ def _generate_video_core(
     output_path: Path,
     aspect_ratio: str = "16:9",
     native_audio: bool = False,
+    quality: str = "fast",
 ) -> bool:
     """Provider-policy chain: CheapInference (priority 1) then DeepInfra (priority 2).
 
     native_audio=True selects DeepInfra's audio-visual models (LTX-2.3-Fast
     first) which render synchronized audio inside the clip itself.
+    quality="hd" tries the 720p silent model (FastWan2.2) before the 480p one.
     """
     if _ci_video_via_bifrost(prompt, duration_seconds, output_path, aspect_ratio):
         return True
@@ -583,29 +585,41 @@ def _generate_video_core(
         return _deepinfra_video(
             prompt, output_path, models=list(DEEPINFRA_VIDEO_AV_MODELS)
         )
-    return _deepinfra_video(prompt, output_path)
+    models = list(DEEPINFRA_VIDEO_MODELS)
+    if quality == "hd" and len(models) >= 2:
+        models = [models[1], models[0]] + models[2:]
+    return _deepinfra_video(prompt, output_path, models=models)
 
 
 def _tts_edge(text: str, output_path: Path, voice: str = "en-US-AriaNeural") -> bool:
-    """Free Microsoft Edge TTS via the repo's edge_tts_service.py (system python)."""
-    try:
-        script = _LIBRECHAT_ROOT / "skill" / "edge_tts_service.py"
-        proc = subprocess.run(
-            ["python", str(script), voice, str(output_path), text],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        ok = proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024
-        if not ok:
-            print(
-                f"[satchida-montage] TTS failed: {proc.stderr[:200] if proc.stderr else 'no output'}",
-                file=sys.stderr,
+    """Free Microsoft Edge TTS via the repo's edge_tts_service.py (system python).
+
+    stdin is detached and CREATE_NO_WINDOW set: an inherited stdio handle from
+    the MCP server process can hang the child on Windows, which once surfaced
+    as a 120s timeout on the first narration attempt.
+    """
+    script = _LIBRECHAT_ROOT / "skill" / "edge_tts_service.py"
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    last_err = ""
+    for attempt in range(2):
+        try:
+            proc = subprocess.run(
+                ["python", str(script), voice, str(output_path), text],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                stdin=subprocess.DEVNULL,
+                creationflags=flags,
             )
-        return ok
-    except Exception as e:
-        print(f"[satchida-montage] TTS failed: {e}", file=sys.stderr)
-        return False
+            if proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024:
+                return True
+            last_err = proc.stderr[:200] if proc.stderr else "no output"
+        except Exception as e:
+            last_err = str(e)[:200]
+        if attempt == 0:
+            time.sleep(2)
+    print(f"[satchida-montage] TTS failed: {last_err}", file=sys.stderr)
+    return False
 
 
 def _mux_audio(video_path: Path, audio_path: Path, output_path: Path) -> bool:
@@ -1283,6 +1297,7 @@ def video_generate(
     filename: str = "",
     narration: str = "",
     native_audio: bool = False,
+    quality: str = "fast",
 ) -> str:
     """
     Generate a single real AI video clip (cloud only).
@@ -1302,6 +1317,8 @@ def video_generate(
         native_audio: When true (and no narration), use audio-visual models —
             Lightricks LTX-2.3-Fast first (native synchronized audio, from
             $0.03/s) — so the clip itself contains synced sound.
+        quality: 'fast' (480p FastWan first, cheapest) or 'hd' (720p FastWan2.2
+            first, better fidelity for ~$0.02/5s).
 
     Returns the absolute path of the generated MP4, or a clear error message.
     """
@@ -1314,7 +1331,8 @@ def video_generate(
 
     use_native = native_audio and not narration.strip()
     ok = _generate_video_core(
-        prompt, duration_seconds, out, aspect_ratio, native_audio=use_native
+        prompt, duration_seconds, out, aspect_ratio,
+        native_audio=use_native, quality=quality,
     )
     if not ok:
         return (

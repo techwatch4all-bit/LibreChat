@@ -690,6 +690,24 @@ native_audio, quality)`. `narration` muxes free Edge-TTS speech onto the clip;
 `native_audio=True` selects the audio-visual chain (LTX first); `quality="hd"`
 tries FastWan2.2 720p before the 480p model.
 
+**CheapInference key lift — recommended dashboard tick-list (2026-11-16):**
+keep the existing text models (`deepseek-v4.1-flash`, `glm-5.3-flash`, `gpt-6-luna`,
+`gpt-oss-120b`) and add:
+
+| Image | Discounted | | Video | Discounted |
+| --- | --- | --- | --- | --- |
+| `flux-3-image-klein` | $0.0077/img (cheapest) | | `kling-v2.6-t2v` | $0.046/s |
+| `flux-2-klein-4b` | $0.0119/img | | `kling-v2.6-i2v` | $0.0595/s (image-to-video) |
+| `grok-imagine-image` | $0.013/img | | `grok-imagine-video` | $0.0371/s (cheapest T2V) |
+| `seedream-4.5` | $0.026/img | | `veo-3.1-lite-generate-001` | $0.0325/s (native audio) |
+| | | | `kling-v2.5-turbo-t2v` | $0.046/s |
+
+Cost reality after the lift: CI images are cheapest anywhere ($0.0077 vs
+DeepInfra $0.012), but CI silent video ($0.19+/5s) is ~15× DeepInfra FastWan
+($0.0125/5s); native-audio video is comparable (Veo-lite $0.16 vs LTX $0.15).
+Chains try CI first per the operator's priority; `refresh-models` auto-discovers
+every ID above (keyword matcher covers them all).
+
 **Phase 4 (planned, parallel):** reproduce the same three scenarios locally with the
 installed ComfyUI (`D:\LAN-AI-Infra\Image-models` — SDXL, DreamShaper, realisticVision,
 SD3.5-turbo, AnimateDiff, mmaudio, workflows/) using the `admin@satchida.com`

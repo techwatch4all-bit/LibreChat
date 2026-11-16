@@ -14,6 +14,7 @@ import {
   AlertCircle,
   X,
   Volume2,
+  VolumeX,
   Film,
   FastForward,
   Rewind,
@@ -50,6 +51,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   const [duration, setDuration] = useState<number>(10);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isLooping, setIsLooping] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [exportPhase, setExportPhase] = useState<'preparing' | 'rendering' | 'encoding' | 'done'>(
@@ -104,144 +106,265 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
     (function() {
       var canvas = document.getElementById('film');
       var ctx = canvas.getContext('2d');
-      var W = 1920, H = 1080;
-      
+      var W = 1920, H = 1080, DURATION = 10;
+
+      // Pre-generate starfield
       var stars = [];
-      for (var i = 0; i < 160; i++) {
+      for (var i = 0; i < 450; i++) {
         stars.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          r: Math.random() * 2.5 + 0.5,
-          color: i % 3 === 0 ? '#8b5cf6' : (i % 3 === 1 ? '#06b6d4' : '#ffffff'),
-          speed: Math.random() * 0.8 + 0.2
+          x: (Math.sin(i * 997.1) * 0.5 + 0.5) * W,
+          y: (Math.cos(i * 613.7) * 0.5 + 0.5) * H,
+          r: (i % 7 === 0) ? 2.2 : ((i % 3 === 0) ? 1.4 : 0.8),
+          alpha: (i % 5 === 0) ? 0.9 : 0.5,
+          hue: (i % 4 === 0) ? '210' : ((i % 6 === 0) ? '40' : '0')
         });
       }
 
+      // Procedural continents map
+      var mapCanvas = document.createElement('canvas');
+      mapCanvas.width = 1024;
+      mapCanvas.height = 512;
+      var mctx = mapCanvas.getContext('2d');
+      mctx.fillStyle = '#0a192f';
+      mctx.fillRect(0, 0, 1024, 512);
+
+      mctx.fillStyle = '#1e3a2f';
+      function drawLand(cx, cy, rx, ry, seed) {
+        mctx.beginPath();
+        for (var a = 0; a < Math.PI * 2; a += 0.1) {
+          var r = 1 + Math.sin(a * 4 + seed) * 0.25 + Math.cos(a * 7 - seed) * 0.15;
+          var x = cx + Math.cos(a) * rx * r;
+          var y = cy + Math.sin(a) * ry * r;
+          if (a === 0) mctx.moveTo(x, y); else mctx.lineTo(x, y);
+        }
+        mctx.closePath();
+        mctx.fill();
+      }
+      drawLand(280, 180, 120, 80, 1.2);
+      drawLand(360, 340, 70, 110, 2.4);
+      drawLand(520, 210, 90, 80, 3.1);
+      drawLand(540, 320, 90, 100, 4.5);
+      drawLand(720, 200, 170, 100, 5.7);
+      drawLand(800, 370, 70, 50, 6.2);
+
+      // Night city lights
+      var nightCanvas = document.createElement('canvas');
+      nightCanvas.width = 1024;
+      nightCanvas.height = 512;
+      var nctx = nightCanvas.getContext('2d');
+      nctx.fillStyle = '#000000';
+      nctx.fillRect(0, 0, 1024, 512);
+      nctx.fillStyle = '#fbbf24';
+      for (var ni = 0; ni < 300; ni++) {
+        var lx = (Math.sin(ni * 43.1) * 0.5 + 0.5) * 1024;
+        var ly = (Math.cos(ni * 89.7) * 0.5 + 0.5) * 512;
+        var p = mctx.getImageData(lx | 0, ly | 0, 1, 1).data;
+        if (p[1] > 35) {
+          nctx.beginPath();
+          nctx.arc(lx, ly, Math.random() * 1.5 + 0.5, 0, Math.PI * 2);
+          nctx.fill();
+        }
+      }
+
       window.film = {
-        duration: 10,
+        duration: DURATION,
         width: W,
         height: H,
         frame: function(t) {
+          t = Math.max(0, Math.min(DURATION, t));
           ctx.clearRect(0, 0, W, H);
-          
-          var grad = ctx.createRadialGradient(W/2, H/2, 100, W/2, H/2, W * 0.7);
-          grad.addColorStop(0, '#090d1f');
-          grad.addColorStop(1, '#020617');
-          ctx.fillStyle = grad;
+
+          // Deep cosmic void
+          var nebulaGrad = ctx.createRadialGradient(W * 0.3, H * 0.4, 100, W * 0.5, H * 0.5, W * 0.8);
+          nebulaGrad.addColorStop(0, '#0d091a');
+          nebulaGrad.addColorStop(0.5, '#050814');
+          nebulaGrad.addColorStop(1, '#000002');
+          ctx.fillStyle = nebulaGrad;
           ctx.fillRect(0, 0, W, H);
 
-          var orbGlow = ctx.createRadialGradient(
-            W/2 + Math.cos(t * 1.5) * 80, 
-            H/2 + Math.sin(t * 1.2) * 40, 
-            20, 
-            W/2, 
-            H/2, 
-            480 + Math.sin(t * 3) * 60
-          );
-          orbGlow.addColorStop(0, 'rgba(139, 92, 246, 0.45)');
-          orbGlow.addColorStop(0.5, 'rgba(6, 182, 212, 0.2)');
-          orbGlow.addColorStop(1, 'rgba(2, 6, 23, 0)');
-          ctx.fillStyle = orbGlow;
-          ctx.fillRect(0, 0, W, H);
+          var camPanX = (t / DURATION) * 80;
+          var camPanY = Math.sin((t / DURATION) * Math.PI) * 40;
 
+          // Parallax Stars
           for (var i = 0; i < stars.length; i++) {
             var s = stars[i];
-            var sx = (s.x + Math.sin(t * s.speed + i) * 60) % W;
-            var sy = (s.y + Math.cos(t * s.speed + i) * 30) % H;
+            var sx = (s.x - camPanX * (s.r * 0.3) + W) % W;
+            var sy = (s.y - camPanY * (s.r * 0.3) + H) % H;
+            var twinkle = s.alpha * (0.8 + Math.sin(t * 3 + i) * 0.2);
+            ctx.fillStyle = s.hue === '0' ? 'rgba(255,255,255,' + twinkle + ')' :
+                            (s.hue === '210' ? 'rgba(186,230,253,' + twinkle + ')' : 'rgba(254,240,138,' + twinkle + ')');
             ctx.beginPath();
-            ctx.arc(sx, sy, s.r * (1 + Math.sin(t * 4 + i) * 0.3), 0, Math.PI * 2);
-            ctx.fillStyle = s.color;
-            ctx.globalAlpha = Math.min(1, Math.max(0.2, Math.sin(t * 2 + i) * 0.5 + 0.5));
+            ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
             ctx.fill();
           }
-          ctx.globalAlpha = 1.0;
 
-          for (var r = 1; r <= 4; r++) {
-            var pulseR = 140 * r + Math.sin(t * 4 + r) * 20;
+          // Moon
+          var moonP = t / DURATION;
+          var moonX = W * 0.15 + moonP * 60;
+          var moonY = H * 0.28 - moonP * 20;
+          var moonR = 34;
+          var moonGrad = ctx.createRadialGradient(moonX - moonR * 0.3, moonY - moonR * 0.3, 4, moonX, moonY, moonR);
+          moonGrad.addColorStop(0, '#e2e8f0');
+          moonGrad.addColorStop(0.7, '#94a3b8');
+          moonGrad.addColorStop(1, '#475569');
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+          ctx.fillStyle = moonGrad;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(moonX + 10, moonY - 5, moonR * 0.95, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+          ctx.fill();
+          ctx.restore();
+
+          // Camera trajectory
+          var earthX, earthY, earthR, sunX, sunY, sunIntensity;
+          if (t < 3.5) {
+            var p1 = t / 3.5;
+            earthX = W * 0.55 - p1 * 40;
+            earthY = H * 0.85 + (1 - p1) * 80;
+            earthR = 520 + p1 * 30;
+            sunX = earthX - earthR * 0.7;
+            sunY = earthY - earthR * 0.75;
+            sunIntensity = Math.max(0, (p1 - 0.5) * 2);
+          } else if (t < 7.0) {
+            var p2 = (t - 3.5) / 3.5;
+            earthX = W * 0.51 - p2 * 30;
+            earthY = H * 0.85;
+            earthR = 550 - p2 * 20;
+            sunX = earthX - earthR * 0.72 + p2 * 40;
+            sunY = earthY - earthR * 0.76 - p2 * 30;
+            sunIntensity = 1.0;
+          } else {
+            var p3 = (t - 7.0) / 3.0;
+            earthX = W * 0.48 - p3 * 50;
+            earthY = H * 0.85 + p3 * 40;
+            earthR = 530 - p3 * 70;
+            sunX = earthX - earthR * 0.70 + 40;
+            sunY = earthY - earthR * 0.78 - 30;
+            sunIntensity = 1.0 - p3 * 0.15;
+          }
+
+          // 1. Sun & Solar Flare
+          if (sunIntensity > 0.05) {
+            var flareAlpha = Math.min(1, sunIntensity);
+            var corona = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 400);
+            corona.addColorStop(0, 'rgba(255, 255, 255, ' + flareAlpha + ')');
+            corona.addColorStop(0.15, 'rgba(254, 240, 138, ' + (flareAlpha * 0.8) + ')');
+            corona.addColorStop(0.4, 'rgba(251, 146, 60, ' + (flareAlpha * 0.4) + ')');
+            corona.addColorStop(0.7, 'rgba(147, 51, 234, ' + (flareAlpha * 0.15) + ')');
+            corona.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = corona;
             ctx.beginPath();
-            ctx.arc(W/2, H/2, pulseR, 0, Math.PI * 2);
-            ctx.strokeStyle = r % 2 === 0 ? 'rgba(139, 92, 246, 0.25)' : 'rgba(6, 182, 212, 0.2)';
-            ctx.lineWidth = 2;
+            ctx.arc(sunX, sunY, 400, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Anamorphic horizontal lens flare streak
+            var streakGrad = ctx.createLinearGradient(sunX - 700, sunY, sunX + 700, sunY);
+            streakGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+            streakGrad.addColorStop(0.35, 'rgba(56, 189, 248, ' + (flareAlpha * 0.4) + ')');
+            streakGrad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (flareAlpha * 0.9) + ')');
+            streakGrad.addColorStop(0.65, 'rgba(56, 189, 248, ' + (flareAlpha * 0.4) + ')');
+            streakGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            ctx.fillStyle = streakGrad;
+            ctx.fillRect(sunX - 700, sunY - 4, 1400, 8);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, 26, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 2. Earth Globe
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+          ctx.clip();
+
+          var rotSpeed = 0.04;
+          var rotOffset = (t * rotSpeed * 1024) % 1024;
+          ctx.drawImage(mapCanvas, rotOffset, 0, 1024 - rotOffset, 512, earthX - earthR, earthY - earthR, earthR * 2 * ((1024 - rotOffset) / 1024), earthR * 2);
+          if (rotOffset > 0) {
+            ctx.drawImage(mapCanvas, 0, 0, rotOffset, 512, earthX - earthR + earthR * 2 * ((1024 - rotOffset) / 1024), earthY - earthR, earthR * 2 * (rotOffset / 1024), earthR * 2);
+          }
+
+          // Clouds
+          ctx.save();
+          ctx.globalAlpha = 0.55;
+          for (var c = 0; c < 8; c++) {
+            var cy = earthY - earthR * 0.7 + c * (earthR * 1.4 / 8);
+            ctx.beginPath();
+            ctx.ellipse(earthX, cy, earthR * 0.95, 24 + Math.sin(t + c) * 6, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.lineWidth = 18;
             ctx.stroke();
           }
+          ctx.restore();
 
-          var barCount = 36;
-          var barWidth = W / (barCount * 1.6);
-          var barGap = barWidth * 0.6;
-          var startX = (W - (barCount * (barWidth + barGap))) / 2;
-          for (var b = 0; b < barCount; b++) {
-            var freq = Math.sin(t * 6 + b * 0.4) * 0.5 + 0.5;
-            var barHeight = 20 + freq * 140;
-            var bx = startX + b * (barWidth + barGap);
-            var by = H - 120 - barHeight;
-            
-            var barGrad = ctx.createLinearGradient(bx, by, bx, by + barHeight);
-            barGrad.addColorStop(0, '#c084fc');
-            barGrad.addColorStop(1, '#3b82f6');
-            ctx.fillStyle = barGrad;
-            ctx.fillRect(bx, by, barWidth, barHeight);
-          }
+          // Terminator Shadow
+          var shadowGrad = ctx.createRadialGradient(
+            sunX, sunY, earthR * 0.2,
+            earthX + earthR * 0.4, earthY + earthR * 0.4, earthR * 1.3
+          );
+          shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          shadowGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.15)');
+          shadowGrad.addColorStop(0.65, 'rgba(2, 6, 23, 0.85)');
+          shadowGrad.addColorStop(0.85, 'rgba(1, 3, 12, 0.98)');
+          shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
+          ctx.fillStyle = shadowGrad;
+          ctx.fillRect(earthX - earthR, earthY - earthR, earthR * 2, earthR * 2);
 
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+          // Night city lights
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = 0.75 * (1 - sunIntensity * 0.5);
+          ctx.drawImage(nightCanvas, rotOffset, 0, 1024 - rotOffset, 512, earthX - earthR, earthY - earthR, earthR * 2 * ((1024 - rotOffset) / 1024), earthR * 2);
+          ctx.restore();
 
-          if (t < 3.5) {
-            var p1 = Math.min(1, t / 1.2);
-            var scale1 = 0.8 + p1 * 0.2;
+          ctx.restore(); // end earth clip
+
+          // 3. Atmospheric Rayleigh Scattering Glow (Outer Limb)
+          var atmoGrad = ctx.createRadialGradient(earthX, earthY, earthR - 4, earthX, earthY, earthR + 42);
+          atmoGrad.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
+          atmoGrad.addColorStop(0.2, 'rgba(56, 189, 248, 0.5)');
+          atmoGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.25)');
+          atmoGrad.addColorStop(0.8, 'rgba(147, 51, 234, 0.08)');
+          atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(earthX, earthY, earthR + 42, 0, Math.PI * 2);
+          ctx.arc(earthX, earthY, earthR - 2, Math.PI * 2, 0, true);
+          ctx.fillStyle = atmoGrad;
+          ctx.fill();
+          ctx.restore();
+
+          // 4. Horizon Rim Specular Light
+          if (sunIntensity > 0.1) {
             ctx.save();
-            ctx.translate(W/2, H/2 - 40);
-            ctx.scale(scale1, scale1);
-            ctx.font = '900 96px system-ui, -apple-system, sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowColor = '#8b5cf6';
-            ctx.shadowBlur = 35;
-            ctx.fillText('SATCHIDA STUDIO', 0, 0);
-
-            ctx.font = '600 28px system-ui, sans-serif';
-            ctx.fillStyle = '#a855f7';
-            ctx.shadowBlur = 15;
-            ctx.fillText('CINEMA-GRADE MOTION GRAPHICS ENGINE', 0, 75);
-            ctx.restore();
-          } else if (t < 7.0) {
-            var p2 = Math.min(1, (t - 3.5) / 1.0);
-            var scale2 = 0.85 + p2 * 0.15;
-            ctx.save();
-            ctx.translate(W/2, H/2 - 40);
-            ctx.scale(scale2, scale2);
-            ctx.font = '900 84px system-ui, -apple-system, sans-serif';
-            ctx.fillStyle = '#38bdf8';
-            ctx.shadowColor = '#06b6d4';
-            ctx.shadowBlur = 30;
-            ctx.fillText('DETERMINISTIC 60 FPS', 0, 0);
-
-            ctx.font = '600 26px system-ui, sans-serif';
-            ctx.fillStyle = '#94a3b8';
-            ctx.shadowBlur = 10;
-            ctx.fillText('PURE FUNCTION MATHEMATICAL PLAYHEAD', 0, 70);
-            ctx.restore();
-          } else {
-            var p3 = Math.min(1, (t - 7.0) / 1.0);
-            var scale3 = 0.85 + p3 * 0.15;
-            ctx.save();
-            ctx.translate(W/2, H/2 - 40);
-            ctx.scale(scale3, scale3);
-            ctx.font = '900 84px system-ui, -apple-system, sans-serif';
-            ctx.fillStyle = '#a855f7';
-            ctx.shadowColor = '#d946ef';
-            ctx.shadowBlur = 30;
-            ctx.fillText('100% CLIENT-SIDE WEBGL', 0, 0);
-
-            ctx.font = '600 26px system-ui, sans-serif';
-            ctx.fillStyle = '#cbd5e1';
-            ctx.shadowBlur = 10;
-            ctx.fillText('ZERO SERVER COMPUTE • DIRECT DEVICE MP4 EXPORT', 0, 70);
+            ctx.beginPath();
+            ctx.arc(earthX, earthY, earthR + 2, Math.PI * 1.15, Math.PI * 1.55);
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (sunIntensity * 0.95) + ')';
+            ctx.lineWidth = 6;
+            ctx.shadowColor = '#38bdf8';
+            ctx.shadowBlur = 25;
+            ctx.stroke();
             ctx.restore();
           }
 
-          ctx.font = '500 18px ui-monospace, monospace';
-          ctx.fillStyle = '#64748b';
-          ctx.shadowBlur = 0;
-          ctx.fillText('PLAYHEAD: ' + t.toFixed(2) + 's / 10.00s  •  FPS: 60', W/2, H - 40);
+          // 5. Cinematic 2.39:1 Anamorphic Letterboxing
+          var letterboxHeight = (H - (W / 2.39)) / 2;
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, W, letterboxHeight);
+          ctx.fillRect(0, H - letterboxHeight, W, letterboxHeight);
+
+          // 6. Optical Vignette
+          var vigGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.35, W / 2, H / 2, W * 0.7);
+          vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+          ctx.fillStyle = vigGrad;
+          ctx.fillRect(0, 0, W, H);
         }
       };
       
@@ -285,6 +408,14 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
                   window.film.frame(e.data.time);
                 } catch (err) {
                   console.warn('Frame render error at t=' + e.data.time, err);
+                }
+              }
+            } else if (e.data && e.data.type === 'AUDIO_MUTE') {
+              if (window.film && typeof window.film.setMuted === 'function') {
+                try {
+                  window.film.setMuted(e.data.muted);
+                } catch (err) {
+                  console.warn('Audio mute error:', err);
                 }
               }
             }
@@ -763,6 +894,25 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
               title={isLooping ? 'Loop Enabled' : 'Loop Disabled'}
             >
               <Repeat className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextMuted = !isMuted;
+                setIsMuted(nextMuted);
+                if (iframeRef.current?.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage(
+                    { type: 'AUDIO_MUTE', muted: nextMuted },
+                    '*',
+                  );
+                }
+              }}
+              className={`rounded p-1.5 transition-colors ${
+                !isMuted ? 'text-amber-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-800'
+              }`}
+              title={isMuted ? 'Unmute Audio & Music' : 'Mute Audio & Music'}
+            >
+              {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </button>
           </div>
 

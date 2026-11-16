@@ -96,6 +96,7 @@ JOB_LOCK = threading.Lock()
 
 BIFROST_URL: str = os.environ.get("SATCHIDA_BIFROST_URL", "http://127.0.0.1:8700")
 DEEPINFRA_API: str = "https://api.deepinfra.com"
+CHEAPERINFERENCE_API: str = "https://api.cheaperinference.com"
 
 # Cheap-first DeepInfra video models (native /v1/inference, synchronous, data-URI
 # response). Prices from DeepInfra's catalog, USD per clip second:
@@ -126,6 +127,21 @@ DEEPINFRA_IMAGE_MODELS = [
 # the Production key's restriction is lifted and refresh-models has run.
 _CI_IMAGE_KEYWORDS = ("image", "flux", "sdxl", "dall", "seedream", "banana", "imagen", "sd3")
 _CI_VIDEO_KEYWORDS = ("video", "kling", "wan", "veo", "hailuo", "pixverse", "seedance", "sora", "i2v", "t2v")
+
+# Verified CheaperInference prices (discounted, 2026-11-17) — the discovery sort
+# tries the cheapest qualifying model first. Unknown models sort last.
+_CI_MODEL_PRICES = {
+    # images, USD per image
+    "flux-3-image-klein": 0.0077,
+    "flux-2-klein-4b": 0.0119,
+    "grok-imagine-image": 0.013,
+    "seedream-4.5": 0.026,
+    # videos, USD per second of output
+    "veo-3.1-lite-generate-001": 0.0325,
+    "grok-imagine-video": 0.0371,
+    "kling-v2.6-t2v": 0.046,
+    "kling-v2.6-i2v": 0.0595,
+}
 
 
 def _supported_durations(model: str) -> list:
@@ -237,132 +253,25 @@ def _ci_media_models(kind: str) -> list:
                 models.append(mid)
     except Exception as e:
         print(f"[satchida-montage] CI catalog query failed: {e}", file=sys.stderr)
+    # Cheapest verified model first; unknown models after the priced ones.
+    bare = lambda mid: mid.split("/", 1)[1].lower()  # noqa: E731
+    models.sort(key=lambda mid: _CI_MODEL_PRICES.get(bare(mid), float("inf")))
     _CI_MEDIA_CACHE["ts"] = now
     _CI_MEDIA_CACHE[kind] = models
     return models
 
 
-def _download_video_content(encoded_id: str, output_path: Path) -> bool:
-    """Fetch a completed Bifrost video job's MP4 (JSON url or raw bytes)."""
-    try:
-        c_status, content = _bifrost_call("GET", f"/v1/videos/{encoded_id}/content", timeout=180)
-    except Exception as e:
-        print(f"[satchida-montage] CI content fetch failed: {e}", file=sys.stderr)
-        return False
-    if c_status == 200 and isinstance(content, dict):
-        url = None
-        for k in ("url", "video_url", "download_url"):
-            if isinstance(content.get(k), str):
-                url = content[k]
-                break
-        if url and _download_url(url, output_path):
-            return True
-    try:
-        req = urllib.request.Request(
-            f"{BIFROST_URL}/v1/videos/{encoded_id}/content",
-            headers={"Authorization": f"Bearer {_bifrost_key()}"},
-        )
-        with urllib.request.urlopen(req, timeout=180) as r:
-            data = r.read()
-        if len(data) > 1024 and data[4:8] == b"ftyp":
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = output_path.with_suffix(output_path.suffix + ".part")
-            tmp.write_bytes(data)
-            tmp.replace(output_path)
-            return True
-        print(
-            f"[satchida-montage] CI content not an MP4 ({len(data)} bytes)",
-            file=sys.stderr,
-        )
-    except Exception as e:
-        print(f"[satchida-montage] CI raw content download failed: {e}", file=sys.stderr)
-    return False
+_PROVIDER_KEY_CACHE: Dict[str, str] = {}
 
 
-def _ci_video_via_bifrost(
-    prompt: str,
-    duration_seconds: float,
-    output_path: Path,
-    aspect_ratio: str = "16:9",
-    timeout: int = 300,
-) -> bool:
-    """Priority-1 chain: CheapInference /v1/videos through Bifrost (:8700)."""
-    global _LAST_VIDEO_MODEL
-    for model in _ci_media_models("video"):
-        seconds = _nearest_duration(model, duration_seconds)
-        size = _SIZE_BY_RATIO.get(aspect_ratio, "1280x720")
-        job = None
-        status = 0
-        for attempt in range(3):
-            try:
-                status, job = _bifrost_call(
-                    "POST",
-                    "/v1/videos",
-                    {"model": model, "prompt": prompt, "seconds": seconds, "size": size},
-                    timeout=60,
-                )
-            except Exception as e:
-                print(
-                    f"[satchida-montage] CI video submit {model} "
-                    f"(attempt {attempt + 1}/3): {e}",
-                    file=sys.stderr,
-                )
-                job = None
-            job_id = job.get("id") if isinstance(job, dict) else None
-            if status == 200 and job_id:
-                break
-            if attempt < 2:
-                time.sleep(8 * (attempt + 1))
-        else:
-            print(
-                f"[satchida-montage] CI video {model} rejected after 3 attempts "
-                f"(HTTP {status}): {str(job)[:200]}",
-                file=sys.stderr,
-            )
-            continue
+def _provider_key(provider: str) -> str:
+    """Decrypt a provider key from Bifrost's store, in-process.
 
-        job_id = job.get("id")
-        encoded = urllib.parse.quote(job_id, safe="")
-        final_state = None
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            time.sleep(4)
-            try:
-                st_status, state = _bifrost_call("GET", f"/v1/videos/{encoded}", timeout=30)
-            except Exception as e:
-                print(f"[satchida-montage] CI poll failed: {e}", file=sys.stderr)
-                continue
-            if st_status != 200 or not isinstance(state, dict):
-                continue
-            s = str(state.get("status", "")).lower()
-            if s in ("completed", "succeeded", "success"):
-                final_state = state
-                break
-            if s in ("failed", "cancelled", "canceled", "error"):
-                print(
-                    f"[satchida-montage] CI video {model} job failed: {state.get('error')}",
-                    file=sys.stderr,
-                )
-                break
-        if not final_state:
-            print(f"[satchida-montage] CI video {model} timed out after {timeout}s", file=sys.stderr)
-            continue
-        if _download_video_content(encoded, output_path):
-            _LAST_VIDEO_MODEL = model
-            print(f"[satchida-montage] video OK via {model} -> {output_path}", file=sys.stderr)
-            return True
-    return False
-
-
-def _deepinfra_key() -> str:
-    """Decrypt the DeepInfra provider key from Bifrost's store, in-process.
-
-    Same Argon2id + AES-256-GCM scheme as Bifrost's encrypt package. The key is
-    never logged, never written to disk, and never leaves this machine.
+    Same Argon2id + AES-256-GCM scheme as Bifrost's encrypt package. Keys are
+    never logged, never written to disk, and never leave this machine.
     """
-    global _DEEPINFRA_KEY_CACHE
-    if _DEEPINFRA_KEY_CACHE:
-        return _DEEPINFRA_KEY_CACHE
+    if provider in _PROVIDER_KEY_CACHE:
+        return _PROVIDER_KEY_CACHE[provider]
     try:
         from argon2.low_level import hash_secret_raw, Type as _ArgonType
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -383,12 +292,13 @@ def _deepinfra_key() -> str:
         )
         try:
             row = con.execute(
-                "SELECT value FROM config_keys WHERE provider='deepinfra' AND enabled=1 LIMIT 1"
+                "SELECT value FROM config_keys WHERE provider=? AND enabled=1 LIMIT 1",
+                (provider,),
             ).fetchone()
         finally:
             con.close()
         if not row:
-            raise RuntimeError("deepinfra key row not found")
+            raise RuntimeError(f"{provider} key row not found")
         salt = b"bifrost-encryption-v1-salt-2024"
         derived = hash_secret_raw(
             passphrase.encode(), salt,
@@ -397,17 +307,114 @@ def _deepinfra_key() -> str:
         )
         blob = base64.b64decode(row[0])
         pt = AESGCM(derived).decrypt(blob[:12], blob[12:], None).decode()
-        _DEEPINFRA_KEY_CACHE = pt
+        _PROVIDER_KEY_CACHE[provider] = pt
         return pt
     except Exception as e:
-        print(f"[satchida-montage] deepinfra key decrypt failed: {e}", file=sys.stderr)
+        print(f"[satchida-montage] {provider} key decrypt failed: {e}", file=sys.stderr)
         return ""
+
+
+def _ci_video_direct(
+    prompt: str,
+    duration_seconds: float,
+    output_path: Path,
+    aspect_ratio: str = "16:9",
+    native_audio: bool = False,
+    quality: str = "fast",
+    image_url: str = "",
+) -> bool:
+    """Priority-1 chain: CheapInference /v1/videos/generations (direct, JSON).
+
+    Their video API is synchronous and buffered (up to ~5 min): one POST returns
+    {id, status, videos:[{url|b64_video}]} — not OpenAI's submit/poll shape, so
+    Bifrost's generic video flow cannot drive it and we call it directly with
+    the key decrypted from Bifrost's store.
+    """
+    global _LAST_VIDEO_MODEL
+    key = _provider_key("CheapInference")
+    if not key:
+        return False
+    if image_url:
+        models = ["kling-v2.6-i2v"]
+    elif native_audio:
+        models = ["veo-3.1-lite-generate-001", "kling-v2.6-t2v"]
+    elif quality == "hd":
+        models = ["kling-v2.6-t2v", "grok-imagine-video"]
+    else:
+        models = ["grok-imagine-video", "kling-v2.6-t2v"]
+
+    for m in models:
+        seconds = int(_nearest_duration(m, duration_seconds))
+        body = {
+            "model": m,
+            "prompt": prompt,
+            "duration_seconds": seconds,
+            "aspect_ratio": aspect_ratio,
+        }
+        if native_audio and not image_url:
+            body["audio"] = True
+        if image_url:
+            body["image_url"] = image_url
+        try:
+            req = urllib.request.Request(
+                f"{CHEAPERINFERENCE_API}/v1/videos/generations",
+                data=json.dumps(body).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + key,
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=360) as r:
+                data = json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            print(
+                f"[satchida-montage] CI video {m} HTTP {e.code}: "
+                f"{e.read().decode(errors='replace')[:250]}",
+                file=sys.stderr,
+            )
+            continue
+        except Exception as e:
+            print(f"[satchida-montage] CI video {m} failed: {e}", file=sys.stderr)
+            continue
+
+        videos = data.get("videos") or []
+        raw = b""
+        for v in videos:
+            try:
+                if v.get("b64_video"):
+                    raw = base64.b64decode(v["b64_video"])
+                elif v.get("url"):
+                    with urllib.request.urlopen(v["url"], timeout=180) as rr:
+                        raw = rr.read()
+            except Exception as e:
+                print(f"[satchida-montage] CI video download failed: {e}", file=sys.stderr)
+                raw = b""
+            if len(raw) > 1024:
+                break
+        if len(raw) > 1024 and raw[4:8] == b"ftyp":
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = output_path.with_suffix(output_path.suffix + ".part")
+            tmp.write_bytes(raw)
+            tmp.replace(output_path)
+            _LAST_VIDEO_MODEL = f"cheapinference/{m}"
+            print(
+                f"[satchida-montage] video OK via cheapinference/{m} -> {output_path}",
+                file=sys.stderr,
+            )
+            return True
+        print(
+            f"[satchida-montage] CI video {m}: no usable video in response "
+            f"({json.dumps(data)[:180]})",
+            file=sys.stderr,
+        )
+    return False
 
 
 def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9") -> bool:
     """Priority-2 chain: DeepInfra OpenAI-compatible images API (direct)."""
     global _LAST_IMAGE_MODEL
-    key = _deepinfra_key()
+    key = _provider_key("deepinfra")
     if not key:
         return False
     size = _SIZE_BY_RATIO.get(aspect_ratio, "1024x1024")
@@ -495,7 +502,7 @@ def _deepinfra_video(
     POST /v1/inference/{model} returns the clip as a data:video/mp4;base64 URI.
     """
     global _LAST_VIDEO_MODEL
-    key = _deepinfra_key()
+    key = _provider_key("deepinfra")
     if not key:
         return False
     if not models:
@@ -572,14 +579,18 @@ def _generate_video_core(
     aspect_ratio: str = "16:9",
     native_audio: bool = False,
     quality: str = "fast",
+    image_url: str = "",
 ) -> bool:
     """Provider-policy chain: CheapInference (priority 1) then DeepInfra (priority 2).
 
-    native_audio=True selects DeepInfra's audio-visual models (LTX-2.3-Fast
-    first) which render synchronized audio inside the clip itself.
-    quality="hd" tries the 720p silent model (FastWan2.2) before the 480p one.
+    native_audio=True selects audio-visual models (CI veo-3.1-lite first, then
+    DeepInfra LTX) which render synchronized audio inside the clip itself.
+    quality="hd" tries the 720p-class model before the cheaper 480p one.
     """
-    if _ci_video_via_bifrost(prompt, duration_seconds, output_path, aspect_ratio):
+    if _ci_video_direct(
+        prompt, duration_seconds, output_path, aspect_ratio,
+        native_audio=native_audio, quality=quality, image_url=image_url,
+    ):
         return True
     if native_audio:
         return _deepinfra_video(
@@ -1298,6 +1309,7 @@ def video_generate(
     narration: str = "",
     native_audio: bool = False,
     quality: str = "fast",
+    image_url: str = "",
 ) -> str:
     """
     Generate a single real AI video clip (cloud only).
@@ -1317,8 +1329,9 @@ def video_generate(
         native_audio: When true (and no narration), use audio-visual models —
             Lightricks LTX-2.3-Fast first (native synchronized audio, from
             $0.03/s) — so the clip itself contains synced sound.
-        quality: 'fast' (480p FastWan first, cheapest) or 'hd' (720p FastWan2.2
-            first, better fidelity for ~$0.02/5s).
+        quality: 'fast' (cheapest first) or 'hd' (higher-fidelity model first).
+        image_url: Optional public image URL — switches to image-to-video
+            (CheapInference kling-v2.6-i2v) to animate a still image.
 
     Returns the absolute path of the generated MP4, or a clear error message.
     """
@@ -1332,7 +1345,7 @@ def video_generate(
     use_native = native_audio and not narration.strip()
     ok = _generate_video_core(
         prompt, duration_seconds, out, aspect_ratio,
-        native_audio=use_native, quality=quality,
+        native_audio=use_native, quality=quality, image_url=image_url,
     )
     if not ok:
         return (

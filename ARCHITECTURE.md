@@ -702,11 +702,27 @@ keep the existing text models (`deepseek-v4.1-flash`, `glm-5.3-flash`, `gpt-6-lu
 | `seedream-4.5` | $0.026/img | | `veo-3.1-lite-generate-001` | $0.0325/s (native audio) |
 | | | | `kling-v2.5-turbo-t2v` | $0.046/s |
 
+**Low-cost text alternates (operator ruling 2026-11-17 — kept, not removed):**
+`deepseek-v4-flash` ($0.0525 in / $0.15 out per M — cheapest output rate for long
+generations), `qwen3.7-flash` ($0.0253 in / $0.109 out — cheapest output of the
+chat set), `qwen3.8-flash`, `qwen3.8-omni-flash` (multimodal audio/video input).
+The same low-cost logic does NOT extend to the media families: dated/same-price
+duplicates (`kling-v2.5-turbo-*`, `deepseek-v4.1-flash-1017*`) and premium tiers
+(`kling-v3.0-*`, `flux-3-image`, `grok-imagine-*-1.5`, `flux-3-video`,
+`seedream-5.0-lite`, `veo-3.1-fast`) stay blacklisted at the Bifrost key (21
+models) so accidental expensive routing cannot happen.
+
 Cost reality after the lift: CI images are cheapest anywhere ($0.0077 vs
 DeepInfra $0.012), but CI silent video ($0.19+/5s) is ~15× DeepInfra FastWan
 ($0.0125/5s); native-audio video is comparable (Veo-lite $0.16 vs LTX $0.15).
 Chains try CI first per the operator's priority; `refresh-models` auto-discovers
 every ID above (keyword matcher covers them all).
+
+**CI video API note:** CheaperInference's video endpoint is JSON + synchronous
+(`POST /v1/videos/generations` → `{id, status, videos:[{url|b64_video}]}` with
+`audio` and `image_url` params) — not OpenAI's submit/poll shape, so like
+DeepInfra it is called directly from the montage server; only CI images flow
+through Bifrost.
 
 **Phase 4 (planned, parallel):** reproduce the same three scenarios locally with the
 installed ComfyUI (`D:\LAN-AI-Infra\Image-models` — SDXL, DreamShaper, realisticVision,

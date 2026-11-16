@@ -674,15 +674,21 @@ the gateway LibreChat connects to.
 | Photorealistic image | DeepInfra `black-forest-labs/FLUX-2-klein-4b` | ≈ $0.012 / image (1280×720) |
 | Animated image, silent | DeepInfra `FastVideo/FastWan-QAD-FP8-1.3B` (480p) | $0.0125 / 5 s clip |
 | Animated image, silent 720p | DeepInfra `FastVideo/FastWan2.2-TI2V-5B` | $0.0225 / 5 s (480p half) |
-| Video with synchronized audio | DeepInfra `Lightricks/LTX-2.3-Fast` (native AAC audio, ≤20 s, up to 4K) | from $0.15 / 5 s |
+| **Cheapest synchronized-audio path** | silent clip (above) + free Edge-TTS narration + ffmpeg mux | **$0.0125–0.0225 / 5 s total** |
+| Optional premium: AI-generated soundscape | DeepInfra `Lightricks/LTX-2.3-Fast` (native AAC audio, ≤20 s, up to 4K) | from $0.15 / 5 s |
 | Speech narration sync | Free Microsoft Edge TTS (`skill/edge_tts_service.py`) + ffmpeg mux | $0 |
 | Higher-quality silent backup | DeepInfra `Wan-AI/Wan2.2-T2V-A14B` | ≈ $0.375 / 5 s |
+
+Operator cost ruling: narration-mux (free TTS) is the default synchronized-audio
+path; the LTX audio-visual chain is opt-in premium for clips that need an
+AI-generated soundscape matched to the visuals.
 
 **Tool surface (satchida-montage MCP, mounted on OpenFilm/Motion presets):**
 `image_generate(prompt, aspect_ratio, filename)` and
 `video_generate(prompt, duration_seconds, aspect_ratio, filename, narration,
-native_audio)`. `narration` muxes free Edge-TTS speech onto the clip;
-`native_audio=True` selects the audio-visual chain (LTX first).
+native_audio, quality)`. `narration` muxes free Edge-TTS speech onto the clip;
+`native_audio=True` selects the audio-visual chain (LTX first); `quality="hd"`
+tries FastWan2.2 720p before the 480p model.
 
 **Phase 4 (planned, parallel):** reproduce the same three scenarios locally with the
 installed ComfyUI (`D:\LAN-AI-Infra\Image-models` — SDXL, DreamShaper, realisticVision,

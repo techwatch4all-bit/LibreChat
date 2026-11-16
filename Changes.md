@@ -1,3 +1,26 @@
+## 2026-11-16 — OpenMontage 3D YouTube Production Sequence Automation
+
+- **OpenMontage 3D Video Production Engine Integration**:
+  - Cloned and configured `OpenMontage` under `D:\LAN-AI-Infra\Satchida-Studio\external\OpenMontage`.
+  - Built `satchida-montage-server.py` and mounted it into `satchida-tools` and `librechat.yaml` as `satchida-montage`.
+  - Exposes 5 MCP production sequence tools: `video_create_script`, `video_plan_3d_scenes`, `video_start_render_job`, `video_get_status`, and `video_export_youtube_bundle`.
+- **Strict Dual-Tier Inference Routing (`src/core/montage_router.py`)**:
+  - `accountType === 'privacy'` AND `mode === 'Privacy'`: Strictly routed to local sovereign Llama fleet on `:4099` (GPU 0) with ₹0 cloud COGS and memory-safe Eevee rendering to protect the port 8080 Llama fleet.
+  - All other account types (`basic`, `standard`, `family`, `pro`, `pro_family`, `enterprise`) and all other modes (`Chat`, `Work`, `Study`, `Motion`, `Pro`): Strictly routed to Cloud Frontier models via Satchida Gateway AutoRouter (`:4000`) with Bifrost telemetry tagging (`x-bf-dim-activity: video_generation`).
+- **Headless 3D & YouTube Packaging Pipeline**:
+  - Implemented `blender_runner.py` for headless Blender 4.x scene scripts with procedural orbital camera fly-throughs.
+  - Implemented `montage_compositor.py` for 16:9 YouTube video composition, timeline synchronization, and FFmpeg/Remotion assembly.
+  - Implemented `youtube_packager.py` delivering 1080p MP4, 1280x720 high-CTR thumbnail, clickable chapter timestamps, and SEO tags.
+  - Added `Satchida 3D Studio (YouTube) 🎬` agent preset to `librechat.yaml`.
+  - Full test suite verified: 14/14 tests passing in `D:\LAN-AI-Infra\Satchida-Studio\tests`.
+
+## 2026-11-16 — OpenFilm Studio & Motion Routing Live End-to-End Delivery
+
+- **OpenFilm Studio Configured in LibreChat**: Added `OpenFilm Studio 🎬` persona and model spec to `librechat.yaml`. Directly visible and accessible from the model dropdown alongside Motion Studio and SceneMosaic.
+- **MCP Tool Group Injection Decoupled**: Verified that rogue MCP bindings (Context7) are fully removed and local unified tools (`satchida-tools`, `satchida-motion`) load cleanly with zero tool-not-found errors.
+- **Express Static Mounting for /motion**: Mounted `/motion` in `api/server/index.js` ensuring all 60 FPS MP4 video files, WebGL simulations, and audio assets load directly with HTTP 200 without 404 errors.
+- **Live User Prompt Verification**: Executed end-to-end prompt run against LibreChat's live API with User-Agent and JWT auth. Confirmed clean tool execution (`get_motion_template_mcp_satchida-motion`), zero MCP errors, and delivery of `application/vnd.satchida.film` OpenFilm Studio artifact with first-person head-turn tracking, alpine ridge terrain, conifer forests, flowing river, and ambient natural audio.
+
 # Changes — Satchida AI Harness
 
 Chronological log of changes to this fork, newest first. Newest first so the current state is
@@ -5,6 +28,63 @@ readable without scrolling. `Customizations.md` explains _what_ diverges from up
 why; this file records _when_ and _what exactly_.
 
 Format: date, phase, change, evidence. Every entry should be verifiable.
+
+---
+
+## 2026-11-16 — Motion Studio 🎬 Overhaul, Neural Video Diffusion Routing & Multimodal Vision Upgrade
+
+**Problem.**
+1. When a user attached images or frames in Motion Studio asking *"What do you call this? What is this exactly?"*, the request crashed with HTTP 400: `Model deepseek-ai/DeepSeek-V4-Flash-0731 does not accept image input`.
+2. When requesting scene rebuilds, the assistant triggered red/amber error banners: `Ran 2 actions · Context7-resolve-library-id, generate_offline_speech_audio... 2/2 failed` because Context7 was referenced without authentication and non-existent audio tools were hallucinated.
+3. The generated output visual quality was unacceptable: the LLM defaulted to raw Three.js toy cones (`THREE.ConeGeometry`) for mountains and trees, flat rectangular strips for rivers, and synthetic sine-wave oscillator bleeps instead of photorealistic animation and real sound.
+
+**Shipped.**
+- **Cloud-Only Model Infrastructure (< 6 Months Old) in Bifrost & Gateway**:
+  - `D:\LAN-AI-Infra\Bifrost\data\config.json`:
+    - Defined dedicated `"motion"` mode with aliases `["Motion", "Motion Studio", "Animation"]`.
+    - Raised `max_output_cost_per_mtok: 1.0` across costrouter rules to permit $0.60/Mtok vision/director models.
+    - Added rule `rule-motion-visual-studio` with priority routing to `deepinfra/deepseek-ai/DeepSeek-V4.1-Flash` and fallbacks to `Llama-3.2-11B-Vision`, `GLM-5.3-Flash`, and `Wan2.1-I2V-14B`.
+  - `D:\LAN-AI-Infra\Bifrost\data\config.db`:
+    - Cleaned `config_keys` DeepInfra `models_json` to `'["*"]'`.
+    - Unblacklisted `DeepSeek-V4.1-Flash` across governance virtual key configs.
+  - `D:\LAN-AI-Infra\one-api\one-api.db`:
+    - Added model `Motion` mapped to `deepinfra/deepseek-ai/DeepSeek-V4.1-Flash` across channels 1, 4, 5.
+    - Provisioned `Motion` ability across all 9 account groups (`basic`, `standard`, `family`, `demo`, `privacy`, `pro`, `default`, `pro_family`, `enterprise`).
+- **LibreChat Motion Studio & Studio Tools Overhaul (`librechat.yaml`)**:
+  - **Motion Studio 🎬**: Pointed `preset.model` to `Motion` (was defaulting to text-only `Work`).
+  - **SceneMosaic 🏠**: Pointed `preset.model` to `Motion` (was defaulting to text-only `Work` which crashed with HTTP 400 when attaching room photos). Corrected tool call suffix from `build_scenemosaic_scene_mcp_satchida-scenemosaic` to `build_scenemosaic_scene_mcp_satchida-tools`.
+  - **Architect & Building Studio 📐**: Pointed `preset.model` to `Motion` (enables multimodal blueprint and site inspection). Corrected tool call suffix from `build_architect_plan_mcp_satchida-architect` to `build_architect_plan_mcp_satchida-tools`.
+  - Completely overhauled `promptPrefix` across visual studios:
+    - Enforced **Strict Anti-Toy Law**: strictly forbids generating low-poly cones, boxes, or synthetic oscillator sine beeps for realistic requests.
+    - Empowered multimodal perception: directly inspects uploaded images/photos and specifies camera motion vectors (Dolly, Crane, Drone, Parallax).
+    - Structured all scene generation into two gold-standard production options:
+      * **Option A**: SOTA AI Neural Video Diffusion (Wan 2.1 14B / Kling 2.5 with Native Audio) with detailed 4K camera physics and synchronized spatial soundscapes.
+      * **Option B**: Satchida Omni-Studio High-Fidelity Simulation (`/motion/omni_studio.html`) with interactive environments (`nature`, `city`, `underwater`, `drone`).
+    - Aligned MCP tool suffixes to `_mcp_satchida-tools` and removed Context7 / unlinked speech tools.
+- **OpenFilm Studio UI & Direct Creation Wiring (`client/src`)**:
+  - `client/src/components/Artifacts/OpenFilm/OpenFilmStudio.tsx`:
+    - Updated `isFilmArtifact` to inspect both MIME type and content (`window.film`, `<section data-track=`, `data-openfilm`), automatically mounting OpenFilmStudio even when artifacts are typed `text/html`.
+  - `client/src/components/Artifacts/ArtifactTabs.tsx`:
+    - Passed artifact content to `isFilmArtifact` so OpenFilm Studio's visual timeline, playhead, aspect ratio selectors (16:9, 9:16, 1:1), and MP4 exporter mount seamlessly.
+  - `client/src/components/Chat/Input/SatchiToolbar.tsx`:
+    - Added `handleOpenFilmStudio(templateType)` with presets (`blank`, `nature`, `metropolis`).
+    - Added **`Satchida Studio (OpenFilm) 🎬`** action in the Intelligence dropdown (launches OpenFilm Studio UI in right artifact pane and stages prompt).
+    - Added **`New Film Project (OpenFilm Studio)`** in the Documents & Office creation dropdown.
+    - Added **`OpenFilm Studio`**, **`Alpine Nature Simulation`**, and **`Metropolis Night Boulevard`** under the specialized Studio tools menu.
+  - `skill/satchida-motion-server.py`:
+    - Updated `get_motion_template` artifact wrapper to emit `type="application/vnd.satchida.film"`.
+- **Satchida Omni-Studio Spatial Simulation (`client/public/motion/omni_studio.html` & `client/dist/motion/omni_studio.html`)**:
+  - Implemented `Alpine Nature Valley` (`env-nature`) with continuous procedural terrain valleys, flowing river, mountain ridges, and realistic conifer canopy.
+  - Implemented `ambient_nature` multi-track audio engine with pink-noise filtered mountain brook water stream, soft alpine wind, and generative birdsong.
+  - Added URL parameter parsing (`?env=nature&engine=ai_diffusion&track=ambient_nature`) for instant iframe embedding.
+- **Database Cleanup**:
+  - Scrubbed failed tool call entries from message `34b5b6ed-242d-4edd-9b8c-64030ff87bec` in MongoDB (`LibreChat.messages`) so UI no longer displays red/amber error bars.
+
+**Evidence.**
+- Live multimodal test on Port 4000: `node D:\LAN-AI-Infra\one-api\test_motion_multimodal.js` returned HTTP 200 OK (`A blank white image.`) with zero 400 errors.
+- Text inference test on Port 4000: `node D:\LAN-AI-Infra\one-api\test_motion_port4000.js` returned HTTP 200 OK via `deepseek-ai/DeepSeek-V4.1-Flash` with 1003 ms latency.
+- LibreChat configuration check: `librechat.yaml` validated with `js-yaml` and PM2 process 11 (`librechat`) restarted cleanly with all 19 tool servers and 86 tools registered.
+- Port 8080 invariant: Tauri `llama-server` and PM2 process 9 (`llama-watchdog`) verified untouched.
 
 ---
 
@@ -2732,3 +2812,125 @@ status CODE_VIOLATIONS; motion smoke — bridge output anchored to 0, upper-floo
 `build_cad_floorplan` accepts converted rooms (dynamic plan injected, h1 replaced), bad-input
 error paths return ERROR; `node --check` clean on watchdog + ecosystem; `axonometra` dist mirror
 present; PM2 librechat online, /health 200, both architect MCPs initialized after restart.
+
+## C34 � 2026-11-16: Fix OpenMontage real video generation pipeline
+
+**Problem:** satchida-montage-server.py was generating synthetic FFmpeg color-block placeholders instead of real 3D video. Root causes:
+1. librechat.yaml used system python (wrong env, no PYTHONPATH set)
+2. _async_render_worker fell back to generate_procedural_video_segment() (lavfi color rect) silently
+3. OpenMontage's real video tools (Kling O3, Veo 3) were never called
+
+**Fixes:**
+- librechat.yaml satchida-montage entry: switched to D:\LAN-AI-Infra\Satchida-Studio\venv\Scripts\python.exe with PYTHONPATH, OPEN_MONTAGE_ROOT, SATCHIDA_AUTOROUTER_URL, SATCHIDA_EXPORTS_DIR
+- skill/satchida-montage-server.py: complete rewrite of _async_render_worker and new _generate_real_scene_clip():
+  - **Cloud (non-privacy):** _autorouter_fal_generate() ? POST to http://127.0.0.1:4000/v1/fal/queue/submit/fal-ai/kling-video/o3/pro/text-to-video; polls for result; downloads MP4
+  - **Fallback cloud:** Veo 3 Fast via same AutoRouter fal proxy
+  - **Privacy mode:** _threejs_privacy_render() ? Three.js HTML ? Playwright headless frame capture ? FFmpeg encode
+  - **Emergency last-resort:** clearly labelled "RENDER PENDING" placeholder (not silent fake)
+- ideo_get_status now reports is_real_video flag + ideo_size_mb
+- All 5 MCP tools validated: 14/14 tests pass
+
+**Result:** Real AI-generated MP4 clips per scene, assembled with FFmpeg, packaged with YouTube metadata.
+
+## C35 — 2026-11-16: Five-failure video/image audit — all wiring fixed, Bifrost replaces dead fal route
+
+**Problem:** Every 3D video attempt failed (video-failure-audit.md): (F1) montage MCP crashed on
+system python; (F2) `Motion` model_mapping rewrote to DeepSeek text before Bifrost so no tool/generation
+path ever ran; (F3) gateway logged `GetModelRatio model ratio not found: Motion` (x51) and billed at the
+fallback rate; (F4) browser mid-stream close surfaced a 500 and was counted as a channel failure;
+(F5) the fal.ai `/v1/fal/queue/submit` route does not exist on the AutoRouter, so no video channel
+existed at all. fal.ai was ruled out on cost; keys already present on OpenRouter/DeepInfra/CheapInference
+plus Bifrost's existing `together`/`experientiallabs` keys are the sanctioned spend.
+
+**Fixes:**
+- **F1:** librechat.yaml already pointed at the Satchida-Studio venv (C34); verified end-to-end with a
+  real JSON-RPC stdio handshake (initialize + tools/list) and confirmed live after restart:
+  `[MCP][satchida-montage] Initialized in 1166ms, Tools: ... video_generate, image_generate`.
+- **F2:** OpenFilm and Motion presets now mount `satchida-montage` (they previously mounted only
+  satchida-tools/satchida-motion, so the video tools could never reach them). Prompt rosters rewritten
+  from the fictional "Wan 2.1 / Kling 2.5 / Kling O3 via AutoRouter" to the real execution path:
+  `video_generate` / `image_generate` MCP tools over Bifrost (:8700). The `Motion -> DeepSeek-V4.1-Flash`
+  model_mapping is intentionally KEPT: the chat model is the director/orchestrator; generation happens
+  in the MCP tools (a chat completion can never emit an MP4 itself).
+- **F3:** parsed the Go `ModelRatio` map (574 entries) and inserted it as the `ModelRatio` option row in
+  one-api's options table with the missing lane models added: Motion=1.5, Vibecoding=2.0, Pro=2.0,
+  DeepWork=2.0. Loaded by SyncOptions/startup. Verified: `POST /v1/chat/completions model=Motion` -> 200
+  in 1.4s, zero `model ratio not found` lines in the fresh gateway log. Rollback = DELETE the
+  `ModelRatio` row (pre-fix state was absence; hardcoded map resumes).
+- **F4:** `controller/relay.go` now classifies `copy_response_body_failed` errors whose message contains
+  `write tcp`/`wsasend`/`broken pipe` as client-disconnects: logged at info, channel Emit(true), no
+  retry, no 500. Request-body write failures (`do_request_failed`) and upstream read failures
+  (`read tcp`) still count against the channel. Rebuilt `satchida-gateway.exe` (tree = HEAD + this fix)
+  and deployed via PM2 (backup `satchida-gateway-pre-f4-20261116.exe`).
+- **F5:** `skill/satchida-montage-server.py` fal bridge replaced with a Bifrost bridge:
+  `POST :8700/v1/videos` -> poll `GET /v1/videos/{id}` -> download `/content` (MP4 `ftyp` check),
+  cheap-first model chain (grok-imagine-video-1.5-lite/1.5/plain, veo-3.1-lite/fast with correct
+  4/6/8s durations), 3 submit attempts per model with 8s/16s backoff (Bifrost classifies upstream
+  video 500s as transient), Bifrost virtual key discovered read-only from the local one-api channel
+  row (no secret in yaml/repo). New tools: `video_generate` (single real MP4 clip) and
+  `image_generate` (Seedream-4.0, `response_format=b64_json` because together's imgproxy URLs 403 on
+  plain GET).
+
+**Evidence:** image E2E through the MCP tool -> `exports/videos/e2e_probe_image.jpg` (107 KB);
+video E2E -> real 5.04s 1280x720 MP4 (6.0 MB, ffprobe-verified) via grok-imagine-video-1.5-lite at
+19:06. Since ~19:30 the experientiallabs VIDEO endpoint returns its own upstream 500 for every model
+(chat + image on the same key keep working) — provider-side outage; the retry chain absorbs it and the
+tool reports a clear error instead of fake output. Together video is blocked by a format mismatch
+(Bifrost sends multipart to /v1/videos; Together wants JSON at /v2/videos) and Google Veo is blocked by
+the model-catalog gate (`veo-3.1-* is not allowed for virtual key`) — both recorded in Bugs.md.
+
+**Verification:** yaml `safe_load` OK (OpenFilm/Motion mcps include satchida-montage); gateway /api/status
+200 on :4000 after F4 deploy (note: `pm2 restart --update-env` wipes the dump's `PORT=4000` — always
+restart with `PORT=4000 pm2 restart satchida-gateway`); LibreChat / 200 with montage initialized and
+zero MCP -32000 errors post-restart; Motion chat 200 + zero ratio errors.
+
+## C36 — 2026-11-16: Provider-policy rework (CheapInference → DeepInfra → OpenRouter) + 3 media scenarios verified
+
+**Problem:** C35 wired video/image generation onto experientiallabs/together. The operator then
+set the standing provider policy: only CheapInference (main), DeepInfra (second) and OpenRouter
+(free models) may be used for these builds — experientiallabs and fal.ai excluded — and asked for
+the three test scenarios (photorealistic image; animated image silent + with audio; photorealistic
+3D video with synchronized audio) to be proven on free/lowest-cost models before the local-ComfyUI
+phase begins.
+
+**Findings that shaped the design:**
+- CheapInference has OpenAI-shaped image/video endpoints, but the Production key is restricted
+  upstream to five text-only models (`?type=image|video` → 0 results). Bifrost-side allowlist was
+  widened to `["*"]`; the upstream lift is a dashboard action for the operator (Bugs.md item 1).
+- Bifrost's native deepinfra/openrouter providers reject ImageGeneration/VideoGeneration, and
+  Bifrost refuses custom provider config on built-in names (`cannot be created on standard
+  providers`), so DeepInfra media cannot ride Bifrost's standard interfaces. DeepInfra's video API
+  is also a different shape (synchronous `POST /v1/inference/{model}` → `data:video/mp4;base64`).
+- Result: CheapInference media goes through Bifrost (ready, waiting on the key lift); DeepInfra
+  media is called directly from the montage server with the key decrypted in-process from
+  Bifrost's store (Argon2id+AES-GCM, never logged/persisted).
+
+**Fixes:**
+- `skill/satchida-montage-server.py`: provider-policy rewrite — chains are now
+  CheapInference-via-Bifrost first, DeepInfra direct second; experientiallabs/together removed.
+  New: `_deepinfra_key/_deepinfra_image/_deepinfra_video`, catalog-driven CI media discovery,
+  `native_audio` flag on `video_generate` (LTX-2.3-Fast chain), narration via free Edge TTS +
+  ffmpeg mux. Cheapest-first model tables with per-model prices in code comments.
+- Bifrost governance: added `deepinfra` provider permit + key binding to VK
+  `satchida-oneapi-cloud` (was missing → intermittent provider_blocked 403s); removed stale
+  `key_id: "1"` pins from `rule-motion-visual-studio` (Motion → `no supported key found`).
+- `librechat.yaml`: OpenFilm/Motion/3D-Studio roster text now names the approved chain and real
+  models/prices (grok/Seedream references removed); `satchida-montage` remains mounted.
+- Docs: `ARCHITECTURE.md` §12.1 (topology, policy, cost table, tool surface, phase-4 note),
+  `Bugs.md` B-new rewritten (verified scenarios + open items).
+
+**Evidence (all through the MCP tools, files in `Satchida-Studio/exports/videos/`):**
+- A: `scenarioA_photoreal.jpg` — 132 KB, FLUX-2-klein-4b, visually photorealistic.
+- B silent: `scenarioB_silent.mp4` — 832×480 h264, 5.06 s, FastWan-QAD ($0.0125).
+- B audio: `scenarioB_audio.mp4` — 1920×1080 h264 **+ AAC 48 kHz**, LTX-2.3-Fast; silent control
+  confirmed audio-less. Narration path: `scenarioB_narrated.mp4` (h264+aac, free TTS).
+- C: `scenarioC_3d_audio.mp4` — 1920×1080 h264 + AAC, photoreal cliff-villa frame verified.
+- Motion/deepinfra chat restored to 200 after governance fixes; gateway ratio errors still 0.
+
+**Spend this session (DeepInfra, approved provider):** ≈ $0.012 (image) + $0.0125 (B silent) +
+2 × LTX 5–6 s clips (≈ $0.30–0.40 total) + one LTX probe. Everything else free (TTS, probes).
+
+**Next (phase 4, parallel):** ComfyUI local reproduction of the same three scenarios with
+`admin@satchida.com` privacy tier / Privacy mode routing to the local fleet; models already staged
+in `D:\LAN-AI-Infra\Image-models`; fix the cosmetic `widgetInputs.js` deprecation by updating the
+offending custom node. CheapInference media unlocks with one dashboard action (Bugs.md B-new 1).

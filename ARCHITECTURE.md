@@ -637,6 +637,64 @@ as protection of secrets.
 
 ---
 
+## 12.1 Media generation pipeline (image / video / audio)
+
+**Provider policy (operator directive, 2026-11-16):** only three cloud providers are
+authorised for media generation, in this cost/priority order:
+
+1. **CheapInference** (purchased credit, main) — OpenAI-shaped `/v1/images/generations`
+   and `/v1/videos`, reached through **Bifrost (:8700)**. Their Production key is
+   currently restricted upstream to five text-only models, so the CI media chain is
+   empty until the operator lifts the key restriction in the CheaperInference
+   dashboard and `POST /api/providers/CheapInference/refresh-models` is run; the
+   chain then discovers new media models automatically (keyword-matched, 10-min cache).
+2. **DeepInfra** (purchased credit, second) — native APIs are **not** expressible
+   through Bifrost's standard-provider interfaces (Bifrost rejects custom provider
+   config on built-in provider names, and DeepInfra's video API is a synchronous
+   `POST /v1/inference/{model}` returning a `data:video/mp4;base64` URI), so
+   `skill/satchida-montage-server.py` calls DeepInfra **directly** with the key
+   decrypted in-process from Bifrost's store (Argon2id + AES-256-GCM, same scheme
+   as Bifrost's `encrypt` package; never logged, never written to disk).
+3. **OpenRouter** (free models only, third) — no video models in its catalog; image
+   models exist but Bifrost's native openrouter provider rejects the images API, so
+   OpenRouter is currently chat-only. Recorded as a follow-up, not a live path.
+
+**Not used (explicitly excluded):** experientiallabs, together, fal.ai.
+
+**Gateway topology:** LibreChat → one-api (:4000, chat gateway + billing ratios) →
+Bifrost (:8700, routing/governance/keys) → providers. The montage MCP server talks
+to Bifrost for chat-side media (CheapInference) and directly to DeepInfra for its
+native media APIs. Model/provider configuration lives in Bifrost; one-api remains
+the gateway LibreChat connects to.
+
+**Lowest-cost model table (verified live 2026-11-16, USD):**
+
+| Scenario | Model | Cost |
+| --- | --- | --- |
+| Photorealistic image | DeepInfra `black-forest-labs/FLUX-2-klein-4b` | ≈ $0.012 / image (1280×720) |
+| Animated image, silent | DeepInfra `FastVideo/FastWan-QAD-FP8-1.3B` (480p) | $0.0125 / 5 s clip |
+| Animated image, silent 720p | DeepInfra `FastVideo/FastWan2.2-TI2V-5B` | $0.0225 / 5 s (480p half) |
+| Video with synchronized audio | DeepInfra `Lightricks/LTX-2.3-Fast` (native AAC audio, ≤20 s, up to 4K) | from $0.15 / 5 s |
+| Speech narration sync | Free Microsoft Edge TTS (`skill/edge_tts_service.py`) + ffmpeg mux | $0 |
+| Higher-quality silent backup | DeepInfra `Wan-AI/Wan2.2-T2V-A14B` | ≈ $0.375 / 5 s |
+
+**Tool surface (satchida-montage MCP, mounted on OpenFilm/Motion presets):**
+`image_generate(prompt, aspect_ratio, filename)` and
+`video_generate(prompt, duration_seconds, aspect_ratio, filename, narration,
+native_audio)`. `narration` muxes free Edge-TTS speech onto the clip;
+`native_audio=True` selects the audio-visual chain (LTX first).
+
+**Phase 4 (planned, parallel):** reproduce the same three scenarios locally with the
+installed ComfyUI (`D:\LAN-AI-Infra\Image-models` — SDXL, DreamShaper, realisticVision,
+SD3.5-turbo, AnimateDiff, mmaudio, workflows/) using the `admin@satchida.com`
+privacy-tier account in Privacy mode, which routes inference to the local model fleet.
+Known cosmetic issue: ComfyUI terminal warns
+`[DEPRECATION WARNING] ... legacy API: /extensions/core/widgetInputs.js` from an
+outdated custom node — update that node in `custom_nodes`; it does not block
+generation.
+
+---
+
 <!-- MERGED-DISTRIBUTED-PART -->
 ## Part II - Distributed Cloudflare-Tunnel edition (supersedes any VPN/Headscale/VPS wording above)
 

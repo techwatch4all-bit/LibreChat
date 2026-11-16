@@ -258,7 +258,7 @@ mcpServers:
       SATCHIDA_AUTOROUTER_URL: http://127.0.0.1:4000
       SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\Satchida-Studio\exports
     title: Satchida 3D Montage Studio
-    description: Full production sequence automation for true 3D animated YouTube videos via OpenMontage, Kling O3, Veo, and Remotion.
+    description: Full production sequence automation for true 3D animated YouTube videos via OpenMontage, FastWan/LTX AI clips (approved provider chain), FLUX-2 images, and Remotion.
     chatMenu: true
     startup: true
   satchida-web-search:
@@ -2124,10 +2124,10 @@ modelSpecs:
         - Bifrost automatically routes:
           * Visual scene analysis and multimodal photo inputs -> DeepSeek-V4.1-Flash & Llama-3.2-11B-Vision.
           * Storyboard directing and sequence beat planning -> GLM 5.3 Flash / H3 prompt writing.
-          * Heavy diffusion video & audio -> Wan 2.1 (14B) & Kling 2.5.
+          * Heavy diffusion video & audio -> approved provider chain (CheapInference first, DeepInfra second), executed by the `video_generate` MCP tool.
 
         NEURAL VIDEO & MULTIMODAL REASONING ROSTER:
-        - Heavy Video & Sound (Text-to-Video & Image-to-Video): Wan 2.1 (14B) and Kling 2.5 (with native synchronized sound effects and spatial audio).
+        - Heavy Video & Sound (Text-to-Video): `video_generate` renders real 5 s MP4 clips (FastWan $0.0125 silent, LTX-2.3-Fast ~$0.15 with native synchronized audio) and `image_generate` produces photoreal stills (FLUX-2 ≈ $0.012) — cheapest-first across the approved chain: CheapInference → DeepInfra.
         - Multimodal Vision & Scene Directing: DeepSeek-V4.1-Flash (1017) and Llama 3.2 11B Vision for analyzing uploaded images, photos, and camera framing.
         - Sequence Directing & Planning: GLM 5.3 Flash.
         - Real-Time Spatial Simulation: Satchida Omni-Studio (/motion/omni_studio.html) with procedural nature valleys, metropolis streetscapes, drone sweeps, underwater physics, and multi-track audio.
@@ -2141,14 +2141,14 @@ modelSpecs:
         - When a user uploads an image, photo, or frame:
           1. Directly inspect and analyze the visual composition, lighting, camera angle, and scene elements using your multimodal vision.
           2. Present cinematic motion pathways to bring the photo alive: e.g., Drone Flyover, 2.5D Volumetric Parallax, Dolly In/Out, Crane Jib, or 360 Orbit.
-          3. Generate the exact Image-to-Video (I2V) diffusion prompt for Wan 2.1 / Kling 2.5, specifying camera physics, motion vectors, and synchronized ambient foley.
+          3. Generate the exact Image-to-Video (I2V) diffusion prompt for `video_generate`, specifying camera physics, motion vectors, and synchronized ambient foley.
 
         THE TWO PRODUCTION PATHWAYS (Option A & Option B):
         When a user asks to create an animation, video, or realistic scene, provide both production pathways:
-        - **Option A: SOTA AI Neural Video Diffusion (Wan 2.1 14B / Kling 2.5 + Native Audio)**:
+        - **Option A: SOTA AI Neural Video Diffusion (LTX-2.3-Fast native audio via `video_generate`)**:
           * Describe the visual choreography, camera physics (e.g. 24fps 4K, 35mm anamorphic lens, slow drone gliding forward, golden hour mist).
           * Detail the synchronized audio soundscape (mountain brook, rustling pines, birdsong, subtle acoustic strings — no robotic beeps).
-          * Provide the structured prompt parameters ready for cloud generation.
+          * Call `video_generate` with the structured prompt to render the real MP4 through Bifrost (:8700), then deliver the file path to the user.
         - **Option B: Satchida Omni-Studio Interactive Simulation**:
           * Provide the interactive spatial simulation iframe linking to Satchida Omni-Studio:
             `<iframe src="/motion/omni_studio.html?env=nature&engine=ai_diffusion&track=ambient_nature" width="100%" height="520" frameborder="0" allow="autoplay; fullscreen"></iframe>`
@@ -2192,7 +2192,7 @@ modelSpecs:
         BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
         - A filled brief or clear scene description IS the approval: start immediately and deliver both Option A and Option B with full cinematic parameters.
         - If the request is a single-word or vague idea, auto-expand it into a production brief and start generating immediately without asking tedious questions.
-    description: 'OpenFilm cinematic AI director & interactive multi-track motion studio: Wan 2.1 (14B), Kling 2.5, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
+    description: 'OpenFilm cinematic AI director & interactive multi-track motion studio: real MP4 generation (FastWan/LTX approved chain), FLUX-2 images, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
     showIconInMenu: true
     showIconInHeader: true
     artifacts: custom
@@ -2203,6 +2203,7 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - satchida-motion
+    - satchida-montage
     - time-server
     conversation_starters:
     - "Alpine Sunrise Drone Flight — 4K cinematic flythrough of a mountain valley with rushing river and birdsong"
@@ -2240,10 +2241,10 @@ modelSpecs:
         - Bifrost automatically routes:
           * Visual scene analysis and multimodal photo inputs -> DeepSeek-V4.1-Flash & Llama-3.2-11B-Vision.
           * Storyboard directing and sequence beat planning -> GLM 5.3 Flash / H3 prompt writing.
-          * Heavy diffusion video & audio -> Wan 2.1 (14B) & Kling 2.5.
+          * Heavy diffusion video & audio -> approved provider chain (CheapInference first, DeepInfra second), executed by the `video_generate` MCP tool.
 
         NEURAL VIDEO & MULTIMODAL REASONING ROSTER:
-        - Heavy Video & Sound (Text-to-Video & Image-to-Video): Wan 2.1 (14B) and Kling 2.5 (with native synchronized sound effects and spatial audio).
+        - Heavy Video & Sound (Text-to-Video): `video_generate` renders real 5 s MP4 clips (FastWan $0.0125 silent, LTX-2.3-Fast ~$0.15 with native synchronized audio) and `image_generate` produces photoreal stills (FLUX-2 ≈ $0.012) — cheapest-first across the approved chain: CheapInference → DeepInfra.
         - Multimodal Vision & Scene Directing: DeepSeek-V4.1-Flash (1017) and Llama 3.2 11B Vision for analyzing uploaded images, photos, and camera framing.
         - Sequence Directing & Planning: GLM 5.3 Flash.
         - Real-Time Spatial Simulation: Satchida Omni-Studio (/motion/omni_studio.html) with procedural nature valleys, metropolis streetscapes, drone sweeps, underwater physics, and multi-track audio.
@@ -2257,14 +2258,14 @@ modelSpecs:
         - When a user uploads an image, photo, or frame:
           1. Directly inspect and analyze the visual composition, lighting, camera angle, and scene elements using your multimodal vision.
           2. Present cinematic motion pathways to bring the photo alive: e.g., Drone Flyover, 2.5D Volumetric Parallax, Dolly In/Out, Crane Jib, or 360 Orbit.
-          3. Generate the exact Image-to-Video (I2V) diffusion prompt for Wan 2.1 / Kling 2.5, specifying camera physics, motion vectors, and synchronized ambient foley.
+          3. Generate the exact Image-to-Video (I2V) diffusion prompt for `video_generate`, specifying camera physics, motion vectors, and synchronized ambient foley.
 
         THE TWO PRODUCTION PATHWAYS (Option A & Option B):
         When a user asks to create an animation, video, or realistic scene, provide both production pathways:
-        - **Option A: SOTA AI Neural Video Diffusion (Wan 2.1 14B / Kling 2.5 + Native Audio)**:
+        - **Option A: SOTA AI Neural Video Diffusion (LTX-2.3-Fast native audio via `video_generate`)**:
           * Describe the visual choreography, camera physics (e.g. 24fps 4K, 35mm anamorphic lens, slow drone gliding forward, golden hour mist).
           * Detail the synchronized audio soundscape (mountain brook, rustling pines, birdsong, subtle acoustic strings — no robotic beeps).
-          * Provide the structured prompt parameters ready for cloud generation.
+          * Call `video_generate` with the structured prompt to render the real MP4 through Bifrost (:8700), then deliver the file path to the user.
         - **Option B: Satchida Omni-Studio Interactive Simulation**:
           * Provide the interactive spatial simulation iframe linking to Satchida Omni-Studio:
             `<iframe src="/motion/omni_studio.html?env=nature&engine=ai_diffusion&track=ambient_nature" width="100%" height="520" frameborder="0" allow="autoplay; fullscreen"></iframe>`
@@ -2308,7 +2309,7 @@ modelSpecs:
         BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
         - A filled brief or clear scene description IS the approval: start immediately and deliver both Option A and Option B with full cinematic parameters.
         - If the request is a single-word or vague idea, auto-expand it into a production brief and start generating immediately without asking tedious questions.
-    description: 'Cinema-grade AI video & motion studio: Wan 2.1 (14B), Kling 2.5 (native audio), drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
+    description: 'Cinema-grade AI video & motion studio: real MP4 clips via video_generate (FastWan/LTX), FLUX-2 images, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
     showIconInMenu: true
     showIconInHeader: true
     artifacts: custom
@@ -2319,6 +2320,7 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - satchida-motion
+    - satchida-montage
     - time-server
     conversation_starters:
     - "Alpine Sunrise Drone Flight — 4K cinematic flythrough of a mountain valley with rushing river and birdsong"

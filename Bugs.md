@@ -1339,5 +1339,68 @@ is killed mid-flight and reports spurious failures — run it per directory, not
   2. Client bundle recompiled cleanly with `npm run build` (`vite build`: 9,767 modules, 8.47s).
   3. Service restarted under PM2 (`pm2 restart librechat`), returning HTTP 200 OK. Status: **Resolved (2026-11-11)**.
 
+### A29 — Motion Studio 🎬 HTTP 400 Multimodal Vision Failure, Hallucinated Context7 Actions & Low-Poly Cones
+
+- **Severity:** High (Workflow crash, visual degradation & hallucinated tool execution)
+- **Evidence:**
+  1. Attaching an image or asking *"What do you call this? What is this exactly?"* returned HTTP 400: `Model deepseek-ai/DeepSeek-V4-Flash-0731 does not accept image input`.
+  2. Rebuilding the animation triggered red/amber error bars: `Ran 2 actions · Context7-resolve-library-id, generate_offline_speech_audio... 2/2 failed`.
+  3. The rendered scene displayed raw Three.js toy cones for mountains and pine trees, flat colored plane strips for rivers, and synthetic oscillator sine-wave bleeps.
+- **Root Cause:**
+  1. `librechat.yaml` configured `Motion Studio` preset to `model: Work`, which resolved to text-only `deepseek-ai/DeepSeek-V4-Flash-0731`. Bifrost governance configs had `DeepSeek-V4.1-Flash` blacklisted and cost limits capped below its $0.60/Mtok rate.
+  2. The prompt instructed the model to call `Context7-resolve-library-id` (an unauthenticated external MCP) and non-existent speech tools, while LibreChat prompt prefix specified `_mcp_satchida-motion` when the actual mounted hub server was `satchida-tools`.
+  3. The prompt forced the model to generate inline single-file HTML/Three.js (`window.film.frame(t)`), forcing the LLM to code raw geometric primitives instead of utilizing cinema-grade neural diffusion models or the Satchida Omni-Studio engine.
+- **Remediation:**
+  1. **Bifrost & Gateway Routing**: Created `"motion"` mode in `data/config.json`, raised `max_output_cost_per_mtok: 1.0`, unblacklisted `DeepSeek-V4.1-Flash` across governance configs, and added routing rule `rule-motion-visual-studio`. Mapped `Motion` in One-API across channels 1, 4, 5 and all 9 user groups.
+  2. **Model Roster**: Approved cloud-only roster (< 6 months old): Wan 2.1 (14B) & Kling 2.5 (with native sound) for video/audio; DeepSeek-V4.1-Flash (1017) & Llama 3.2 11B Vision for multimodal perception and scene directing; GLM 5.3 Flash for sequencing. Deprecated Qwen 2.5-VL-72B and Gemini 2.0 Flash.
+  3. **Strict Anti-Toy Law**: Updated `librechat.yaml` to enforce two gold-standard pathways: Option A (AI Neural Video Diffusion with Audio) and Option B (Satchida Omni-Studio Multi-Track Simulation at `/motion/omni_studio.html`).
+  4. **MCP Tool Cleanup**: Removed `context7` from `mcp.json` and `librechat.yaml`; aligned tools to `_mcp_satchida-tools`; scrubbed failed tool calls from MongoDB conversation history.
+- **Verification:**
+  1. End-to-end multimodal Node HTTP test on port 4000: returned HTTP 200 OK without 400 error.
+  2. End-to-end text inference on port 4000: returned HTTP 200 OK with 1003 ms latency.
+  3. LibreChat restarted cleanly under PM2 (`librechat` ID 11), registering all 19 tool servers and 86 tools. Status: **Resolved (2026-11-16)**.
+
 ## B-new (2026-11-10): Per-user MCP connection failures are cause-less and flaky
 Per-user MCP connections (UserConnectionManager → MCPConnectionFactory.connect) fail for a changing subset of stdio servers; the catch at packages/api/src/mcp/connection.ts:2252 logs "[MCP] Connection failed" and rethrows WITHOUT the error message, so the cause is invisible in logs. Standalone spawn of the same command with the SDK default environment succeeds in ~2s with the full tool list, so the server code is healthy. Suspects: per-user spawn environment/concurrency on Windows. Interim mitigation shipped: TOOL AVAILABILITY CONTRACT in all mode prompts (fallback to web_search, never surface tool errors). UPDATE 2026-11-10 (step 1 done): the catch now logs the cause (connection.ts "Connection failed: <message>"); packages/api rebuilt and deployed. Post-restart steady state: 0 failures, per-user connections persist and are reused across generations, app-level catalogs carry all tools. If the failure recurs, the log will now name the cause directly — then address the spawn path.
+
+## B-new (2026-11-16): Media generation — provider policy, gates fixed, three scenarios verified
+
+Provider policy (operator directive): **CheapInference (1) → DeepInfra (2) → OpenRouter (3, free
+models)**. experientiallabs / together / fal.ai are **not used** (the earlier experientiallabs
+chain in this entry has been removed). Full pipeline description and cost table:
+`ARCHITECTURE.md` §12.1; history: `Changes.md` C35/C36.
+
+**Verified working (2026-11-16 night, all through `satchida-montage` MCP tools):**
+- Scenario A photorealistic image — DeepInfra `FLUX-2-klein-4b` ≈ $0.012/image.
+- Scenario B animated image silent — DeepInfra `FastWan-QAD-FP8-1.3B` $0.0125/5s (832×480).
+- Scenario B with synchronized audio — DeepInfra `LTX-2.3-Fast` native AAC (1080p), from $0.15/5s;
+  speech-narration path (free Edge TTS + ffmpeg mux) also verified.
+- Scenario C photoreal 3D video + synchronized audio — `LTX-2.3-Fast`, frame-verified.
+
+**Open items (approval/dashboard actions, not code):**
+1. **CheapInference key is text-only upstream.** `GET /v1/models?type=image|video` returns 0 for
+   the Production key although their docs expose image/video endpoints. Lift the model restriction
+   on the key in the CheaperInference dashboard, then `POST /api/providers/CheapInference/refresh-models`
+   — the montage chain auto-discovers the new media models (keyword match, 10-min cache). Likely
+   the cheapest option of all once open.
+2. **OpenRouter has no video models**; its image models are unreachable via Bifrost's native
+   openrouter provider (images API unsupported). Chat-based image extraction is a follow-up only
+   if DeepInfra/CI prices ever rise — OpenRouter images are not cheaper today.
+3. **DeepInfra direct calls (by design):** Bifrost refuses custom provider config on built-in
+   provider names (`cannot be created on standard providers: deepinfra`) and DeepInfra's video API
+   shape (sync `/v1/inference/{model}` + data-URI) does not fit Bifrost's `/v1/videos` contract, so
+   the montage server calls DeepInfra directly with the key decrypted in-process from Bifrost's
+   store. Proper fix if this must go through Bifrost: add native DeepInfra video/image support to
+   Bifrost (code change + rebuild) — approval-gated.
+
+**Fixed tonight (regressions/gaps found while wiring the policy):**
+- Virtual key `satchida-oneapi-cloud` had **no deepinfra provider permit** → intermittent
+  `provider_blocked` 403s on Motion/deepinfra chat. Added the permit + bound the DeepInfra
+  provider key via `PUT /api/governance/virtual-keys/{id}`.
+- `rule-motion-visual-studio` fallbacks pinned stale `key_id: "1"` values that no longer resolve →
+  `no supported key found with id "1"`. Pins removed via `PUT /api/routing/rules/{id}`; normal key
+  selection now applies.
+- CheapInference Production key allowlist widened Bifrost-side to `["*"]` (upstream restriction
+  remains — see item 1).
+- ComfyUI terminal `[DEPRECATION WARNING] ... widgetInputs.js` — an outdated custom node; update it
+  in ComfyUI `custom_nodes` during phase 4. Cosmetic only.

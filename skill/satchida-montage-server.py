@@ -1356,7 +1356,7 @@ def video_plan_3d_scenes(project_id: str) -> str:
 
     plan = []
     for sc in scenes:
-        engine = "Three.js → Playwright (privacy/local)" if is_privacy else "grok-imagine-video via Bifrost (:8700)"
+        engine = "Three.js → Playwright (privacy/local)" if is_privacy else "Satchida diffusion engine (cloud)"
         plan.append({
             "scene_id": sc["scene_id"],
             "duration_sec": sc.get("duration_sec", 6.0),
@@ -1368,7 +1368,7 @@ def video_plan_3d_scenes(project_id: str) -> str:
     with open(proj_dir / "scenes_plan.json", "w", encoding="utf-8") as f:
         json.dump(plan, f, indent=2)
 
-    engine_label = "Three.js + Playwright (zero-cloud)" if is_privacy else "AI video diffusion via Bifrost (:8700)"
+    engine_label = "Three.js + Playwright (zero-cloud)" if is_privacy else "Satchida diffusion engine (cloud)"
     plan_md = "\n".join(
         f"- **{p['scene_id']}** ({p['duration_sec']:.0f}s) → {p['render_engine']}"
         for p in plan
@@ -1540,7 +1540,7 @@ def video_start_render_job(project_id: str, resolution: str = "1080p") -> str:
         f"### 🚀 Render Job Started\n\n"
         f"**Job ID:** `{job_id}`\n"
         f"**Project:** `{project_id}`\n"
-        f"**Engine:** grok-imagine-video via Bifrost (:8700) [cloud] "
+        f"**Engine:** Satchida Studio diffusion render [cloud] "
         f"| Three.js + Playwright [privacy]\n\n"
         f"Poll status with: `video_get_status(job_id=\"{job_id}\")`\n"
         f"Expected render time: 2–10 min depending on scene count and provider queue."
@@ -1758,7 +1758,7 @@ def video_generate(
         f"### 🎬 Video Generated{audio_note}\n\n"
         f"**File:** `{out}` ({size_mb:.2f} MB)\n"
         f"{url_line}"
-        f"**Model:** {_LAST_VIDEO_MODEL or 'unknown'} · {aspect_ratio}\n\n"
+        f"**Engine:** Satchida Studio render engine · {aspect_ratio}\n\n"
         f"Show this to the user. EMBED THE VIDEO SO IT PLAYS INLINE — choose the first"
         f" option that fits your persona:\n"
         f"1. Film artifact: wrap `<video src=\"{web_url}\" controls autoplay loop"
@@ -1810,7 +1810,7 @@ def image_generate(
         return (
             f"### 🖼 Image Generated\n\n"
             f"**File:** `{out}` ({size_kb:.0f} KB)\n"
-            f"**Model:** {_LAST_IMAGE_MODEL or 'unknown'} · {aspect_ratio}\n"
+            f"**Engine:** Satchida Studio render engine · {aspect_ratio}\n"
             f"{url_line}\n"
             f"Show this image to the user. When embedding it in your reply, copy the"
             f" ![generated image](/generated/...) markdown above verbatim — NEVER a"

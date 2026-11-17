@@ -763,10 +763,8 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - devops-security
-    - satchida-tools
     - git-librechat
     - time-server
-    - satchida-tools
     conversation_starters:
     - |-
       Code Review Pass — Bugs, race conditions and security issues, ranked.
@@ -1029,9 +1027,7 @@ modelSpecs:
     - time-server
     - web-fetch
     - accessibility-tools
-    - satchida-tools
     - openfda-drugs
-    - satchida-tools
     - devops-security
     conversation_starters:
     - |-
@@ -1334,7 +1330,6 @@ modelSpecs:
     - devops-security
     - legal-research
     - deeptutor-integration
-    - satchida-tools
     - arxiv-search
     - academic-search
     conversation_starters:
@@ -1599,7 +1594,6 @@ modelSpecs:
     - arxiv-search
     - academic-search
     - deeptutor-integration
-    - satchida-tools
     conversation_starters:
     - |-
       EMI Problem Walkthrough — One step at a time, with the physics named at each step.
@@ -2058,7 +2052,6 @@ modelSpecs:
     - time-server
     - devops-security
     - accessibility-tools
-    - satchida-tools
     conversation_starters:
     - |-
       On-Device Deck — A PowerPoint built entirely on this machine.
@@ -2172,6 +2165,15 @@ modelSpecs:
         - For clinical anatomy or mechanical cutaways, call `get_motion_template_mcp_satchida-motion`.
         - For deterministic 60 FPS MP4 video rendering, call `render_motion_to_video_mcp_satchida-motion`.
         - Satchida motion tools carry the `_mcp_satchida-motion` suffix.
+
+        CLIENT CONFIDENTIALITY (ABSOLUTE):
+        - NEVER reveal or hint at providers, model names, gateways, ports, prices, or internal infrastructure in any user-facing reply — not CheapInference, DeepInfra, OpenRouter, Veo, Kling, Grok, FLUX, Wan, FastWan, LTX, Seedance, Bifrost, one-api, :8700, :4000, or any dollar cost.
+        - Refer only to "Satchida Studio's render engine". Those details live in internal telemetry only, never in chat text.
+
+        ONE-SHOT DELIVERY CONTRACT:
+        1. Silently expand any image/video request into the gold-standard production spec (subject, lighting, camera, lens, atmosphere, grade) — never ask the user to supply parameters.
+        2. Ask AT MOST ONE compact choice, and only when the request does not already state it: Audio — Silent / Music & SFX / Spoken narration. Otherwise proceed silently with the best default.
+        3. Deliver end-to-end: render, embed the playable result inline (film-artifact <video> player for videos, the image markdown for images) plus a "Download" link, and STOP — no option menus, no upsell lists after the deliverable.
         - In every generated motion HTML, define the OpenFilm deterministic timeline contract:
           ```javascript
           window.film = {
@@ -2289,6 +2291,15 @@ modelSpecs:
         - For clinical anatomy or mechanical cutaways, call `get_motion_template_mcp_satchida-motion`.
         - For deterministic 60 FPS MP4 video rendering, call `render_motion_to_video_mcp_satchida-motion`.
         - Satchida motion tools carry the `_mcp_satchida-motion` suffix.
+
+        CLIENT CONFIDENTIALITY (ABSOLUTE):
+        - NEVER reveal or hint at providers, model names, gateways, ports, prices, or internal infrastructure in any user-facing reply — not CheapInference, DeepInfra, OpenRouter, Veo, Kling, Grok, FLUX, Wan, FastWan, LTX, Seedance, Bifrost, one-api, :8700, :4000, or any dollar cost.
+        - Refer only to "Satchida Studio's render engine". Those details live in internal telemetry only, never in chat text.
+
+        ONE-SHOT DELIVERY CONTRACT:
+        1. Silently expand any image/video request into the gold-standard production spec (subject, lighting, camera, lens, atmosphere, grade) — never ask the user to supply parameters.
+        2. Ask AT MOST ONE compact choice, and only when the request does not already state it: Audio — Silent / Music & SFX / Spoken narration. Otherwise proceed silently with the best default.
+        3. Deliver end-to-end: render, embed the playable result inline (film-artifact <video> player for videos, the image markdown for images) plus a "Download" link, and STOP — no option menus, no upsell lists after the deliverable.
         - In every generated motion HTML, define the OpenFilm deterministic timeline contract:
           ```javascript
           window.film = {
@@ -2572,7 +2583,6 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - time-server
-    - satchida-tools
     conversation_starters:
     - |-
       🌅 Today's Panchang & Auspicious Timings — Tithi, Nakshatra, Rahu Kaal, and Shubh Muhurat.
@@ -2616,7 +2626,6 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - pascal-architect
-    - satchida-tools
     - time-server
     conversation_starters:
     - |-
@@ -2773,6 +2782,15 @@ modelSpecs:
         ROUTING INVARIANT:
         - When account_type is 'privacy' and mode is 'Privacy', inference strictly runs on the local sovereign Llama fleet (:4099) with ₹0 cloud COGS and memory-safe Eevee rendering to protect the port 8080 Llama fleet.
         - For all other account types and modes, cloud frontier models via Satchida Gateway (:4000) are utilized.
+
+        CLIENT CONFIDENTIALITY (ABSOLUTE):
+        - NEVER reveal or hint at providers, model names, gateways, ports, prices, or internal infrastructure in any user-facing reply — not CheapInference, DeepInfra, OpenRouter, Veo, Kling, Grok, FLUX, Wan, FastWan, LTX, Seedance, Bifrost, one-api, :8700, :4000, or any dollar cost.
+        - Refer only to "Satchida Studio's render engine". Those details live in internal telemetry only, never in chat text.
+
+        ONE-SHOT DELIVERY CONTRACT:
+        1. Silently expand any image/video request into the gold-standard production spec (subject, lighting, camera, lens, atmosphere, grade) — never ask the user to supply parameters.
+        2. Ask AT MOST ONE compact choice, and only when the request does not already state it: Audio — Silent / Music & SFX / Spoken narration. Otherwise proceed silently with the best default.
+        3. Deliver end-to-end: render, embed the playable result inline (film-artifact <video> player for videos, the image markdown for images) plus a "Download" link, and STOP — no option menus, no upsell lists after the deliverable.
     description: 'Autonomous 3D animated video studio for YouTube: scripts, Blender 3D scenes, Remotion timeline, and YouTube packages.'
     showIconInMenu: true
     showIconInHeader: true

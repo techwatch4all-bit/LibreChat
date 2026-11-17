@@ -24,6 +24,8 @@ No third-party API key ever exists in this file or in client configs.
 """
 
 from __future__ import annotations
+import ctypes
+import datetime
 import os
 import sys
 import json
@@ -280,11 +282,22 @@ def _provider_key(provider: str) -> str:
 
         passphrase = os.environ.get("BIFROST_ENCRYPTION_KEY", "").strip()
         if not passphrase:
-            out = subprocess.run(
-                "pm2 env 15", capture_output=True, text=True, timeout=20, shell=True
+            # Resolve the Bifrost PM2 process by NAME (ids shift across daemon
+            # restarts), then read its env. Never logs the passphrase.
+            listing = subprocess.run(
+                "pm2 jlist", capture_output=True, text=True, timeout=30, shell=True
             ).stdout
-            m = _re.search(r"^BIFROST_ENCRYPTION_KEY:\s*(.*)$", out, _re.M)
-            passphrase = m.group(1).strip() if m else ""
+            bifrost_id = ""
+            for proc in json.loads(listing or "[]"):
+                if proc.get("name") == "satchida-bifrost":
+                    bifrost_id = str(proc.get("pm_id", ""))
+                    break
+            if bifrost_id:
+                out = subprocess.run(
+                    f"pm2 env {bifrost_id}", capture_output=True, text=True, timeout=20, shell=True
+                ).stdout
+                m = _re.search(r"^BIFROST_ENCRYPTION_KEY:\s*(.*)$", out, _re.M)
+                passphrase = m.group(1).strip() if m else ""
         if not passphrase:
             raise RuntimeError("encryption passphrase unavailable")
         con = sqlite3.connect(
@@ -358,6 +371,7 @@ def _ci_video_direct(
             body["audio"] = True
         if image_url:
             body["image_url"] = image_url
+        t0 = time.time()
         try:
             req = urllib.request.Request(
                 f"{CHEAPERINFERENCE_API}/v1/videos/generations",
@@ -371,14 +385,34 @@ def _ci_video_direct(
             with urllib.request.urlopen(req, timeout=360) as r:
                 data = json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
+            latency_ms = (time.time() - t0) * 1000.0
+            msg = e.read().decode(errors="replace")[:250]
             print(
-                f"[satchida-montage] CI video {m} HTTP {e.code}: "
-                f"{e.read().decode(errors='replace')[:250]}",
+                f"[satchida-montage] CI video {m} HTTP {e.code}: {msg}",
                 file=sys.stderr,
+            )
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="cheapinference",
+                model=m,
+                status="error",
+                cost=0.0,
+                latency_ms=latency_ms,
+                error_details=f"HTTP {e.code}: {msg}",
             )
             continue
         except Exception as e:
+            latency_ms = (time.time() - t0) * 1000.0
             print(f"[satchida-montage] CI video {m} failed: {e}", file=sys.stderr)
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="cheapinference",
+                model=m,
+                status="error",
+                cost=0.0,
+                latency_ms=latency_ms,
+                error_details=str(e),
+            )
             continue
 
         videos = data.get("videos") or []
@@ -401,6 +435,14 @@ def _ci_video_direct(
             tmp.write_bytes(raw)
             tmp.replace(output_path)
             _LAST_VIDEO_MODEL = f"cheapinference/{m}"
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="cheapinference",
+                model=m,
+                status="success",
+                cost=_CI_MODEL_PRICES.get(m, 0.0) * seconds,
+                latency_ms=(time.time() - t0) * 1000.0,
+            )
             print(
                 f"[satchida-montage] video OK via cheapinference/{m} -> {output_path}",
                 file=sys.stderr,
@@ -414,8 +456,202 @@ def _ci_video_direct(
     return False
 
 
+
+# ── Video/Image Bifrost Tracking & Approval Invariants ───────────────────────
+MODEL_ESTIMATED_COSTS: Dict[str, float] = {
+    "Lightricks/LTX-2.3-Fast": 0.15,
+    "FastVideo/FastWan-QAD-FP8-1.3B": 0.0125,
+    "FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers": 0.0225,
+    "Wan-AI/Wan2.2-T2V-A14B": 0.375,
+    "ByteDance/Seedance-1.5-Pro": 0.20,
+    "kling-v2.6-t2v": 0.05,
+    "kling-v2.6-i2v": 0.05,
+    "grok-imagine-video": 0.03,
+    "veo-3.1-lite-generate-001": 0.10,
+    "black-forest-labs/FLUX-2-klein-4b": 0.012,
+    "black-forest-labs/FLUX-2-klein-9b": 0.012,
+    "ByteDance-Seed/Seedream-4.0": 0.015,
+}
+
+LOGS_DB_PATH = r"D:\LAN-AI-Infra\Bifrost\data\logs.db"
+
+def get_today_video_spend() -> float:
+    """Query Bifrost logs.db for cumulative video generation cost today (UTC)."""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{LOGS_DB_PATH}?mode=ro", uri=True, timeout=5)
+        c = conn.cursor()
+        today_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        c.execute("""
+            SELECT SUM(cost) 
+            FROM logs 
+            WHERE object_type = 'video_generation' 
+              AND status = 'success'
+              AND timestamp >= ?
+        """, (today_utc,))
+        row = c.fetchone()
+        conn.close()
+        return float(row[0]) if (row and row[0] is not None) else 0.0
+    except Exception as e:
+        print(f"[satchida-montage] Failed to query today video spend: {e}", file=sys.stderr)
+        return 0.0
+
+def get_detailed_usage_context():
+    """Retrieve tenant, user seat, plan and day/week/month token and cost usage."""
+    tenant_name = "Satchida HQ (satchida-master)"
+    user_name = "Satchida Super Admin (root)"
+    seat_plan = "Pro / Privacy Dedicated Seat"
+    quota_info = "Unlimited / High-Priority Master"
+    
+    try:
+        import sqlite3
+        con_one = sqlite3.connect(r"file:D:\LAN-AI-Infra\one-api\one-api.db?mode=ro", uri=True, timeout=3)
+        row = con_one.execute("""
+            SELECT u.username, u.display_name, u.[group], u.quota, u.used_quota,
+                   t.name, t.plan, t.max_seats
+            FROM users u
+            LEFT JOIN tenants t ON t.id = 'satchida-master' OR t.id = 'tenant_operator'
+            LIMIT 1
+        """).fetchone()
+        con_one.close()
+        if row:
+            u_user, u_disp, u_grp, u_quota, u_used, t_name, t_plan, t_seats = row
+            user_name = f"{u_disp or u_user} ({u_user})"
+            if t_name:
+                tenant_name = f"{t_name} (Plan: {t_plan or u_grp}, Max Seats: {t_seats})"
+            seat_plan = f"Group: {u_grp.upper()} | Plan: {(t_plan or u_grp).capitalize()}"
+            quota_info = f"Used Quota: {u_used:,} | Balance: {u_quota:,}"
+    except Exception as e:
+        print(f"[satchida-montage] Failed to fetch one-api details: {e}", file=sys.stderr)
+
+    day_tokens, day_cost, day_reqs = 0, 0.0, 0
+    week_tokens, week_cost, week_reqs = 0, 0.0, 0
+    month_tokens, month_cost, month_reqs = 0, 0.0, 0
+
+    try:
+        import sqlite3
+        con_logs = sqlite3.connect(f"file:{LOGS_DB_PATH}?mode=ro", uri=True, timeout=3)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        day_start = now.strftime("%Y-%m-%d 00:00:00")
+        week_start = (now - datetime.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        month_start = (now - datetime.timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+
+        c = con_logs.cursor()
+        c.execute("SELECT count(*), coalesce(sum(total_tokens), 0), coalesce(sum(cost), 0) FROM logs WHERE timestamp >= ? AND status = 'success'", (day_start,))
+        day_reqs, day_tokens, day_cost = c.fetchone()
+
+        c.execute("SELECT count(*), coalesce(sum(total_tokens), 0), coalesce(sum(cost), 0) FROM logs WHERE timestamp >= ? AND status = 'success'", (week_start,))
+        week_reqs, week_tokens, week_cost = c.fetchone()
+
+        c.execute("SELECT count(*), coalesce(sum(total_tokens), 0), coalesce(sum(cost), 0) FROM logs WHERE timestamp >= ? AND status = 'success'", (month_start,))
+        month_reqs, month_tokens, month_cost = c.fetchone()
+        con_logs.close()
+    except Exception as e:
+        print(f"[satchida-montage] Failed to fetch usage stats from logs.db: {e}", file=sys.stderr)
+
+    return {
+        "tenant_name": tenant_name,
+        "user_name": user_name,
+        "seat_plan": seat_plan,
+        "quota_info": quota_info,
+        "day": f"{day_tokens:,} tokens (${day_cost:.4f}, {day_reqs} reqs)",
+        "week": f"{week_tokens:,} tokens (${week_cost:.4f}, {week_reqs} reqs)",
+        "month": f"{month_tokens:,} tokens (${month_cost:.4f}, {month_reqs} reqs)",
+    }
+
+def check_video_approval(model_name: str, duration_seconds: float = 5.0) -> bool:
+    """
+    Enforce operator approval if today's video spend >= $1.00 or if this request pushes spend >= $1.00.
+    Triggers native Windows modal dialog with full tenant, user seat, and token usage diagnostics.
+    """
+    est_cost = MODEL_ESTIMATED_COSTS.get(model_name, 0.10)
+    if "LTX" in model_name:
+        est_cost = max(0.03 * duration_seconds, 0.15)
+        
+    current_spend = get_today_video_spend()
+    projected_spend = current_spend + est_cost
+    
+    if projected_spend >= 1.00:
+        diag = get_detailed_usage_context()
+        title = "⚠️ Satchida Video Generation Approval & Security Gate"
+        msg = (
+            f"=== VIDEO GENERATION REQUEST APPROVAL ===\n\n"
+            f"• Target Model: {model_name}\n"
+            f"• Estimated Cost: ${est_cost:.4f} ({duration_seconds:.0f}s clip)\n"
+            f"• Today's Video Spend: ${current_spend:.4f} → Projected: ${projected_spend:.4f}\n\n"
+            f"--- SECURITY & ACCOUNT CONTEXT ---\n"
+            f"• Tenant: {diag['tenant_name']}\n"
+            f"• User / Identity: {diag['user_name']}\n"
+            f"• Seat / Plan: {diag['seat_plan']}\n"
+            f"• Quota Status: {diag['quota_info']}\n\n"
+            f"--- USAGE HISTORY (UP TO THIS REQUEST) ---\n"
+            f"• Past 24h: {diag['day']}\n"
+            f"• Past 7d:  {diag['week']}\n"
+            f"• Past 30d: {diag['month']}\n\n"
+            f"Threshold Exceeded: Daily video cap ($1.00) reached.\n"
+            f"Do you authorize this video generation?"
+        )
+        flags = 0x4 | 0x30 | 0x1000 | 0x10000
+        res = ctypes.windll.user32.MessageBoxW(0, msg, title, flags)
+        if res != 6: # IDYES == 6
+            print(f"[satchida-montage] Video generation for {model_name} DENIED by operator popup.", file=sys.stderr)
+            return False
+        print(f"[satchida-montage] Video generation for {model_name} APPROVED by operator popup.", file=sys.stderr)
+        return True
+    return True
+
+def log_media_to_bifrost(
+    object_type: str,
+    provider: str,
+    model: str,
+    status: str,
+    cost: float,
+    latency_ms: float = 0.0,
+    error_details: str = "",
+    virtual_key_name: str = "satchida-oneapi-cloud",
+):
+    """Log media generation event into Bifrost logs.db so it is tracked & metered in Bifrost gateway metrics."""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(LOGS_DB_PATH, timeout=10)
+        c = conn.cursor()
+        log_id = str(uuid.uuid4())
+        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        
+        vk_id = "1f8097a4-0791-40b4-865e-9081937f4840"
+        tenant_id = "satchida-master"
+        tenant_name = "Satchida HQ"
+        
+        c.execute("""
+            INSERT INTO logs (
+                id, timestamp, object_type, provider, model, canonical_model_name,
+                status, cost, latency, upstream_latency, overhead_latency,
+                virtual_key_id, virtual_key_name,
+                team_id, team_name, customer_id, customer_name,
+                tenant_id, tenant_name, user_agent, app, error_details, created_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?
+            )
+        """, (
+            log_id, now, object_type, provider, model, model,
+            status, cost, latency_ms, latency_ms, 0.0,
+            vk_id, virtual_key_name,
+            tenant_id, tenant_name, tenant_id, tenant_name,
+            tenant_id, tenant_name, "LibreChat-Montage/1.0", "LibreChat", error_details, now
+        ))
+        conn.commit()
+        conn.close()
+        return log_id
+    except Exception as e:
+        print(f"[satchida-montage] Failed to log media event to Bifrost logs.db: {e}", file=sys.stderr)
+        return None
+
 def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9") -> bool:
-    """Priority-2 chain: DeepInfra OpenAI-compatible images API (direct)."""
+    """Priority-2 chain: DeepInfra OpenAI-compatible images API (logged & metered via Bifrost)."""
     global _LAST_IMAGE_MODEL
     key = _provider_key("deepinfra")
     if not key:
@@ -425,6 +661,7 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
     for model in DEEPINFRA_IMAGE_MODELS:
         use_size = size
         while True:
+            t0 = time.time()
             body = {
                 "model": model,
                 "prompt": prompt,
@@ -445,10 +682,20 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                 with urllib.request.urlopen(req, timeout=120) as r:
                     data = json.loads(r.read().decode())
             except urllib.error.HTTPError as e:
+                latency_ms = (time.time() - t0) * 1000.0
                 msg = e.read().decode(errors="replace")[:200]
                 print(
                     f"[satchida-montage] deepinfra image {model} HTTP {e.code}: {msg}",
                     file=sys.stderr,
+                )
+                log_media_to_bifrost(
+                    object_type="image_generation",
+                    provider="deepinfra",
+                    model=model,
+                    status="error",
+                    cost=0.0,
+                    latency_ms=latency_ms,
+                    error_details=f"HTTP {e.code}: {msg}"
                 )
                 if e.code == 400 and use_size != "1024x1024" and not tried_default:
                     use_size = "1024x1024"
@@ -456,9 +703,20 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                     continue
                 break
             except Exception as e:
+                latency_ms = (time.time() - t0) * 1000.0
                 print(f"[satchida-montage] deepinfra image failed: {e}", file=sys.stderr)
+                log_media_to_bifrost(
+                    object_type="image_generation",
+                    provider="deepinfra",
+                    model=model,
+                    status="error",
+                    cost=0.0,
+                    latency_ms=latency_ms,
+                    error_details=str(e)
+                )
                 break
 
+            latency_ms = (time.time() - t0) * 1000.0
             entries = data.get("data") or []
             if not entries:
                 break
@@ -479,8 +737,17 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                 tmp.replace(output_path)
                 if output_path.exists() and output_path.stat().st_size > 1024:
                     _LAST_IMAGE_MODEL = f"deepinfra/{model}"
+                    cost = MODEL_ESTIMATED_COSTS.get(model, 0.012)
+                    log_media_to_bifrost(
+                        object_type="image_generation",
+                        provider="deepinfra",
+                        model=model,
+                        status="success",
+                        cost=cost,
+                        latency_ms=latency_ms
+                    )
                     print(
-                        f"[satchida-montage] image OK via deepinfra/{model} -> {output_path}",
+                        f"[satchida-montage] image OK via deepinfra/{model} -> {output_path} (cost: ${cost:.4f})",
                         file=sys.stderr,
                     )
                     return True
@@ -512,6 +779,7 @@ def _deepinfra_video(
         models = [model] if model else list(DEEPINFRA_VIDEO_MODELS)
     for m in models:
         body = {"prompt": prompt}
+        t0 = time.time()
         try:
             req = urllib.request.Request(
                 f"{DEEPINFRA_API}/v1/inference/{urllib.parse.quote(m, safe='/')}",
@@ -525,14 +793,34 @@ def _deepinfra_video(
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 data = json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
+            latency_ms = (time.time() - t0) * 1000.0
+            msg = e.read().decode(errors="replace")[:200]
             print(
-                f"[satchida-montage] deepinfra video {m} HTTP {e.code}: "
-                f"{e.read().decode(errors='replace')[:200]}",
+                f"[satchida-montage] deepinfra video {m} HTTP {e.code}: {msg}",
                 file=sys.stderr,
+            )
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="deepinfra",
+                model=m,
+                status="error",
+                cost=0.0,
+                latency_ms=latency_ms,
+                error_details=f"HTTP {e.code}: {msg}",
             )
             continue
         except Exception as e:
+            latency_ms = (time.time() - t0) * 1000.0
             print(f"[satchida-montage] deepinfra video {m} failed: {e}", file=sys.stderr)
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="deepinfra",
+                model=m,
+                status="error",
+                cost=0.0,
+                latency_ms=latency_ms,
+                error_details=str(e),
+            )
             continue
 
         vurl = data.get("video_url") or ""
@@ -562,6 +850,14 @@ def _deepinfra_video(
             tmp.write_bytes(raw)
             tmp.replace(output_path)
             _LAST_VIDEO_MODEL = f"deepinfra/{m}"
+            log_media_to_bifrost(
+                object_type="video_generation",
+                provider="deepinfra",
+                model=m,
+                status="success",
+                cost=MODEL_ESTIMATED_COSTS.get(m, 0.0),
+                latency_ms=(time.time() - t0) * 1000.0,
+            )
             print(
                 f"[satchida-montage] video OK via deepinfra/{m} -> {output_path}",
                 file=sys.stderr,
@@ -590,6 +886,17 @@ def _generate_video_core(
     DeepInfra LTX) which render synchronized audio inside the clip itself.
     quality="hd" tries the 720p-class model before the cheaper 480p one.
     """
+    # Spend gate: fires only when this request pushes today's video spend to
+    # or past the $1.00 daily cap. Estimates with the primary model of the
+    # active chain, so a cheap request never triggers a dialog.
+    primary_model = (
+        "kling-v2.6-i2v" if image_url
+        else "veo-3.1-lite-generate-001" if native_audio
+        else "kling-v2.6-t2v" if quality == "hd"
+        else "grok-imagine-video"
+    )
+    check_video_approval(primary_model, duration_seconds)
+
     if _ci_video_direct(
         prompt, duration_seconds, output_path, aspect_ratio,
         native_audio=native_audio, quality=quality, image_url=image_url,
@@ -597,7 +904,7 @@ def _generate_video_core(
         return True
     if native_audio:
         return _deepinfra_video(
-            prompt, output_path, models=list(DEEPINFRA_VIDEO_AV_MODELS)
+            prompt, output_path, models=list(DEEPINFRA_VIDEO_AV_MODELS),
         )
     models = list(DEEPINFRA_VIDEO_MODELS)
     if quality == "hd" and len(models) >= 2:
@@ -654,6 +961,31 @@ def _mux_audio(video_path: Path, audio_path: Path, output_path: Path) -> bool:
         return enc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024
     except Exception as e:
         print(f"[satchida-montage] audio mux failed: {e}", file=sys.stderr)
+        return False
+
+
+def _strip_audio(video_path: Path) -> bool:
+    """Remove the audio track in place. Some priority-1 models (e.g. CI
+    grok-imagine-video) embed ambient audio even when none was requested; a
+    caller that asked for a silent clip gets a genuinely silent file."""
+    try:
+        silent = video_path.with_name(video_path.stem + "_silent" + video_path.suffix)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(video_path),
+            "-map", "0:v:0",
+            "-c:v", "copy",
+            "-an",
+            str(silent),
+        ]
+        enc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if enc.returncode == 0 and silent.exists() and silent.stat().st_size > 1024:
+            silent.replace(video_path)
+            return True
+        print(f"[satchida-montage] audio strip failed rc={enc.returncode}", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"[satchida-montage] audio strip failed: {e}", file=sys.stderr)
         return False
 
 
@@ -1141,12 +1473,19 @@ def _async_render_worker(job_id: str, project_id: str, resolution: str) -> None:
         video_size_mb = final_path.stat().st_size / (1024 * 1024) if final_path.exists() else 0
         is_real_video = video_size_mb > 0.1  # > 100 KB indicates real content
 
+        # Publish to LibreChat's web-servable static dirs so the chat can link
+        # and play the deliverable (filesystem paths never render in browsers).
+        video_web_url = _publish_artifact(final_path)
+        thumb_web_url = _publish_artifact(thumb_path)
+
         with JOB_LOCK:
             ACTIVE_JOBS[job_id].update({
                 "stage": "Complete",
                 "progress": 100,
                 "status": "SUCCESS",
                 "video_path": str(final_path),
+                "video_web_url": video_web_url,
+                "thumbnail_web_url": thumb_web_url,
                 "thumbnail_path": str(thumb_path),
                 "video_size_mb": round(video_size_mb, 2),
                 "is_real_video": is_real_video,
@@ -1234,10 +1573,19 @@ def video_get_status(job_id: str) -> str:
         if warnings:
             warn_block = "\n**Warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
 
+        video_web_url = job.get("video_web_url", "")
+        web_block = (
+            f"\n**Web URL (embed this in your reply so the video plays in chat):**\n\n"
+            f"**[{Path(job.get('video_path', '')).name} — watch the video]({video_web_url})**\n\n"
+            f"Markdown to embed verbatim: `![video]({video_web_url})`\n"
+            if video_web_url
+            else ""
+        )
         return (
             f"### ✅ Render Complete\n\n"
             f"**Job:** `{job_id}` | **Elapsed:** {elapsed}s\n"
             f"**Video:** `{job.get('video_path', '')}` ({video_mb} MB) — {video_flag}\n"
+            f"{web_block}"
             f"**Thumbnail:** `{job.get('thumbnail_path', '')}`\n"
             f"**Scenes:** {job.get('scenes_rendered', '?')}/{job.get('scenes_total', '?')} rendered\n"
             f"{warn_block}\n\n"
@@ -1301,6 +1649,28 @@ def video_export_youtube_bundle(project_id: str) -> str:
         f"**Scenes:** {bundle.get('scenes_rendered', '?')}/{bundle.get('scenes_total', '?')} real video clips rendered.\n\n"
         f"Upload `video_path` and `thumbnail_path` to YouTube Studio."
     )
+
+
+def _publish_artifact(path: Path) -> str:
+    """Copy a generated artifact into LibreChat's web-servable static dirs and
+    return a RELATIVE URL (/generated/<name>) that renders in every client —
+    local browser and ai.satchida.com alike. Raw D:\\ paths never display in
+    chat; browsers cannot load filesystem paths from an http page.
+    """
+    try:
+        name = path.name
+        for base in (
+            _LIBRECHAT_ROOT / "client" / "public" / "generated",
+            _LIBRECHAT_ROOT / "client" / "dist" / "generated",
+        ):
+            dest_dir = base
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / name
+            shutil.copyfile(path, dest)
+        return f"/generated/{name}"
+    except Exception as e:
+        print(f"[satchida-montage] artifact publish failed: {e}", file=sys.stderr)
+        return ""
 
 
 @mcp.tool()
@@ -1369,13 +1739,35 @@ def video_generate(
             audio_note = " (narration requested but TTS/mux failed — silent clip)"
     elif native_audio:
         audio_note = " with native synchronized audio"
+    else:
+        # Caller asked for a silent clip; some priority-1 models still embed
+        # ambient audio, so strip the track to honor the request.
+        if _strip_audio(out):
+            audio_note = " (silent clip, audio track stripped)"
+        else:
+            audio_note = " (silent requested; model-embedded audio kept)"
 
     size_mb = out.stat().st_size / (1024 * 1024)
+    web_url = _publish_artifact(out)
+    url_line = (
+        f"**Web URL (use this in markdown so the video plays in chat):** {web_url}\n"
+        if web_url
+        else ""
+    )
     return (
         f"### 🎬 Video Generated{audio_note}\n\n"
         f"**File:** `{out}` ({size_mb:.2f} MB)\n"
+        f"{url_line}"
         f"**Model:** {_LAST_VIDEO_MODEL or 'unknown'} · {aspect_ratio}\n\n"
-        f"Show this file to the user; it is a real MP4 ready for playback or upload."
+        f"Show this to the user. EMBED THE VIDEO SO IT PLAYS INLINE — choose the first"
+        f" option that fits your persona:\n"
+        f"1. Film artifact: wrap `<video src=\"{web_url}\" controls autoplay loop"
+        f" style=\"width:100%\"></video>` in your :::artifact{{type=\"application/vnd.satchida.film\"}}"
+        f" block (preferred for OpenFilm/Motion/3D Studio).\n"
+        f"2. Plain markdown link: `[▶ Watch the video]({web_url})` — clicking plays it"
+        f" in the browser tab.\n"
+        f"NEVER use `![video]({web_url})` — markdown images cannot play MP4s.\n"
+        f"NEVER use a filesystem path — browsers cannot load it."
     )
 
 
@@ -1408,11 +1800,21 @@ def image_generate(
     ok = _generate_image_core(prompt, out, aspect_ratio)
     if ok:
         size_kb = out.stat().st_size / 1024
+        web_url = _publish_artifact(out)
+        url_line = (
+            f"\n**Web URL (embed exactly this so the image displays in chat):**\n\n"
+            f"![generated image]({web_url})\n"
+            if web_url
+            else ""
+        )
         return (
             f"### 🖼 Image Generated\n\n"
             f"**File:** `{out}` ({size_kb:.0f} KB)\n"
-            f"**Model:** {_LAST_IMAGE_MODEL or 'unknown'} · {aspect_ratio}\n\n"
-            f"Show this image to the user."
+            f"**Model:** {_LAST_IMAGE_MODEL or 'unknown'} · {aspect_ratio}\n"
+            f"{url_line}\n"
+            f"Show this image to the user. When embedding it in your reply, copy the"
+            f" ![generated image](/generated/...) markdown above verbatim — NEVER a"
+            f" filesystem path, which browsers cannot load."
         )
     return (
         "Error: image generation failed on the approved provider chain "

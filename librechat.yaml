@@ -257,6 +257,7 @@ mcpServers:
       OPEN_MONTAGE_ROOT: D:\LAN-AI-Infra\Satchida-Studio\external\OpenMontage
       SATCHIDA_AUTOROUTER_URL: http://127.0.0.1:4000
       SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\Satchida-Studio\exports
+    timeout: 480000
     title: Satchida 3D Montage Studio
     description: Full production sequence automation for true 3D animated YouTube videos via OpenMontage, FastWan/LTX AI clips (approved provider chain), FLUX-2 images, and Remotion.
     chatMenu: true
@@ -306,6 +307,7 @@ mcpServers:
     command: python
     args:
     - skill/satchida-motion-server.py
+    timeout: 480000
     title: Satchida Motion Graphics and Video Engine
     description: Deterministic GSAP motion graphics engine, HTML animation linter, and frame-by-frame 60 FPS MP4 video exporter.
     chatMenu: true

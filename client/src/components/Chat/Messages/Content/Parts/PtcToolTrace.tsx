@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { isReportableRunStepDuration } from 'librechat-data-provider';
 import type { TranslationKeys } from '~/hooks';
 import type { PtcTraceEntry } from '~/store';
-import { cn, parseToolName, getRunStepDurationLabels } from '~/utils';
+import {
+  cn,
+  parseToolName,
+  getRunStepDurationLabels,
+  isInternalMCPServer,
+  getStudioToolLabelKey,
+} from '~/utils';
 import { useMessageContext } from '~/Providers/MessageContext';
 import { ptcTraceByToolCallId, ptcTraceKey } from '~/store';
 import { useMCPServerNames } from '~/hooks/MCP';
@@ -39,6 +45,13 @@ function PtcTraceLine({ entry }: { entry: PtcTraceEntry }) {
   const { i18n } = useTranslation();
   const mcpServerNames = useMCPServerNames();
   const parsed = parseToolName(entry.name, mcpServerNames);
+  const isStudioTool = parsed.mcpServer ? isInternalMCPServer(parsed.mcpServer) : false;
+  let toolLabel = parsed.toolName;
+  if (isStudioTool) {
+    toolLabel = localize(getStudioToolLabelKey(parsed.toolName));
+  } else if (parsed.friendlyKey) {
+    toolLabel = localize(parsed.friendlyKey);
+  }
   const running = entry.status === 'running';
   const failed = entry.status === 'error';
   const duration = isReportableRunStepDuration(entry.durationMs)
@@ -60,13 +73,13 @@ function PtcTraceLine({ entry }: { entry: PtcTraceEntry }) {
         </span>
         <span className="sr-only">{localize(STATUS_LABEL_KEYS[entry.status])}</span>
         <span className="shrink-0 text-text-primary">
-          {parsed.mcpServer && (
+          {parsed.mcpServer && !isInternalMCPServer(parsed.mcpServer) && (
             <>
               <span className="text-text-secondary">{parsed.mcpServer}</span>
               <span className="text-text-tertiary">·</span>
             </>
           )}
-          {parsed.friendlyKey ? localize(parsed.friendlyKey) : parsed.toolName}
+          {toolLabel}
         </span>
         <span className="min-w-0 flex-1 truncate text-text-tertiary">{entry.args ?? ''}</span>
         {duration ? (

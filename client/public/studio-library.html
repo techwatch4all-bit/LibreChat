@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Satchida Studio Library</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0d0b10; color:#e8e4f0; font-family:'Segoe UI', system-ui, sans-serif; }
+  header { padding:28px 32px 10px; }
+  h1 { margin:0; font-size:22px; font-weight:600; letter-spacing:.02em; }
+  p.sub { margin:6px 0 0; color:#9a92ad; font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; padding:20px 32px 48px; }
+  .card { background:#17131f; border:1px solid #262035; border-radius:14px; overflow:hidden; }
+  .media { position:relative; aspect-ratio:16/10; background:#000; display:flex; align-items:center; justify-content:center; }
+  .media img, .media video { width:100%; height:100%; object-fit:cover; display:block; }
+  .badge { position:absolute; top:8px; left:8px; background:rgba(10,8,14,.75); border:1px solid #2e2840; color:#cfc6e2; font-size:10.5px; padding:2px 8px; border-radius:99px; letter-spacing:.06em; text-transform:uppercase; }
+  .meta { padding:10px 12px 12px; }
+  .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
+  .when { color:#8d85a3; font-size:11.5px; }
+  a.dl { color:#a78bfa; font-size:12.5px; text-decoration:none; font-weight:600; }
+  a.dl:hover { text-decoration:underline; }
+  .empty { padding:40px; color:#8d85a3; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Studio Library</h1>
+  <p class="sub">Every image and video created with Satchida Studio — browse, play, and download. Your creations stay here even if a chat is deleted.</p>
+</header>
+<div class="grid" id="grid"><div class="empty">Loading your creations…</div></div>
+<script>
+async function load() {
+  const grid = document.getElementById('grid');
+  try {
+    const r = await fetch('/generated/manifest.json', { cache: 'no-store' });
+    const items = await r.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      grid.innerHTML = '<div class="empty">No creations yet — generate one from any Satchida Studio chat.</div>';
+      return;
+    }
+    grid.innerHTML = items.map(it => {
+      const sizeMB = (it.size / (1024 * 1024)).toFixed(2);
+      const media = it.kind === 'video'
+        ? `<video src="${it.url}" preload="metadata" controls muted></video>`
+        : `<img src="${it.url}" loading="lazy" alt="">`;
+      return `<div class="card">
+        <div class="media">${media}<span class="badge">${it.kind}</span></div>
+        <div class="meta">
+          <div class="name" title="${it.name}">${it.name}</div>
+          <div class="row">
+            <span class="when">${it.created || ''} · ${sizeMB} MB</span>
+            <a class="dl" href="${it.url}" download>Download</a>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = '<div class="empty">Could not load the library manifest.</div>';
+  }
+}
+load();
+</script>
+</body>
+</html>

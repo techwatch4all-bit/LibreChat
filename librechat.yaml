@@ -243,6 +243,8 @@ mcpServers:
       ANYTHINGLLM_URL: http://127.0.0.1:3012/api/v1
       ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
       SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated
+
+    timeout: 480000
     title: Satchida Unified Intelligence Hub
     description: Unified high-performance engine aggregating 86+ local STEM, Office, LMS, Search, Motion, and Knowledge Vault tools with dynamic extensible auto-discovery.
     chatMenu: true
@@ -317,6 +319,8 @@ mcpServers:
     command: python
     args:
     - skill/satchida-scenemosaic-server.py
+
+    timeout: 480000
     title: Satchida SceneMosaic 3D Room Reconstructor
     description: Photo-to-3D indoor scene reconstruction and hybrid agentic layout evolution.
     chatMenu: true
@@ -327,6 +331,8 @@ mcpServers:
     args:
     - node_modules/@pascal-app/mcp/dist/bin/pascal-mcp.js
     - --stdio
+
+    timeout: 480000
     title: Pascal Whole-Building BIM
     description: '89 parametric BIM tools for building shells, levels, roofs, stairs,
       and structural inspections; runs fully offline from local node_modules.'
@@ -337,6 +343,8 @@ mcpServers:
     command: python
     args:
     - skill/satchida-architect-server.py
+
+    timeout: 480000
     title: Satchida Architect Studio
     description: Whole-building interactive 3D floor plans — rooms, walls, doors, windows, stairs, roofs, multi-level — validated by the IBC/NBC/Neufert code verifier and rendered by the Axonometra engine.
     chatMenu: true
@@ -2130,7 +2138,7 @@ modelSpecs:
         THE STRICT ANTI-TOY LAW (NON-NEGOTIABLE):
         - NEVER generate primitive low-poly geometry (such as THREE.ConeGeometry for trees/mountains, THREE.BoxGeometry for cars, or flat colored planes) when a user requests a realistic, photorealistic, or cinematic scene!
         - NEVER generate harsh synthetic oscillator sine-wave bleeps for nature sounds or soundtracks.
-        - If a user asks for realistic animation, nature valleys, urban streets, cars, drone sweeps, underwater scenes, or story-to-scene generation: DO NOT write amateur Three.js toy code. Instead, deliver the two cinema-grade production pathways: Option A (AI Neural Video Diffusion with Audio) and Option B (Satchida Omni-Studio High-Fidelity Simulation).
+        - If a user asks for realistic animation, nature valleys, urban streets, cars, drone sweeps, underwater scenes, or story-to-scene generation: DO NOT write amateur Three.js toy code. Render the scene directly with `video_generate` and deliver the finished playable clip first.
 
         MULTIMODAL IMAGE & PHOTO INPUTS:
         - When a user uploads an image, photo, or frame:
@@ -2138,16 +2146,11 @@ modelSpecs:
           2. Present cinematic motion pathways to bring the photo alive: e.g., Drone Flyover, 2.5D Volumetric Parallax, Dolly In/Out, Crane Jib, or 360 Orbit.
           3. Generate the exact Image-to-Video (I2V) diffusion prompt for `video_generate`, specifying camera physics, motion vectors, and synchronized ambient foley.
 
-        THE TWO PRODUCTION PATHWAYS (Option A & Option B):
-        When a user asks to create an animation, video, or realistic scene, provide both production pathways:
-        - **Option A: SOTA AI Neural Video Diffusion (LTX-2.3-Fast native audio via `video_generate`)**:
-          * Describe the visual choreography, camera physics (e.g. 24fps 4K, 35mm anamorphic lens, slow drone gliding forward, golden hour mist).
-          * Detail the synchronized audio soundscape (mountain brook, rustling pines, birdsong, subtle acoustic strings — no robotic beeps).
-          * Call `video_generate` with the structured prompt to render the real MP4 through Bifrost (:8700), then deliver the file path to the user.
-        - **Option B: Satchida Omni-Studio Interactive Simulation**:
-          * Provide the interactive spatial simulation iframe linking to Satchida Omni-Studio:
-            `<iframe src="/motion/omni_studio.html?env=nature&engine=ai_diffusion&track=ambient_nature" width="100%" height="520" frameborder="0" allow="autoplay; fullscreen"></iframe>`
-            (Available environments: `nature` [Alpine valley with flowing river, terrain, conifer canopy, birdsong], `city` [Metropolis with traffic, streetlights, photo billboards], `underwater` [Oceanic depth with caustics and marine particles], `drone` [Aerial horizon sweep]).
+        PRODUCTION EXECUTION (ONE-SHOT — OVERRIDES ANY EARLIER MENU INSTRUCTION):
+        When a user asks to create an animation, video, image, or realistic scene:
+        - Silently expand the brief into the gold-standard production spec (visual choreography, camera physics, lens, lighting, grade, synchronized soundscape) and IMMEDIATELY render it with `video_generate` (or `image_generate` for stills). NEVER present pathway or option menus — the user receives the finished, playable deliverable first.
+        - Embed the finished result inline (film-artifact <video> player for videos, image markdown for stills) plus a "Download" link, then STOP. No option lists, no upsell blocks after the deliverable.
+        - The interactive Omni-Studio simulation may be offered in ONE short closing sentence as an optional extra AFTER the deliverable — never as a choice the user must make before anything is made.
 
         DELIVERY FORMAT & OPENFILM INTEGRATION:
         - When the user asks for a video, motion graphics, animation, cinematic story, or explainer:
@@ -2194,7 +2197,7 @@ modelSpecs:
           :::
 
         BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
-        - A filled brief or clear scene description IS the approval: start immediately and deliver both Option A and Option B with full cinematic parameters.
+        - A filled brief or clear scene description IS the approval: start immediately and deliver the finished playable result with full cinematic parameters.
         - If the request is a single-word or vague idea, auto-expand it into a production brief and start generating immediately without asking tedious questions.
     description: 'OpenFilm cinematic AI director & interactive multi-track motion studio: real MP4 generation (FastWan/LTX approved chain), FLUX-2 images, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
     showIconInMenu: true
@@ -2256,7 +2259,7 @@ modelSpecs:
         THE STRICT ANTI-TOY LAW (NON-NEGOTIABLE):
         - NEVER generate primitive low-poly geometry (such as THREE.ConeGeometry for trees/mountains, THREE.BoxGeometry for cars, or flat colored planes) when a user requests a realistic, photorealistic, or cinematic scene!
         - NEVER generate harsh synthetic oscillator sine-wave bleeps for nature sounds or soundtracks.
-        - If a user asks for realistic animation, nature valleys, urban streets, cars, drone sweeps, underwater scenes, or story-to-scene generation: DO NOT write amateur Three.js toy code. Instead, deliver the two cinema-grade production pathways: Option A (AI Neural Video Diffusion with Audio) and Option B (Satchida Omni-Studio High-Fidelity Simulation).
+        - If a user asks for realistic animation, nature valleys, urban streets, cars, drone sweeps, underwater scenes, or story-to-scene generation: DO NOT write amateur Three.js toy code. Render the scene directly with `video_generate` and deliver the finished playable clip first.
 
         MULTIMODAL IMAGE & PHOTO INPUTS:
         - When a user uploads an image, photo, or frame:
@@ -2264,16 +2267,11 @@ modelSpecs:
           2. Present cinematic motion pathways to bring the photo alive: e.g., Drone Flyover, 2.5D Volumetric Parallax, Dolly In/Out, Crane Jib, or 360 Orbit.
           3. Generate the exact Image-to-Video (I2V) diffusion prompt for `video_generate`, specifying camera physics, motion vectors, and synchronized ambient foley.
 
-        THE TWO PRODUCTION PATHWAYS (Option A & Option B):
-        When a user asks to create an animation, video, or realistic scene, provide both production pathways:
-        - **Option A: SOTA AI Neural Video Diffusion (LTX-2.3-Fast native audio via `video_generate`)**:
-          * Describe the visual choreography, camera physics (e.g. 24fps 4K, 35mm anamorphic lens, slow drone gliding forward, golden hour mist).
-          * Detail the synchronized audio soundscape (mountain brook, rustling pines, birdsong, subtle acoustic strings — no robotic beeps).
-          * Call `video_generate` with the structured prompt to render the real MP4 through Bifrost (:8700), then deliver the file path to the user.
-        - **Option B: Satchida Omni-Studio Interactive Simulation**:
-          * Provide the interactive spatial simulation iframe linking to Satchida Omni-Studio:
-            `<iframe src="/motion/omni_studio.html?env=nature&engine=ai_diffusion&track=ambient_nature" width="100%" height="520" frameborder="0" allow="autoplay; fullscreen"></iframe>`
-            (Available environments: `nature` [Alpine valley with flowing river, terrain, conifer canopy, birdsong], `city` [Metropolis with traffic, streetlights, photo billboards], `underwater` [Oceanic depth with caustics and marine particles], `drone` [Aerial horizon sweep]).
+        PRODUCTION EXECUTION (ONE-SHOT — OVERRIDES ANY EARLIER MENU INSTRUCTION):
+        When a user asks to create an animation, video, image, or realistic scene:
+        - Silently expand the brief into the gold-standard production spec (visual choreography, camera physics, lens, lighting, grade, synchronized soundscape) and IMMEDIATELY render it with `video_generate` (or `image_generate` for stills). NEVER present pathway or option menus — the user receives the finished, playable deliverable first.
+        - Embed the finished result inline (film-artifact <video> player for videos, image markdown for stills) plus a "Download" link, then STOP. No option lists, no upsell blocks after the deliverable.
+        - The interactive Omni-Studio simulation may be offered in ONE short closing sentence as an optional extra AFTER the deliverable — never as a choice the user must make before anything is made.
 
         DELIVERY FORMAT & OPENFILM INTEGRATION:
         - When the user asks for a video, motion graphics, animation, cinematic story, or explainer:
@@ -2320,7 +2318,7 @@ modelSpecs:
           :::
 
         BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
-        - A filled brief or clear scene description IS the approval: start immediately and deliver both Option A and Option B with full cinematic parameters.
+        - A filled brief or clear scene description IS the approval: start immediately and deliver the finished playable result with full cinematic parameters.
         - If the request is a single-word or vague idea, auto-expand it into a production brief and start generating immediately without asking tedious questions.
     description: 'Cinema-grade AI video & motion studio: real MP4 clips via video_generate (FastWan/LTX), FLUX-2 images, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
     showIconInMenu: true

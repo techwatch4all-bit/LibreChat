@@ -9,8 +9,15 @@ import {
   splitToolCallName,
 } from 'librechat-data-provider';
 import type { TAttachment, PartMetadata } from 'librechat-data-provider';
+import {
+  cn,
+  getToolDisplayLabel,
+  getStudioToolLabelKey,
+  isInternalMCPServer,
+  logger,
+  openInNewTab,
+} from '~/utils';
 import { useLocalize, useProgress, useExpandCollapse, useLazyCollapseBody } from '~/hooks';
-import { cn, getToolDisplayLabel, logger, openInNewTab } from '~/utils';
 import { ToolIcon, getToolIconType, isError } from './ToolOutput';
 import { useMCPIconMap, useMCPServerNames } from '~/hooks/MCP';
 import { resolveToolCallPhase } from '~/utils/toolCallPhase';
@@ -128,15 +135,21 @@ export default function ToolCall({
   }, [name, parsedAuthUrl, mcpServerNames]);
 
   const toolIconType = useMemo(() => getToolIconType(name), [name]);
-  const displayFunctionName = useMemo(
-    () =>
-      /** `function_name` has already had the MCP delimiter and server stripped
-       *  above, so re-parsing it would classify an MCP function that happens to
-       *  share a built-in's name (`read_file`, `set_memory`) as that native
-       *  tool and show, and announce, an unrelated label. */
-      isMCPToolCall ? function_name : getToolDisplayLabel(function_name, localize, mcpServerNames),
-    [function_name, isMCPToolCall, localize, mcpServerNames],
-  );
+  const displayFunctionName = useMemo(() => {
+    /** Internal studio servers never expose their tool ids: map to the
+     *  friendly activity label ("Rendered video", ...). */
+    if (isMCPToolCall && isInternalMCPServer(mcpServerName)) {
+      return localize(getStudioToolLabelKey(function_name));
+    }
+    /** `function_name` has already had the MCP delimiter and server stripped
+     *  above, so re-parsing it would classify an MCP function that happens to
+     *  share a built-in's name (`read_file`, `set_memory`) as that native
+     *  tool and show, and announce, an unrelated label. */
+    if (isMCPToolCall) {
+      return function_name;
+    }
+    return getToolDisplayLabel(function_name, localize, mcpServerNames);
+  }, [function_name, isMCPToolCall, localize, mcpServerName, mcpServerNames]);
   const mcpIconMap = useMCPIconMap();
   const mcpIconUrl = isMCPToolCall ? mcpIconMap.get(mcpServerName) : undefined;
 
@@ -308,7 +321,7 @@ export default function ToolCall({
     if (errorLine.length > 0) {
       return errorLine;
     }
-    if (isMCPToolCall && mcpServerName) {
+    if (isMCPToolCall && mcpServerName && !isInternalMCPServer(mcpServerName)) {
       return localize('com_ui_via_server', { 0: mcpServerName });
     }
     if (domain && domain.length !== Constants.ENCODED_DOMAIN_LENGTH) {

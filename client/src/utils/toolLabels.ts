@@ -31,6 +31,32 @@ export const TOOL_FRIENDLY_NAME_KEYS: Record<string, TranslationKeys> = {
   read_file: 'com_ui_tool_name_read_file',
 };
 
+/**
+ * Satchida studio servers are internal infrastructure: end users must never
+ * see their names, tool ids, providers, or gateways in chat. Tools on these
+ * servers render with friendly activity labels only.
+ */
+const STUDIO_SERVER_PREFIX = 'satchida-';
+
+const STUDIO_TOOL_LABEL_KEYS: Record<string, TranslationKeys> = {
+  video_generate: 'com_ui_tool_name_studio_render',
+  image_generate: 'com_ui_tool_name_studio_image',
+  video_create_script: 'com_ui_tool_name_studio_pipeline',
+  video_plan_3d_scenes: 'com_ui_tool_name_studio_pipeline',
+  video_start_render_job: 'com_ui_tool_name_studio_render',
+  video_get_status: 'com_ui_tool_name_studio_pipeline',
+  video_export_youtube_bundle: 'com_ui_tool_name_studio_pipeline',
+  render_motion_to_video: 'com_ui_tool_name_studio_animation',
+};
+
+export function isInternalMCPServer(serverName: string): boolean {
+  return serverName.startsWith(STUDIO_SERVER_PREFIX);
+}
+
+export function getStudioToolLabelKey(toolName: string): TranslationKeys {
+  return STUDIO_TOOL_LABEL_KEYS[toolName] ?? 'com_ui_tool_name_studio_action';
+}
+
 export interface ParsedToolName {
   /** Original tool id (unchanged). */
   raw: string;
@@ -41,7 +67,7 @@ export interface ParsedToolName {
    *  code-style badge next to the server name. */
   toolName: string;
   /** Translation key for a user-friendly display name, when the raw
-   *  name matches a built-in native tool (web_search, execute_code, …).
+   *  name matches a built-in native tool (web_search, execute_code, ...).
    *  Absent for MCP tools and unknown names. */
   friendlyKey?: TranslationKeys;
 }
@@ -78,6 +104,9 @@ export function parseToolName(
  *   - MCP tool  → server name (keeps the header summary short)
  *   - Native   → localized friendly name from {@link TOOL_FRIENDLY_NAME_KEYS}
  *   - Unknown  → raw name
+ *
+ * Tools on internal studio servers never expose the server: they resolve to
+ * a friendly activity label ("Rendered video", "Generated image", ...).
  */
 export function getToolDisplayLabel(
   rawName: string,
@@ -85,7 +114,12 @@ export function getToolDisplayLabel(
   knownServerNames?: readonly string[],
 ): string {
   const parsed = parseToolName(rawName, knownServerNames);
-  if (parsed.mcpServer) return parsed.mcpServer;
+  if (parsed.mcpServer) {
+    if (isInternalMCPServer(parsed.mcpServer)) {
+      return localize(getStudioToolLabelKey(parsed.toolName));
+    }
+    return parsed.mcpServer;
+  }
   if (parsed.friendlyKey) return localize(parsed.friendlyKey);
   return parsed.toolName;
 }

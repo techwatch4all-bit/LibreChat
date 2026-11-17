@@ -535,20 +535,50 @@ const startServer = async () => {
   if (!fs.existsSync(motionDir)) {
     fs.mkdirSync(motionDir, { recursive: true });
   }
-  app.use('/motion', express.static(motionDir, {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.mp4')) {
-        res.setHeader('Content-Type', 'video/mp4');
-      } else if (filePath.endsWith('.webm')) {
-        res.setHeader('Content-Type', 'video/webm');
-      } else if (filePath.endsWith('.mp3')) {
-        res.setHeader('Content-Type', 'audio/mpeg');
-      } else if (filePath.endsWith('.html')) {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      }
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-  }));
+  app.use(
+    '/motion',
+    express.static(motionDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.mp4')) {
+          res.setHeader('Content-Type', 'video/mp4');
+        } else if (filePath.endsWith('.webm')) {
+          res.setHeader('Content-Type', 'video/webm');
+        } else if (filePath.endsWith('.mp3')) {
+          res.setHeader('Content-Type', 'audio/mpeg');
+        } else if (filePath.endsWith('.html')) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      },
+    }),
+  );
+
+  // Studio artifact home — stable directory OUTSIDE client/dist so client
+  // rebuilds can never 404 a delivered creation. The montage server publishes
+  // here and the Studio Library manifest lives alongside the artifacts.
+  const studioGeneratedDir = path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated');
+  if (!fs.existsSync(studioGeneratedDir)) {
+    fs.mkdirSync(studioGeneratedDir, { recursive: true });
+  }
+  app.use(
+    '/generated',
+    express.static(studioGeneratedDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.mp4')) {
+          res.setHeader('Content-Type', 'video/mp4');
+        } else if (filePath.endsWith('.webm')) {
+          res.setHeader('Content-Type', 'video/webm');
+        } else if (filePath.endsWith('.png')) {
+          res.setHeader('Content-Type', 'image/png');
+        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+          res.setHeader('Content-Type', 'image/jpeg');
+        } else if (filePath.endsWith('.json')) {
+          res.setHeader('Content-Type', 'application/json');
+        }
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      },
+    }),
+  );
 
   app.post('/api/explain', express.json(), async (req, res) => {
     try {
@@ -568,66 +598,77 @@ RULES FOR YOUR SPOKEN EXPLANATION:
 5. Speak naturally like a real human teacher. No bullet points, no markdown, no emojis, no robotic jargon.`;
 
       const http = require('http');
-      const gatewayKey = process.env.SATCHIDA_GATEWAY_VK || 'SPYfLW63OU6l04br13668aD230414eF2B2Ca38Ae8d35E9A7';
+      const gatewayKey =
+        process.env.SATCHIDA_GATEWAY_VK || 'SPYfLW63OU6l04br13668aD230414eF2B2Ca38Ae8d35E9A7';
       const payload = JSON.stringify({
         model: 'Study',
         messages: [
-          { role: 'system', content: 'You are an inspiring master teacher who explains concepts simply and intuitively.' },
-          { role: 'user', content: promptText }
+          {
+            role: 'system',
+            content:
+              'You are an inspiring master teacher who explains concepts simply and intuitively.',
+          },
+          { role: 'user', content: promptText },
         ],
         max_tokens: 180,
-        temperature: 0.4
+        temperature: 0.4,
       });
 
-      const llmReq = http.request({
-        hostname: '127.0.0.1',
-        port: 4000,
-        path: '/v1/chat/completions',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${gatewayKey}`,
-          'X-Bifrost-Mode': 'study',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (llmRes) => {
-        let body = '';
-        llmRes.on('data', chunk => body += chunk);
-        llmRes.on('end', async () => {
-          try {
-            const parsed = JSON.parse(body);
-            let speech = parsed.choices?.[0]?.message?.content?.trim() || '';
+      const llmReq = http.request(
+        {
+          hostname: '127.0.0.1',
+          port: 4000,
+          path: '/v1/chat/completions',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${gatewayKey}`,
+            'X-Bifrost-Mode': 'study',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        },
+        (llmRes) => {
+          let body = '';
+          llmRes.on('data', (chunk) => (body += chunk));
+          llmRes.on('end', async () => {
+            try {
+              const parsed = JSON.parse(body);
+              let speech = parsed.choices?.[0]?.message?.content?.trim() || '';
 
-            // Clean up any stray quotes or markdown
-            speech = speech.replace(/^["']|["']$/g, '').trim();
+              // Clean up any stray quotes or markdown
+              speech = speech.replace(/^["']|["']$/g, '').trim();
 
-            // Select Neural Indian English Voice: Neerja (Female) or Prabhat (Male)
-            const edgeVoice = voice === 'male' ? 'en-IN-PrabhatNeural' : 'en-IN-NeerjaExpressiveNeural';
-            const tempAudioName = `tts_teacher_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
-            const tempAudioPath = path.join(tempAudioDir, tempAudioName);
+              // Select Neural Indian English Voice: Neerja (Female) or Prabhat (Male)
+              const edgeVoice =
+                voice === 'male' ? 'en-IN-PrabhatNeural' : 'en-IN-NeerjaExpressiveNeural';
+              const tempAudioName = `tts_teacher_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+              const tempAudioPath = path.join(tempAudioDir, tempAudioName);
 
-            // Synthesize high-quality Indian English voice via edge-tts helper
-            const { spawn } = require('child_process');
-            const pythonScript = path.resolve('D:\\LAN-AI-Infra\\LibreChat\\skill\\edge_tts_service.py');
-            const pyProc = spawn('python', [pythonScript, edgeVoice, tempAudioPath, speech]);
+              // Synthesize high-quality Indian English voice via edge-tts helper
+              const { spawn } = require('child_process');
+              const pythonScript = path.resolve(
+                'D:\\LAN-AI-Infra\\LibreChat\\skill\\edge_tts_service.py',
+              );
+              const pyProc = spawn('python', [pythonScript, edgeVoice, tempAudioPath, speech]);
 
-            pyProc.on('close', (code) => {
-              if (code === 0 && fs.existsSync(tempAudioPath)) {
-                res.json({
-                  ok: true,
-                  explanation: speech,
-                  audioUrl: `/temp_audio/${tempAudioName}`
-                });
-              } else {
-                // Fallback to text explanation if edge-tts fails
-                res.json({ ok: true, explanation: speech, audioUrl: null });
-              }
-            });
-          } catch (e) {
-            res.status(500).json({ ok: false, error: 'Failed to parse LLM response' });
-          }
-        });
-      });
+              pyProc.on('close', (code) => {
+                if (code === 0 && fs.existsSync(tempAudioPath)) {
+                  res.json({
+                    ok: true,
+                    explanation: speech,
+                    audioUrl: `/temp_audio/${tempAudioName}`,
+                  });
+                } else {
+                  // Fallback to text explanation if edge-tts fails
+                  res.json({ ok: true, explanation: speech, audioUrl: null });
+                }
+              });
+            } catch (_e) {
+              res.status(500).json({ ok: false, error: 'Failed to parse LLM response' });
+            }
+          });
+        },
+      );
 
       llmReq.on('error', (err) => {
         logger.error('Explain LLM request error:', err);

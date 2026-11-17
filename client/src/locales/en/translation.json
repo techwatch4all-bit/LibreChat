@@ -1292,7 +1292,7 @@
   "com_ui_branch_created": "Branch created successfully",
   "com_ui_branch_error": "Failed to create branch",
   "com_ui_branch_message": "Create branch from this response",
-  "com_ui_bulk_delete_error": "Some items could not be deleted",
+  "com_ui_bulk_delete_error": "Deleted {{deleted}} of {{total}} chats — retry the rest from the selection.",
   "com_ui_by_author": "by {{0}}",
   "com_ui_cache_read": "Cache read",
   "com_ui_cache_write": "Cache write",
@@ -1483,7 +1483,6 @@
   "com_ui_bulk_deleting": "Deleting… {{count}} left",
   "com_ui_bulk_delete_confirm": "This will permanently delete {{count}} chats.",
   "com_ui_bulk_delete_success": "Deleted {{count}} chats.",
-  "com_ui_bulk_delete_error": "Deleted {{deleted}} of {{total}} chats — retry the rest from the selection.",
   "com_ui_delete_conversation_tooltip": "Delete conversation",
   "com_ui_delete_link": "Delete Link",
   "com_ui_delete_mcp_server": "Delete MCP Server?",
@@ -1495,7 +1494,6 @@
   "com_ui_delete_project_action": "Delete project",
   "com_ui_delete_project_confirm": "Delete \"{{name}}\"? The chats inside won't be deleted.",
   "com_ui_delete_prompt": "Delete Prompt?",
-  "com_ui_delete_selected": "Delete selected",
   "com_ui_delete_selected_items": "Delete selected items",
   "com_ui_delete_shared_link": "Delete shared link?",
   "com_ui_delete_shared_link_heading": "Delete Shared Link",
@@ -3227,7 +3225,6 @@
   "com_admin_groups_save": "Save group",
   "com_admin_groups_remove_member": "Remove",
   "com_admin_groups_delete": "Delete",
-
   "com_admin_users_title": "Users",
   "com_admin_users_new": "New user",
   "com_admin_users_name": "Name",
@@ -3484,5 +3481,10 @@
   "starters_badge_motion_form": "Exercise Form",
   "starters_badge_motion_yoga": "Yoga Alignment",
   "starters_badge_motion_nutrition": "Nutrition Lab",
-  "starters_badge_motion_rehab": "Rehab & Glucose"
+  "starters_badge_motion_rehab": "Rehab & Glucose",
+  "com_ui_tool_name_studio_render": "Rendered video",
+  "com_ui_tool_name_studio_image": "Generated image",
+  "com_ui_tool_name_studio_pipeline": "Studio render pipeline",
+  "com_ui_tool_name_studio_animation": "Rendered animation",
+  "com_ui_tool_name_studio_action": "Studio action"
 }

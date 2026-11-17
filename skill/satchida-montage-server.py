@@ -1767,25 +1767,109 @@ def video_export_youtube_bundle(project_id: str) -> str:
 
 
 def _publish_artifact(path: Path) -> str:
-    """Copy a generated artifact into LibreChat's web-servable static dirs and
-    return a RELATIVE URL (/generated/<name>) that renders in every client —
-    local browser and ai.satchida.com alike. Raw D:\\ paths never display in
-    chat; browsers cannot load filesystem paths from an http page.
+    """Publish a finished artifact to the STABLE studio home
+    (D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated) which LibreChat
+    serves at /generated via a dedicated express static route. This directory
+    is outside client/dist, so client rebuilds can never 404 a delivered
+    creation. Also maintains manifest.json for the Studio Library gallery.
+    The manifest carries NO provider/model/cost data.
     """
     try:
+        stable_dir = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
+        stable_dir.mkdir(parents=True, exist_ok=True)
         name = path.name
-        for base in (
-            _LIBRECHAT_ROOT / "client" / "public" / "generated",
-            _LIBRECHAT_ROOT / "client" / "dist" / "generated",
-        ):
-            dest_dir = base
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest = dest_dir / name
-            shutil.copyfile(path, dest)
+        kind = "video" if name.lower().endswith((".mp4", ".webm")) else "image"
+        dest = stable_dir / name
+        shutil.copyfile(path, dest)
+        manifest_path = stable_dir / "manifest.json"
+        try:
+            entries = []
+            if manifest_path.exists():
+                entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not any(e.get("name") == name for e in entries):
+                entries.append({
+                    "name": name,
+                    "kind": kind,
+                    "url": f"/generated/{name}",
+                    "created": datetime.datetime.now(datetime.timezone.utc).strftime(
+                        "%Y-%m-%d %H:%M"
+                    ),
+                    "size": dest.stat().st_size,
+                })
+            entries.sort(key=lambda e: e.get("created", ""), reverse=True)
+            manifest_path.write_text(json.dumps(entries, indent=1), encoding="utf-8")
+        except Exception as me:
+            print(f"[satchida-montage] manifest update skipped: {me}", file=sys.stderr)
         return f"/generated/{name}"
     except Exception as e:
         print(f"[satchida-montage] artifact publish failed: {e}", file=sys.stderr)
         return ""
+
+
+# ── Async render jobs ─────────────────────────────────────────────────────────
+# Cloud video renders take 1–6 minutes — longer than any safe synchronous MCP
+# request. video_generate therefore starts a background job and returns
+# immediately; the persona polls video_job_status until the clip is done.
+# Jobs finish even if the chat disconnects, and every finished clip is
+# published to the Studio Library automatically.
+
+MEDIA_JOBS: Dict[str, dict] = {}
+_MEDIA_JOB_LOCK = threading.Lock()
+
+
+def _render_video_job(job_id: str, spec: dict) -> None:
+    """Background worker: approval gate → render → publish → settle."""
+    with _MEDIA_JOB_LOCK:
+        MEDIA_JOBS[job_id]["status"] = "rendering"
+    prompt = spec["prompt"]
+    out = VIDEOS_DIR / Path(spec["filename"]).name
+    try:
+        use_native = spec["native_audio"] and not spec["narration"].strip()
+        ok = _generate_video_core(
+            prompt, spec["duration_seconds"], out, spec["aspect_ratio"],
+            native_audio=use_native, quality=spec["quality"],
+            image_url=spec["image_url"],
+        )
+        if not ok:
+            raise RuntimeError(
+                "render failed on the approved provider chain (check stderr logs)"
+            )
+
+        audio_note = ""
+        if spec["narration"].strip():
+            audio_path = out.with_suffix(".narration.mp3")
+            if _tts_edge(spec["narration"].strip(), audio_path):
+                muxed = out.with_name(out.stem + "_vo" + out.suffix)
+                if _mux_audio(out, audio_path, muxed):
+                    out = muxed
+                    audio_note = " with synchronized narration audio"
+            if not audio_note:
+                audio_note = " (narration requested but TTS/mux failed — silent clip)"
+        elif spec["native_audio"]:
+            audio_note = " with native synchronized audio"
+        else:
+            # Silent request: priority-1 models may still embed ambient audio.
+            if _strip_audio(out):
+                audio_note = " (silent clip, audio track stripped)"
+            else:
+                audio_note = " (silent requested; model-embedded audio kept)"
+
+        web_url = _publish_artifact(out)
+        with _MEDIA_JOB_LOCK:
+            MEDIA_JOBS[job_id].update({
+                "status": "done",
+                "web_url": web_url,
+                "file": str(out),
+                "size_mb": round(out.stat().st_size / (1024 * 1024), 2),
+                "engine": _LAST_VIDEO_MODEL or "Satchida Studio",
+                "audio_note": audio_note,
+                "aspect_ratio": spec["aspect_ratio"],
+            })
+        print(f"[satchida-montage] job {job_id} done -> {out}", file=sys.stderr)
+    except Exception as e:
+        with _MEDIA_JOB_LOCK:
+            MEDIA_JOBS[job_id].update({"status": "failed", "error": str(e)})
+        print(f"[satchida-montage] job {job_id} FAILED: {e}", file=sys.stderr)
 
 
 @mcp.tool()
@@ -1800,90 +1884,89 @@ def video_generate(
     image_url: str = "",
 ) -> str:
     """
-    Generate a single real AI video clip (cloud only).
-
-    Provider policy: CheapInference first (via Bifrost :8700), then DeepInfra
-    (direct native API). Silent models are cheapest: FastWan-QAD 480p
-    ($0.0125/5s) -> FastWan2.2 ($0.0225/5s 720p) -> Wan2.2-A14B ($0.375/5s).
-    All are 5-second clips.
+    Start an async render job for one real AI video clip (cloud only), and
+    return a job id immediately. Poll video_job_status(job_id) — typically
+    every ~20 s — until status is 'done', then embed the result. Do NOT
+    re-call video_generate for the same scene while a job is running.
 
     Args:
         prompt: Text description of the video to generate.
-        duration_seconds: Clip length (DeepInfra models render fixed 5s clips).
+        duration_seconds: Clip length (models render fixed 5s clips).
         aspect_ratio: '16:9', '9:16', or '1:1' (model permitting).
         filename: Optional output filename (auto-generated if empty).
-        narration: Optional spoken narration. When set, free Edge TTS generates
-            the voice track and it is muxed onto the clip (synchronized speech).
-        native_audio: When true (and no narration), use audio-visual models —
-            Lightricks LTX-2.3-Fast first (native synchronized audio, from
-            $0.03/s) — so the clip itself contains synced sound.
-        quality: 'fast' (cheapest first) or 'hd' (higher-fidelity model first).
-        image_url: Optional public image URL — switches to image-to-video
-            (CheapInference kling-v2.6-i2v) to animate a still image.
+        narration: Optional spoken narration. When set, free neural TTS
+            generates the voice track and it is muxed onto the clip.
+        native_audio: When true (and no narration), audio-visual models
+            generate synchronized sound inside the clip itself.
+        quality: 'fast' (cheapest first) or 'hd' (higher-fidelity first).
+        image_url: Optional public image URL — switches to image-to-video.
 
-    Returns the absolute path of the generated MP4, or a clear error message.
+    Returns the job id and polling instructions, or a clear error message.
     """
     if not prompt.strip():
         return "Error: prompt is required."
     name = filename.strip() or f"clip-{uuid.uuid4().hex[:8]}.mp4"
     if not name.lower().endswith(".mp4"):
         name += ".mp4"
-    out = VIDEOS_DIR / Path(name).name
+    name = Path(name).name
 
-    use_native = native_audio and not narration.strip()
-    ok = _generate_video_core(
-        prompt, duration_seconds, out, aspect_ratio,
-        native_audio=use_native, quality=quality, image_url=image_url,
-    )
-    if not ok:
-        return (
-            "Error: video generation failed on the approved provider chain "
-            "(CheapInference via Bifrost, DeepInfra direct). Check Bifrost "
-            "(:8700) and this server's stderr logs."
-        )
-
-    audio_note = ""
-    if narration.strip():
-        audio_path = out.with_suffix(".narration.mp3")
-        if _tts_edge(narration.strip(), audio_path):
-            muxed = out.with_name(out.stem + "_vo" + out.suffix)
-            if _mux_audio(out, audio_path, muxed):
-                out = muxed
-                audio_note = " with synchronized narration audio"
-        if not audio_note:
-            audio_note = " (narration requested but TTS/mux failed — silent clip)"
-    elif native_audio:
-        audio_note = " with native synchronized audio"
-    else:
-        # Caller asked for a silent clip; some priority-1 models still embed
-        # ambient audio, so strip the track to honor the request.
-        if _strip_audio(out):
-            audio_note = " (silent clip, audio track stripped)"
-        else:
-            audio_note = " (silent requested; model-embedded audio kept)"
-
-    size_mb = out.stat().st_size / (1024 * 1024)
-    web_url = _publish_artifact(out)
-    url_line = (
-        f"**Web URL (use this in markdown so the video plays in chat):** {web_url}\n"
-        if web_url
-        else ""
-    )
+    job_id = f"vjob-{uuid.uuid4().hex[:8]}"
+    spec = {
+        "prompt": prompt.strip(),
+        "duration_seconds": duration_seconds,
+        "aspect_ratio": aspect_ratio,
+        "filename": name,
+        "narration": narration,
+        "native_audio": native_audio,
+        "quality": quality,
+        "image_url": image_url,
+    }
+    with _MEDIA_JOB_LOCK:
+        MEDIA_JOBS[job_id] = {"id": job_id, "status": "queued", "spec": spec}
+    threading.Thread(target=_render_video_job, args=(job_id, spec), daemon=True).start()
+    print(f"[satchida-montage] video job {job_id} queued ({name})", file=sys.stderr)
     return (
-        f"### 🎬 Video Generated{audio_note}\n\n"
-        f"**File:** `{out}` ({size_mb:.2f} MB)\n"
-        f"{url_line}"
-        f"**Engine:** Satchida Studio render engine · {aspect_ratio}\n\n"
-        f"Show this to the user. EMBED THE VIDEO SO IT PLAYS INLINE — choose the first"
-        f" option that fits your persona:\n"
-        f"1. Film artifact: wrap `<video src=\"{web_url}\" controls autoplay loop"
-        f" style=\"width:100%\"></video>` in your :::artifact{{type=\"application/vnd.satchida.film\"}}"
-        f" block (preferred for OpenFilm/Motion/3D Studio).\n"
-        f"2. Plain markdown link: `[▶ Watch the video]({web_url})` — clicking plays it"
-        f" in the browser tab.\n"
-        f"NEVER use `![video]({web_url})` — markdown images cannot play MP4s.\n"
-        f"NEVER use a filesystem path — browsers cannot load it."
+        f"🎬 Render job started — job_id: `{job_id}` (file: {name}).\n\n"
+        f"Poll `video_job_status(job_id=\"{job_id}\")` every ~20 seconds until it "
+        f"reports status 'done', then deliver: embed the film-artifact "
+        f"<video> player with the returned Web URL and a Download link. "
+        f"If status is 'awaiting_approval', tell the user to approve the "
+        f"render in the popup window. Never start a duplicate render for the "
+        f"same scene while the job is running."
     )
+
+
+@mcp.tool()
+def video_job_status(job_id: str) -> str:
+    """
+    Poll an async video render job started with video_generate.
+    Returns status ('queued' | 'rendering' | 'done' | 'failed'), progress
+    notes, and — when done — the Web URL to embed plus the Download link.
+    """
+    with _MEDIA_JOB_LOCK:
+        job = MEDIA_JOBS.get(job_id)
+    if not job:
+        return f"Error: job `{job_id}` not found. Check the job id from video_generate."
+    status = job["status"]
+    if status == "done":
+        return (
+            f"### ✅ Job {job_id} — render complete\n\n"
+            f"**Web URL (embed this so the video plays in chat):** {job['web_url']}\n\n"
+            f"Deliver now: film-artifact `<video src=\"{job['web_url']}\" controls "
+            f"autoplay loop style=\"width:100%\"></video>` inside your "
+            f":::artifact{{type=\"application/vnd.satchida.film\"}} block, plus "
+            f"`[Download]({job['web_url']})`. "
+            f"{job.get('audio_note', '')} · {job.get('aspect_ratio')} · "
+            f"{job.get('size_mb')} MB. Then STOP — no option menus."
+        )
+    if status == "failed":
+        return f"### ❌ Job {job_id} — failed: {job.get('error', 'unknown error')}"
+    if status == "queued":
+        return (
+            f"Job {job_id}: queued (awaiting spend approval — if the approval "
+            f"popup is open, the user must click it). Poll again in ~20 s."
+        )
+    return f"Job {job_id}: rendering… poll again in ~20 s."
 
 
 @mcp.tool()

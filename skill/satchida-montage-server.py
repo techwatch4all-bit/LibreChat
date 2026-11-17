@@ -372,6 +372,10 @@ def _ci_video_direct(
         if image_url:
             body["image_url"] = image_url
         t0 = time.time()
+        budget_ref = uuid.uuid4().hex
+        budget_est = _CI_MODEL_PRICES.get(m, 0.04) * seconds
+        if not _media_budget_gate(budget_ref, m, budget_est):
+            continue
         try:
             req = urllib.request.Request(
                 f"{CHEAPERINFERENCE_API}/v1/videos/generations",
@@ -400,6 +404,7 @@ def _ci_video_direct(
                 latency_ms=latency_ms,
                 error_details=f"HTTP {e.code}: {msg}",
             )
+            _media_budget_settle(budget_ref, 0.0, "", m, "CheapInference", f"error: HTTP {e.code}")
             continue
         except Exception as e:
             latency_ms = (time.time() - t0) * 1000.0
@@ -413,6 +418,7 @@ def _ci_video_direct(
                 latency_ms=latency_ms,
                 error_details=str(e),
             )
+            _media_budget_settle(budget_ref, 0.0, "", m, "CheapInference", f"error: {e}")
             continue
 
         videos = data.get("videos") or []
@@ -435,13 +441,20 @@ def _ci_video_direct(
             tmp.write_bytes(raw)
             tmp.replace(output_path)
             _LAST_VIDEO_MODEL = f"cheapinference/{m}"
-            log_media_to_bifrost(
+            bf_log_id = log_media_to_bifrost(
                 object_type="video_generation",
                 provider="cheapinference",
                 model=m,
                 status="success",
                 cost=_CI_MODEL_PRICES.get(m, 0.0) * seconds,
                 latency_ms=(time.time() - t0) * 1000.0,
+            )
+            _media_budget_settle(
+                budget_ref,
+                _CI_MODEL_PRICES.get(m, 0.0) * seconds,
+                bf_log_id or "",
+                m,
+                "CheapInference",
             )
             print(
                 f"[satchida-montage] video OK via cheapinference/{m} -> {output_path}",
@@ -600,6 +613,72 @@ def check_video_approval(model_name: str, duration_seconds: float = 5.0) -> bool
         return True
     return True
 
+
+def _media_budget_gate(ref: str, model: str, est_usd: float) -> bool:
+    """Ask one-api (the customer-billing authority) to reserve the estimate
+    against the tenant's period budget BEFORE the provider call executes.
+    Denied or unreachable => the generation does not run (fail-closed)."""
+    try:
+        req = urllib.request.Request(
+            f"{AUTOROUTER_URL}/api/media/precheck",
+            data=json.dumps({
+                "ref": ref,
+                "tenant_id": os.environ.get("SATCHIDA_TENANT_ID", "satchida-master"),
+                "model_name": model,
+                "estimated_cost_usd": round(est_usd, 6),
+            }).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode())
+        if data.get("approved"):
+            print(f"[satchida-montage] budget APPROVED ref={ref[:8]} est=${est_usd:.4f}", file=sys.stderr)
+            return True
+        print(
+            f"[satchida-montage] budget DENIED ref={ref[:8]} reason={data.get('reason')} "
+            f"remaining={data.get('remaining_quota')}",
+            file=sys.stderr,
+        )
+        return False
+    except Exception as e:
+        print(f"[satchida-montage] budget precheck error: {e} — DENIED (fail-closed)", file=sys.stderr)
+        return False
+
+
+def _media_budget_settle(
+    ref: str,
+    actual_usd: float,
+    bf_log_id: str = "",
+    model: str = "",
+    provider: str = "",
+    note: str = "",
+) -> None:
+    """Settle the reservation with the exact billed cost. Refunds unused
+    reserve or deducts shortfall at one-api; never misses a cent."""
+    try:
+        req = urllib.request.Request(
+            f"{AUTOROUTER_URL}/api/media/settle",
+            data=json.dumps({
+                "ref": ref,
+                "tenant_id": os.environ.get("SATCHIDA_TENANT_ID", "satchida-master"),
+                "actual_cost_usd": round(actual_usd, 6),
+                "bifrost_log_id": bf_log_id or "",
+                "model_name": model,
+                "provider": provider,
+                "note": note,
+            }).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            json.loads(r.read().decode())
+        print(f"[satchida-montage] budget SETTLED ref={ref[:8]} actual=${actual_usd:.4f}", file=sys.stderr)
+    except Exception as e:
+        # The direct-sync daemon remains the safety net for unsettled rows.
+        print(f"[satchida-montage] budget settle error (daemon safety net applies): {e}", file=sys.stderr)
+
+
 def log_media_to_bifrost(
     object_type: str,
     provider: str,
@@ -662,6 +741,10 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
         use_size = size
         while True:
             t0 = time.time()
+            budget_ref = uuid.uuid4().hex
+            budget_est = MODEL_ESTIMATED_COSTS.get(model, 0.012)
+            if not _media_budget_gate(budget_ref, model, budget_est):
+                return False
             body = {
                 "model": model,
                 "prompt": prompt,
@@ -697,6 +780,7 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                     latency_ms=latency_ms,
                     error_details=f"HTTP {e.code}: {msg}"
                 )
+                _media_budget_settle(budget_ref, 0.0, "", model, "DeepInfra", f"error: HTTP {e.code}")
                 if e.code == 400 and use_size != "1024x1024" and not tried_default:
                     use_size = "1024x1024"
                     tried_default = True
@@ -714,6 +798,7 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                     latency_ms=latency_ms,
                     error_details=str(e)
                 )
+                _media_budget_settle(budget_ref, 0.0, "", model, "DeepInfra", f"error: {e}")
                 break
 
             latency_ms = (time.time() - t0) * 1000.0
@@ -738,13 +823,20 @@ def _deepinfra_image(prompt: str, output_path: Path, aspect_ratio: str = "16:9")
                 if output_path.exists() and output_path.stat().st_size > 1024:
                     _LAST_IMAGE_MODEL = f"deepinfra/{model}"
                     cost = MODEL_ESTIMATED_COSTS.get(model, 0.012)
-                    log_media_to_bifrost(
+                    bf_log_id = log_media_to_bifrost(
                         object_type="image_generation",
                         provider="deepinfra",
                         model=model,
                         status="success",
                         cost=cost,
                         latency_ms=latency_ms
+                    )
+                    _media_budget_settle(
+                        budget_ref,
+                        cost,
+                        bf_log_id or "",
+                        model,
+                        "DeepInfra",
                     )
                     print(
                         f"[satchida-montage] image OK via deepinfra/{model} -> {output_path} (cost: ${cost:.4f})",
@@ -780,6 +872,10 @@ def _deepinfra_video(
     for m in models:
         body = {"prompt": prompt}
         t0 = time.time()
+        budget_ref = uuid.uuid4().hex
+        budget_est = MODEL_ESTIMATED_COSTS.get(m, 0.0375)
+        if not _media_budget_gate(budget_ref, m, budget_est):
+            continue
         try:
             req = urllib.request.Request(
                 f"{DEEPINFRA_API}/v1/inference/{urllib.parse.quote(m, safe='/')}",
@@ -808,6 +904,7 @@ def _deepinfra_video(
                 latency_ms=latency_ms,
                 error_details=f"HTTP {e.code}: {msg}",
             )
+            _media_budget_settle(budget_ref, 0.0, "", m, "DeepInfra", f"error: HTTP {e.code}")
             continue
         except Exception as e:
             latency_ms = (time.time() - t0) * 1000.0
@@ -821,6 +918,7 @@ def _deepinfra_video(
                 latency_ms=latency_ms,
                 error_details=str(e),
             )
+            _media_budget_settle(budget_ref, 0.0, "", m, "DeepInfra", f"error: {e}")
             continue
 
         vurl = data.get("video_url") or ""
@@ -850,13 +948,20 @@ def _deepinfra_video(
             tmp.write_bytes(raw)
             tmp.replace(output_path)
             _LAST_VIDEO_MODEL = f"deepinfra/{m}"
-            log_media_to_bifrost(
+            bf_log_id = log_media_to_bifrost(
                 object_type="video_generation",
                 provider="deepinfra",
                 model=m,
                 status="success",
                 cost=MODEL_ESTIMATED_COSTS.get(m, 0.0),
                 latency_ms=(time.time() - t0) * 1000.0,
+            )
+            _media_budget_settle(
+                budget_ref,
+                MODEL_ESTIMATED_COSTS.get(m, 0.0),
+                bf_log_id or "",
+                m,
+                "DeepInfra",
             )
             print(
                 f"[satchida-montage] video OK via deepinfra/{m} -> {output_path}",
@@ -1002,6 +1107,11 @@ def _ci_image_via_bifrost(
     global _LAST_IMAGE_MODEL
     size = _SIZE_BY_RATIO.get(aspect_ratio, "1024x1024")
     for model in _ci_media_models("image"):
+        bare_name = model.split("/", 1)[1].lower() if "/" in model else model.lower()
+        budget_ref = uuid.uuid4().hex
+        budget_est = _CI_MODEL_PRICES.get(bare_name, 0.008)
+        if not _media_budget_gate(budget_ref, bare_name, budget_est):
+            continue
         try:
             status, resp = _bifrost_call(
                 "POST",
@@ -1018,6 +1128,7 @@ def _ci_image_via_bifrost(
             )
         except Exception as e:
             print(f"[satchida-montage] CI image submit {model}: {e}", file=sys.stderr)
+            _media_budget_settle(budget_ref, 0.0, "", bare_name, "CheapInference", "submit failed")
             continue
         if status != 200 or not isinstance(resp, dict):
             print(
@@ -1045,6 +1156,10 @@ def _ci_image_via_bifrost(
             tmp.replace(output_path)
             if output_path.exists() and output_path.stat().st_size > 1024:
                 _LAST_IMAGE_MODEL = model
+                # Bifrost meters this row natively (pricing overrides) and the
+                # one-api direct-sync daemon books it — closing the reservation
+                # at $0 avoids double-billing.
+                _media_budget_settle(budget_ref, 0.0, "", bare_name, "CheapInference", "booked by bifrost sync")
                 return True
         except Exception as e:
             print(f"[satchida-montage] CI image save {model}: {e}", file=sys.stderr)

@@ -230,3 +230,11 @@ client/public/motion/*.png
 # local backups & one-off ops scripts
 *.bak-*
 skill/*.bak
+
+# runtime-generated media artifacts (products live on disk, never in git)
+client/public/generated/
+client/dist/generated/
+client/public/temp_audio/
+# live session tokens for e2e replay - secrets, never commit
+e2e/storageState_live.json
+/test-results/

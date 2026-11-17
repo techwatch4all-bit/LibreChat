@@ -305,21 +305,40 @@ def get_verified_market_rates(category: str = "bullion_forex") -> str:
     Includes:
     - Real-Time Gold Spot (USD/oz, USD/g, and converted INR/g using live USD/INR exchange rate)
     - Real-Time Silver Spot (USD/oz, USD/g, and converted INR/g)
-    - Live USD/INR, Brent Crude Oil, Sensex (^BSESN), and Nifty 50 (^NSEI)
+    - Live Forex Benchmarks (USD/INR, SGD/INR, EUR/INR, GBP/INR, AED/INR, CAD/INR, AUD/INR, JPY/INR)
+    - Brent Crude Oil, Sensex (^BSESN), and Nifty 50 (^NSEI)
     - Mathematically calculated domestic 24K landed price ranges (accounting for India customs duties & taxes)
     - Hardcoded Order-of-Magnitude Bounds to prevent 10x parsing errors (e.g. confusing '1.40 Lakh' with 14,000).
 
-    Use this tool whenever the user asks for gold, silver, bullion, fuel benchmarks, forex, or financial market rates.
+    Use this tool whenever the user asks for gold, silver, bullion, fuel benchmarks, forex (e.g. Singapore dollar, USD, EUR, AED), or financial market rates.
     """
     try:
         symbols = {
             'gold_spot_usd': 'GC=F',
             'silver_spot_usd': 'SI=F',
             'usd_inr': 'INR=X',
+            'sgd_inr': 'SGDINR=X',
+            'eur_inr': 'EURINR=X',
+            'gbp_inr': 'GBPINR=X',
+            'aed_inr': 'AEDINR=X',
+            'cad_inr': 'CADINR=X',
+            'aud_inr': 'AUDINR=X',
+            'jpy_inr': 'JPYINR=X',
             'brent_crude_usd': 'BZ=F',
             'sensex': '^BSESN',
             'nifty_50': '^NSEI'
         }
+
+        # Dynamic currency detection from category string if provided
+        cat_clean = category.strip().upper().replace("/", "").replace("-", "")
+        if len(cat_clean) == 3 and cat_clean not in ["ALL", "GEN", "RAW"]:
+            # e.g. "SGD" -> "SGDINR=X"
+            pair_sym = f"{cat_clean}INR=X"
+            symbols[f"{category.strip().lower()}_inr"] = pair_sym
+        elif len(cat_clean) == 6 and not cat_clean.startswith("BULLIO"):
+            # e.g. "SGDINR" -> "SGDINR=X"
+            symbols[f"{cat_clean.lower()}"] = f"{cat_clean}=X"
+
         quotes = {}
         for key, sym in symbols.items():
             try:
@@ -374,6 +393,17 @@ def get_verified_market_rates(category: str = "bullion_forex") -> str:
                 'domestic_999_silver_kg_expected': f'₹{est_domestic_silver_kg:,}',
                 'domestic_999_silver_per_g_expected': f'₹{round(est_domestic_silver_kg/1000, 1)}'
             }
+
+        benchmarks['forex_inr_rates'] = {
+            'USD/INR': quotes.get('usd_inr', {}).get('price'),
+            'SGD/INR': quotes.get('sgd_inr', {}).get('price'),
+            'EUR/INR': quotes.get('eur_inr', {}).get('price'),
+            'GBP/INR': quotes.get('gbp_inr', {}).get('price'),
+            'AED/INR': quotes.get('aed_inr', {}).get('price'),
+            'CAD/INR': quotes.get('cad_inr', {}).get('price'),
+            'AUD/INR': quotes.get('aud_inr', {}).get('price'),
+            'JPY/INR': quotes.get('jpy_inr', {}).get('price'),
+        }
 
         return json.dumps({
             'status': 'verified_live_feed',

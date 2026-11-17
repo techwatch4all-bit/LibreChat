@@ -18,9 +18,10 @@ import HeaderAudioSpeaker from './HeaderAudioSpeaker';
 import SubagentThreadLink from './SubagentThreadLink';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import AddMultiConvo from './AddMultiConvo';
+import AccountTierBadge from './AccountTierBadge';
 import { useHasAccess } from '~/hooks';
 import { useChatContext } from '~/Providers';
-import TokenUsage from './Input/TokenUsage';
+import HeaderBillingGauge from './HeaderBillingGauge';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -113,6 +114,9 @@ function Header({
             <AddMultiConvo />
           </div>
         )}
+        <div className="hidden items-center md:flex">
+          <AccountTierBadge />
+        </div>
       </div>
 
       <div className={cn('flex flex-shrink-0 items-center gap-2', hiddenBehindNav)}>
@@ -128,13 +132,7 @@ function Header({
         <HeaderMenu startupConfig={startupConfig} trace={trace} className="md:hidden" />
         <div className="hidden items-center gap-2 md:flex">
           {trace.show && <TraceButton onClick={trace.open} />}
-          <TokenUsage
-            index={index}
-            conversation={conversation}
-            isSubmitting={isSubmitting}
-            placement="bottom"
-            alwaysShow={true}
-          />
+          <HeaderBillingGauge />
           <HeaderAudioSpeaker />
           <ExportAndShareMenu isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false} />
           {hasAccessToTemporaryChat === true && <TemporaryChat />}

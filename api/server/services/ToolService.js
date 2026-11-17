@@ -2387,9 +2387,24 @@ async function loadToolsForExecution({
     ? [...new Set([...allowedNonSpecialToolNames, ...ptcOrchestratedToolNames])]
     : allowedNonSpecialToolNames;
 
+  const expandedToolNamesToLoad = [];
+  for (const name of allToolNamesToLoad) {
+    expandedToolNamesToLoad.push(name);
+    if (!name.includes('_mcp_')) {
+      if (toolRegistry && typeof toolRegistry.keys === 'function') {
+        const prefix = `${name}_mcp_`;
+        for (const regKey of toolRegistry.keys()) {
+          if (regKey.startsWith(prefix)) {
+            expandedToolNamesToLoad.push(regKey);
+          }
+        }
+      }
+    }
+  }
+
   const actionToolNames = [];
   const regularToolNames = [];
-  for (const name of allToolNamesToLoad) {
+  for (const name of expandedToolNamesToLoad) {
     (isActionTool(name) ? actionToolNames : regularToolNames).push(name);
   }
 

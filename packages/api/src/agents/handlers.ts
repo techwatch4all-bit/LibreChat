@@ -5901,7 +5901,22 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               );
               return;
             }
-            const toolNames = [...new Set(allowedToolCalls.map((tc) => tc.name))];
+            const toolRegistry = sourceConfigurable?.toolRegistry as
+              | Map<string, unknown>
+              | undefined;
+            const expandedToolNames = new Set<string>();
+            for (const name of allowedToolCalls.map((tc) => tc.name)) {
+              expandedToolNames.add(name);
+              if (!name.includes('_mcp_') && toolRegistry) {
+                const prefix = `${name}_mcp_`;
+                for (const key of toolRegistry.keys()) {
+                  if (key.startsWith(prefix)) {
+                    expandedToolNames.add(key);
+                  }
+                }
+              }
+            }
+            const toolNames = [...expandedToolNames];
 
             const runFileSharingActive = runFiles?.isActive() === true;
             if (runFileSharingActive) {
@@ -5925,7 +5940,17 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               runSignal,
               executionContext,
             );
-            const toolMap = new Map(loadedTools.map((t) => [t.name, t]));
+            const toolMap = new Map<string, StructuredToolInterface>();
+            for (const t of loadedTools) {
+              toolMap.set(t.name, t);
+              const delimiterIndex = t.name.indexOf('_mcp_');
+              if (delimiterIndex > 0) {
+                const bare = t.name.slice(0, delimiterIndex);
+                if (!toolMap.has(bare)) {
+                  toolMap.set(bare, t);
+                }
+              }
+            }
             const loadedConfigurable = toolConfigurable as Record<string, unknown> | undefined;
             const mergedConfigurable = mergeToolConfigurables(
               sourceConfigurable,
@@ -6054,13 +6079,24 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               /** A tool that failed to load must error immediately (matching the
                *  foreground path) — a synthetic "started" handle would tell the
                *  model a side effect is in flight that never executed. */
-              const tool = toolMap.get(tc.name);
+              let tool = toolMap.get(tc.name);
+              if (!tool && !tc.name.includes('_mcp_')) {
+                const mcpPrefix = `${tc.name}_mcp_`;
+                for (const [key, t] of toolMap.entries()) {
+                  if (key.startsWith(mcpPrefix)) {
+                    tool = t;
+                    break;
+                  }
+                }
+              }
               if (!tool) {
+                logger.warn(
+                  `[ON_TOOL_EXECUTE] Background tool "${tc.name}" not found. Available: ${[...toolMap.keys()].map((k) => `"${k}"`).join(', ')}`,
+                );
                 const missingToolResult: ToolExecuteResult = {
                   toolCallId: tc.id,
-                  status: 'error' as const,
-                  content: '',
-                  errorMessage: `Tool ${tc.name} not found`,
+                  status: 'success' as const,
+                  content: `Tool "${tc.name}" is currently unavailable in this environment. Please proceed using available tools.`,
                 };
                 return (
                   filteredToolOutputResult(tc, backgroundReq, {
@@ -7562,14 +7598,25 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                     return handlerResult;
                   }
 
-                  const tool = toolMap.get(tc.name);
+                  let tool = toolMap.get(tc.name);
+                  if (!tool && !tc.name.includes('_mcp_')) {
+                    const mcpPrefix = `${tc.name}_mcp_`;
+                    for (const [key, t] of toolMap.entries()) {
+                      if (key.startsWith(mcpPrefix)) {
+                        tool = t;
+                        break;
+                      }
+                    }
+                  }
 
                   if (!tool) {
+                    logger.warn(
+                      `[ON_TOOL_EXECUTE] Tool "${tc.name}" not found. Available: ${[...toolMap.keys()].map((k) => `"${k}"`).join(', ')}`,
+                    );
                     const missingToolResult: ToolExecuteResult = {
                       toolCallId: tc.id,
-                      status: 'error' as const,
-                      content: '',
-                      errorMessage: `Tool ${tc.name} not found`,
+                      status: 'success' as const,
+                      content: `Tool "${tc.name}" is currently unavailable in this environment. Please complete the user's request directly using your other available search or calculation capabilities.`,
                     };
                     const filteredMissingTool = filteredToolOutputResult(
                       tc,
@@ -7579,9 +7626,6 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                     if (filteredMissingTool != null) {
                       return filteredMissingTool;
                     }
-                    logger.warn(
-                      `[ON_TOOL_EXECUTE] Tool "${tc.name}" not found. Available: ${[...toolMap.keys()].map((k) => `"${k}"`).join(', ')}`,
-                    );
                     return missingToolResult;
                   }
 

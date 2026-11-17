@@ -116,7 +116,10 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
     return <UniverOffice artifact={props.artifact} />;
   }
 
-  if (isFilmArtifact(props.artifact.type) || props.artifact.type === SATCHIDA_FILM_ARTIFACT_TYPE) {
+  if (
+    isFilmArtifact(props.artifact.type, props.artifact.content) ||
+    props.artifact.type === SATCHIDA_FILM_ARTIFACT_TYPE
+  ) {
     return <OpenFilmStudio artifact={props.artifact} />;
   }
 

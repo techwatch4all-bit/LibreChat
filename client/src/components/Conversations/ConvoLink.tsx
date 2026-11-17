@@ -9,6 +9,7 @@ interface ConvoLinkProps {
   isHovered: boolean;
   isSharedBadgeVisible: boolean;
   title: string | null;
+  timestamp?: string | null;
   onRename: () => void;
   isSmallScreen: boolean;
   localize: (key: TranslationKeys, options?: TOptions) => string;
@@ -39,6 +40,7 @@ const ConvoLink: React.FC<ConvoLinkProps> = ({
   isHovered,
   isSharedBadgeVisible,
   title,
+  timestamp,
   onRename,
   isSmallScreen,
   localize,
@@ -163,6 +165,11 @@ const ConvoLink: React.FC<ConvoLinkProps> = ({
           {displayTitle}
         </span>
       </span>
+      {timestamp && (
+        <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary select-none group-hover:opacity-0 group-focus-within:opacity-0 transition-opacity duration-150">
+          {timestamp}
+        </span>
+      )}
     </button>
   );
 };

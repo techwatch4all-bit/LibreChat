@@ -1,4 +1,4 @@
-# Customizations — Satchida AI Harness
+# Customizations â€” Satchida AI Harness
 
 Every deviation from upstream LibreChat, with its reason and its upstream counterpart. This
 is the running inventory; `Changes.md` is the chronological log.
@@ -6,6 +6,24 @@ is the running inventory; `Changes.md` is the chronological log.
 **Status as of the initial audit (commit `f10b1d91`, 2026-09-30): nothing is customized
 yet.** The sections below are planned work, recorded so the divergence from upstream stays
 auditable as it accumulates.
+
+---
+
+## F. Motion Studio & Neural Video Diffusion Pipeline (2026-11-16)
+
+Upstream LibreChat lacks specialized video diffusion prompts, multimodal scene-directing pipelines,
+and high-fidelity spatial simulation runtime. This fork integrates a cloud-only SOTA video and
+multimodal inference architecture with strict production quality controls.
+
+| #   | Divergence | Upstream behaviour | Reason |
+| --- | --- | --- | --- |
+| F1  | `Motion` mode routed via Bifrost & One-API to cloud-only SOTA video & multimodal models (< 6 months old) | Generic LLM text routing without dedicated video/diffusion pipeline | Cinema-grade video and audio generation requires modern neural diffusion (Wan 2.1 14B, Kling 2.5 with native audio) and multimodal directing (DeepSeek-V4.1-Flash, Llama 3.2 11B Vision). |
+| F2  | **Strict Anti-Toy Law** in Motion Studio system prompt | LLMs freely generate primitive Three.js geometry (`THREE.ConeGeometry`, `BoxGeometry`) and sine-wave oscillator beeps | Prevents amateur low-poly visuals and robotic sounds when photorealistic scenes are requested. |
+| F3  | Dual-pathway delivery (Option A: Neural Diffusion with Audio; Option B: Satchida Omni-Studio) | Single-block code output without camera physics or studio alternatives | Gives users production-ready generative diffusion prompts alongside real-time interactive spatial simulation. |
+| F4  | Custom high-fidelity spatial simulation runtime at `/motion/omni_studio.html` | No native multi-track spatial simulation runtime | Delivers procedural continuous terrain, natural water reflections, 2.5D camera parallax, and stereo ambient nature/city/drone soundscapes in-browser. |
+| F5  | Multimodal image/frame inspection for camera trajectory planning | Image inputs in Motion mode were previously unhandled or threw 400 | Allows users to upload any photo or video frame to generate dynamic camera dolly, crane, or drone parallax video prompts. |
+| F6  | Studio tools (SceneMosaic, Architect Studio) aligned to `Motion` multimodal routing and valid `_mcp_satchida-tools` server suffixes | Routed to text-only `Work` and referenced unmounted MCP servers (`_mcp_satchida-scenemosaic`, `_mcp_satchida-architect`) | Prevents HTTP 400 crashes when users upload room photos or site plans, and ensures tool calls resolve to the mounted Satchida Unified Hub. |
+| F7  | Direct OpenFilm Studio UI launch actions & automatic `window.film` artifact recognition | No visual timeline studio or direct studio button; artifacts strictly tied to exact MIME types | Enables users to open OpenFilm Studio directly from toolbar/dropdowns with 1 click, and automatically routes any film/animation artifact into the visual timeline and MP4 exporter. |
 
 ---
 
@@ -22,7 +40,7 @@ document before they can answer honestly.
 | E2  | Cards are built by `starter()` and always end with an approval gate plus `My additions: [ ]`                | Prompt strings are authored per card with no shared envelope               | One definition of the gate and the customization tail; 133 cards cannot drift apart. The gate must appear before the deliverable, which the test suite enforces.                                     |
 | E3  | `findStarterSlots()` skips markdown links so `[Source](URL)` is never a slot                                 | Bracket heuristics treat the first `[` as an input                          | Citation links are part of the output contract, not user input. Without this the highlighter and Tab order landed on `[Source]`.                                                                    |
 | E4  | The staged-brief hint renders in every mode                                                                  | The coach strip was Motion-only                                             | The behaviour is identical in all modes; hiding the hint made Chat/Work/Study look like they behaved differently.                                                                                   |
-| E5  | `BRIEF_FIRST_CONTRACT` is appended to all 34 persona system prompts and every mode `promptPrefix`            | Mode prompts carry execution instructions only                              | The contract has to survive whichever entry point the user picks (card, persona library, ✨ tab, typed prompt). Safety screening is carved out so red-flag triage still comes before the gate.       |
+| E5  | `BRIEF_FIRST_CONTRACT` is appended to all 34 persona system prompts and every mode `promptPrefix`            | Mode prompts carry execution instructions only                              | The contract has to survive whichever entry point the user picks (card, persona library, âœ¨ tab, typed prompt). Safety screening is carved out so red-flag triage still comes before the gate.       |
 | E6  | Motion and SceneMosaic use the filled-brief-is-approval variant                                              | n/a                                                                         | After approval the motion tool call must be the first step; a generic "wait for GO" would contradict the mode's own workflow.                                                                       |
 | E7  | Card prompts are catalogued in `client/src/common/starters.ts` with `title` / `description` / `inputs`      | Prompt strings only, with the UI deriving a label from the text             | The card pill needs stable copy; deriving a title from the prompt produced truncated 36-character labels on 40 cards and none at all on 60.                                                         |
 | E8  | Verified by `starter catalog contract` Jest block                                                           | No catalog-level tests upstream                                             | The failure mode here is silent data drift across hundreds of strings, which only a data-integrity test catches.                                                                                    |
@@ -36,13 +54,13 @@ These are deliberate, each with its upstream counterpart and reason. See `Change
 
 | #   | Divergence                                                                                                   | Upstream behaviour                                                                                     | Reason                                                                                                                                                                                                |
 | --- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Admin routers `users`/`groups`/`roles`/`grants` gate on **`access:admin`** (tenant-scoped)                    | `requireCapability(OPERATOR_CONTROL, { platformOnly: true })` — platform operator only                  | The deployment has tenant administrators who must manage their own tenant's accounts. `OPERATOR_CONTROL` implies every capability, so operators still pass unchanged.                                  |
-| D2  | `GET /api/admin/users` listing scope is derived from **caller authority**; `?scope`/`?tenantId` are ignored   | Scope came from the request (`!req.query.tenantId` → `runAsSystem`), i.e. any caller could be served all tenants | The upstream form was a cross-tenant read once a non-operator could reach the route. Fail-closed: a caller with neither platform authority nor a tenant is refused.                                     |
+| D1  | Admin routers `users`/`groups`/`roles`/`grants` gate on **`access:admin`** (tenant-scoped)                    | `requireCapability(OPERATOR_CONTROL, { platformOnly: true })` â€” platform operator only                  | The deployment has tenant administrators who must manage their own tenant's accounts. `OPERATOR_CONTROL` implies every capability, so operators still pass unchanged.                                  |
+| D2  | `GET /api/admin/users` listing scope is derived from **caller authority**; `?scope`/`?tenantId` are ignored   | Scope came from the request (`!req.query.tenantId` â†’ `runAsSystem`), i.e. any caller could be served all tenants | The upstream form was a cross-tenant read once a non-operator could reach the route. Fail-closed: a caller with neither platform authority nor a tenant is refused.                                     |
 | D3  | New `seedTenantAdmin(tenantId, roleName?)` and operator-only `POST /api/admin/grants/tenant-admin`            | No tenant-administrator provisioning path; `bootstrapOperatorCapability` only covers the platform operator | Needed to grant the tenant-scoped capability set. Refuses `OPERATOR_CONTROL`, so it cannot escalate.                                                                                                   |
-| D4  | `GrantPrincipalType` is `ROLE \| GROUP \| USER`; grant body accepts an operator-only `tenantId`                | ROLE-only (`Record`/`Set` structure was left as a placeholder for expansion)                            | A group must be able to carry an entitlement so members inherit it, and an operator must be able to write a grant *for another tenant* — the handler previously stamped only the caller's own tenant.   |
+| D4  | `GrantPrincipalType` is `ROLE \| GROUP \| USER`; grant body accepts an operator-only `tenantId`                | ROLE-only (`Record`/`Set` structure was left as a placeholder for expansion)                            | A group must be able to carry an entitlement so members inherit it, and an operator must be able to write a grant *for another tenant* â€” the handler previously stamped only the caller's own tenant.   |
 | D5  | `accountType` added to the User schema and `IUser` (`basic\|standard\|family\|pro\|pro_family\|enterprise\|privacy`, lowercase)                  | Absent                                                                                                  | This is the value the one-api seat linkage keys on (one-api resolves a seat's group by exact name). Lowercase is load-bearing: a mis-cased name silently bypasses one-api's `MaxSeats` cap.             |
-| D6  | Admin user list/search/create/update live in `packages/api/src/admin/users.ts`; `/api` keeps wiring only       | User create (and bulk, and reset-password) were inline in `api/server/routes/admin/users.js` using `mongoose.models.*` | The repo's own rule is "`/api` holds wiring, not behaviour". Bulk and reset-password remain inline — recorded as outstanding.                                                                           |
-| D7  | `GET /api/admin/verify` returns `isOperator` and `tenantId`                                                    | Returned `{ user }` only                                                                                | The panel inferred authority from `role === 'ADMIN' && tenantId in (undefined,'satchida-master')` — which mis-classifies every tenant admin (their role is also `ADMIN`).                                |
+| D6  | Admin user list/search/create/update live in `packages/api/src/admin/users.ts`; `/api` keeps wiring only       | User create (and bulk, and reset-password) were inline in `api/server/routes/admin/users.js` using `mongoose.models.*` | The repo's own rule is "`/api` holds wiring, not behaviour". Bulk and reset-password remain inline â€” recorded as outstanding.                                                                           |
+| D7  | `GET /api/admin/verify` returns `isOperator` and `tenantId`                                                    | Returned `{ user }` only                                                                                | The panel inferred authority from `role === 'ADMIN' && tenantId in (undefined,'satchida-master')` â€” which mis-classifies every tenant admin (their role is also `ADMIN`).                                |
 | D8  | `admin/` vanilla-JS panel is served at `/admin` by the API process                                             | Upstream expects the **AGPL-3.0** `LibreChat-AI/admin-panel` via `ADMIN_PANEL_URL`                       | Licensing: the AGPL panel cannot ship in a paid service (see C1). `admin/` is the clean replacement; upstream's `AdminPanel.tsx` link is retained.                                                      |
 | D9  | `TENANT_SEAT_CAPABILITIES` includes `'vscode_server'` for developer suite gating                               | Absent (capabilities were unformalized or absent)                                                       | Gates access to the bare-metal VS Code Server Web workspace for Pro and Pro Family developer tiers.                                                                                                       |
 | D10 | ModelSelector groups curated Satchida modes at top, hides internal gateway duplicates, and segregates My Agents & Cloud BYOK | Uncurated flat list with raw custom endpoints mixed with model specs | Enhances executive UX, eliminates duplicate submenus, preserves direct access to Agents and personal API keys. |
@@ -50,7 +68,7 @@ These are deliberate, each with its upstream counterpart and reason. See `Change
 | D12 | Tenant Admin RBAC guardrails enforce group/role immutability and block ADMIN role mutations | Tenant admins could mutate groups/roles or escalate privileges | Strict least-privilege boundary between operator authority and community/tenant administrators. |
 | D13 | Registration and user creation support community-specific unique identifiers (School permanent roll, RWA unit, Corporate ID) | Unstructured text | Ensures durable academic progression tracking, residential parcel mapping, and enterprise employee numbering. |
 
-**Not changed:** `audit.js` remains operator-only — `AuditLog` is deliberately outside tenant
+**Not changed:** `audit.js` remains operator-only â€” `AuditLog` is deliberately outside tenant
 isolation (`chainKey`-scoped), so exposing it per-tenant needs that read path verified first.
 
 ---
@@ -59,7 +77,7 @@ isolation (`chainKey`-scoped), so exposing it per-tenant needs that read path ve
 
 | Component     | Upstream location                                                                                                        | Reason                                                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `admin-panel` | `docker-compose.yml:42`, `deploy-compose.yml:46` (image `registry.librechat.ai/clickhouse/librechat-admin-panel:latest`) | **AGPL-3.0.** Network use in a paid service triggers source-disclosure obligations. Full analysis in `ARCHITECTURE.md` §3. |
+| `admin-panel` | `docker-compose.yml:42`, `deploy-compose.yml:46` (image `registry.librechat.ai/clickhouse/librechat-admin-panel:latest`) | **AGPL-3.0.** Network use in a paid service triggers source-disclosure obligations. Full analysis in `ARCHITECTURE.md` Â§3. |
 
 Consequences: remove the `ADMIN_PANEL_PORT`, `ADMIN_PANEL_SESSION_SECRET`,
 `ADMIN_PANEL_SESSION_COOKIE_SECURE`, and `VITE_API_BASE_URL` variables; the
@@ -71,7 +89,7 @@ Note: `docker-compose.override.yml.example`, `api/server/routes/admin/auth.js`, 
 ### C2. Stale references removed
 
 `static-browser-server` appears in `bun.lock` and `package-lock.json` with no corresponding
-source usage — the Static Browser feature was removed from LibreChat in favour of the Code
+source usage â€” the Static Browser feature was removed from LibreChat in favour of the Code
 API. Both lockfiles should be regenerated rather than hand-edited.
 
 ---
@@ -83,7 +101,7 @@ will appear in the fork:
 
 | Path                                               | Purpose                                                                                     |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `packages/data-schemas/src/schema/plan.ts`         | Tier definitions — price, quota, refill interval, seat limit                                |
+| `packages/data-schemas/src/schema/plan.ts`         | Tier definitions â€” price, quota, refill interval, seat limit                                |
 | `packages/data-schemas/src/schema/subscription.ts` | User/tenant subscription with lifecycle status                                              |
 | `packages/data-schemas/src/schema/payment.ts`      | Payment attempt and reconciliation record                                                   |
 | `packages/api/src/billing/`                        | `PaymentProvider` interface, `ManualUpiProvider`, `RazorpayUpiProvider`, assignment service |
@@ -110,10 +128,10 @@ These change shipped behavior and belong in `librechat.example.yaml`:
 New `configSchema` keys (`packages/data-provider/src/config.ts`), each defaulting to today's
 behavior:
 
-- `payments.provider` — `'manual'` \| `'razorpay'`
-- `payments.upiQrAsset` — path to the owner's static UPI QR
-- `payments.razorpayKeyId` / `payments.razorpayWebhookSecret` — sourced from env, never config
-- `billing.demoTier` — the demo role key and its token allowance
+- `payments.provider` â€” `'manual'` \| `'razorpay'`
+- `payments.upiQrAsset` â€” path to the owner's static UPI QR
+- `payments.razorpayKeyId` / `payments.razorpayWebhookSecret` â€” sourced from env, never config
+- `billing.demoTier` â€” the demo role key and its token allowance
 
 ---
 
@@ -121,17 +139,17 @@ behavior:
 
 **Master logo (confirmed 2026-10-03):** `D:\LAN-AI-Infra\Satchida\Satchida-logo.png`
 
-> ⚠️ **Treat as the opaque-plate master.** The SCode fork's `docs/BRAND-ASSETS.md` §1–2 documents
-> that the supplied master is 2048×2048 with a **fully opaque white plate**, and that the obvious
-> knockout `coverage = 255 - min(R,G,B)` is **not idempotent** — PNG transparency stores RGB as
+> âš ï¸� **Treat as the opaque-plate master.** The SCode fork's `docs/BRAND-ASSETS.md` Â§1â€“2 documents
+> that the supplied master is 2048Ã—2048 with a **fully opaque white plate**, and that the obvious
+> knockout `coverage = 255 - min(R,G,B)` is **not idempotent** â€” PNG transparency stores RGB as
 > zero, so re-running it paints the background opaque **black**. The correct formula is
 > `coverage = (255 - min(R,G,B)) * alpha / 255`.
 >
-> **Reuse the existing generator and its safety guard — do not write a new one:**
+> **Reuse the existing generator and its safety guard â€” do not write a new one:**
 > `D:\LAN-AI-Infra\Zcode\SCode\scripts\generate-brand-assets.ps1`. It refuses to run on an
 > already-transparent input and emits `flat` and `sketch` flavours. The boot splash is a
 > **separate** pipeline (`scripts/build-splash-mandala.mjs`) that deliberately does not use the
-> coverage formula. Post-generation alpha verification is mandatory (`BRAND-ASSETS.md` §5):
+> coverage formula. Post-generation alpha verification is mandatory (`BRAND-ASSETS.md` Â§5):
 > expected `cornerA=0`, `midA>100` on every asset.
 >
 > Pre-existing Satchida outputs, for reference: `D:\LAN-AI-Infra\Satchida\brand-assets\`
@@ -153,15 +171,15 @@ Theming swaps semantic theme tokens, not raw colors.
 not responses, not plan copy, not feature lists, not comparison tables, not the agent or preset
 names, not `librechat.example.yaml` values a user can observe.
 
-This is a compliance requirement, not only branding. Anthropic Commercial Terms §A.1 permits
-"products and services Customer makes available to its own customers and end users"; §D.4
+This is a compliance requirement, not only branding. Anthropic Commercial Terms Â§A.1 permits
+"products and services Customer makes available to its own customers and end users"; Â§D.4
 restricts building a **competing product or service**. Never presenting ourselves as provider
-access is what keeps us inside §A.1.
+access is what keeps us inside Â§A.1.
 
 **Do not add a "powered by \<provider\>" tier or mode later.** That single feature would be the
 thing that makes Satchida a competing product of that provider.
 
-Full detail, claims ledger and marketing copy: `PRIVACY.md` §2.1.
+Full detail, claims ledger and marketing copy: `PRIVACY.md` Â§2.1.
 
 ---
 
@@ -169,21 +187,21 @@ Full detail, claims ledger and marketing copy: `PRIVACY.md` §2.1.
 
 Recorded so no one "fixes" working upstream behavior:
 
-- `packages/data-schemas/src/schema/role.ts` — RBAC backing the plan tiers
-- `packages/data-provider/src/permissions.ts` — `PermissionTypes` as the feature matrix
-- `packages/data-schemas/src/schema/balance.ts` — token credits, `autoRefillEnabled`,
+- `packages/data-schemas/src/schema/role.ts` â€” RBAC backing the plan tiers
+- `packages/data-provider/src/permissions.ts` â€” `PermissionTypes` as the feature matrix
+- `packages/data-schemas/src/schema/balance.ts` â€” token credits, `autoRefillEnabled`,
   `refillIntervalValue` / `refillIntervalUnit`, and the `reservations` / `reservedCredits`
   concurrency-safe in-flight debiting
-- `packages/api/src/middleware/checkBalance.ts` — quota enforcement
-- `packages/api/src/auth/googleRefresh.ts` + `googleId` — Google registration
-- `packages/api/src/admin/*` — operator API surface we build the console on
-- `REFILL_INTERVAL_UNITS` (`packages/data-provider/src/balance.ts`) — already covers
+- `packages/api/src/middleware/checkBalance.ts` â€” quota enforcement
+- `packages/api/src/auth/googleRefresh.ts` + `googleId` â€” Google registration
+- `packages/api/src/admin/*` â€” operator API surface we build the console on
+- `REFILL_INTERVAL_UNITS` (`packages/data-provider/src/balance.ts`) â€” already covers
   `days`, `weeks`, `months`, which is exactly the requested quota periods
-- `@librechat/agents` `^4.0.1` — the agent runtime; **never clone the repo**
+- `@librechat/agents` `^4.0.1` â€” the agent runtime; **never clone the repo**
 
 ---
 
-## C7. Family profile data contract (2026-10-05 — substrate only)
+## C7. Family profile data contract (2026-10-05 â€” substrate only)
 
 Added optional family/guardian linkage, family limits, and distinct guardian-processing, transcript-view, and image-generation consent timestamps/versions to the shared User schema/types. Legacy defaults leave profiles unlinked, limits null, image generation disabled when configured, and all consent records null. The public user type exposes only `familyRole`; normal user/auth response allowlists exclude owner/guardian IDs, limits, and consent metadata.
 
@@ -198,7 +216,7 @@ This is **not** a family product implementation: no family creation/service API,
 | `code-interpreter` (Code API) | Apache-2.0          | Sandboxed code execution, Pro and above | 3     |
 | `quickbooks-online-mcp`       | Apache-2.0          | QuickBooks MCP server, Enterprise only  | 3     |
 | `rag-api`                     | MIT                 | Optional RAG retrieval                  | 3     |
-| Razorpay                      | Proprietary service | UPI gateway — **not yet, no account**   | 6     |
+| Razorpay                      | Proprietary service | UPI gateway â€” **not yet, no account**   | 6     |
 
 `rag-api` and the admin-panel wiring are upstream compose entries; only the code-interpreter
 and QuickBooks services are new deployment units.
@@ -212,7 +230,7 @@ and QuickBooks services are new deployment units.
 **It is not a workspace.** The root `package.json` declares `api`, `client`, and `packages/*`
 only, so the console installs its own `node_modules` and never participates in the LibreChat
 dependency graph. It also deliberately does **not** use `@librechat/client` primitives, the
-client router, or the client's localization runtime — the handover places this SPA on the
+client router, or the client's localization runtime â€” the handover places this SPA on the
 control service at `:8443`, and coupling it to the LibreChat bundle would break that.
 
 **Its own design system, upstream theme rules not in force.** `packages/client/src/theme/*`
@@ -295,11 +313,11 @@ entry point. This is a divergence from upstream in two respects worth recording:
 - **Visible copy lives in `translation.json` under `com_marketing_*`.** Roughly 56 new English keys
   were added. Per the frontend rules the copy goes through `useLocalize()` like any other string,
   even though the page is brand content.
-- **The page states what can be defended and stops there.** No anonymity claim, per SOLUTIONS.md §B1.
-  The billing relationship is described as Satchida↔organisation, never Satchida↔end user.
+- **The page states what can be defended and stops there.** No anonymity claim, per SOLUTIONS.md Â§B1.
+  The billing relationship is described as Satchidaâ†”organisation, never Satchidaâ†”end user.
 
 Artwork is CSS and the brand PNGs only: no image-generation dependency, no new runtime asset. The
-"photoreal" treatment is gradient mesh, glass and 3D transform rather than rendered photography —
+"photoreal" treatment is gradient mesh, glass and 3D transform rather than rendered photography â€”
 which is also the only version that recolours correctly between the light and dark themes instead of
 shipping two sets of bitmaps.
 
@@ -327,7 +345,7 @@ Upstream LibreChat lacks specialized execution styles (Plan/Build) and unified q
    - Syncs directly with conversation spec and model.
 
 4. **Action Icon Toolbar (`client/src/components/Chat/Input/SatchiToolbar.tsx`):**
-   - Icon row: 🌐 Globe (web search), 🧠 Think (reasoning pulse), ✨ Wand (prompt expander + toast), 🔬 Research (deep research), 🖼️ Image (image generation).
+   - Icon row: ðŸŒ� Globe (web search), ðŸ§  Think (reasoning pulse), âœ¨ Wand (prompt expander + toast), ðŸ”¬ Research (deep research), ðŸ–¼ï¸� Image (image generation).
    - Tooltips powered by `@librechat/client`'s `TooltipAnchor`.
 
 5. **Composer Integration (`client/src/components/Chat/Input/ChatForm.tsx`):**
@@ -346,9 +364,9 @@ Upstream LibreChat lacks specialized execution styles (Plan/Build) and unified q
 
 Upstream LibreChat's hook executor (`@librechat/api/dist/index.cjs`, function `runCommand`) spawns the guardrail hook process with `node_child_process.spawn` but **omits `windowsHide`**. On Windows, Node defaults the new console process to create a visible window (via `CreateProcess` default `CREATE_NEW_CONSOLE`), so **every** incoming chat message that runs a guardrail/pre-hook (the `child-safety-gate`, `redact-secrets`, and `use_classifier` hooks) flashes a PowerShell console window for a fraction of a second.
 
-**Customization:** the spawn options block now passes `windowsHide: process.platform === "win32"` so the hook process is created as an invisible window. Hidden consoles do not block execution or capture — `stdio: ["pipe","pipe","pipe"]` is preserved, so hook stdout/stderr/CDP capture still works.
+**Customization:** the spawn options block now passes `windowsHide: process.platform === "win32"` so the hook process is created as an invisible window. Hidden consoles do not block execution or capture â€” `stdio: ["pipe","pipe","pipe"]` is preserved, so hook stdout/stderr/CDP capture still works.
 
-**Persistence:** delivered as a manual `patches/@librechat+api+1.7.52.patch` (upstream offline, so `npx patch-package` cannot fetch the registry). The patch is applied by the existing `postinstall` → `patch-package` hook on any future `npm install`. **Caveat:** because the patch targets the compiled `dist/index.cjs` and is version-pinned to `1.7.52`, an upstream minor bump of `@librechat/api` will conflict until the patch is regenerated. It must be re-patched inside `node_modules` too — editing only `src/agents/hooks/executor.ts` does **not** affect the runtime (`main` = `dist/index.cjs`).
+**Persistence:** delivered as a manual `patches/@librechat+api+1.7.52.patch` (upstream offline, so `npx patch-package` cannot fetch the registry). The patch is applied by the existing `postinstall` â†’ `patch-package` hook on any future `npm install`. **Caveat:** because the patch targets the compiled `dist/index.cjs` and is version-pinned to `1.7.52`, an upstream minor bump of `@librechat/api` will conflict until the patch is regenerated. It must be re-patched inside `node_modules` too â€” editing only `src/agents/hooks/executor.ts` does **not** affect the runtime (`main` = `dist/index.cjs`).
 
 **References:** LibreChat `Bugs.md` entry **B25**; Bifrost `bifrost/Bugs.md` entry **BIF-026** (relates the `--update-env` PORT-pollution recurrence, **B26** in LibreChat `Bugs.md`).
 
@@ -481,14 +499,14 @@ Previous quota window calculations used `now % 86400`, which anchored 24-hour da
    - Fixed `getTodayDay()` to format local calendar date components.
    - Added a 3-way time range selector (`24h Rolling` | `Today` | `7 Days`) to `Dashboard/index.js` with cross-referencing subtexts.
 
-## C23. Guaranteed ≥ 80% Gross Margin Telemetry & Official List Pricing (2026-11-08)
+## C23. Guaranteed â‰¥ 80% Gross Margin Telemetry & Official List Pricing (2026-11-08)
 
-Operators required transparent verification of actual upstream landed COGS against retail billed usage to enforce and guarantee a gross margin of ≥ 80%.
+Operators required transparent verification of actual upstream landed COGS against retail billed usage to enforce and guarantee a gross margin of â‰¥ 80%.
 
 **Customization:**
 1. **Gross Margin % Computation (`web/berry/src/views/Dashboard/component/CostReconciliationTable.js`):**
    - Dynamically calculates `((quotaUSD - costUSD) / quotaUSD) * 100` across Upstream Provider Totals and Model Breakdown.
-   - Color-coded visual chips: Green (`≥80% Target Met`), Amber (`50% - 79% Low`), Red (`<50% Deficit Risk`).
+   - Color-coded visual chips: Green (`â‰¥80% Target Met`), Amber (`50% - 79% Low`), Red (`<50% Deficit Risk`).
    - Summary margin chips displayed in both table footers.
 2. **Commercial List Price Policy Header:**
    - Standard retail pricing policy alert ($0.30/M input, $1.20/M output, with 80%+ discount on cached tokens).
@@ -497,12 +515,12 @@ Operators required transparent verification of actual upstream landed COGS again
 
 ## C24. High-Performance Blob CSV Export, Fleet-Wide Telemetry & Complete Tenant Metadata (2026-11-08)
 
-Previous implementations used `encodeURI` data URIs that truncated large CSV exports, serialized tenants without `monthly_fee_inr` or `max_seats` (causing the dashboard to display ₹0 /mo MRR), and formatted zero cost as `.00`.
+Previous implementations used `encodeURI` data URIs that truncated large CSV exports, serialized tenants without `monthly_fee_inr` or `max_seats` (causing the dashboard to display â‚¹0 /mo MRR), and formatted zero cost as `.00`.
 
 **Customization:**
 1. **Complete Tenant Contract Schema (`model/analytics_tenant.go`):**
    - Added `MaxSeats` and `MonthlyFeeINR` fields to `TenantUsageSummary` and `TenantUsageOverview`, populating them directly from the `tenants` table.
-   - Eliminates ₹0/mo contract fee fallbacks and accurately reflects genuine fleet MRR (₹15,399/mo) and seat limits.
+   - Eliminates â‚¹0/mo contract fee fallbacks and accurately reflects genuine fleet MRR (â‚¹15,399/mo) and seat limits.
 2. **Direct Action Buttons & Blob CSV Exports (`TenantCommercialCard.js` & `TenantUsageDrawer.js`):**
    - Added "Statement / PDF", "Export CSV", and "Export Fleet Summary CSV" buttons directly onto `TenantCommercialCard.js`.
    - Replaced legacy data URIs with standard `Blob` and `URL.createObjectURL(blob)` in all export paths.
@@ -521,8 +539,8 @@ Previous implementations used `encodeURI` data URIs that truncated large CSV exp
    - Built a comprehensive frontend backup manager in Berry dashboard allowing operators to inspect, download, and delete archived metric runs.
 3. **Hybrid Dual-Engine Architecture & Real COGS on Privacy Tier:**
    - Standardized definition of COGS (Cost of Goods Sold) as direct variable upstream API provider charges and network delivery costs.
-   - Clarified that Privacy accounts feature a hybrid dual-engine: local GPU inference with ₹0 cloud COGS when in Privacy mode, and frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek) when in Chat, Study, Work, or Vibe Coding (VS Code Server Web, MCP, Code Execution).
-   - Accurately recalibrated Privacy gross margin to **~85.8% to 88.0%** based on real cloud usage (~.50 / ₹445.50 COGS) against the ₹3,499 monthly fee.
+   - Clarified that Privacy accounts feature a hybrid dual-engine: local GPU inference with â‚¹0 cloud COGS when in Privacy mode, and frontier cloud models (Claude 3.5 Sonnet, GPT-4o, DeepSeek) when in Chat, Study, Work, or Vibe Coding (VS Code Server Web, MCP, Code Execution).
+   - Accurately recalibrated Privacy gross margin to **~85.8% to 88.0%** based on real cloud usage (~.50 / â‚¹445.50 COGS) against the â‚¹3,499 monthly fee.
 
 ## C26. Persona & MCP shipping assets under `satchida/` (2026-11-09)
 
@@ -531,13 +549,13 @@ manifest; the fork adds two product-layer directories so a client edge node can 
 provisioned from this repo alone. No upstream file is modified.
 
 **Customization:**
-1. **`satchida/personas/`** — `personas.ts`: verbatim copy of the 34-persona master
+1. **`satchida/personas/`** â€” `personas.ts`: verbatim copy of the 34-persona master
    library from `satchida-ai-unified-suite/src/lib/constants/personas.constants.ts`
    (deltas only: provenance header + `export` on the three private rule blocks;
    verified with `diff --strip-trailing-cr`). Plus `specification.md` (operator spec:
    11 categories / 44 starters, staging protocol, ModelSpec overrides) and `README.md`
    (wiring map, stale-data audit, origin-sync rule, shipping checklist).
-2. **`satchida/mcp/`** — `recommended-mcp.ts`: curated external MCP catalog copied
+2. **`satchida/mcp/`** â€” `recommended-mcp.ts`: curated external MCP catalog copied
    from the unified-suite constant (type inlined). Plus `README.md`: manifest of all
    21 `librechat.yaml` servers (custom servers confirmed git-tracked under `skill/`),
    packaged-server dependencies and pre-warm steps, external sidecar requirements
@@ -545,33 +563,33 @@ provisioned from this repo alone. No upstream file is modified.
    `D:/LAN-AI-Infra` paths, and audit findings (deeptutor `dist/` untracked, hardcoded
    AnythingLLM API key, US-law `legal-research` pairing, unbound `clinical-research`,
    unreferenced `stem-math-server.py`).
-3. **Runtime untouched** — `ConversationStarters.tsx`, `librechat.yaml`, and MCP
-   configs are unchanged; the P0–P2 persona improvement plan (rule-block wiring,
+3. **Runtime untouched** â€” `ConversationStarters.tsx`, `librechat.yaml`, and MCP
+   configs are unchanged; the P0â€“P2 persona improvement plan (rule-block wiring,
    dangling-placeholder fixes, safety rewrites, matrix fixes) is tracked in the
    session todo list and logged in `Changes.md` (2026-11-09 entry).
 
-## C27. P0–P2 persona accuracy contract, MCP credential/path portability & staging starters (2026-11-09)
+## C27. P0â€“P2 persona accuracy contract, MCP credential/path portability & staging starters (2026-11-09)
 
-Supersedes C26's "Runtime untouched" note: the P0–P2 plan now lands runtime changes. Upstream
+Supersedes C26's "Runtime untouched" note: the P0â€“P2 plan now lands runtime changes. Upstream
 LibreChat contains none of the following.
 
 **Customization:**
-1. **Accuracy contract in `librechat.yaml` ModelSpecs** — four anti-fabrication rule blocks
+1. **Accuracy contract in `librechat.yaml` ModelSpecs** â€” four anti-fabrication rule blocks
    (citation obligation, no fabricated numerics, stale-data refusal, Satchida-SI identity)
    appended to the `promptPrefix` of all 7 mode specs (Chat, Work, Pro, Vibecoding, Study,
    Study-Local, Privacy), plus zero-old-data rewrites in `librechat.yaml` and
    `satchida/personas/personas.ts` (8/8, 0 residuals).
-2. **Privacy honesty** — the Privacy spec carries `webSearch: false` and a local-only
+2. **Privacy honesty** â€” the Privacy spec carries `webSearch: false` and a local-only
    no-live-context refusal line; `family_health` routes to Chat rather than Privacy. Diverges
    from upstream's web-enabled defaults; jest mode-filter tests pin the routing.
-3. **MCP credentials via env template** — `${ANYTHINGLLM_API_KEY}` in `librechat.yaml`,
+3. **MCP credentials via env template** â€” `${ANYTHINGLLM_API_KEY}` in `librechat.yaml`,
    expanded per connection by `extractEnvVariable` in `packages/api/src/mcp/connection.ts`
    (upstream does not resolve env templates in MCP command args); the secret lives only in
    `.env`. Paired with portable MCP args: 14 relative `skill/...` paths and
    `git --repository .` instead of `D:/LAN-AI-Infra` absolutes.
-4. **MCP mode×allowlist matrix** — per-spec `mcpServers` allowlists across all 7 modes
+4. **MCP modeÃ—allowlist matrix** â€” per-spec `mcpServers` allowlists across all 7 modes
    (upstream: one global set).
-5. **Client starters refactor** — `client/src/common/starters.ts` extracted from
+5. **Client starters refactor** â€” `client/src/common/starters.ts` extracted from
    `ConversationStarters.tsx` (deictic gate, label-bracket skip, Tab-cycle helpers), all copy
    through `useLocalize()` with `starters_*` English keys; new colocated jest spec 7/7.
 6. **E2E harness adaptations** (divergence from upstream test infra, forced by this fork's own
@@ -584,7 +602,7 @@ LibreChat contains none of the following.
    URL to `http://localhost:3098` (off the live pm2 port), and `e2e/setup/start-server.js`
    drops a `SATCHIDA_OPERATOR_USER_ID` that leaked in from the production `.env` (unless the
    caller sets it explicitly), so plain `npm run lighthouse` runs the lane on this box.
-7. **Self-hosted deck fonts** — the sales decks load Source Serif 4 / Inter / IBM Plex Mono from
+7. **Self-hosted deck fonts** â€” the sales decks load Source Serif 4 / Inter / IBM Plex Mono from
    `client/public/decks/fonts/` (23 local woff2 + `fonts.css`; css2 `@font-face` set mirrored
    verbatim, unicode-ranges preserved) instead of fonts.googleapis.com / fonts.gstatic.com. Upstream
    LibreChat carries no Google Fonts references of its own; this divergence covers the fork's deck
@@ -594,16 +612,16 @@ LibreChat contains none of the following.
 
 ## C28. Product recommendations, universal legal disclaimers & click-and-go suggested questions (2026-11-10)
 
-1. **Product Recommendations & Commercial Disclaimer**: In librechat.yaml and satchida/personas/personas.ts (LIVE_DATA_ENGAGEMENT_RULES), whenever queries touch active formulations, skincare, supplements, or commercial items, the assistant provides 3–4 concrete market products with search links (e.g. Amazon.in) accompanied by an explicit commercial disclaimer clarifying independence and non-endorsement.
+1. **Product Recommendations & Commercial Disclaimer**: In librechat.yaml and satchida/personas/personas.ts (LIVE_DATA_ENGAGEMENT_RULES), whenever queries touch active formulations, skincare, supplements, or commercial items, the assistant provides 3â€“4 concrete market products with search links (e.g. Amazon.in) accompanied by an explicit commercial disclaimer clarifying independence and non-endorsement.
 2. **Universal Legal Protection Disclaimers**: Added domain-specific mandatory legal disclaimers across all 7 personas (health/skincare, finance/tax/bullion, statutory/legal, general/technical) before suggested questions for liability protection.
 3. **Click-and-Go Suggested Questions**: Enhanced client/src/components/Chat/Messages/Content/Markdown.tsx and introduced SuggestedQuestions.tsx to parse suggested next questions and render interactive click-and-go cards with one-click submitMessage execution instead of plain static markdown text.
-8. **Self-hosted Tailwind runtime for artifact previews** — sandpack previews and the React-template
+8. **Self-hosted Tailwind runtime for artifact previews** â€” sandpack previews and the React-template
    sandbox load Tailwind 3.4.17 from `client/public/assets/vendor/tailwind-3.4.17.js` (vendored Play
    CDN build, auto-copied to dist by the publicDir-copy plugin) via `TAILWIND_RUNTIME_URL` in
    `client/src/utils/artifacts.ts`, instead of cdn.tailwindcss.com (Changes.md 2026-11-10
    "Self-hosted Tailwind runtime"). Same zero-third-party principle as item 7; the sandpack bundler
    itself (codesandbox.io, env-overridable) and the marked jsdelivr script remain external.
-9. **Self-hosted sandpack runtimes** — artifact previews load their toolchain from the repo:
+9. **Self-hosted sandpack runtimes** â€” artifact previews load their toolchain from the repo:
    marked (SRI-verified byte-exact copy) at `assets/vendor/marked-15.0.12.min.js`, the React/node
    compile bundler mirrored (and patched: font links stripped, publicPath re-prefixed) at
    `assets/vendor/sandpack-runtime/`, and the static-template relay served by
@@ -655,7 +673,7 @@ Upstream LibreChat includes no motion-graphics studio mode, grouped persona navi
 **Customization:**
 1. **Motion Studio Two-Tier Navigator & 70-Persona Catalog (`client/src/common/starters.ts`, `client/src/components/Chat/Input/ConversationStarters.tsx`, `client/src/locales/en/translation.json`)**:
    - Exported `MOTION_GROUPS` (5 Discipline Groups: `arch_engineering`, `robotics_how`, `stem_tech`, `business_creative`, `care_living`) and 20 `motion_*` categories containing 70 multi-slot simulation, CAD/floorplan, drone/UAV, robotics, cutaway, STEM/cyber, art/cartoon, medical, fitness/nutrition, home/interior, and WCAG AAA senior personas.
-   - Added `hasGroupedNavigation` in `ConversationStarters.tsx` (1-row Discipline Groups + 8-card `4×2` `✨ Spotlight` grid + contextual sub-category filter pills + inline `role="searchbox"` search + dismissible `role="status"` staged coach banner) while keeping standard non-Motion modes unchanged.
+   - Added `hasGroupedNavigation` in `ConversationStarters.tsx` (1-row Discipline Groups + 8-card `4Ã—2` `âœ¨ Spotlight` grid + contextual sub-category filter pills + inline `role="searchbox"` search + dismissible `role="status"` staged coach banner) while keeping standard non-Motion modes unchanged.
    - Enforced `activeMode === 'Motion'` always-stage behavior into `#prompt-textarea` with `Tab`/`Shift+Tab` parameter cycling and automatic MCP server selection (`satchida-motion` plus domain companion MCP servers).
 2. **Self-Hosted Three.js Vendor (`client/public/assets/vendor/three/`)**:
    - Vendored offline `three@0.128.0` UMD (`three.min.js` + `OrbitControls.js`) for air-gapped 3D WebGL artifacts without relying on external CDNs.
@@ -668,7 +686,7 @@ Upstream LibreChat includes no motion-graphics studio mode, grouped persona navi
 Divergence from upstream LibreChat conversation-starters behavior:
 
 1. **Upstream auto-submits plain starters; Satchida always stages.** `ConversationStarters.tsx`
-   no longer calls `submitMessage` on card click — every persona card stages its prompt into the
+   no longer calls `submitMessage` on card click â€” every persona card stages its prompt into the
    textarea for editing/customization first. This is a product decision for student personas: a
    click must never execute without the user's further input. Upstream merge will conflict here
    by design; keep the always-stage side.
@@ -683,17 +701,71 @@ Divergence from upstream LibreChat conversation-starters behavior:
 
 Not upstream. Three pieces:
 
-1. **Vendored engine bundles** — `client/public/assets/vendor/axonometra/` (+ mirrored into
+1. **Vendored engine bundles** â€” `client/public/assets/vendor/axonometra/` (+ mirrored into
    `client/dist/assets/vendor/axonometra/`; the live server serves vendor assets from `dist`)
    carries the MIT Axonometra planner (`@axonometra/editor@0.8.0`, zero runtime npm deps; a
-   maintained fork of NeonPlan 3D — credit preserved in the shipped NOTICE). See PROVENANCE.md
+   maintained fork of NeonPlan 3D â€” credit preserved in the shipped NOTICE). See PROVENANCE.md
    in that directory.
-2. **`skill/satchida-architect-server.py`** — Satchida-only MCP server (`satchida-architect` in
+2. **`skill/satchida-architect-server.py`** â€” Satchida-only MCP server (`satchida-architect` in
    `librechat.yaml`) that validates whole-building plan JSON (rooms/walls/doors/windows/stairs/
    roof/multi-floor, with door-swing, walkway and daylight checks) and emits an artifact that
    mounts the planner via `memoryStore({building})`. Users can walk through and keep editing the
    generated plan in the artifact.
-3. **Scoped CORS middleware in `api/server/index.js`** — `Access-Control-Allow-Origin: *` for
+3. **Scoped CORS middleware in `api/server/index.js`** â€” `Access-Control-Allow-Origin: *` for
    `/assets/vendor/axonometra` only. Needed because artifact iframes are sandboxed without
    `allow-same-origin`, and ES-module imports (unlike the classic script tags the other studios
    use) require CORS. Serves public MIT assets only; discloses nothing.
+
+## C33. OpenMontage 3D YouTube Video Production Integration (2026-11-16)
+
+1. **OpenMontage Engine Integration & Satchida Studio Bridge (`skill/satchida-montage-server.py`, `librechat.yaml`)**:
+   - Integrates OpenMontage multi-stage agentic video pipeline (`D:\LAN-AI-Infra\Satchida-Studio\external\OpenMontage`) into LibreChat.
+   - Mounted `satchida-montage` into `librechat.yaml` and unified hub (`satchida-tools`), registering 5 automated production sequence tools (`video_create_script`, `video_plan_3d_scenes`, `video_start_render_job`, `video_get_status`, `video_export_youtube_bundle`).
+2. **Dual-Tier Model Routing Invariant (`src/core/montage_router.py`)**:
+   - Strict enforcement: Local LLM inference on the Llama fleet (:4099 / GPU 0) is **strictly and exclusively** used for `accountType === 'privacy'` running in `mode === 'Privacy'`.
+   - All other account types (`basic`, `standard`, `family`, `pro`, `pro_family`, `enterprise`) and modes (`Chat`, `Work`, `Study`, `Motion`, `Pro`) always route to Cloud Frontier Models via AutoRouter (`http://127.0.0.1:4000/v1`) with Bifrost telemetry tagging (`x-bf-dim-activity: video_generation`).
+3. **Hardware Invariant & Headless 3D Pipeline (`src/engines/`)**:
+   - `blender_runner.py`: Restricts rendering to memory-safe Eevee Next / CPU under Privacy mode to prevent VRAM eviction of the port 8080 Llama fleet.
+   - `montage_compositor.py`: 16:9 widescreen YouTube timeline composition with audio-visual synchronization and FFmpeg/Remotion assembly.
+   - `youtube_packager.py`: Formats 1080p MP4, generates 1280x720 high-CTR thumbnail, clickable chapter timestamps, and SEO tags.
+4. **Preset & Starters**:
+   - Added `Satchida 3D Studio (YouTube) ðŸŽ¬` persona preset in `librechat.yaml` with conversation starters for 3D Science Explainers, Tech Showcases, and Architectural Walkthroughs.
+
+
+## C34 — 2026-11-16: Fix OpenMontage real video generation pipeline
+
+**Problem:** satchida-montage-server.py was generating synthetic FFmpeg color-block placeholders instead of real 3D video. Root causes:
+1. librechat.yaml used system python (wrong env, no PYTHONPATH set)
+2. _async_render_worker fell back to generate_procedural_video_segment() (lavfi color rect) silently
+3. OpenMontage's real video tools (Kling O3, Veo 3) were never called
+
+**Fixes:**
+- librechat.yaml satchida-montage entry: switched to D:\LAN-AI-Infra\Satchida-Studio\venv\Scripts\python.exe with PYTHONPATH, OPEN_MONTAGE_ROOT, SATCHIDA_AUTOROUTER_URL, SATCHIDA_EXPORTS_DIR
+- skill/satchida-montage-server.py: complete rewrite of _async_render_worker and new _generate_real_scene_clip():
+  - **Cloud (non-privacy):** _autorouter_fal_generate() ? POST to http://127.0.0.1:4000/v1/fal/queue/submit/fal-ai/kling-video/o3/pro/text-to-video; polls for result; downloads MP4
+  - **Fallback cloud:** Veo 3 Fast via same AutoRouter fal proxy
+  - **Privacy mode:** _threejs_privacy_render() ? Three.js HTML ? Playwright headless frame capture ? FFmpeg encode
+  - **Emergency last-resort:** clearly labelled "RENDER PENDING" placeholder (not silent fake)
+- ideo_get_status now reports is_real_video flag + ideo_size_mb
+- All 5 MCP tools validated: 14/14 tests pass
+
+**Result:** Real AI-generated MP4 clips per scene, assembled with FFmpeg, packaged with YouTube metadata.
+
+## C35 — 2026-11-17: Bare-to-Bound MCP Tool Resolution & Hallucination Defense
+
+**Problem:** When model system prompts or LLMs invoke tools using bare names (e.g. `get_verified_market_rates` instead of `get_verified_market_rates_mcp_satchida-tools`), the upstream agent executor threw a "Tool X not found" error. LangChain propagated an error `ToolMessage`, rendering prominent red failure badges in the UI (`Failed: get_verified_market_rates Tool get_verified_market_rates not found · failed`), damaging user trust and brand reliability. Additionally, `satchida-web-search-server.py` lacked explicit SGD/INR and dynamic forex pairs.
+
+**Fixes:**
+1. **Bare-to-Bound MCP Expansion (`packages/api/src/agents/handlers.ts`, `api/server/services/ToolService.js`)**:
+   - `handlers.ts`: Expanded requested `toolNames` using `sourceConfigurable.toolRegistry` to resolve bare names to registered MCP tool names (`${name}_mcp_`).
+   - `toolMap` aliasing: In `toolMap` construction, indexed each MCP tool by both its bound name (`${tool}_mcp_${server}`) and its bare name (`${tool}`).
+   - Fallback prefix lookup: In both foreground and background execution paths, added a dynamic prefix lookup (`${tc.name}_mcp_`) across `toolMap.entries()`.
+   - `ToolService.js`: In `loadToolsForExecution`, expanded bare non-special tool names against `toolRegistry.keys()` before categorizing into regular tools.
+2. **Hallucination Defense & Non-Failing Degradation (`packages/api/src/agents/handlers.ts`)**:
+   - Replaced `status: 'error'` and raw `Tool ${tc.name} not found` error payloads in both foreground and background execution with `status: 'success'` and an actionable instruction to the LLM to complete the request directly using available tools.
+   - Completely eliminates frontend red failure cards for missing or hallucinated tool names.
+3. **Forex Expansion in Verified Market Rates (`skill/satchida-web-search-server.py`)**:
+   - Enhanced `get_verified_market_rates`: Added SGD/INR (`SGDINR=X`), EUR/INR (`EURINR=X`), GBP/INR (`GBPINR=X`), AED/INR (`AEDINR=X`), CAD/INR (`CADINR=X`), AUD/INR (`AUDINR=X`), JPY/INR (`JPYINR=X`), and dynamic 3-letter / 6-letter currency pair resolution from the `category` parameter.
+4. **Configuration Cleanup (`librechat.yaml`)**:
+   - Deduplicated repeated `satchida-tools` listings across model specs (`Chat`, `Work`, `Study`, `Vibecoding`, `Privacy`, `Panchang-Vedic`, `Architect-Studio`).
+

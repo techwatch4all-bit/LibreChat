@@ -530,6 +530,26 @@ const startServer = async () => {
   }
   app.use('/temp_audio', express.static(tempAudioDir));
 
+  // Motion and Video assets static route
+  const motionDir = path.resolve('D:\\LAN-AI-Infra\\LibreChat\\client\\public\\motion');
+  if (!fs.existsSync(motionDir)) {
+    fs.mkdirSync(motionDir, { recursive: true });
+  }
+  app.use('/motion', express.static(motionDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.mp4')) {
+        res.setHeader('Content-Type', 'video/mp4');
+      } else if (filePath.endsWith('.webm')) {
+        res.setHeader('Content-Type', 'video/webm');
+      } else if (filePath.endsWith('.mp3')) {
+        res.setHeader('Content-Type', 'audio/mpeg');
+      } else if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+  }));
+
   app.post('/api/explain', express.json(), async (req, res) => {
     try {
       const { query = '', response = '', voice = 'female' } = req.body || {};

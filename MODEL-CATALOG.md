@@ -70,6 +70,22 @@ matters more than cost.
 
 ---
 
+## 3.1 Cinema-Grade Video & Motion Studio Models (< 6 Months Old, Cloud-Only)
+
+Configured for Motion Studio (`Motion` mode) across Bifrost and Satchida Gateway:
+
+| Category | Model | Role & Capability | Deployment |
+|---|---|---|---|
+| **Heavy Video + Audio** | `Wan 2.1 (14B)` (`deepinfra/Wan-AI/Wan2.1-I2V-14B`) | SOTA open-weights video diffusion, fluid dynamics, camera physics | Cloud Serverless (DeepInfra) |
+| **Heavy Video + Audio** | `Kling 2.5 (Native Sound)` (`fal/kling-v2-5-audio`) | Cinematic photorealistic text-to-video / image-to-video with synchronized foley | Cloud Serverless (Fal) |
+| **Multimodal Scene Director** | `DeepSeek-V4.1-Flash (1017)` (`deepinfra/deepseek-ai/DeepSeek-V4.1-Flash`) | Multimodal vision, image analysis, framing, and camera choreography | Cloud Serverless (DeepInfra) |
+| **Image-to-Text & Vision** | `Llama 3.2 11B Vision` (`deepinfra/meta-llama/Llama-3.2-11B-Vision-Instruct`) | Fast high-accuracy image OCR, scene decomposition, and layout | Cloud Serverless (DeepInfra) |
+| **Sequence Planning** | `GLM 5.3 Flash` (`deepinfra/zai-org/GLM-5.3-Flash`) | Multi-scene timeline planning, narrative sequence orchestration | Cloud Serverless (DeepInfra) |
+
+*Deprecated / Excluded Models (Obsolete, > 6 months old):* `Qwen 2.5-VL-72B`, `Gemini 2.0 Flash`.
+
+---
+
 ## 4. Speech — STT and TTS
 
 ### ✅ Confirmed supported natively

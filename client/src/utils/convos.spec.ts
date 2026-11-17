@@ -17,6 +17,7 @@ import {
   removeConvoFromAllQueries,
   addConversationToAllConversationsQueries,
   invalidateConversationLists,
+  formatConversationTimestamp,
 } from './convos';
 import { normalizeData } from './collection';
 
@@ -29,6 +30,35 @@ jest.mock('date-fns', () => {
 });
 
 describe('Conversation Utilities', () => {
+  describe('formatConversationTimestamp', () => {
+    it('returns empty string for null or undefined', () => {
+      expect(formatConversationTimestamp(null)).toBe('');
+      expect(formatConversationTimestamp(undefined)).toBe('');
+      expect(formatConversationTimestamp('')).toBe('');
+      expect(formatConversationTimestamp('invalid-date')).toBe('');
+    });
+
+    it('formats today timestamp with time', () => {
+      const now = new Date();
+      const formatted = formatConversationTimestamp(now.toISOString(), 'en-US', true);
+      expect(formatted).toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+    });
+
+    it('formats this year non-today timestamp with month and day', () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 10);
+      const formatted = formatConversationTimestamp(pastDate.toISOString(), 'en-US');
+      expect(formatted).toBeTruthy();
+      expect(formatted).not.toContain(':');
+    });
+
+    it('formats previous year timestamp with month, day, and year', () => {
+      const formatted = formatConversationTimestamp('2022-05-15T10:00:00Z', 'en-US');
+      expect(formatted).toContain('2022');
+      expect(formatted).toContain('May');
+    });
+  });
+
   describe('groupConversations', () => {
     it('groups conversations by date correctly', () => {
       const conversations = [

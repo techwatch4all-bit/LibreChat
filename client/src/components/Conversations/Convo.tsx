@@ -14,11 +14,11 @@ import {
   usePinConversationMutation,
   useUpdateConversationMutation,
 } from '~/data-provider';
-import { useNavigateToConvo, useLocalize, useShiftKey } from '~/hooks';
+import { useNavigateToConvo, useLocalize, useShiftKey, useClockFormat } from '~/hooks';
 import ConversationEndpointIcon from './ConversationEndpointIcon';
 import { focusableInRow, resolveRowBeside } from './focus';
 import { areConversationRenderPropsEqual } from './utils';
-import { cn, logger, setDocumentTitle } from '~/utils';
+import { cn, logger, setDocumentTitle, formatConversationTimestamp } from '~/utils';
 import { NotificationSeverity } from '~/common';
 import { CONVERSATION_DRAG_TYPE } from './dnd';
 import ConvoActions from './ConvoActions';
@@ -62,6 +62,7 @@ function Conversation({
   const unpinMutation = usePinConversationMutation();
   const activeConvos = useRecoilValue(store.allConversationsSelector);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  const hour12 = useClockFormat();
   /* A deployment with shared links off leaves existing links in the database but stops
      serving them, so the row must not advertise one that no longer resolves. */
   const { data: startupConfig } = useGetStartupConfig();
@@ -157,6 +158,10 @@ function Conversation({
     setTitleInput(title as string);
     setRenaming(true);
   };
+
+  const formattedTimestamp = useMemo(() => {
+    return formatConversationTimestamp(conversation.createdAt, undefined, hour12);
+  }, [conversation.createdAt, hour12]);
 
   const handleRenameSubmit = async (newTitle: string) => {
     if (!conversationId || newTitle === title) {
@@ -404,6 +409,7 @@ function Conversation({
           isHovered={isHovered}
           isSharedBadgeVisible={isSharedBadgeVisible}
           title={title}
+          timestamp={formattedTimestamp}
           onRename={handleRename}
           isSmallScreen={isSmallScreen}
           localize={localize}

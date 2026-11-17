@@ -127,9 +127,15 @@ function ModelSelectorContent() {
               modelSpecs?.filter(
                 (spec) =>
                   !spec.group &&
-                  !['Chat', 'Work', 'Study', 'Study-Local', 'Vibecoding', 'Privacy'].includes(
-                    spec.name,
-                  ),
+                  ![
+                    'Chat',
+                    'Work',
+                    'Study',
+                    'Study-Local',
+                    'Vibecoding',
+                    'Privacy',
+                    'Pro',
+                  ].includes(spec.name),
               ) || [],
               selectedValues.modelSpec || '',
             )}

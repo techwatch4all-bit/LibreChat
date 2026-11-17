@@ -91,37 +91,77 @@ def simplify_complex_text(text: str, target_reading_level: str = "grade 6") -> s
         return f"Error simplifying text: {str(e)}"
 
 @mcp.tool()
-def generate_offline_speech_audio(text: str, output_filename: str = "assistant_voice.wav") -> str:
+def generate_offline_speech_audio(text: str, output_filename: str = "assistant_voice.mp3", voice: str = "en-US-ChristopherNeural") -> str:
     """
-    Generates a clear speech audio file (.wav) using the Windows native SpeechSynthesizer engine completely offline.
-    Places the audio file in the shared accessible folder for immediate playback.
+    Generates a high-fidelity natural neural speech audio file (.mp3 or .wav).
+    Uses high-quality Neural TTS (Edge-TTS) with seamless offline SAPI fallback.
+    Places the audio file in the public motion folder and SharedDocs for instant playback and video dubbing.
     
-    :param text: The text string or announcement to speak.
-    :param output_filename: The target .wav filename (default: 'assistant_voice.wav').
+    :param text: The text string or narration script to speak.
+    :param output_filename: Target filename ending in .mp3 or .wav (default: 'assistant_voice.mp3').
+    :param voice: Voice persona (e.g. 'en-US-ChristopherNeural', 'en-US-JennyNeural', 'en-IN-NeerjaNeural').
     """
     try:
-        target_dir = r"D:\LAN-AI-Infra\SharedDocs\audio"
-        os.makedirs(target_dir, exist_ok=True)
-        out_path = os.path.join(target_dir, output_filename)
-        
-        # Clean text
-        clean_text = text.replace("'", "").replace('"', '').replace("\n", " ")[:1000]
-        
+        import shutil
+        import asyncio
+        if not output_filename.endswith((".mp3", ".wav")):
+            output_filename += ".mp3"
+
+        # Public web path for direct web audio & video playback in artifacts
+        public_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "client", "public", "motion")
+        shared_dir = r"D:\LAN-AI-Infra\SharedDocs\audio"
+        for d in [public_dir, shared_dir]:
+            os.makedirs(d, exist_ok=True)
+            
+        pub_path = os.path.join(public_dir, output_filename)
+        shared_path = os.path.join(shared_dir, output_filename)
+        clean_text = text.replace('"', '').strip()[:2500]
+
+        # 1. Try High-Quality Neural TTS
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(clean_text, voice)
+            asyncio.run(communicate.save(pub_path))
+            if os.path.exists(pub_path) and os.path.getsize(pub_path) > 1000:
+                shutil.copy2(pub_path, shared_path)
+                size_kb = round(os.path.getsize(pub_path) / 1024, 1)
+                return (
+                    f"🔊 **Cinema-Grade Neural Audio Generated!**\n"
+                    f"- **Web URL**: `/motion/{output_filename}`\n"
+                    f"- **Local Path**: `{shared_path}`\n"
+                    f"- **Voice**: {voice}\n"
+                    f"- **Size**: {size_kb} KB\n"
+                    f"- **Playback Ready**: You can embed `<audio src=\"/motion/{output_filename}\" autoplay controls></audio>` inside any OpenFilm or Motion artifact."
+                )
+        except Exception as neural_err:
+            pass
+
+        # 2. Fallback to Windows SAPI SpeechSynthesizer if offline or network unavailable
+        wav_filename = os.path.splitext(output_filename)[0] + ".wav"
+        out_wav = os.path.join(shared_dir, wav_filename)
+        sapi_text = clean_text.replace("'", "").replace("\n", " ")[:1000]
         script = f"""
 Add-Type -AssemblyName System.Speech
 $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$speaker.SetOutputToWaveFile('{out_path}')
-$speaker.Speak('{clean_text}')
+$speaker.SetOutputToWaveFile('{out_wav}')
+$speaker.Speak('{sapi_text}')
 $speaker.Dispose()
 """
-        script_file = os.path.join(target_dir, "_synth.ps1")
+        script_file = os.path.join(shared_dir, "_synth.ps1")
         with open(script_file, "w", encoding="utf-8") as f:
             f.write(script)
             
         res = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", script_file], capture_output=True, text=True, timeout=15)
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
-            size_kb = round(os.path.getsize(out_path) / 1024, 1)
-            return f"🔊 **Offline Audio Generated Successfully!**\n- **File Path**: `{out_path}`\n- **Audio Size**: {size_kb} KB\n- **Engine**: Windows SAPI Offline Neural Engine (Zero external network egress)"
+        if os.path.exists(out_wav) and os.path.getsize(out_wav) > 1000:
+            shutil.copy2(out_wav, os.path.join(public_dir, wav_filename))
+            size_kb = round(os.path.getsize(out_wav) / 1024, 1)
+            return (
+                f"🔊 **Offline Audio Generated Successfully!**\n"
+                f"- **Web URL**: `/motion/{wav_filename}`\n"
+                f"- **Local Path**: `{out_wav}`\n"
+                f"- **Size**: {size_kb} KB\n"
+                f"- **Engine**: Windows SAPI Offline Engine"
+            )
         return f"Speech synthesis completed with exit code {res.returncode}, but file was not created. Error: {res.stderr}"
     except Exception as e:
         return f"Error generating speech audio: {str(e)}"

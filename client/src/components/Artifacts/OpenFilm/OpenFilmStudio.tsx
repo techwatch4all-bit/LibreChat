@@ -26,11 +26,27 @@ import { useLocalize } from '~/hooks';
 
 export const SATCHIDA_FILM_MIME = 'application/vnd.satchida.film' as const;
 
-export function isFilmArtifact(type?: string): boolean {
+export function isFilmArtifact(type?: string, content?: string): boolean {
   if (!type) {
     return false;
   }
-  return type === SATCHIDA_FILM_MIME || type === 'application/vnd.librechat.film';
+  if (
+    type === SATCHIDA_FILM_MIME ||
+    type === 'application/vnd.librechat.film' ||
+    type === 'film' ||
+    type === 'video'
+  ) {
+    return true;
+  }
+  if (
+    content &&
+    (content.includes('window.film') ||
+      content.includes('<section data-track=') ||
+      content.includes('data-openfilm'))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 interface OpenFilmStudioProps {
@@ -72,7 +88,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   // Source film HTML: from current editor state, or artifact content, or fallback demo
   const rawFilmContent = useMemo(() => {
     const raw = (currentCode || artifact.content || '').trim();
-    if (raw.length > 0) {
+    if (raw.length > 0 && (raw.includes('</script>') || raw.includes('</html>')) && (raw.includes('window.film') || raw.includes('requestAnimationFrame') || raw.includes('renderer.render'))) {
       return raw;
     }
     // High-yield fallback Satchida Motion Studio template
@@ -386,7 +402,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       <style>
         html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; height: 100% !important; overflow: hidden !important; background: #000 !important; }
         canvas { width: 100% !important; height: 100% !important; object-fit: contain !important; }
-        #controls, #scrubber, .hint, #satchida-controls, #btn-play, #btn-restart, .playback-bar { display: none !important; }
+        #controls, #scrubber, .hint, #satchida-controls, #btn-play, #btn-restart, .playback-bar, #veil, #hud, #bar { display: none !important; }
       </style>
       <script>
         window.film = window.film || {};

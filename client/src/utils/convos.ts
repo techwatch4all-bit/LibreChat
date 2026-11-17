@@ -99,6 +99,49 @@ const getConversationDate = (
   return dateValue ? parseISO(dateValue) : fallbackDate;
 };
 
+/**
+ * Formats a conversation timestamp for sidebar row display.
+ * Shows time (e.g., 2:30 PM) for today, short date (e.g., Nov 14) for this year,
+ * or month/day/year (e.g., Nov 14, 2025) for previous years.
+ */
+export const formatConversationTimestamp = (
+  dateStr?: string | Date | null,
+  locale?: string,
+  hour12?: boolean,
+): string => {
+  if (!dateStr) {
+    return '';
+  }
+  const date = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
+  const now = new Date();
+  const safeLocale = locale && locale !== 'auto' ? locale : undefined;
+
+  if (isToday(date)) {
+    return new Intl.DateTimeFormat(safeLocale, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12,
+    }).format(date);
+  }
+
+  if (date.getFullYear() === now.getFullYear()) {
+    return new Intl.DateTimeFormat(safeLocale, {
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(safeLocale, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+};
+
 /** A title's own initial, as a code point: `charAt(0)` on a supplementary-plane letter
  *  returns half a surrogate pair, which renders as a replacement character and collapses
  *  unrelated initials into one heading. Non-letters share a single `#` group. The case is

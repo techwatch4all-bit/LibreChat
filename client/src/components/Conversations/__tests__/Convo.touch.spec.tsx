@@ -20,6 +20,7 @@ jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string) => key,
   useNavigateToConvo: () => ({ navigateToConvo: jest.fn() }),
   useShiftKey: () => false,
+  useClockFormat: () => true,
 }));
 
 jest.mock('~/data-provider', () => ({
@@ -44,6 +45,7 @@ jest.mock('~/store', () => ({
 jest.mock('~/utils', () => ({
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
   logger: { error: jest.fn() },
+  formatConversationTimestamp: () => '10:00 AM',
 }));
 
 jest.mock('../ConvoOptions', () => ({

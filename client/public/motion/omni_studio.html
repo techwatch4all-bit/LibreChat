@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satchida Omni-Motion Studio — Universal Photorealistic Motion Generator</title>
+  <style>
+    :root {
+      --bg: #05070d;
+      --panel: rgba(10, 14, 24, 0.88);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.35);
+      --green: #10b981;
+      --gold: #f59e0b;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      user-select: none;
+    }
+
+    body.pseudo-fullscreen {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 999999 !important;
+    }
+
+    /* Primary Render Viewport */
+    #viewport-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* 3D WebGL Canvas */
+    #gl-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 2;
+    }
+
+    /* AI Video Diffusion Player */
+    #ai-video-player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 3;
+    }
+
+    /* 2.5D Parallax Photo Canvas */
+    #parallax-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      z-index: 4;
+    }
+
+    /* Cinematic Film Vignette & Grade */
+    .cinema-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      background: radial-gradient(circle at center, transparent 40%, rgba(3,5,10,0.55) 88%),
+                  linear-gradient(to bottom, rgba(3,5,10,0.65) 0%, transparent 12%, transparent 88%, rgba(3,5,10,0.85) 100%);
+    }
+
+    /* Start / Unmute Modal */
+    #start-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      background: rgba(3, 5, 10, 0.88);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      text-align: center;
+      padding: 24px;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+    }
+    #start-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .start-card {
+      background: rgba(12, 17, 30, 0.96);
+      border: 2px solid var(--accent);
+      border-radius: 22px;
+      padding: 36px 48px;
+      max-width: 580px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 50px var(--accent-glow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .big-launch-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #03050a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 900;
+      box-shadow: 0 0 35px var(--accent);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .start-card:hover .big-launch-btn { transform: scale(1.1); }
+
+    /* Top Studio Header */
+    header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(3, 5, 10, 0.95), rgba(3, 5, 10, 0.6) 70%, transparent);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .specs-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      border: 1px solid var(--panel-border);
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: rgba(0,0,0,0.4);
+      font-weight: 600;
+    }
+
+    /* Director's Studio Sidebar / Panel */
+    .studio-panel {
+      position: absolute;
+      top: 85px;
+      right: 20px;
+      z-index: 30;
+      width: 320px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+    .studio-panel::-webkit-scrollbar { width: 4px; }
+    .studio-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+    .panel-section-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .chip-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      color: var(--text-muted);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    .chip-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .chip-btn.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+
+    /* Prompt Bar at the Center-Bottom */
+    .prompt-bar-container {
+      position: absolute;
+      bottom: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      width: min(720px, calc(100vw - 40px));
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 6px 10px 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    }
+    .prompt-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .prompt-input::placeholder { color: #64748b; }
+    .prompt-submit-btn {
+      background: var(--accent);
+      color: #03050a;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .prompt-submit-btn:hover { filter: brightness(1.15); transform: scale(1.02); }
+
+    /* Audio Equalizer Spectrum Display */
+    .audio-eq-hud {
+      position: absolute;
+      bottom: 95px;
+      left: 20px;
+      z-index: 30;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 52px;
+      width: 200px;
+    }
+    .eq-bar {
+      flex: 1;
+      background: linear-gradient(to top, #10b981, #38bdf8);
+      border-radius: 2px;
+      min-height: 4px;
+      transition: height 0.06s ease;
+    }
+    .eq-meta {
+      position: absolute;
+      top: 6px;
+      left: 14px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--green);
+    }
+
+    /* Bottom Control Bar */
+    footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: linear-gradient(to top, rgba(3, 5, 10, 0.98), rgba(3, 5, 10, 0.8) 70%, transparent);
+      padding: 14px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .timeline-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+    .progress-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #38bdf8, #10b981);
+      border-radius: 3px;
+    }
+    .time-badge {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      min-width: 120px;
+      text-align: right;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .left-controls, .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(255,255,255,0.15); }
+    .btn-primary { background: #0284c7; border-color: #38bdf8; }
+    .btn-green { background: #059669; border-color: #34d399; }
+    .vol-slider { width: 85px; accent-color: var(--accent); cursor: pointer; }
+
+    #toast-notice {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      background: rgba(12, 17, 30, 0.96);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    #toast-notice.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(4px);
+    }
+  </style>
+  <script src="/assets/vendor/three/three.min.js"></script>
+</head>
+<body>
+
+  <div id="toast-notice">🔔 <span>Notification</span></div>
+
+  <!-- Start Experience Modal -->
+  <div id="start-overlay" onclick="startOmniStudio()">
+    <div class="start-card">
+      <div class="big-launch-btn">🎬</div>
+      <h2 style="font-size: 24px; font-weight: 800; color: #fff;">Satchida Omni-Motion Studio</h2>
+      <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5;">
+        Universal Photorealistic Motion Generator. Switch dynamically between <b>AI Video Diffusion</b>, <b>Interactive Real-Time 3D</b>, and <b>2.5D Volumetric Parallax</b> across City, Underwater, Aerial Drone, and Cosmic worlds.
+      </p>
+      <button class="btn btn-green" style="padding: 12px 30px; font-size: 15px; font-weight: 700;">
+        🔊 Enter Studio & Enable Audio
+      </button>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge" id="engine-badge"><span class="badge-dot"></span> OPTION A: AI DIFFUSION</span>
+          <span class="specs-tag" id="env-badge">CITY METROPOLIS</span>
+          <span class="specs-tag" id="cam-badge">DRONE ORBIT</span>
+          <span class="specs-tag">60 FPS MASTER</span>
+        </div>
+        <h1 style="font-size: 17px; font-weight: 800; color: #fff; margin-top: 2px;">
+          Satchida Omni-Motion Studio
+        </h1>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn" id="test-beep-btn" onclick="testSpeakerChime()">🔔 Test Speaker Output</button>
+      <button class="btn btn-primary" onclick="toggleSidebar()">🎛️ Director Controls</button>
+    </div>
+  </header>
+
+  <!-- Viewport Area -->
+  <div id="viewport-container">
+    <canvas id="gl-canvas"></canvas>
+    <video id="ai-video-player" loop playsinline preload="auto" src="/motion/metropolis_photo_cinematic_master.mp4"></video>
+    <canvas id="parallax-canvas"></canvas>
+    <div class="cinema-vignette"></div>
+  </div>
+
+  <!-- Director's Studio Sidebar -->
+  <div class="studio-panel" id="studio-panel">
+    <!-- Engine Choice -->
+    <div>
+      <div class="panel-section-title">⚡ GENERATION ENGINE</div>
+      <div class="chip-grid">
+        <button class="chip-btn active" id="eng-ai" onclick="selectEngine('ai_diffusion')">
+          <span>🌟</span> Option A: AI Video
+        </button>
+        <button class="chip-btn" id="eng-3d" onclick="selectEngine('realtime_3d')">
+          <span>🕹️</span> Option B: Real-Time 3D
+        </button>
+        <button class="chip-btn" id="eng-25d" onclick="selectEngine('parallax_25d')" style="grid-column: span 2;">
+          <span>📸</span> Option C: 2.5D Photo Parallax
+        </button>
+      </div>
+    </div>
+
+    <!-- Environment Choice -->
+    <div>
+      <div class="panel-section-title">🌍 ENVIRONMENT ARCHETYPE</div>
+      <div class="chip-grid">
+        <button class="chip-btn active" id="env-nature" onclick="selectEnvironment('nature')">
+          <span>🌲</span> Alpine Nature Valley
+        </button>
+        <button class="chip-btn" id="env-city" onclick="selectEnvironment('city')">
+          <span>🏙️</span> City Night Neon
+        </button>
+        <button class="chip-btn" id="env-ocean" onclick="selectEnvironment('underwater')">
+          <span>🌊</span> Deep Underwater
+        </button>
+        <button class="chip-btn" id="env-sky" onclick="selectEnvironment('sky_aerial')">
+          <span>⛅</span> Aerial Stratosphere
+        </button>
+        <button class="chip-btn" id="env-space" onclick="selectEnvironment('cosmic')">
+          <span>🌌</span> Cosmic Orbit
+        </button>
+      </div>
+    </div>
+
+    <!-- Camera Motion Mode -->
+    <div>
+      <div class="panel-section-title">🎥 CAMERA MOTION CONTROL</div>
+      <div class="chip-grid">
+        <button class="chip-btn active" id="cam-drone" onclick="selectCamera('fpv_drone')">
+          <span>🚁</span> FPV Drone Orbit
+        </button>
+        <button class="chip-btn" id="cam-dolly" onclick="selectCamera('dolly_track')">
+          <span>🎬</span> Cine Dolly Push
+        </button>
+        <button class="chip-btn" id="cam-crane" onclick="selectCamera('crane_boom')">
+          <span>🏗️</span> High Crane Jib
+        </button>
+        <button class="chip-btn" id="cam-eye" onclick="selectCamera('street_eye')">
+          <span>👁️</span> Ground Eye / Walk
+        </button>
+      </div>
+    </div>
+
+    <!-- Audio Soundtrack Profile -->
+    <div>
+      <div class="panel-section-title">🎵 AUDIO SOUNDTRACK</div>
+      <div class="chip-grid">
+        <button class="chip-btn active" id="snd-nature" onclick="selectAudioTrack('ambient_nature')">
+          <span>🍃</span> Alpine Birds & River
+        </button>
+        <button class="chip-btn" id="snd-lofi" onclick="selectAudioTrack('city_lofi')">
+          <span>📻</span> Lo-Fi City Beat
+        </button>
+        <button class="chip-btn" id="snd-ocean" onclick="selectAudioTrack('ambient_ocean')">
+          <span>🫧</span> Submerged Abyss
+        </button>
+        <button class="chip-btn" id="snd-sky" onclick="selectAudioTrack('stratosphere_wind')">
+          <span>🌬️</span> Aerial Wind Drone
+        </button>
+        <button class="chip-btn" id="snd-synth" onclick="selectAudioTrack('celestial_synth')">
+          <span>✨</span> Celestial Chords
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Command Bar -->
+  <div class="prompt-bar-container">
+    <span style="font-size: 16px;">✨</span>
+    <input type="text" id="prompt-input" class="prompt-input" placeholder="Describe any scene, motion or camera trajectory... (e.g., 'Bioluminescent deep sea turtle dive with volumetric sun rays')" value="City metropolis night boulevard with flowing two-way traffic and FPV drone orbit">
+    <button class="prompt-submit-btn" onclick="executePrompt()">Generate Motion</button>
+  </div>
+
+  <!-- Audio Equalizer Spectrum Display -->
+  <div class="audio-eq-hud">
+    <div class="eq-meta" id="eq-title">AUDIO: ACTIVE</div>
+    <div class="eq-bar" id="eq-0"></div>
+    <div class="eq-bar" id="eq-1"></div>
+    <div class="eq-bar" id="eq-2"></div>
+    <div class="eq-bar" id="eq-3"></div>
+    <div class="eq-bar" id="eq-4"></div>
+    <div class="eq-bar" id="eq-5"></div>
+    <div class="eq-bar" id="eq-6"></div>
+    <div class="eq-bar" id="eq-7"></div>
+    <div class="eq-bar" id="eq-8"></div>
+    <div class="eq-bar" id="eq-9"></div>
+    <div class="eq-bar" id="eq-10"></div>
+    <div class="eq-bar" id="eq-11"></div>
+    <div class="eq-bar" id="eq-12"></div>
+    <div class="eq-bar" id="eq-13"></div>
+    <div class="eq-bar" id="eq-14"></div>
+    <div class="eq-bar" id="eq-15"></div>
+    <div class="eq-bar" id="eq-16"></div>
+    <div class="eq-bar" id="eq-17"></div>
+  </div>
+
+  <!-- Bottom Playback Deck -->
+  <footer>
+    <div class="timeline-container">
+      <div class="progress-bar-bg" id="progress-bar-bg" onclick="seekTimeline(event)">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="time-badge" id="timecode">00:00.00 / 00:10.00</div>
+    </div>
+
+    <div class="controls-row">
+      <div class="left-controls">
+        <button class="btn btn-primary" id="play-btn" onclick="togglePlayPause()">
+          <span id="play-icon">⏸ Pause</span>
+        </button>
+        <button class="btn btn-green" id="audio-toggle-btn" onclick="toggleMuteState()">
+          <span id="audio-btn-icon">🔊 Sound On</span>
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; color: var(--text-muted);">VOL</span>
+          <input type="range" id="vol-slider" class="vol-slider" min="0" max="1" step="0.05" value="0.85" oninput="setStudioVolume(this.value)">
+        </div>
+      </div>
+
+      <div class="right-controls">
+        <span class="specs-tag" id="active-status-tag">ENGINE: OPTION A (AI DIFFUSION)</span>
+        <button class="btn" id="fullscreen-btn" onclick="toggleFullscreenStudio()">⛶ Fullscreen</button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ------------------------------------------------------------------------
+    // STUDIO STATE MANAGEMENT
+    // ------------------------------------------------------------------------
+    let state = {
+      engine: 'ai_diffusion',     // 'ai_diffusion' | 'realtime_3d' | 'parallax_25d'
+      environment: 'city',        // 'city' | 'underwater' | 'sky_aerial' | 'cosmic'
+      camera: 'fpv_drone',        // 'fpv_drone' | 'dolly_track' | 'crane_boom' | 'street_eye'
+      audioTrack: 'city_lofi',    // 'city_lofi' | 'ambient_ocean' | 'stratosphere_wind' | 'celestial_synth'
+      isPlaying: false,
+      isMuted: false,
+      volume: 0.85,
+      currentTime: 0,
+      duration: 10.0
+    };
+
+    // DOM Elements
+    const aiVideo = document.getElementById('ai-video-player');
+    const glCanvas = document.getElementById('gl-canvas');
+    const parallaxCanvas = document.getElementById('parallax-canvas');
+    const startOverlay = document.getElementById('start-overlay');
+    const toastNotice = document.getElementById('toast-notice');
+    const playIcon = document.getElementById('play-icon');
+    const audioBtnIcon = document.getElementById('audio-btn-icon');
+    const volSlider = document.getElementById('vol-slider');
+    const progressFill = document.getElementById('progress-fill');
+    const progressBarBg = document.getElementById('progress-bar-bg');
+    const timecode = document.getElementById('timecode');
+    const engineBadge = document.getElementById('engine-badge');
+    const envBadge = document.getElementById('env-badge');
+    const camBadge = document.getElementById('cam-badge');
+    const activeStatusTag = document.getElementById('active-status-tag');
+    const promptInput = document.getElementById('prompt-input');
+
+    // First-Person Interactive Head-Look Tracking
+    let targetYaw = 0;
+    let targetPitch = 0;
+    let currentYaw = 0;
+    let currentPitch = 0;
+
+    window.addEventListener('mousemove', (e) => {
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = -(e.clientY / window.innerHeight) * 2 + 1;
+      targetYaw = -nx * 0.95;   // ±55° head look horizontal
+      targetPitch = ny * 0.55;  // ±30° head look vertical
+    });
+
+    // ------------------------------------------------------------------------
+    // WEB AUDIO SOUND SYNTHESIZER & MULTI-TRACK ENGINE
+    // ------------------------------------------------------------------------
+    let audioCtx = null;
+    let masterGain = null;
+    let synthNodes = [];
+    let eqInterval = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(state.volume, audioCtx.currentTime);
+        masterGain.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function testSpeakerChime() {
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+      osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.2); // C6
+      gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+      showToast('🔊 Speaker Chime Emitted (523Hz - 1046Hz)');
+    }
+
+    function stopSynthAudio() {
+      synthNodes.forEach(node => {
+        try { node.stop(); } catch(e){}
+        try { node.disconnect(); } catch(e){}
+      });
+      synthNodes = [];
+    }
+
+    function startSynthEnvironment(type) {
+      if (!audioCtx || state.isMuted) return;
+      stopSynthAudio();
+
+      const now = audioCtx.currentTime;
+      if (type === 'ambient_nature') {
+        // High-fidelity natural soundscape: flowing mountain stream + pine breeze + birdsong
+        // 1. Mountain Brook Water Stream (Pink-ish filtered noise)
+        const bufferSize = audioCtx.sampleRate * 2;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          output[i] = (b0 + b1 + b2) * 0.15;
+        }
+        const streamSource = audioCtx.createBufferSource();
+        streamSource.buffer = noiseBuffer;
+        streamSource.loop = true;
+
+        const streamFilter = audioCtx.createBiquadFilter();
+        streamFilter.type = 'bandpass';
+        streamFilter.frequency.setValueAtTime(650, now);
+        streamFilter.Q.setValueAtTime(2.2, now);
+
+        const streamGain = audioCtx.createGain();
+        streamGain.gain.setValueAtTime(0.18 * state.volume, now);
+
+        streamSource.connect(streamFilter);
+        streamFilter.connect(streamGain);
+        streamGain.connect(masterGain);
+        streamSource.start();
+        synthNodes.push(streamSource);
+
+        // 2. Soft Ambient Nature Harmony Pad (warm D-major9th chords)
+        [146.83, 220.00, 277.18, 329.63, 440.00].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime((0.04 / (i + 1)) * state.volume, now);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start();
+          synthNodes.push(osc);
+        });
+
+        // 3. Generative Bird Chirp Engine
+        const chirpInterval = setInterval(() => {
+          if (!audioCtx || state.isMuted || state.audioTrack !== 'ambient_nature') {
+            clearInterval(chirpInterval);
+            return;
+          }
+          const t = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          const baseFreq = 1800 + Math.random() * 1200;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(baseFreq, t);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * (1.1 + Math.random() * 0.3), t + 0.06);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, t + 0.14);
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.12 * state.volume, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          osc.connect(g);
+          g.connect(masterGain);
+          osc.start(t);
+          osc.stop(t + 0.18);
+        }, 3200);
+
+      } else if (type === 'ambient_ocean') {
+        // Deep resonant ocean sub-bass + water filter
+        const osc = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(55, now); // A1 sub
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(180, now);
+
+        gain.gain.setValueAtTime(0.25 * state.volume, now);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        synthNodes.push(osc);
+      } else if (type === 'stratosphere_wind') {
+        // High altitude filtered wind drone
+        const osc = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(110, now);
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(450, now);
+        filter.Q.setValueAtTime(4, now);
+
+        gain.gain.setValueAtTime(0.2 * state.volume, now);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        synthNodes.push(osc);
+      } else if (type === 'celestial_synth') {
+        // Ethereal fifth chords
+        [220, 330, 440].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime((0.08 / (i + 1)) * state.volume, now);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start();
+          synthNodes.push(osc);
+        });
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // THREE.JS REAL-TIME 3D MULTI-ENVIRONMENT ENGINE
+    // ------------------------------------------------------------------------
+    let scene, camera, renderer;
+    let envGroup = null;
+    let animFrameId = null;
+
+    function initThreeEngine() {
+      if (renderer) return;
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
+      renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+
+      buildEnvironment(state.environment);
+      animateThree();
+    }
+
+    function buildEnvironment(envType) {
+      if (!scene) return;
+      if (envGroup) scene.remove(envGroup);
+      envGroup = new THREE.Group();
+      scene.add(envGroup);
+
+      if (envType === 'nature') {
+        scene.fog = new THREE.FogExp2(0x8ba6ba, 0.0035);
+        scene.background = new THREE.Color(0x9fc0d6);
+
+        // Sun & Atmospheric Lighting
+        const sunLight = new THREE.DirectionalLight(0xfff6dc, 2.8);
+        sunLight.position.set(80, 140, 100);
+        envGroup.add(sunLight);
+
+        const ambLight = new THREE.AmbientLight(0xdbeafe, 1.3);
+        envGroup.add(ambLight);
+
+        // Procedural Rolling Terrain with River Valley
+        const terrainGeo = new THREE.PlaneGeometry(600, 600, 48, 48);
+        const pos = terrainGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const y = pos.getY(i);
+          const distFromRiver = Math.abs(x + Math.sin(y * 0.02) * 20);
+          const valleyDepth = Math.max(0, 1 - distFromRiver / 45);
+          const mountainElev = (Math.sin(x * 0.015) * Math.cos(y * 0.015) * 45) + (Math.sin(x * 0.03 + y * 0.02) * 15);
+          const z = Math.max(-10, (mountainElev * (1 - valleyDepth * 0.8)) - (valleyDepth * 8));
+          pos.setZ(i, z);
+        }
+        terrainGeo.computeVertexNormals();
+        const terrainMat = new THREE.MeshStandardMaterial({
+          color: 0x2d4f28,
+          roughness: 0.85,
+          metalness: 0.05,
+          flatShading: true
+        });
+        const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+        terrain.rotation.x = -Math.PI / 2;
+        terrain.position.y = -2;
+        envGroup.add(terrain);
+
+        // Flowing Specular River
+        const riverGeo = new THREE.PlaneGeometry(36, 600, 8, 32);
+        const riverMat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          roughness: 0.15,
+          metalness: 0.85,
+          transparent: true,
+          opacity: 0.88
+        });
+        const river = new THREE.Mesh(riverGeo, riverMat);
+        river.rotation.x = -Math.PI / 2;
+        river.position.y = 0.5;
+        envGroup.add(river);
+        envGroup.userData.river = river;
+
+        // Distant High Snow-Capped Alpine Mountain Peaks
+        // Distant High Snow-Capped Alpine Mountain Peaks (Procedural Ridge Tessellation)
+        const peakGeo = new THREE.CylinderGeometry(8, 90, 180, 16, 8);
+        const ppos = peakGeo.attributes.position;
+        for (let pi = 0; pi < ppos.count; pi++) {
+          const py = ppos.getY(pi);
+          const px = ppos.getX(pi);
+          const pz = ppos.getZ(pi);
+          const ridge = Math.sin(px * 0.08) * Math.cos(pz * 0.08) * 14;
+          ppos.setX(pi, px + ridge * 0.5);
+          ppos.setZ(pi, pz + ridge * 0.5);
+        }
+        peakGeo.computeVertexNormals();
+        const peakMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85, flatShading: true });
+        const snowMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4, flatShading: true });
+
+        [[-170, -250, 1.3], [-60, -290, 1.6], [80, -270, 1.5], [190, -240, 1.2]].forEach(([px, pz, s]) => {
+          const mountain = new THREE.Mesh(peakGeo, peakMat);
+          mountain.scale.set(s, s, s);
+          mountain.position.set(px, 80 * s, pz);
+
+          const snow = new THREE.Mesh(new THREE.ConeGeometry(90 * 0.45, 180 * 0.45, 16), snowMat);
+          snow.position.set(0, 180 * 0.28, 0);
+          mountain.add(snow);
+
+          envGroup.add(mountain);
+        });
+
+        // Dense Natural Conifer Forest Clusters
+        const treeGroup = new THREE.Group();
+        const trunkGeo = new THREE.CylinderGeometry(0.4, 0.7, 4, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3f2e1e, roughness: 0.9 });
+        const foliageGeo1 = new THREE.ConeGeometry(3.8, 7.5, 12);
+        const foliageGeo2 = new THREE.ConeGeometry(2.8, 6.0, 12);
+        const foliageGeo3 = new THREE.ConeGeometry(1.8, 4.5, 12);
+        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x144522, roughness: 0.8, flatShading: true });
+
+        for (let i = 0; i < 110; i++) {
+          const side = (i % 2 === 0 ? 1 : -1);
+          const tx = side * (24 + Math.random() * 120);
+          const tz = (Math.random() - 0.5) * 460;
+          const ts = 0.75 + Math.random() * 0.65;
+
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+          trunk.position.y = 2 * ts;
+          tree.add(trunk);
+
+          const f1 = new THREE.Mesh(foliageGeo1, foliageMat);
+          f1.position.y = 5.2 * ts;
+          tree.add(f1);
+
+          const f2 = new THREE.Mesh(foliageGeo2, foliageMat);
+          f2.position.y = 8.0 * ts;
+          tree.add(f2);
+
+          const f3 = new THREE.Mesh(foliageGeo3, foliageMat);
+          f3.position.y = 10.6 * ts;
+          tree.add(f3);
+
+          tree.scale.set(ts, ts, ts);
+          tree.position.set(tx, 0, tz);
+          treeGroup.add(tree);
+        }
+        envGroup.add(treeGroup);
+
+        // Soaring Birds / Eagles Flock
+        const birdGroup = new THREE.Group();
+        const wingMat = new THREE.MeshBasicMaterial({ color: 0x1e293b, side: THREE.DoubleSide });
+        for (let b = 0; b < 7; b++) {
+          const bird = new THREE.Group();
+          const leftWing = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.7), wingMat);
+          leftWing.position.x = -1.1;
+          leftWing.rotation.x = Math.PI / 2;
+          const rightWing = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.7), wingMat);
+          rightWing.position.x = 1.1;
+          rightWing.rotation.x = Math.PI / 2;
+          bird.add(leftWing);
+          bird.add(rightWing);
+          bird.userData = { lw: leftWing, rw: rightWing, phase: Math.random() * Math.PI * 2, speed: 18 + Math.random() * 8 };
+          bird.position.set((Math.random() - 0.5) * 80, 35 + Math.random() * 20, (Math.random() - 0.5) * 120);
+          birdGroup.add(bird);
+        }
+        envGroup.add(birdGroup);
+        envGroup.userData.birdGroup = birdGroup;
+
+      } else if (envType === 'city') {
+        scene.fog = new THREE.FogExp2(0x060914, 0.0035);
+        scene.background = new THREE.Color(0x050811);
+
+        // Ambient & Directional Lights
+        const amb = new THREE.AmbientLight(0x223355, 1.2);
+        envGroup.add(amb);
+        const dir = new THREE.DirectionalLight(0x38bdf8, 1.5);
+        dir.position.set(50, 120, 50);
+        envGroup.add(dir);
+
+        // Asphalt Ground
+        const roadGeo = new THREE.PlaneGeometry(120, 800);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.35, metalness: 0.2 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        envGroup.add(road);
+
+        // Skyscrapers along street
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        for (let i = -10; i <= 10; i++) {
+          [-45, 45].forEach(sideX => {
+            const h = 60 + Math.random() * 140;
+            const mat = new THREE.MeshStandardMaterial({
+              color: 0x090e1a,
+              roughness: 0.2,
+              metalness: 0.8,
+              emissive: Math.random() > 0.4 ? 0x0ea5e9 : 0xf43f5e,
+              emissiveIntensity: Math.random() * 0.4
+            });
+            const bldg = new THREE.Mesh(boxGeo, mat);
+            bldg.scale.set(24 + Math.random() * 10, h, 28);
+            bldg.position.set(sideX, h / 2, i * 36);
+            envGroup.add(bldg);
+          });
+        }
+
+        // Vehicles & Headlight Beams
+        const carGroup = new THREE.Group();
+        for (let i = 0; i < 16; i++) {
+          const isLeftLane = i % 2 === 0;
+          const carMat = new THREE.MeshStandardMaterial({
+            color: isLeftLane ? 0x1e293b : 0x991b1b,
+            metalness: 0.9,
+            roughness: 0.15
+          });
+          const carMesh = new THREE.Mesh(boxGeo, carMat);
+          carMesh.scale.set(3.2, 1.6, 6.0);
+          carMesh.position.set(isLeftLane ? -8 - (i % 3) * 4 : 8 + (i % 3) * 4, 1.0, (i - 8) * 40);
+
+          // Headlight / Taillight glow
+          const lightGeo = new THREE.SphereGeometry(0.35, 8, 8);
+          const lightMat = new THREE.MeshBasicMaterial({ color: isLeftLane ? 0xe0f2fe : 0xef4444 });
+          const lightMesh = new THREE.Mesh(lightGeo, lightMat);
+          lightMesh.position.set(0, 0, isLeftLane ? 3.1 : -3.1);
+          carMesh.add(lightMesh);
+
+          carGroup.add(carMesh);
+        }
+        envGroup.add(carGroup);
+        envGroup.userData.carGroup = carGroup;
+
+      } else if (envType === 'underwater') {
+        scene.fog = new THREE.FogExp2(0x02162e, 0.015);
+        scene.background = new THREE.Color(0x021124);
+
+        const amb = new THREE.AmbientLight(0x064e3b, 1.5);
+        envGroup.add(amb);
+        const topLight = new THREE.DirectionalLight(0x38bdf8, 2.5);
+        topLight.position.set(0, 100, 0);
+        envGroup.add(topLight);
+
+        // Seabed with wave dunes
+        const sandGeo = new THREE.PlaneGeometry(300, 300, 32, 32);
+        const pos = sandGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const u = pos.getX(i);
+          const v = pos.getY(i);
+          pos.setZ(i, Math.sin(u * 0.1) * 3 + Math.cos(v * 0.1) * 2);
+        }
+        sandGeo.computeVertexNormals();
+        const sandMat = new THREE.MeshStandardMaterial({ color: 0x042f2e, roughness: 0.8 });
+        const sand = new THREE.Mesh(sandGeo, sandMat);
+        sand.rotation.x = -Math.PI / 2;
+        sand.position.y = -20;
+        envGroup.add(sand);
+
+        // Marine Snow Floating Particles
+        const partGeo = new THREE.BufferGeometry();
+        const partCount = 1200;
+        const partPositions = new Float32Array(partCount * 3);
+        for (let i = 0; i < partCount * 3; i += 3) {
+          partPositions[i] = (Math.random() - 0.5) * 160;
+          partPositions[i + 1] = Math.random() * 80 - 15;
+          partPositions[i + 2] = (Math.random() - 0.5) * 160;
+        }
+        partGeo.setAttribute('position', new THREE.BufferAttribute(partPositions, 3));
+        const partMat = new THREE.PointsMaterial({ color: 0x67e8f9, size: 0.7, transparent: true, opacity: 0.7 });
+        const particles = new THREE.Points(partGeo, partMat);
+        envGroup.add(particles);
+        envGroup.userData.particles = particles;
+
+      } else if (envType === 'sky_aerial') {
+        scene.fog = new THREE.FogExp2(0x38bdf8, 0.002);
+        scene.background = new THREE.Color(0x0284c7);
+
+        const sunLight = new THREE.DirectionalLight(0xfef08a, 3.0);
+        sunLight.position.set(100, 80, -100);
+        envGroup.add(sunLight);
+        envGroup.add(new THREE.AmbientLight(0xbae6fd, 1.8));
+
+        // Procedural Volumetric Cloud Layer
+        const cloudGeo = new THREE.DodecahedronGeometry(12, 1);
+        const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.85 });
+        const cloudGroup = new THREE.Group();
+        for (let i = 0; i < 40; i++) {
+          const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+          cloud.scale.set(1 + Math.random() * 2, 0.6 + Math.random() * 0.8, 1 + Math.random() * 2);
+          cloud.position.set((Math.random() - 0.5) * 400, Math.random() * 30 - 10, (Math.random() - 0.5) * 400);
+          cloudGroup.add(cloud);
+        }
+        envGroup.add(cloudGroup);
+        envGroup.userData.cloudGroup = cloudGroup;
+
+      } else if (envType === 'cosmic') {
+        scene.fog = null;
+        scene.background = new THREE.Color(0x010206);
+
+        // Sun
+        const sun = new THREE.DirectionalLight(0xffffff, 3.5);
+        sun.position.set(250, 50, 150);
+        envGroup.add(sun);
+        envGroup.add(new THREE.AmbientLight(0x1e293b, 0.5));
+
+        // Earth Sphere
+        const earthGeo = new THREE.SphereGeometry(60, 48, 48);
+        const earthMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.6, metalness: 0.1 });
+        const earth = new THREE.Mesh(earthGeo, earthMat);
+        earth.position.set(0, -50, -100);
+        envGroup.add(earth);
+        envGroup.userData.earth = earth;
+      }
+    }
+
+    function animateThree() {
+      animFrameId = requestAnimationFrame(animateThree);
+      const time = performance.now() * 0.001;
+
+      // Camera Trajectories based on state.camera
+      if (state.camera === 'fpv_drone') {
+        const radius = 65;
+        camera.position.x = Math.sin(time * 0.4) * radius;
+        camera.position.z = Math.cos(time * 0.4) * radius;
+        camera.position.y = 22 + Math.sin(time * 0.6) * 12;
+        camera.lookAt(0, 5, 0);
+      } else if (state.camera === 'dolly_track') {
+        camera.position.set(0, 6, 80 - (time * 12 % 160));
+        camera.lookAt(0, 5, -100);
+      } else if (state.camera === 'crane_boom') {
+        camera.position.set(Math.sin(time * 0.2) * 20, 12 + (Math.sin(time * 0.5) * 0.5 + 0.5) * 55, 70);
+        camera.lookAt(0, 10, 0);
+      } else if (state.camera === 'street_eye') {
+        currentYaw += (targetYaw - currentYaw) * 0.08;
+        currentPitch += (targetPitch - currentPitch) * 0.08;
+
+        if (state.environment === 'nature') {
+          // First-person walking along riverbank with realistic head-bob
+          const walkZ = 40 - (time * 6.0 % 160);
+          const headBob = 2.0 + Math.sin(time * 5.0) * 0.08;
+          camera.position.set(4, headBob, walkZ);
+          
+          const lookDist = 50;
+          const lx = camera.position.x + Math.sin(currentYaw) * lookDist;
+          const ly = camera.position.y + Math.sin(currentPitch) * lookDist;
+          const lz = camera.position.z - Math.cos(currentYaw) * lookDist;
+          camera.lookAt(lx, ly, lz);
+        } else {
+          camera.position.set(-14, 2.8, (time * 8 % 100) - 50);
+          camera.lookAt(0, 3, (time * 8 % 100) + 40);
+        }
+      }
+
+      // Dynamic Object Animations
+      if (envGroup && envGroup.userData.carGroup) {
+        envGroup.userData.carGroup.children.forEach((car, idx) => {
+          const speed = idx % 2 === 0 ? -25 : 22;
+          car.position.z = ((car.position.z + speed * 0.02 + 400) % 800) - 400;
+        });
+      }
+      if (envGroup && envGroup.userData.particles) {
+        envGroup.userData.particles.rotation.y = time * 0.03;
+      }
+      if (envGroup && envGroup.userData.earth) {
+        envGroup.userData.earth.rotation.y = time * 0.05;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // ------------------------------------------------------------------------
+    // STUDIO ENGINE & ENVIRONMENT SWITCHING
+    // ------------------------------------------------------------------------
+    function selectEngine(engineType) {
+      state.engine = engineType;
+      document.querySelectorAll('[id^="eng-"]').forEach(el => el.classList.remove('active'));
+      document.getElementById({
+        'ai_diffusion': 'eng-ai',
+        'realtime_3d': 'eng-3d',
+        'parallax_25d': 'eng-25d'
+      }[engineType]).classList.add('active');
+
+      if (engineType === 'ai_diffusion') {
+        glCanvas.style.display = 'none';
+        parallaxCanvas.style.display = 'none';
+        aiVideo.style.display = 'block';
+        aiVideo.play();
+        engineBadge.innerHTML = '<span class="badge-dot"></span> OPTION A: AI DIFFUSION';
+        activeStatusTag.textContent = 'ENGINE: OPTION A (AI DIFFUSION)';
+        showToast('Switched to Option A: AI Video Diffusion Engine (60 FPS Master)');
+      } else if (engineType === 'realtime_3d') {
+        aiVideo.style.display = 'none';
+        parallaxCanvas.style.display = 'none';
+        glCanvas.style.display = 'block';
+        aiVideo.pause();
+        initThreeEngine();
+        engineBadge.innerHTML = '<span class="badge-dot"></span> OPTION B: REAL-TIME 3D';
+        activeStatusTag.textContent = 'ENGINE: OPTION B (WEBGL PBR 3D)';
+        showToast('Switched to Option B: Real-Time Interactive 3D Web Engine');
+      } else if (engineType === 'parallax_25d') {
+        aiVideo.style.display = 'none';
+        glCanvas.style.display = 'none';
+        parallaxCanvas.style.display = 'block';
+        aiVideo.pause();
+        initParallaxEngine();
+        engineBadge.innerHTML = '<span class="badge-dot"></span> OPTION C: 2.5D PARALLAX';
+        activeStatusTag.textContent = 'ENGINE: OPTION C (2.5D CAMERA PROJECTION)';
+        showToast('Switched to Option C: 2.5D Volumetric Camera Projection');
+      }
+    }
+
+    function selectEnvironment(envType) {
+      state.environment = envType;
+      document.querySelectorAll('[id^="env-"]').forEach(el => el.classList.remove('active'));
+      const envBtn = document.getElementById({
+        'nature': 'env-nature',
+        'city': 'env-city',
+        'underwater': 'env-ocean',
+        'sky_aerial': 'env-sky',
+        'cosmic': 'env-space'
+      }[envType]);
+      if (envBtn) envBtn.classList.add('active');
+
+      envBadge.textContent = envType === 'nature' ? 'ALPINE NATURE VALLEY' : envType.toUpperCase().replace('_', ' ');
+
+      if (state.engine === 'ai_diffusion') {
+        if (envType === 'nature') {
+          aiVideo.src = '/motion/alpine_river_valley_fpv.mp4';
+        } else if (envType === 'city') {
+          aiVideo.src = '/motion/metropolis_photo_cinematic_master.mp4';
+        } else if (envType === 'underwater') {
+          aiVideo.src = '/motion/metropolis_shibuya_master.mp4';
+        } else {
+          aiVideo.src = '/motion/metropolis_traffic_master.mp4';
+        }
+        aiVideo.play();
+      }
+
+      if (scene) {
+        buildEnvironment(envType);
+      }
+
+      // Automatically pair soundtrack archetype
+      const pairedTrack = {
+        'nature': 'ambient_nature',
+        'city': 'city_lofi',
+        'underwater': 'ambient_ocean',
+        'sky_aerial': 'stratosphere_wind',
+        'cosmic': 'celestial_synth'
+      }[envType] || 'ambient_nature';
+      selectAudioTrack(pairedTrack);
+
+      showToast(`Environment Loaded: ${envType.toUpperCase()}`);
+    }
+
+    function selectCamera(camType) {
+      state.camera = camType;
+      document.querySelectorAll('[id^="cam-"]').forEach(el => el.classList.remove('active'));
+      document.getElementById({
+        'fpv_drone': 'cam-drone',
+        'dolly_track': 'cam-dolly',
+        'crane_boom': 'cam-crane',
+        'street_eye': 'cam-eye'
+      }[camType]).classList.add('active');
+
+      camBadge.textContent = camType.toUpperCase().replace('_', ' ');
+      showToast(`Camera Trajectory: ${camType.toUpperCase().replace('_', ' ')}`);
+    }
+
+    function selectAudioTrack(trackType) {
+      state.audioTrack = trackType;
+      document.querySelectorAll('[id^="snd-"]').forEach(el => el.classList.remove('active'));
+      const btn = document.getElementById({
+        'ambient_nature': 'snd-nature',
+        'city_lofi': 'snd-lofi',
+        'ambient_ocean': 'snd-ocean',
+        'stratosphere_wind': 'snd-sky',
+        'celestial_synth': 'snd-synth'
+      }[trackType]);
+      if (btn) btn.classList.add('active');
+
+      if (trackType === 'city_lofi') {
+        stopSynthAudio();
+        aiVideo.muted = state.isMuted;
+        aiVideo.volume = state.volume;
+      } else {
+        aiVideo.muted = true;
+        startSynthEnvironment(trackType);
+      }
+      showToast(`Soundtrack Active: ${trackType.replace('_', ' ').toUpperCase()}`);
+    }
+
+    // ------------------------------------------------------------------------
+    // 2.5D PHOTO PARALLAX ENGINE
+    // ------------------------------------------------------------------------
+    let parallaxImg = null;
+    let parallaxReq = null;
+
+    function initParallaxEngine() {
+      if (parallaxImg) return;
+      parallaxImg = new Image();
+      parallaxImg.src = '/motion/north_of_times_square.jpg';
+      parallaxImg.onload = () => {
+        renderParallaxFrame();
+      };
+    }
+
+    function renderParallaxFrame() {
+      if (state.engine !== 'parallax_25d') return;
+      parallaxReq = requestAnimationFrame(renderParallaxFrame);
+      const ctx = parallaxCanvas.getContext('2d');
+      parallaxCanvas.width = window.innerWidth;
+      parallaxCanvas.height = window.innerHeight;
+
+      const t = performance.now() * 0.001;
+      const zoom = 1.05 + Math.sin(t * 0.4) * 0.08;
+      const panX = Math.sin(t * 0.5) * 50;
+      const panY = Math.cos(t * 0.3) * 20;
+
+      const sw = parallaxImg.width / zoom;
+      const sh = parallaxImg.height / zoom;
+      const sx = (parallaxImg.width - sw) / 2 + panX;
+      const sy = (parallaxImg.height - sh) / 2 + panY;
+
+      ctx.drawImage(parallaxImg, sx, sy, sw, sh, 0, 0, parallaxCanvas.width, parallaxCanvas.height);
+    }
+
+    // ------------------------------------------------------------------------
+    // PROMPT BAR INTERPRETER
+    // ------------------------------------------------------------------------
+    function executePrompt() {
+      const q = promptInput.value.toLowerCase();
+      showToast('Analyzing prompt & configuring scene parameters...');
+
+      if (q.includes('3d') || q.includes('interactive') || q.includes('game') || q.includes('option b')) {
+        selectEngine('realtime_3d');
+      } else if (q.includes('photo') || q.includes('parallax') || q.includes('option c')) {
+        selectEngine('parallax_25d');
+      } else {
+        selectEngine('ai_diffusion');
+      }
+
+      if (q.includes('nature') || q.includes('mountain') || q.includes('river') || q.includes('tree') || q.includes('forest') || q.includes('bird') || q.includes('green') || q.includes('landscape') || q.includes('lake') || q.includes('valley')) {
+        selectEnvironment('nature');
+      } else if (q.includes('water') || q.includes('ocean') || q.includes('sea') || q.includes('submersible')) {
+        selectEnvironment('underwater');
+      } else if (q.includes('sky') || q.includes('aerial') || q.includes('cloud') || q.includes('stratosphere')) {
+        selectEnvironment('sky_aerial');
+      } else if (q.includes('space') || q.includes('orbit') || q.includes('cosmic') || q.includes('earth')) {
+        selectEnvironment('cosmic');
+      } else {
+        selectEnvironment('city');
+      }
+
+      if (q.includes('drone') || q.includes('orbit')) {
+        selectCamera('fpv_drone');
+      } else if (q.includes('dolly') || q.includes('push')) {
+        selectCamera('dolly_track');
+      } else if (q.includes('crane') || q.includes('boom')) {
+        selectCamera('crane_boom');
+      } else if (q.includes('walk') || q.includes('pedestrian') || q.includes('eye')) {
+        selectCamera('street_eye');
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // PLAYBACK CONTROLS & TIMELINE
+    // ------------------------------------------------------------------------
+    function startOmniStudio() {
+      initAudio();
+      startOverlay.classList.add('hidden');
+      state.isPlaying = true;
+      state.isMuted = false;
+
+      aiVideo.volume = state.volume;
+      aiVideo.muted = false;
+      aiVideo.play().catch(() => {
+        aiVideo.muted = true;
+        aiVideo.play();
+      });
+
+      playIcon.textContent = '⏸ Pause';
+      audioBtnIcon.textContent = '🔊 Sound On';
+      startEqVisualizer();
+      showToast('🎬 Satchida Omni-Motion Studio Activated');
+    }
+
+    function togglePlayPause() {
+      state.isPlaying = !state.isPlaying;
+      if (state.isPlaying) {
+        if (state.engine === 'ai_diffusion') aiVideo.play();
+        playIcon.textContent = '⏸ Pause';
+        showToast('Playback Resumed');
+      } else {
+        if (state.engine === 'ai_diffusion') aiVideo.pause();
+        playIcon.textContent = '▶ Play';
+        showToast('Playback Paused');
+      }
+    }
+
+    function toggleMuteState() {
+      state.isMuted = !state.isMuted;
+      aiVideo.muted = state.isMuted;
+      if (masterGain) {
+        masterGain.gain.setValueAtTime(state.isMuted ? 0 : state.volume, audioCtx.currentTime);
+      }
+      if (state.isMuted) {
+        audioBtnIcon.textContent = '🔇 Muted';
+        showToast('Audio Muted');
+      } else {
+        audioBtnIcon.textContent = '🔊 Sound On';
+        showToast('Audio Unmuted');
+      }
+    }
+
+    function setStudioVolume(val) {
+      state.volume = parseFloat(val);
+      aiVideo.volume = state.volume;
+      if (masterGain && !state.isMuted) {
+        masterGain.gain.setValueAtTime(state.volume, audioCtx.currentTime);
+      }
+    }
+
+    function seekTimeline(e) {
+      const rect = progressBarBg.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      if (state.engine === 'ai_diffusion' && aiVideo.duration) {
+        aiVideo.currentTime = pos * aiVideo.duration;
+      }
+    }
+
+    aiVideo.addEventListener('timeupdate', () => {
+      if (!aiVideo.duration) return;
+      const progress = (aiVideo.currentTime / aiVideo.duration) * 100;
+      progressFill.style.width = progress + '%';
+      
+      const curM = String(Math.floor(aiVideo.currentTime / 60)).padStart(2, '0');
+      const curS = String(Math.floor(aiVideo.currentTime % 60)).padStart(2, '0');
+      const durM = String(Math.floor(aiVideo.duration / 60)).padStart(2, '0');
+      const durS = String(Math.floor(aiVideo.duration % 60)).padStart(2, '0');
+      timecode.textContent = `${curM}:${curS} / ${durM}:${durS}`;
+    });
+
+    function toggleFullscreenStudio() {
+      document.body.classList.toggle('pseudo-fullscreen');
+      const fsBtn = document.getElementById('fullscreen-btn');
+      if (document.body.classList.contains('pseudo-fullscreen')) {
+        fsBtn.innerHTML = '🗗 Exit Fullscreen';
+        showToast('Fullscreen mode engaged');
+      } else {
+        fsBtn.innerHTML = '⛶ Fullscreen';
+        showToast('Exited fullscreen');
+      }
+    }
+
+    function toggleSidebar() {
+      const panel = document.getElementById('studio-panel');
+      panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function showToast(msg) {
+      toastNotice.querySelector('span').innerText = msg;
+      toastNotice.classList.add('show');
+      setTimeout(() => toastNotice.classList.remove('show'), 2800);
+    }
+
+    function startEqVisualizer() {
+      const bars = [];
+      for (let i = 0; i < 18; i++) bars.push(document.getElementById(`eq-${i}`));
+      if (eqInterval) clearInterval(eqInterval);
+      eqInterval = setInterval(() => {
+        if (!state.isPlaying || state.isMuted) {
+          bars.forEach(b => { if (b) b.style.height = '4px'; });
+          return;
+        }
+        bars.forEach((b, idx) => {
+          if (!b) return;
+          const energy = Math.sin(Date.now() * 0.009 + idx * 0.35) * 0.5 + 0.5;
+          const h = Math.floor(6 + (energy + Math.random() * 0.4) * 32 * state.volume);
+          b.style.height = `${h}px`;
+        });
+      }, 50);
+    }
+
+    window.addEventListener('resize', () => {
+      if (renderer && camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+
+    window.addEventListener('load', () => {
+      aiVideo.load();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('engine')) selectEngine(params.get('engine'));
+      if (params.get('env')) selectEnvironment(params.get('env'));
+      if (params.get('camera')) selectCamera(params.get('camera'));
+      if (params.get('track')) selectAudioTrack(params.get('track'));
+      if (params.get('prompt')) {
+        promptInput.value = params.get('prompt');
+        executeDirectorPrompt();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import {
   excelBufferToUniverSnapshot,
   docxBufferToUniverDocSnapshot,
 } from '~/components/Artifacts/Univer';
+import { SATCHIDA_FILM_ARTIFACT_TYPE } from '~/common/artifacts';
 import { Constants } from 'librechat-data-provider';
 import {
   DropdownMenu,
@@ -42,6 +43,7 @@ import {
   Table2,
   SlidersHorizontal,
   Film,
+  Video,
 } from 'lucide-react';
 import {
   satchiModeAtom,
@@ -345,6 +347,129 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
       status: 'success',
     });
   }, [disabled, setArtifacts, setCurrentArtifactId, setArtifactsVisible, showToast]);
+
+  // SATCHIDA STUDIO (OPENFILM): Direct Launch & Template Actions
+  const handleOpenFilmStudio = useCallback(
+    (templateType: 'blank' | 'nature' | 'metropolis' = 'blank') => {
+      if (disabled) return;
+      const artifactId = `satchida-film-${Date.now()}`;
+      let initialFilm = '';
+      if (templateType === 'nature') {
+        initialFilm = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#020617; }
+    iframe { width:100%; height:100%; border:none; }
+  </style>
+</head>
+<body>
+  <iframe src="/motion/omni_studio.html?env=nature&engine=ai_diffusion&track=ambient_nature" allow="autoplay; fullscreen"></iframe>
+  <script>
+    window.film = {
+      duration: 15,
+      width: 1920,
+      height: 1080,
+      frame: function(t) {}
+    };
+  </script>
+</body>
+</html>`;
+      } else if (templateType === 'metropolis') {
+        initialFilm = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#020617; }
+    iframe { width:100%; height:100%; border:none; }
+  </style>
+</head>
+<body>
+  <iframe src="/motion/omni_studio.html?env=city&engine=ai_diffusion&track=ambient_city" allow="autoplay; fullscreen"></iframe>
+  <script>
+    window.film = {
+      duration: 15,
+      width: 1920,
+      height: 1080,
+      frame: function(t) {}
+    };
+  </script>
+</body>
+</html>`;
+      } else {
+        initialFilm = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #020617;
+      display: flex; align-items: center; justify-content: center;
+    }
+    canvas {
+      width: 100%; height: 100%; object-fit: contain;
+      background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage" width="1920" height="1080"></canvas>
+  <script>
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    window.film = {
+      duration: 10,
+      width: 1920,
+      height: 1080,
+      frame: function(t) {
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, 1920, 1080);
+        const glow = ctx.createRadialGradient(960, 540, 50, 960, 540, 600);
+        glow.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
+        glow.addColorStop(1, 'rgba(2, 6, 23, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, 1920, 1080);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 56px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Satchida Studio · OpenFilm', 960, 500);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '24px system-ui, -apple-system, sans-serif';
+        ctx.fillText('Time: ' + t.toFixed(2) + 's / 10.00s · 60 FPS Deterministic Pure Frame', 960, 580);
+      }
+    };
+  </script>
+</body>
+</html>`;
+      }
+      setArtifacts((prev) => ({
+        ...(prev || {}),
+        [artifactId]: {
+          id: artifactId,
+          title:
+            templateType === 'nature'
+              ? 'Alpine Nature Valley (OpenFilm Studio)'
+              : templateType === 'metropolis'
+              ? 'Metropolis Night (OpenFilm Studio)'
+              : 'New Film Project (OpenFilm)',
+          type: SATCHIDA_FILM_ARTIFACT_TYPE,
+          content: initialFilm,
+          lastUpdateTime: Date.now(),
+        },
+      }));
+      setCurrentArtifactId(artifactId);
+      setArtifactsVisible(true);
+      showToast({
+        message: 'Opened Satchida Studio (OpenFilm)!',
+        status: 'success',
+      });
+    },
+    [disabled, setArtifacts, setCurrentArtifactId, setArtifactsVisible, showToast],
+  );
 
   const handleOpenOfficeFile = useCallback(async () => {
     if (disabled) return;
@@ -720,23 +845,24 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
               </div>
             </DropdownMenuItem>
 
-            {/* 🎬 Satchida Motion Animation */}
+            {/* 🎬 Satchida Studio (OpenFilm) */}
             <DropdownMenuItem
-              onClick={() =>
+              onClick={() => {
+                handleOpenFilmStudio('blank');
                 handleApplyPersonaPrompt(
-                  'Act as an elite Motion Graphics Director. Transform the following report, document, or concept into a cinema-grade, single-file HTML motion graphic artifact using Satchida-Motion (HTML5, GSAP 3, fluid camera moves, kinetic typography, window.__TIMELINE__, and bottom playback scrubber). Never output static presentation slides or bullet points.',
-                  'Satchida Motion Studio',
-                )
-              }
+                  'Act as Satchida Motion Studio (OpenFilm). Choreograph a cinema-grade photorealistic video using Wan 2.1 (14B) & Kling 2.5 with native audio. Produce both Option A (Neural Video Diffusion) and Option B (Satchida Omni-Studio 3D simulation).',
+                  'Satchida Studio (OpenFilm)',
+                );
+              }}
               className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
             >
               <Film className="h-4 w-4 shrink-0 text-violet-400" />
               <div>
                 <div className="font-semibold text-text-primary">
-                  {localize('com_satchida_motion')}
+                  Satchida Studio (OpenFilm) 🎬
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
-                  {localize('com_satchida_motion_desc')}
+                  Launch visual timeline, canvas stage & MP4 video exporter
                 </div>
               </div>
             </DropdownMenuItem>
@@ -841,6 +967,22 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
                   {localize('com_satchida_open_office_file_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* 🎬 New Film Project (OpenFilm Studio) */}
+            <DropdownMenuItem
+              onClick={() => handleOpenFilmStudio('blank')}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Film className="h-4 w-4 shrink-0 text-violet-400" />
+              <div>
+                <div className="font-semibold text-text-primary">
+                  New Film Project (OpenFilm)
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Open visual timeline, canvas stage & MP4 exporter
                 </div>
               </div>
             </DropdownMenuItem>
@@ -1089,6 +1231,60 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                       </div>
                       <div className="text-[11px] leading-tight text-text-secondary">
                         {localize('com_satchida_vibe_desc')}
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator className="my-1 bg-border-light/60" />
+
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                    Satchida Studio (OpenFilm)
+                  </div>
+
+                  {/* OpenFilm Studio Canvas */}
+                  <DropdownMenuItem
+                    onClick={() => handleOpenFilmStudio('blank')}
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+                  >
+                    <Film className="h-4 w-4 shrink-0 text-violet-400" />
+                    <div>
+                      <div className="font-semibold text-text-primary">
+                        OpenFilm Studio
+                      </div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Interactive timeline, playhead & MP4 exporter
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Alpine Nature Simulation */}
+                  <DropdownMenuItem
+                    onClick={() => handleOpenFilmStudio('nature')}
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+                  >
+                    <Sparkles className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <div>
+                      <div className="font-semibold text-text-primary">
+                        Alpine Nature Simulation
+                      </div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Procedural 3D terrain, river flow & birdsong
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Metropolis Night Simulation */}
+                  <DropdownMenuItem
+                    onClick={() => handleOpenFilmStudio('metropolis')}
+                    className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+                  >
+                    <Video className="h-4 w-4 shrink-0 text-cyan-400" />
+                    <div>
+                      <div className="font-semibold text-text-primary">
+                        Metropolis Night Boulevard
+                      </div>
+                      <div className="text-[11px] leading-tight text-text-secondary">
+                        Volumetric traffic lighting & city audio
                       </div>
                     </div>
                   </DropdownMenuItem>

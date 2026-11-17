@@ -799,8 +799,12 @@ export function createTransactionMethods(
               $sum: {
                 $cond: [
                   { $eq: ['$tokenType', 'prompt'] },
-                  { $abs: { $ifNull: ['$rawAmount', 0] } },
-                  { $abs: { $ifNull: ['$inputTokens', 0] } },
+                  {
+                    $abs: {
+                      $ifNull: ['$inputTokens', { $ifNull: ['$rawAmount', 0] }],
+                    },
+                  },
+                  0,
                 ],
               },
             },

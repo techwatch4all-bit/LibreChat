@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Spinner } from '@librechat/client';
 import { Constants } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
@@ -43,6 +44,7 @@ function TokenUsageIndicator({
   compactionEnabled: boolean;
 }) {
   const localize = useLocalize();
+  const queryClient = useQueryClient();
   const view = useTokenUsage({ index, conversation, isSubmitting });
   /** Owned here, not in the popover: `unmountOnHide` would otherwise lose the
    *  in-flight state the moment the pointer leaves. */
@@ -52,6 +54,22 @@ function TokenUsageIndicator({
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
   const disclosureRef = useRef<HTMLButtonElement>(null);
   const conversationId = conversation?.conversationId ?? '';
+
+  // Invalidate userUsageStats when submission finishes so billing numbers refresh
+  const prevIsSubmitting = useRef(isSubmitting);
+  useEffect(() => {
+    if (prevIsSubmitting.current && !isSubmitting) {
+      queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+    }
+    prevIsSubmitting.current = isSubmitting;
+  }, [isSubmitting, queryClient]);
+
+  // Invalidate when popover opens to ensure real-time accuracy
+  useEffect(() => {
+    if (popoverOpen) {
+      queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+    }
+  }, [popoverOpen, queryClient]);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**

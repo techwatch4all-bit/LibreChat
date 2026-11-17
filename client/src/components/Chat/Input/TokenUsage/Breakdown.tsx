@@ -158,11 +158,10 @@ export default function Breakdown({
     normalizeTokenCount(view.subagentUsage?.cacheRead) +
     normalizeTokenCount(view.subagentUsage?.cacheWrite);
 
-  // Billing / Account Usage Analytics integration
+  // Billing / Account Usage Analytics integration (aligned with HeaderBillingGauge 30-day window)
   const thirtyDaysAgo = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString();
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0, 0).toISOString();
   }, []);
   const { data: billingStats } = useGetUserUsageStats({ startDate: thirtyDaysAgo });
 

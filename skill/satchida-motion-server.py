@@ -100,7 +100,7 @@ def _wrap_template_artifact(style: str, title: str, html: str) -> str:
     return (
         f"Customize the HTML below and deliver your final response wrapped identically inside "
         f"`:::artifact{{...}}` + ````html ... ```` + `:::`:\n{extra}\n"
-        f":::artifact{{identifier=\"motion-{slug}\" type=\"text/html\" title=\"{title}\"}}\n"
+        f":::artifact{{identifier=\"motion-{slug}\" type=\"application/vnd.satchida.film\" title=\"{title}\"}}\n"
         f"````html\n{html.strip()}\n````\n"
         f":::"
     )

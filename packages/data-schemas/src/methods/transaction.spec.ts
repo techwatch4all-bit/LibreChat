@@ -35,6 +35,7 @@ let upsertBalanceFields: ReturnType<typeof createTransactionMethods>['upsertBala
 let updateBalance: ReturnType<typeof createTransactionMethods>['updateBalance'];
 let getMultiplier: ReturnType<typeof createTxMethods>['getMultiplier'];
 let getCacheMultiplier: ReturnType<typeof createTxMethods>['getCacheMultiplier'];
+let getUserUsageStats: ReturnType<typeof createTransactionMethods>['getUserUsageStats'];
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
@@ -64,6 +65,7 @@ beforeAll(async () => {
   findBalanceByUser = transactionMethods.findBalanceByUser;
   upsertBalanceFields = transactionMethods.upsertBalanceFields;
   updateBalance = transactionMethods.updateBalance;
+  getUserUsageStats = transactionMethods.getUserUsageStats;
 
   const spendMethods = createSpendTokensMethods(mongoose, {
     createTransaction: transactionMethods.createTransaction,
@@ -627,6 +629,85 @@ describe('Transactions Config Tests', () => {
     expect(transactions[0].readTokens).toBe(-5);
     const balance = await Balance.findOne({ user: userId });
     expect(balance?.tokenCredits).toBe(initialBalance);
+  });
+});
+
+describe('getUserUsageStats Tests', () => {
+  test('correctly aggregates standard transactions', async () => {
+    const userId = new mongoose.Types.ObjectId();
+
+    await Transaction.create({
+      user: userId,
+      tokenType: 'prompt',
+      rawAmount: -500,
+    });
+    await Transaction.create({
+      user: userId,
+      tokenType: 'completion',
+      rawAmount: -200,
+    });
+
+    const stats = await getUserUsageStats(userId.toString());
+    expect(stats.inputTokens).toBe(500);
+    expect(stats.outputTokens).toBe(200);
+    expect(stats.cacheRead).toBe(0);
+    expect(stats.cacheWrite).toBe(0);
+    expect(stats.totalTokens).toBe(700);
+    expect(stats.transactionCount).toBe(2);
+  });
+
+  test('correctly aggregates structured transactions without double-counting cache tokens', async () => {
+    const userId = new mongoose.Types.ObjectId();
+
+    // In structured transactions: rawAmount = -(input + read + write) = -(800 + 5000 + 200) = -6000
+    await Transaction.create({
+      user: userId,
+      tokenType: 'prompt',
+      rawAmount: -6000,
+      inputTokens: -800,
+      readTokens: -5000,
+      writeTokens: -200,
+    });
+    await Transaction.create({
+      user: userId,
+      tokenType: 'completion',
+      rawAmount: -300,
+    });
+
+    const stats = await getUserUsageStats(userId.toString());
+    // inputTokens must be the actual prompt input (800), not rawAmount (6000)
+    expect(stats.inputTokens).toBe(800);
+    expect(stats.outputTokens).toBe(300);
+    expect(stats.cacheRead).toBe(5000);
+    expect(stats.cacheWrite).toBe(200);
+    // totalTokens = 800 + 300 + 5000 + 200 = 6300 (not 6000 + 300 + 5000 + 200 = 11500)
+    expect(stats.totalTokens).toBe(6300);
+    expect(stats.transactionCount).toBe(2);
+  });
+
+  test('respects startDate filtering', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const oldDate = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const recentDate = new Date();
+
+    await Transaction.create({
+      user: userId,
+      tokenType: 'prompt',
+      rawAmount: -1000,
+      createdAt: oldDate,
+    });
+    await Transaction.create({
+      user: userId,
+      tokenType: 'prompt',
+      rawAmount: -250,
+      createdAt: recentDate,
+    });
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const stats = await getUserUsageStats(userId.toString(), thirtyDaysAgo);
+    expect(stats.inputTokens).toBe(250);
+    expect(stats.totalTokens).toBe(250);
+    expect(stats.transactionCount).toBe(1);
   });
 });
 

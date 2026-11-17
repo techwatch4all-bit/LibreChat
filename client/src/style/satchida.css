@@ -201,6 +201,18 @@ html[data-theme='satchida'].light .satchida-auth-card {
     0 24px 60px -28px rgb(30 58 138 / 0.35);
 }
 
+/* Chrome / Safari / Edge autofill styling for Satchida brand theme */
+html[data-theme='satchida'] input.webkit-dark-styles:-webkit-autofill,
+html[data-theme='satchida'] input.webkit-dark-styles:-webkit-autofill:hover,
+html[data-theme='satchida'] input.webkit-dark-styles:-webkit-autofill:focus,
+html[data-theme='satchida'] input.webkit-dark-styles:-webkit-autofill:active {
+  -webkit-text-fill-color: rgb(var(--text-primary)) !important;
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--surface-primary)) inset !important;
+  box-shadow: 0 0 0 1000px rgb(var(--surface-primary)) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: rgb(var(--text-primary));
+}
+
 @keyframes satchida-field-drift {
   from {
     background-position:

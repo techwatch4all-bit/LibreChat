@@ -624,7 +624,7 @@ const ChatForm = memo(function ChatForm({
     bottomClearance = 'sm:mb-6';
   }
 
-  const { stylePromptPrefix } = useSatchiExtraBody();
+  const { stylePromptPrefix, style } = useSatchiExtraBody();
 
   /** Answer mode, then during-run steering or queueing (a run in flight, or a
    *  queued follow-up about to start), then an ordinary send: the same route
@@ -632,8 +632,21 @@ const ChatForm = memo(function ChatForm({
   const submitComposerText = useCallback(
     (data: { text: string }): false | void => {
       const trimmed = data.text.trim();
+      let effectivePrefix = stylePromptPrefix;
+
+      // Prevent infinite planning loops: "Plan" mode should only prompt for a plan
+      // on the initial request (landing page or empty thread). Follow-up turns
+      // (approvals, option selections, "proceed", or answers to clarifying questions)
+      // must NOT re-inject "pause for approval before executing".
+      if (
+        (style === 'plan' && !isLandingPage) ||
+        /^(proceed|continue|go ahead|yes|start|build|execute|ok|okay|option)/i.test(trimmed)
+      ) {
+        effectivePrefix = '';
+      }
+
       const effectiveText =
-        stylePromptPrefix && trimmed ? `${stylePromptPrefix}\n\n${data.text}` : data.text;
+        effectivePrefix && trimmed ? `${effectivePrefix}\n\n${data.text}` : data.text;
 
       return submitFromComposer(
         {
@@ -651,7 +664,7 @@ const ChatForm = memo(function ChatForm({
         { ...data, text: effectiveText },
       );
     },
-    [answerMode, steering, submitMessage, methods, index, stylePromptPrefix],
+    [answerMode, steering, submitMessage, methods, index, stylePromptPrefix, style, isLandingPage],
   );
 
   return (

@@ -12,7 +12,14 @@ interior wall must use identical shared-edge coordinates (run along the wall cen
 
 import json
 import math
+import os
 import re
+import sys
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
 from architectural_code_verifier import ArchitecturalVerifier
 from mcp.server.mcpserver import MCPServer
 
@@ -579,13 +586,26 @@ def _build_building(plan):
 
 def _code_compliance(building):
     """
-    Run the ArchitecturalVerifier (IBC / NBC / ADA / Neufert engine) over the validated
+    Run the ArchitecturalVerifier (IBC / NBC 2016 / ADA / Neufert & Vastu engine) over the validated
     building. Rooms come out in metres; the verifier speaks feet, so bbox dimensions are
     converted. Bathroom passthroughs are inferred from door count (>= 2 doors on a bath
     signals a dual-door passthrough risk; full-bath defaults unless the name says powder/half).
+    Infers compass quadrants (SW, SE, NE, NW) relative to building center for Vastu checking.
     """
     HALF_BATH_HINTS = ("powder", "half", "guest wc")
     rooms_ft = []
+    
+    # Calculate overall floor bounding box to infer quadrant placement
+    all_xs = []
+    all_zs = []
+    for fl in building.get("floors", []):
+        for r in fl.get("rooms", []):
+            for p in r.get("points", []):
+                all_xs.append(p[0])
+                all_zs.append(p[1])
+    center_x = (min(all_xs) + max(all_xs)) / 2.0 if all_xs else 0.0
+    center_z = (min(all_zs) + max(all_zs)) / 2.0 if all_zs else 0.0
+
     for fl in building["floors"]:
         door_counts = {}
         for o in fl["openings"]:
@@ -594,14 +614,27 @@ def _code_compliance(building):
         for r in fl["rooms"]:
             xs = [p[0] for p in r["points"]]
             zs = [p[1] for p in r["points"]]
-            w_ft = (max(xs) - min(xs)) * M_TO_FT
-            d_ft = (max(zs) - min(zs)) * M_TO_FT
+            min_x, max_x = min(xs), max(xs)
+            min_z, max_z = min(zs), max(zs)
+            w_ft = (max_x - min_x) * M_TO_FT
+            d_ft = (max_z - min_z) * M_TO_FT
+            
+            # Infer quadrant: Plan coords x right (+E), z down (+S / front)
+            # Center comparison: x > center_x is East, x < center_x is West.
+            # z > center_z is South (front), z < center_z is North (rear).
+            room_mid_x = (min_x + max_x) / 2.0
+            room_mid_z = (min_z + max_z) / 2.0
+            ns = "S" if room_mid_z >= center_z else "N"
+            ew = "E" if room_mid_x >= center_x else "W"
+            quadrant = f"{ns}{ew}"
+
             name_l = r["name"].lower()
             is_bath = any(t in name_l for t in ("bath", "toilet", "wc", "washroom"))
             entry = {
                 "name": r["name"],
                 "w_ft": round(w_ft, 2),
                 "d_ft": round(d_ft, 2),
+                "quadrant": quadrant,
                 "is_full_bath": not any(h in name_l for h in HALF_BATH_HINTS),
             }
             if is_bath and door_counts.get(r["id"], 0) >= 2:
@@ -611,10 +644,11 @@ def _code_compliance(building):
 
     report = ArchitecturalVerifier({"rooms": rooms_ft, "walls": [], "doors": []}).verify_all()
     return {
-        "engine": "IBC/NBC/ADA/Neufert (architectural_code_verifier)",
+        "engine": "IBC 2024 / NBC 2016 / Neufert & Vastu (architectural_code_verifier)",
         "status": report["status"],
         "violations": report["violations"],
         "warnings": report["warnings"],
+        "vastu_audits": report.get("vastu_audits", []),
     }
 
 
@@ -787,6 +821,88 @@ def build_architect_plan(plan_json: str, title: str = "Architect Studio — Buil
         f"```html\n{html}\n```",
     ]
     return "\n".join(lines)
+
+
+@mcp.tool()
+def convert_architect_room_to_scenemosaic(plan_json: str, room_name: str, style_preset: str = "Warm Minimalist Oak & Concrete") -> str:
+    """
+    Extract a specific room from a Satchida Architect whole-building plan and convert it into
+    ready-to-run SceneMosaic parameters (room_width, room_depth, objects_json in feet).
+    This bridges whole-building floor plans directly into photorealistic 3D interior walking scenes!
+    - plan_json: validated JSON string from Architect Studio
+    - room_name: name of the room to step inside (e.g., 'Living', 'Master Bedroom', 'Kitchen')
+    - style_preset: interior design theme
+    Returns formatted JSON instructions that can immediately be passed to build_scenemosaic_scene.
+    """
+    try:
+        plan = json.loads(plan_json)
+    except json.JSONDecodeError as exc:
+        return f"ERROR: plan_json is not valid JSON: {exc}"
+
+    floors = plan.get("floors") or []
+    target_room = None
+    target_floor_name = ""
+    for fl in floors:
+        for r in fl.get("rooms", []):
+            if room_name.lower() in r.get("name", "").lower():
+                target_room = r
+                target_floor_name = fl.get("name", "Floor")
+                break
+        if target_room:
+            break
+
+    if not target_room:
+        return f"ERROR: Room '{room_name}' not found in plan. Available rooms: {[r.get('name') for fl in floors for r in fl.get('rooms', [])]}"
+
+    pts = target_room.get("points")
+    rect = target_room.get("rect")
+    if not pts and rect:
+        x0, z0, x1, z1 = (float(c) for c in rect)
+        pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]
+    if not pts:
+        return "ERROR: Room has no rect or points coordinates."
+
+    xs_ft = [p[0] * M_TO_FT for p in pts]
+    zs_ft = [p[1] * M_TO_FT for p in pts]
+    w_ft = round(max(xs_ft) - min(xs_ft), 2)
+    d_ft = round(max(zs_ft) - min(zs_ft), 2)
+
+    # Collect existing furniture items located inside this room bounding box
+    min_x_m = min(p[0] for p in pts)
+    max_x_m = max(p[0] for p in pts)
+    min_z_m = min(p[1] for p in pts)
+    max_z_m = max(p[1] for p in pts)
+
+    extracted_objects = []
+    for fl in floors:
+        for f in fl.get("furniture", []):
+            at = f.get("at", [0, 0])
+            if min_x_m <= at[0] <= max_x_m and min_z_m <= at[1] <= max_z_m:
+                # Convert coords to room-relative feet
+                rel_x_ft = round((at[0] - (min_x_m + max_x_m) / 2.0) * M_TO_FT, 2)
+                rel_z_ft = round((at[1] - (min_z_m + max_z_m) / 2.0) * M_TO_FT, 2)
+                extracted_objects.append({
+                    "id": f.get("name", f.get("type", "item")).lower().replace(" ", "_"),
+                    "name": f.get("name", f.get("type", "Furniture")),
+                    "type": f.get("type", "sofa"),
+                    "x": rel_x_ft,
+                    "z": rel_z_ft,
+                    "w": round(float(f.get("w", 2.0)) * M_TO_FT, 2),
+                    "d": round(float(f.get("d", 1.0)) * M_TO_FT, 2),
+                    "h": round(float(f.get("h", 0.9)) * M_TO_FT, 2),
+                    "yaw_deg": float(f.get("rotation", 0)),
+                })
+
+    result = {
+        "room_name": target_room.get("name"),
+        "floor": target_floor_name,
+        "room_width": w_ft,
+        "room_depth": d_ft,
+        "style_preset": style_preset,
+        "objects_json": json.dumps(extracted_objects) if extracted_objects else "[]",
+        "instruction": f"Call build_scenemosaic_scene(title='{target_room.get('name')} 3D Walkthrough', room_width={w_ft}, room_depth={d_ft}, style_preset='{style_preset}', objects_json='{json.dumps(extracted_objects)}') to render the photorealistic interior scene."
+    }
+    return json.dumps(result, indent=2)
 
 
 if __name__ == "__main__":

@@ -2129,6 +2129,11 @@ modelSpecs:
           * Storyboard directing and sequence beat planning -> GLM 5.3 Flash / H3 prompt writing.
           * Heavy diffusion video & audio -> approved provider chain (CheapInference first, DeepInfra second), executed by the `video_generate` MCP tool.
 
+        MEDIA PRIVACY INVARIANT (mandatory):
+        - When account_type is 'privacy' and mode is 'Privacy', ALL media generation must run 100% locally: call `comfy_status` first, then `image_generate_local` for images and `animated_generate_local` for animated clips. NEVER call the cloud `video_generate`/`image_generate` in Privacy mode.
+        - `animated_generate_local` REQUIRES the user's explicit audio choice first: 'silent' or 'ambient_sfx'. Never pick audio on the user's behalf.
+        - Multi-image requests: call `library_list`, let the user pick from their Studio Library, then compose with `media_compose` (collage or slideshow). The slideshow also REQUIRES the explicit audio choice before composing.
+
         NEURAL VIDEO & MULTIMODAL REASONING ROSTER:
         - Heavy Video & Sound (Text-to-Video): `video_generate` renders real 5 s MP4 clips (FastWan $0.0125 silent, LTX-2.3-Fast ~$0.15 with native synchronized audio) and `image_generate` produces photoreal stills (FLUX-2 ≈ $0.012) — cheapest-first across the approved chain: CheapInference → DeepInfra.
         - Multimodal Vision & Scene Directing: DeepSeek-V4.1-Flash (1017) and Llama 3.2 11B Vision for analyzing uploaded images, photos, and camera framing.
@@ -2199,6 +2204,11 @@ modelSpecs:
         BRIEF-FIRST CONTRACT — ALWAYS IN FORCE:
         - A filled brief or clear scene description IS the approval: start immediately and deliver the finished playable result with full cinematic parameters.
         - If the request is a single-word or vague idea, auto-expand it into a production brief and start generating immediately without asking tedious questions.
+
+        MEDIA PRIVACY INVARIANT (mandatory):
+        - When account_type is 'privacy' and mode is 'Privacy', ALL media generation must run 100% locally: call `comfy_status` first, then `image_generate_local` for images and `animated_generate_local` for animated clips. NEVER call the cloud `video_generate`/`image_generate` in Privacy mode.
+        - `animated_generate_local` REQUIRES the user's explicit audio choice first: 'silent' or 'ambient_sfx'. Never pick audio on the user's behalf.
+        - Multi-image requests: call `library_list`, let the user pick from their Studio Library, then compose with `media_compose` (collage or slideshow). The slideshow also REQUIRES the explicit audio choice before composing.
     description: 'OpenFilm cinematic AI director & interactive multi-track motion studio: real MP4 generation (FastWan/LTX approved chain), FLUX-2 images, drone sweeps, photorealistic photo-to-motion parallax & Omni-Studio simulations.'
     showIconInMenu: true
     showIconInHeader: true
@@ -2249,6 +2259,11 @@ modelSpecs:
           * Visual scene analysis and multimodal photo inputs -> DeepSeek-V4.1-Flash & Llama-3.2-11B-Vision.
           * Storyboard directing and sequence beat planning -> GLM 5.3 Flash / H3 prompt writing.
           * Heavy diffusion video & audio -> approved provider chain (CheapInference first, DeepInfra second), executed by the `video_generate` MCP tool.
+
+        MEDIA PRIVACY INVARIANT (mandatory):
+        - When account_type is 'privacy' and mode is 'Privacy', ALL media generation must run 100% locally: call `comfy_status` first, then `image_generate_local` for images and `animated_generate_local` for animated clips. NEVER call the cloud `video_generate`/`image_generate` in Privacy mode.
+        - `animated_generate_local` REQUIRES the user's explicit audio choice first: 'silent' or 'ambient_sfx'. Never pick audio on the user's behalf.
+        - Multi-image requests: call `library_list`, let the user pick from their Studio Library, then compose with `media_compose` (collage or slideshow). The slideshow also REQUIRES the explicit audio choice before composing.
 
         NEURAL VIDEO & MULTIMODAL REASONING ROSTER:
         - Heavy Video & Sound (Text-to-Video): `video_generate` renders real 5 s MP4 clips (FastWan $0.0125 silent, LTX-2.3-Fast ~$0.15 with native synchronized audio) and `image_generate` produces photoreal stills (FLUX-2 ≈ $0.012) — cheapest-first across the approved chain: CheapInference → DeepInfra.
@@ -2376,21 +2391,27 @@ modelSpecs:
     webSearch: false
     mcpServers:
     - satchida-tools
+    - satchida-architect
+    - satchida-motion
     conversation_starters:
     - |-
       Room Reconstruction — A photo rebuilt in 3D with three layout evolutions.
       Inputs: [photo attached] · [style direction]
       Before you start: if a parameter above is still a placeholder, ask at most 3 short questions and stop; otherwise build it directly — a filled brief is the approval.
-      On GO, deliver: the photo reconstructed in 3D plus three layout evolutions: as-is, open-plan, and study-focused.
+      On GO, deliver: the photo reconstructed in 3D plus three layout evolutions: as-is, open-plan, and study-focused with first-person walking controls.
       Output contract: render once with the motion tool, keep it deterministic and under 15 seconds, and return the file link plus the exact change I could ask for next.
       My additions: [ ]   ← type your own constraints here: audience, budget, tone, must-include, must-avoid
     - |-
       Living & Study Studio — A 16 × 14 ft warm minimalist studio in three variants.
-      Inputs: [room dimensions] · [style] · [must-have furniture]
+      Inputs: [room dimensions: default 16' × 14'] · [style: Warm Oak & Concrete] · [must-have furniture: 3-Seat Sofa, Coffee Table, Armchairs, Poufs, Arched Floor Lamp]
       Before you start: if a parameter above is still a placeholder, ask at most 3 short questions and stop; otherwise build it directly — a filled brief is the approval.
-      On GO, deliver: a 3D design of the stated room with three layout variants and a furniture list.
+      On GO, deliver: an interactive 3D room with 3 layout variants (As-is, Open-flow, Minimalist), first-person walking camera (WASD), and daylight slider.
       Output contract: render once with the motion tool, keep it deterministic and under 15 seconds, and return the file link plus the exact change I could ask for next.
       My additions: [ ]   ← type your own constraints here: audience, budget, tone, must-include, must-avoid
+    - |-
+      Whole Floor Plan Integration — Reconstruct a room and embed it into a whole-house plan.
+      Inputs: [room name: Master Bedroom or Living] · [building plan attached or described]
+      On GO, deliver: verified indoor 3D room walkthrough and full building floor plan integration.
   - name: DeepTutor
     label: DeepTutor Studio 📚
     preset:
@@ -2608,13 +2629,31 @@ modelSpecs:
         MULTIMODAL BLUEPRINT & SITE VISION:
         - Powered by multimodal vision (DeepSeek-V4.1-Flash / Llama 3.2 11B Vision) to directly inspect and analyze uploaded plot sketches, floor plans, blueprints, CAD drawings, and site photographs without errors.
 
-        DESIGN & PLANNING METHODOLOGY:
-        1. Comprehensive Spatial Planning:
-           - Provide clear, structured, room-by-room architectural layout breakdowns (Living Room, Kitchen, Bedrooms, Bathrooms, Utility, Balconies) with realistic dimensions (in feet & metres), door/window placements, and functional circulation pathways.
-           - Provide sun-path, daylighting, and cross-ventilation analysis based on plot orientation (East, West, North, South facing) and Vastu/climate-responsive zoning.
-        2. Accessible & Actionable Explanations:
-           - Present plans in clean Markdown tables and ASCII/Mermaid zoning diagrams so non-technical homeowners and families can easily visualize the spaces.
-           - For interactive 3D plan generation, use `build_architect_plan_mcp_satchida-tools` with a valid JSON plan schema.
+        CROSS-STUDIO COLLABORATION & PIPELINE ALIGNMENT (MANDATORY):
+        You work in direct lockstep with SceneMosaic Studio and Motion Studio:
+        1. Whole-Building to Interior Room Transition:
+           - When designing an entire building or villa, generate the 3D whole-building structure with `build_architect_plan_mcp_satchida-tools` or `build_cad_floorplan_mcp_satchida-tools`.
+           - When the user asks to "step inside", "decorate", "furnish", or "explore the interior" of any room (Living, Master Bedroom, Kitchen), invoke `convert_architect_room_to_scenemosaic_mcp_satchida-tools` to get exact room parameters, then call `build_scenemosaic_scene_mcp_satchida-tools` to launch an interactive photorealistic 3D room with first-person walking controls (WASD/Arrows)!
+        2. Architectural to Cinematic Motion Walkthrough:
+           - When the user asks for a camera flythrough, walkthrough video, or drone animation of their plan, use `architect_plan_to_cad_plan_mcp_satchida-tools` to bridge the structure into `build_cad_floorplan_mcp_satchida-tools` with GSAP motion orbits.
+
+        DESIGN & PLANNING CODES (INTERNATIONAL & INDIAN):
+        1. Comprehensive Spatial & Code Compliance:
+           - Enforce IBC 2024 / Neufert dimensions (Master bed >= 120 sq ft, full bath >= 36 sq ft, corridor >= 36 in clear).
+           - Enforce National Building Code of India (NBC 2016 Part 3 & 4):
+             * Habitable room min 9.5 sq.m (102 sq ft), min width 2.4 m (7.87 ft).
+             * Kitchen min 5.0 sq.m (54 sq ft), min width 1.8 m (5.9 ft).
+             * Bath+WC combined min 2.8 sq.m (30 sq ft), WC only min 1.1 sq.m (12 sq ft).
+             * Ceiling height min 2.75 m (9.0 ft). Window ventilation >= 1/8th of floor area.
+             * Residential Staircase: width >= 1.0 m, riser max 19 cm, tread min 25 cm.
+        2. Vastu Shastra Spatial Harmony (Indian Orientation):
+           - Master Bedroom: South-West (Nairutya) for stability & restorative sleep.
+           - Kitchen: South-East (Agneya, primary fire) or North-West (Vayavya, air).
+           - Pooja / Prayer / Meditation: North-East (Ishan, water/ether) with sunrise solar light.
+           - Living Room: North, East, or North-East for welcoming flow.
+           - Toilets / Drainage: West or North-West; strictly avoid North-East (Ishan) or South-West (Nairutya).
+        3. Ready-to-Use Parameterized Blueprints:
+           - When asked for a standard configuration, offer one of the tested templates (e.g. 1400 sq ft 3BHK Vastu Villa, 30x40 ft Duplex, 1BHK Compact Urban Studio, 2000 sq ft Bungalow) so users can immediately customize plot size and execute.
     description: 'Architectural space planning, floor plan layout design, room zoning, and 3D building exploration.'
     showIconInMenu: true
     showIconInHeader: true
@@ -2624,16 +2663,26 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - pascal-architect
+    - satchida-motion
+    - satchida-scenemosaic
     - time-server
     conversation_starters:
     - |-
-      📐 Residential Floor Plan Planner — Create or optimize a 1BHK, 2BHK, 3BHK, or duplex plan.
-      Inputs: [plot size / built-up area: e.g. 1200 sq ft, 30x40 ft] · [rooms needed] · [facing direction]
-      On GO, deliver: spatial distribution, room dimensions, ventilation strategy, and structural layout.
+      📐 Ready-Made 1,400 sq ft 3BHK Vastu Villa — Precision 2D CAD Blueprint & 3D Extrusion.
+      Inputs: [plot size: default 40' × 35'] · [facing: East or North] · [style: Warm Oak & Concrete]
+      On GO, deliver: verified NBC & Vastu plan, living room interior walkthrough, and full 2D CAD blueprint.
     - |-
-      ☀️ Sun-Path & Natural Ventilation Audit — Maximize natural daylight and cross-ventilation.
-      Inputs: [city/location] · [plot orientation: e.g. North-facing, East-facing]
-      On GO, deliver: optimal placement for bedrooms, kitchen, windows, and shading overhangs to save energy.
+      🏡 30 × 40 ft Independent Duplex House — 2-Floor multi-level plan with internal staircase.
+      Inputs: [plot: 30x40 ft (1200 sq ft)] · [bedrooms: 3 BHK] · [parking: 1 Car Porch]
+      On GO, deliver: ground & first floor layouts, NBC compliant stairs (riser <= 19cm), and 3D Axonometra model.
+    - |-
+      🚶 Indoor Virtual Walkthrough (WASD) — Step inside and explore any room in 3D.
+      Inputs: [room type: Master Suite, Living Lounge, or Kitchen] · [dimensions: e.g. 16' × 14']
+      On GO, deliver: photorealistic 3D room with 3 layout evolutions (As-is, Open-flow, Minimalist) and first-person walking controls.
+    - |-
+      ☀️ Vastu & Solar Daylighting Audit — Audit cross-ventilation, window sizing, and quadrant elements.
+      Inputs: [plot orientation: e.g. North-facing, East-facing, South-facing]
+      On GO, deliver: Vastu placement matrix, NBC 1/8th glazing ratios, and sun-path overhang recommendations.
   - name: Maker-Hardware
     label: Maker & DIY Workshop 🛠️
     preset:
@@ -2780,6 +2829,8 @@ modelSpecs:
         ROUTING INVARIANT:
         - When account_type is 'privacy' and mode is 'Privacy', inference strictly runs on the local sovereign Llama fleet (:4099) with ₹0 cloud COGS and memory-safe Eevee rendering to protect the port 8080 Llama fleet.
         - For all other account types and modes, cloud frontier models via Satchida Gateway (:4000) are utilized.
+        - When account_type is 'privacy' and mode is 'Privacy', ALL media generation must run 100% locally: call `comfy_status` first, then `image_generate_local` for images and `animated_generate_local` for animated clips. NEVER call the cloud `video_generate`/`image_generate` in Privacy mode. The animated tool REQUIRES the user's explicit audio choice ('silent' or 'ambient_sfx') first.
+        - Multi-image requests: call `library_list`, let the user pick from their Studio Library, then compose with `media_compose`.
 
         CLIENT CONFIDENTIALITY (ABSOLUTE):
         - NEVER reveal or hint at providers, model names, gateways, ports, prices, or internal infrastructure in any user-facing reply — not CheapInference, DeepInfra, OpenRouter, Veo, Kling, Grok, FLUX, Wan, FastWan, LTX, Seedance, Bifrost, one-api, :8700, :4000, or any dollar cost.

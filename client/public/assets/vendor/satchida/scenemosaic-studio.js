@@ -845,7 +845,67 @@
       camTween = { raf: global.requestAnimationFrame(step) };
     }
 
+    var isWalking = false;
+    var walkSpeed = 0.16;
+    var keysDown = {};
+
+    global.addEventListener('keydown', function (e) {
+      keysDown[e.key.toLowerCase()] = true;
+      if (e.key.toLowerCase() === 'w' && !isDragging && document.activeElement.tagName !== 'INPUT') {
+        // Toggle walking mode if not already active
+      }
+    });
+
+    global.addEventListener('keyup', function (e) {
+      delete keysDown[e.key.toLowerCase()];
+    });
+
+    function updateWalkMovement() {
+      if (!isWalking) return;
+      var forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+      var side = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+      var move = new THREE.Vector3();
+      if (keysDown['w'] || keysDown['arrowup']) move.add(forward);
+      if (keysDown['s'] || keysDown['arrowdown']) move.sub(forward);
+      if (keysDown['d'] || keysDown['arrowright']) move.add(side);
+      if (keysDown['a'] || keysDown['arrowleft']) move.sub(side);
+
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(walkSpeed);
+        camera.position.add(move);
+        controls.target.add(move);
+        // Keep camera eye level (5.2 ft / 1.6 m)
+        camera.position.y = 5.2;
+        // Clamp to room bounds
+        var padW = roomW * 0.44;
+        var padD = roomD * 0.44;
+        camera.position.x = Math.max(-padW, Math.min(padW, camera.position.x));
+        camera.position.z = Math.max(-padD, Math.min(padD, camera.position.z));
+      }
+    }
+
     function setCameraPreset(mode, instant) {
+      if (mode === 'walk') {
+        isWalking = true;
+        controls.maxPolarAngle = Math.PI * 0.52;
+        controls.minDistance = 0.5;
+        controls.maxDistance = 30;
+        var startWalk = new THREE.Vector3(0, 5.2, roomD * 0.35);
+        var lookWalk = new THREE.Vector3(0, 4.8, -roomD * 0.2);
+        if (instant) {
+          camera.position.copy(startWalk);
+          controls.target.copy(lookWalk);
+          controls.update();
+        } else {
+          tweenCameraTo(startWalk, lookWalk, 650);
+        }
+        return;
+      }
+      isWalking = false;
       var aspectFactor = Math.max(1.0, 0.92 / Math.max(0.35, camera.aspect || 1));
       var span = Math.max(roomW, roomD);
       var targetPos = new THREE.Vector3();
@@ -1030,6 +1090,7 @@
     var animId = 0;
     function animate() {
       animId = global.requestAnimationFrame(animate);
+      updateWalkMovement();
       controls.update();
       renderer.render(scene, camera);
     }
@@ -1109,6 +1170,7 @@
       '<button class="sm-btn c" data-cam="2d">2D Map</button>' +
       '<button class="sm-btn c active" data-cam="iso">Iso</button>' +
       '<button class="sm-btn c" data-cam="eye">Eye</button>' +
+      '<button class="sm-btn c" data-cam="walk" title="First-Person Walk (WASD / Arrows)">🚶 Walk</button>' +
       '<button class="sm-btn c" data-cam="top">Top</button></div>' +
       '<h3>Daylight</h3><div class="sm-sl"><span id="sm-sunl">11:00</span><input id="sm-sun" type="range" min="7" max="19" step="1" value="11"/></div>' +
       '<div class="sm-exp"><button class="sm-ebtn" id="sm-glb">Export .glb</button><button class="sm-ebtn" id="sm-json">Export JSON</button></div></div>';

@@ -172,9 +172,10 @@ const SEAT_POLICY_BY_TYPE = {
 // Default to the public Cloudflare tunnel so every tenant deployment works
 // out-of-the-box without any extra env var. Local dev (where One-API runs on
 // the same machine) overrides this in .env:  ONEAPI_BASE_URL=http://127.0.0.1:4000
-const ONEAPI_BASE_URL = (
-  process.env.ONEAPI_BASE_URL || 'https://gateway.satchida.com'
-).replace(/\/+$/, '');
+const ONEAPI_BASE_URL = (process.env.ONEAPI_BASE_URL || 'https://gateway.satchida.com').replace(
+  /\/+$/,
+  '',
+);
 
 const ONEAPI_TENANT = process.env.ONEAPI_DEFAULT_TENANT || 'satchida-master';
 
@@ -481,7 +482,6 @@ router.delete('/:id/seat-token', requireManageUsers, revokeSeatTokenHandler);
 
 router.get('/', requireReadUsers, handlers.listUsers);
 router.get('/search', requireReadUsers, handlers.searchUsers);
-router.delete('/:id', requireManageUsers, handlers.deleteUser);
 
 /**
  * Admin-initiated password reset for a user.
@@ -633,9 +633,7 @@ async function syncUserSeatToOneApi(userId, accountType, familyRole) {
 async function suspendSeatOnOneApi(userId) {
   try {
     if (!oneApiConfigured()) return;
-    const user = await runAsSystem(() =>
-      db.getUserById(userId, 'satchidaSeatAlias tenantId'),
-    );
+    const user = await runAsSystem(() => db.getUserById(userId, 'satchidaSeatAlias tenantId'));
     if (!user?.satchidaSeatAlias) return;
     const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
     const disabled = await disableTokensForAlias(tenantId, user.satchidaSeatAlias);
@@ -699,9 +697,7 @@ async function restoreSeatOnOneApi(userId) {
 async function deleteSeatOnOneApi(userId) {
   try {
     if (!oneApiConfigured()) return;
-    const user = await runAsSystem(() =>
-      db.getUserById(userId, 'satchidaSeatAlias tenantId'),
-    );
+    const user = await runAsSystem(() => db.getUserById(userId, 'satchidaSeatAlias tenantId'));
     if (!user?.satchidaSeatAlias) return;
     const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
     // 1. Disable all active tokens first
@@ -713,7 +709,10 @@ async function deleteSeatOnOneApi(userId) {
     ).catch((err) => {
       // 404 is fine — alias may already be gone
       if (!err.message?.includes('404')) {
-        console.warn(`[oneApi] seat-policy delete failed for ${user.satchidaSeatAlias}:`, err.message);
+        console.warn(
+          `[oneApi] seat-policy delete failed for ${user.satchidaSeatAlias}:`,
+          err.message,
+        );
       }
     });
     console.info(`[oneApi] Deleted seat ${user.satchidaSeatAlias} for user ${userId}`);
@@ -737,8 +736,6 @@ async function deleteSeatOnOneApi(userId) {
  */
 async function moveUserToAccountTypeGroup(userId, newAccountType) {
   try {
-    if (!newAccountType || !SEAT_TYPES.includes(newAccountType)) return;
-
     // 1. Get all groups the user is currently a member of
     const currentGroups = await runAsSystem(() => db.getUserGroups(userId)).catch(() => []);
 
@@ -746,16 +743,14 @@ async function moveUserToAccountTypeGroup(userId, newAccountType) {
     for (const g of currentGroups) {
       const gType = g.accountType || g.seatType;
       if (gType && SEAT_TYPES.includes(gType) && gType !== newAccountType) {
-        await runAsSystem(() =>
-          db.removeUserFromGroup(userId, g._id.toString()).catch(() => {}),
-        );
+        await runAsSystem(() => db.removeUserFromGroup(userId, g._id.toString()).catch(() => {}));
       }
     }
 
+    if (!newAccountType || !SEAT_TYPES.includes(newAccountType)) return;
+
     // 3. Find the target group for the new accountType (tenant-scoped first, then global)
-    const user = await runAsSystem(() =>
-      db.getUserById(userId, 'tenantId').catch(() => null),
-    );
+    const user = await runAsSystem(() => db.getUserById(userId, 'tenantId').catch(() => null));
     const tenantId = user?.tenantId;
 
     let targetGroup = null;
@@ -833,7 +828,7 @@ router.patch('/:id', requireManageUsers, async (req, res, next) => {
 
       // ── Group membership ────────────────────────────────────────────────────
       // Move to the right LibreChat group immediately when accountType changes.
-      if (newType) {
+      if (newType !== undefined) {
         moveUserToAccountTypeGroup(id, newType).catch(() => {});
       }
 
@@ -875,6 +870,21 @@ router.get('/:id/groups', requireReadUsers, handlers.getUserGroups);
  * query, bounded-concurrency password hashing, one insert per collection, and
  * one group update per distinct group.
  */
-router.post('/bulk', requireManageUsers, handlers.bulkCreateUsers);
+router.post('/bulk', requireManageUsers, async (req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function (data) {
+    if (res.statusCode >= 200 && res.statusCode < 300 && Array.isArray(data?.users)) {
+      for (const u of data.users) {
+        if (u._id) {
+          const uid = u._id.toString();
+          syncUserSeatToOneApi(uid, u.accountType, u.familyRole).catch(() => {});
+          if (u.accountType) moveUserToAccountTypeGroup(uid, u.accountType).catch(() => {});
+        }
+      }
+    }
+    return originalJson(data);
+  };
+  return handlers.bulkCreateUsers(req, res, next);
+});
 
 module.exports = router;

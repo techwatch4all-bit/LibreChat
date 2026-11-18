@@ -696,6 +696,22 @@ export default function Breakdown({
                   {billingStats.cacheRead > 0 && (
                     <Row label={localize('com_ui_cache_read')} value={billingStats.cacheRead} />
                   )}
+                  {billingStats.local && billingStats.local.totalTokens > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-text-tertiary pt-1 border-t border-border-light/50">
+                      <span>Local GPU (Privacy):</span>
+                      <span className="font-medium text-emerald-500">
+                        {formatTokens(billingStats.local.totalTokens)}
+                      </span>
+                    </div>
+                  )}
+                  {billingStats.cloud && billingStats.cloud.totalTokens > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-text-tertiary">
+                      <span>Cloud Frontier:</span>
+                      <span className="font-medium text-blue-500">
+                        {formatTokens(billingStats.cloud.totalTokens)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </>
             )}

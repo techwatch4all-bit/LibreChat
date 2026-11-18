@@ -15,7 +15,15 @@ export type FamilyRole = 'owner' | 'adult' | 'minor' | null;
  * it seeded (`basic`/`pro`/`family`/`privacy`), and a mis-cased name silently
  * bypasses that side's `MaxSeats` cap.
  */
-export const ACCOUNT_TYPES = ['basic', 'pro', 'family', 'privacy'] as const;
+export const ACCOUNT_TYPES = [
+  'basic',
+  'standard',
+  'family',
+  'pro',
+  'pro_family',
+  'enterprise',
+  'privacy',
+] as const;
 export type AccountType = TenantAccountType;
 
 export interface FamilyLimits {

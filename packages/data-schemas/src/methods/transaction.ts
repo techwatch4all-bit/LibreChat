@@ -118,6 +118,20 @@ export function createTransactionMethods(
     cacheWrite: number;
     totalTokens: number;
     transactionCount: number;
+    local?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheRead: number;
+      totalTokens: number;
+      transactionCount: number;
+    };
+    cloud?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheRead: number;
+      totalTokens: number;
+      transactionCount: number;
+    };
   }>;
   deleteTransactions: (
     filter: FilterQuery<ITransaction>,
@@ -773,6 +787,20 @@ export function createTransactionMethods(
     cacheWrite: number;
     totalTokens: number;
     transactionCount: number;
+    local?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheRead: number;
+      totalTokens: number;
+      transactionCount: number;
+    };
+    cloud?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheRead: number;
+      totalTokens: number;
+      transactionCount: number;
+    };
   }> {
     try {
       const Transaction = mongoose.models.Transaction;
@@ -789,6 +817,14 @@ export function createTransactionMethods(
           (match.createdAt as Record<string, unknown>).$lte = endDate;
         }
       }
+
+      const isLocalCond = {
+        $regexMatch: {
+          input: { $ifNull: ['$model', ''] },
+          regex: '^(privacy|local|ollama|bonsai|gguf)',
+          options: 'i',
+        },
+      };
 
       const results = await Transaction.aggregate([
         { $match: match },
@@ -824,6 +860,76 @@ export function createTransactionMethods(
               $sum: { $abs: { $ifNull: ['$writeTokens', 0] } },
             },
             count: { $sum: 1 },
+
+            localInputTokens: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [{ $eq: ['$tokenType', 'prompt'] }, isLocalCond],
+                  },
+                  {
+                    $abs: {
+                      $ifNull: ['$inputTokens', { $ifNull: ['$rawAmount', 0] }],
+                    },
+                  },
+                  0,
+                ],
+              },
+            },
+            localOutputTokens: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [{ $eq: ['$tokenType', 'completion'] }, isLocalCond],
+                  },
+                  { $abs: { $ifNull: ['$rawAmount', 0] } },
+                  0,
+                ],
+              },
+            },
+            localCacheRead: {
+              $sum: {
+                $cond: [isLocalCond, { $abs: { $ifNull: ['$readTokens', 0] } }, 0],
+              },
+            },
+            localCount: {
+              $sum: { $cond: [isLocalCond, 1, 0] },
+            },
+
+            cloudInputTokens: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [{ $eq: ['$tokenType', 'prompt'] }, { $not: [isLocalCond] }],
+                  },
+                  {
+                    $abs: {
+                      $ifNull: ['$inputTokens', { $ifNull: ['$rawAmount', 0] }],
+                    },
+                  },
+                  0,
+                ],
+              },
+            },
+            cloudOutputTokens: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [{ $eq: ['$tokenType', 'completion'] }, { $not: [isLocalCond] }],
+                  },
+                  { $abs: { $ifNull: ['$rawAmount', 0] } },
+                  0,
+                ],
+              },
+            },
+            cloudCacheRead: {
+              $sum: {
+                $cond: [{ $not: [isLocalCond] }, { $abs: { $ifNull: ['$readTokens', 0] } }, 0],
+              },
+            },
+            cloudCount: {
+              $sum: { $cond: [{ $not: [isLocalCond] }, 1, 0] },
+            },
           },
         },
       ]);
@@ -836,6 +942,20 @@ export function createTransactionMethods(
           cacheWrite: 0,
           totalTokens: 0,
           transactionCount: 0,
+          local: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheRead: 0,
+            totalTokens: 0,
+            transactionCount: 0,
+          },
+          cloud: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheRead: 0,
+            totalTokens: 0,
+            transactionCount: 0,
+          },
         };
       }
 
@@ -845,6 +965,16 @@ export function createTransactionMethods(
       const cacheRead = Number(row.cacheRead) || 0;
       const cacheWrite = Number(row.cacheWrite) || 0;
 
+      const localInput = Number(row.localInputTokens) || 0;
+      const localOutput = Number(row.localOutputTokens) || 0;
+      const localCache = Number(row.localCacheRead) || 0;
+      const localCount = Number(row.localCount) || 0;
+
+      const cloudInput = Number(row.cloudInputTokens) || 0;
+      const cloudOutput = Number(row.cloudOutputTokens) || 0;
+      const cloudCache = Number(row.cloudCacheRead) || 0;
+      const cloudCount = Number(row.cloudCount) || 0;
+
       return {
         inputTokens: input,
         outputTokens: output,
@@ -852,6 +982,20 @@ export function createTransactionMethods(
         cacheWrite,
         totalTokens: input + output + cacheRead + cacheWrite,
         transactionCount: Number(row.count) || 0,
+        local: {
+          inputTokens: localInput,
+          outputTokens: localOutput,
+          cacheRead: localCache,
+          totalTokens: localInput + localOutput + localCache,
+          transactionCount: localCount,
+        },
+        cloud: {
+          inputTokens: cloudInput,
+          outputTokens: cloudOutput,
+          cacheRead: cloudCache,
+          totalTokens: cloudInput + cloudOutput + cloudCache,
+          transactionCount: cloudCount,
+        },
       };
     } catch (error) {
       logger.error('Error calculating user usage stats:', error);

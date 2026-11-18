@@ -1,15 +1,26 @@
-import React, { useId, useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Activity, Calendar, Zap, ArrowUpRight, ArrowDownLeft, ShieldCheck, ChevronDown } from 'lucide-react';
+import { useRecoilValue } from 'recoil';
+import { QueryKeys } from 'librechat-data-provider';
+import {
+  Zap,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownLeft,
+  ShieldCheck,
+  ChevronDown,
+  RefreshCw,
+  Settings as SettingsIcon,
+  Coins,
+  Cpu,
+  Cloud,
+} from 'lucide-react';
 import { useGetUserUsageStats, useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { formatTokens, cn } from '~/utils';
 import { useAuthContext } from '~/hooks';
-
-const SIZE = 20;
-const STROKE_WIDTH = 2.5;
-const RADIUS = (SIZE - STROKE_WIDTH) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+import Settings from '~/components/Nav/Settings';
+import store from '~/store';
 
 const SHOW_DELAY_MS = 100;
 const HIDE_DELAY_MS = 150;
@@ -17,19 +28,33 @@ const HIDE_DELAY_MS = 150;
 type TimeTab = 'month' | '7days' | '30days';
 
 export default function HeaderBillingGauge() {
-  const { isAuthenticated } = useAuthContext();
+  const { user, isAuthenticated } = useAuthContext();
   const { data: startupConfig } = useGetStartupConfig();
   const queryClient = useQueryClient();
-  const popover = Ariakit.usePopoverStore({ placement: 'bottom' });
+  const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
+
+  const popover = Ariakit.usePopoverStore({ placement: 'bottom-end' });
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
   const disclosureRef = useRef<HTMLButtonElement>(null);
 
   const [activeTab, setActiveTab] = useState<TimeTab>('month');
+  const [showSettings, setShowSettings] = useState(false);
 
-  // Refresh stats whenever popover opens
+  // Invalidate queries when prompt completion occurs in real-time
+  const prevIsSubmitting = useRef(isSubmitting);
+  useEffect(() => {
+    if (prevIsSubmitting.current && !isSubmitting) {
+      queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.balance] });
+    }
+    prevIsSubmitting.current = isSubmitting;
+  }, [isSubmitting, queryClient]);
+
+  // Invalidate when popover opens to ensure live accuracy
   useEffect(() => {
     if (popoverOpen) {
       queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.balance] });
     }
   }, [popoverOpen, queryClient]);
 
@@ -88,26 +113,20 @@ export default function HeaderBillingGauge() {
   useEffect(() => cancelTimers, [cancelTimers]);
 
   // Date boundaries for tracking:
-  // 1. Current calendar month (1st of current month 00:00:00 to now)
+  // 1. Current calendar month (1st of month 00:00:00 to now)
   // 2. Last 7 days
-  // 3. Last 30 days (1 month rolling)
-  // Rolling to-date queries should NOT specify an endDate so current session activity is never excluded.
+  // 3. Last 30 days (rolling 1 month, aligned with chat breakdown)
+  // No endDate so live session activity is never excluded.
   const dateRanges = useMemo(() => {
     const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const last7DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0);
-    const last30DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0, 0);
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+    const last7DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0).toISOString();
+    const last30DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0, 0).toISOString();
 
     return {
-      month: {
-        startDate: currentMonthStart.toISOString(),
-      },
-      '7days': {
-        startDate: last7DaysStart.toISOString(),
-      },
-      '30days': {
-        startDate: last30DaysStart.toISOString(),
-      },
+      month: { startDate: currentMonthStart },
+      '7days': { startDate: last7DaysStart },
+      '30days': { startDate: last30DaysStart },
     };
   }, []);
 
@@ -116,7 +135,7 @@ export default function HeaderBillingGauge() {
   const { data: stats7d, isLoading: loading7d } = useGetUserUsageStats(dateRanges['7days']);
   const { data: stats30d, isLoading: loading30d } = useGetUserUsageStats(dateRanges['30days']);
 
-  // Fetch user balance / credits if balance enabled
+  // Fetch user balance / credits
   const balanceQuery = useGetUserBalance({
     enabled: !!isAuthenticated && !!startupConfig?.balance?.enabled,
   });
@@ -132,20 +151,38 @@ export default function HeaderBillingGauge() {
   const isLoading =
     activeTab === '7days' ? loading7d : activeTab === '30days' ? loading30d : loadingMonth;
 
+  const hasCredits = typeof balanceData?.tokenCredits === 'number';
   const hasQuota = typeof balanceData?.refillAmount === 'number' && balanceData.refillAmount > 0;
 
-  // Gauge calculation for Current Month:
-  // If user has a quota / refillAmount, calculate percentage of monthly quota.
-  // Otherwise if tokens have been consumed, show an active status ring in primary color.
-  const percent = useMemo(() => {
+  // Dynamic pill display
+  let pillValue: string;
+  let pillLabel: string;
+  let iconColor = 'text-amber-500 fill-amber-500';
+
+  if (hasCredits) {
+    pillValue = formatTokens(balanceData!.tokenCredits);
+    pillLabel = 'Credits';
+  } else if (hasQuota) {
+    const remaining = Math.max(0, (balanceData!.refillAmount ?? 0) - (monthStats?.totalTokens ?? 0));
+    pillValue = formatTokens(remaining);
+    pillLabel = 'Left';
+    if (remaining <= 0) {
+      iconColor = 'text-rose-500 fill-rose-500';
+    }
+  } else {
+    pillValue = loadingMonth ? '...' : formatTokens(monthStats?.totalTokens ?? 0);
+    pillLabel = 'Month';
+    iconColor = 'text-emerald-500 fill-emerald-500';
+  }
+
+  // Quota percentage for progress bar
+  const quotaPercent = useMemo(() => {
     if (!monthStats || monthStats.totalTokens === 0) return 0;
     if (hasQuota) {
       return Math.min(100, Math.round((monthStats.totalTokens / (balanceData?.refillAmount ?? 1)) * 100));
     }
     return 100;
   }, [monthStats, balanceData, hasQuota]);
-
-  const offset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 
   // Current month label (e.g. "November 2026")
   const currentMonthName = useMemo(() => {
@@ -158,8 +195,8 @@ export default function HeaderBillingGauge() {
         ref={disclosureRef}
         store={popover}
         type="button"
-        data-testid="header-billing-gauge"
-        aria-label="Account Billing & Token Usage"
+        data-testid="header-balance-pill"
+        aria-label="Account Balance & Token Usage"
         aria-haspopup="dialog"
         onPointerDown={() => {
           pinAtPointerDownRef.current = pinnedRef.current;
@@ -183,54 +220,21 @@ export default function HeaderBillingGauge() {
           popover.show();
         }}
         className={cn(
-          'flex size-theme-control items-center justify-center rounded-theme-control-round transition-colors',
-          'hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
-          'duration-300 animate-in fade-in zoom-in-95',
+          'group flex h-9 items-center gap-1.5 rounded-full border border-border-light bg-surface-primary px-3 py-1 text-xs font-medium text-text-primary transition-all duration-200',
+          'hover:border-border-medium hover:bg-surface-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+          'shadow-sm',
         )}
       >
-        <span
-          role="meter"
-          aria-label="Monthly Billing Tokens"
-          className="relative flex items-center justify-center"
-        >
-          <svg
-            width={SIZE}
-            height={SIZE}
-            viewBox={`0 0 ${SIZE} ${SIZE}`}
-            className="-rotate-90"
-            aria-hidden="true"
-            focusable="false"
-          >
-            {/* Background Track */}
-            <circle
-              cx={SIZE / 2}
-              cy={SIZE / 2}
-              r={RADIUS}
-              fill="transparent"
-              strokeWidth={STROKE_WIDTH}
-              className="stroke-border-heavy"
-            />
-            {/* Filled Progress */}
-            <circle
-              cx={SIZE / 2}
-              cy={SIZE / 2}
-              r={RADIUS}
-              fill="transparent"
-              strokeWidth={STROKE_WIDTH}
-              strokeDasharray={CIRCUMFERENCE}
-              strokeDashoffset={percent === 0 ? CIRCUMFERENCE : offset}
-              strokeLinecap="round"
-              className={cn(
-                'transition-all duration-300',
-                hasQuota && percent > 90
-                  ? 'stroke-status-error'
-                  : hasQuota && percent > 70
-                    ? 'stroke-status-warning'
-                    : 'stroke-primary',
-              )}
-            />
-          </svg>
+        <span className="flex items-center justify-center">
+          <Zap className={cn('size-3.5 transition-transform group-hover:scale-110', iconColor)} />
         </span>
+        <span className="font-semibold text-text-primary">
+          {pillValue}
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+          {pillLabel}
+        </span>
+        <ChevronDown className="size-3 text-text-tertiary transition-transform duration-200 group-data-[open]:rotate-180" />
       </Ariakit.PopoverDisclosure>
 
       <Ariakit.Popover
@@ -246,26 +250,88 @@ export default function HeaderBillingGauge() {
           if (e.pointerType !== 'touch') scheduleHide();
         }}
         className={cn(
-          'z-50 rounded-lg border border-border-light bg-surface-primary p-3.5 shadow-lg outline-none',
-          'origin-top translate-y-1 scale-95 opacity-0 transition-[opacity,transform] duration-150 ease-out',
+          'z-50 rounded-xl border border-border-light bg-surface-primary p-4 shadow-xl outline-none',
+          'origin-top-right translate-y-1 scale-95 opacity-0 transition-[opacity,transform] duration-150 ease-out',
           'data-[enter]:translate-y-0 data-[enter]:scale-100 data-[enter]:opacity-100',
           'data-[leave]:translate-y-1 data-[leave]:scale-95 data-[leave]:opacity-0',
         )}
       >
-        <div className="w-80 space-y-3 text-text-primary">
+        <div className="w-84 space-y-3.5 text-text-primary">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border-light pb-2.5">
             <div className="flex items-center gap-2">
-              <Activity className="size-4 text-primary" />
-              <span className="text-sm font-semibold text-text-primary">Token Usage & Billing</span>
+              <Coins className="size-4 text-amber-500" />
+              <span className="text-sm font-semibold text-text-primary">Balance & Token Usage</span>
             </div>
-            {balanceData?.tokenCredits !== undefined && (
-              <span className="inline-flex items-center gap-1 rounded bg-surface-tertiary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
-                <Zap className="size-3 text-amber-500" />
-                {balanceData.tokenCredits.toLocaleString()} Credits
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Synced
+            </span>
           </div>
+
+          {/* Balance / Entitlement Card */}
+          {hasCredits ? (
+            <div className="rounded-lg border border-border-light bg-surface-secondary/50 p-3 space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
+                Available Token Balance
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-bold text-text-primary">
+                  {balanceData!.tokenCredits.toLocaleString()}
+                </span>
+                <span className="text-xs text-text-tertiary font-medium">Credits</span>
+              </div>
+              {balanceData?.autoRefillEnabled && (
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary pt-1 border-t border-border-light/60">
+                  <RefreshCw className="size-3 text-primary shrink-0" />
+                  <span>
+                    Refills {balanceData.refillAmount?.toLocaleString()} every {balanceData.refillIntervalValue}{' '}
+                    {balanceData.refillIntervalUnit}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : hasQuota ? (
+            <div className="rounded-lg border border-border-light bg-surface-secondary/50 p-3 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold uppercase tracking-wider text-text-tertiary">
+                  Monthly Quota Usage
+                </span>
+                <span className="font-semibold text-text-primary">
+                  {quotaPercent}%
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-tertiary">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-300',
+                    quotaPercent > 90
+                      ? 'bg-status-error'
+                      : quotaPercent > 70
+                        ? 'bg-status-warning'
+                        : 'bg-emerald-500',
+                  )}
+                  style={{ width: `${quotaPercent}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-text-secondary">
+                <span>Used: {formatTokens(monthStats?.totalTokens ?? 0)}</span>
+                <span>Quota: {formatTokens(balanceData!.refillAmount!)}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="size-4 text-emerald-500" />
+                <span className="text-xs font-semibold text-text-primary">
+                  {user?.accountType ? `${user.accountType.toUpperCase()} Plan` : 'Standard Tier'}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-text-secondary">
+                Unlimited AI token access. No hard quota cutoffs applied.
+              </div>
+            </div>
+          )}
 
           {/* Timeframe Selector Tabs */}
           <div className="flex rounded-md bg-surface-secondary p-0.5 text-xs">
@@ -303,7 +369,7 @@ export default function HeaderBillingGauge() {
                   : 'text-text-secondary hover:text-text-primary',
               )}
             >
-              1 Month
+              30 Days
             </button>
           </div>
 
@@ -370,13 +436,102 @@ export default function HeaderBillingGauge() {
             )}
           </div>
 
-          {/* Footer Link / Info */}
-          <div className="border-t border-border-light pt-2 flex items-center justify-between text-[11px] text-text-tertiary">
-            <span>Synced with Account Settings</span>
-            <span className="text-primary font-medium">Live</span>
+          {/* Local LLM vs Cloud LLM In/Out Section */}
+          <div className="space-y-2 border-t border-border-light/70 pt-2.5">
+            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
+              <span>Compute Distribution</span>
+              <span className="text-[10px] lowercase font-normal text-text-tertiary">in / out tokens</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* Local LLM */}
+              <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 text-[11px]">
+                    <Cpu className="size-3 text-emerald-500" />
+                    Local LLM
+                  </span>
+                  <span className="text-[9px] rounded bg-emerald-500/15 px-1 py-0.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                    Privacy GPU
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-border-light/50 text-[11px]">
+                  <span className="text-text-secondary">In:</span>
+                  <span className="font-semibold text-text-primary">
+                    {isLoading ? '...' : formatTokens(currentStats?.local?.inputTokens ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-text-secondary">Out:</span>
+                  <span className="font-semibold text-text-primary">
+                    {isLoading ? '...' : formatTokens(currentStats?.local?.outputTokens ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-0.5 border-t border-border-light/40 text-[11px] font-medium text-text-primary">
+                  <span>Total:</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    {isLoading ? '...' : formatTokens(currentStats?.local?.totalTokens ?? 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Cloud LLM */}
+              <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 text-[11px]">
+                    <Cloud className="size-3 text-blue-500" />
+                    Cloud LLM
+                  </span>
+                  <span className="text-[9px] rounded bg-blue-500/15 px-1 py-0.5 text-blue-600 dark:text-blue-400 font-medium">
+                    Frontier API
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-border-light/50 text-[11px]">
+                  <span className="text-text-secondary">In:</span>
+                  <span className="font-semibold text-text-primary">
+                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.inputTokens ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-text-secondary">Out:</span>
+                  <span className="font-semibold text-text-primary">
+                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.outputTokens ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-0.5 border-t border-border-light/40 text-[11px] font-medium text-text-primary">
+                  <span>Total:</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">
+                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.totalTokens ?? 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Explanatory Helper: clarifying Context window vs Account tokens */}
+          <div className="rounded-md border border-border-light/60 bg-surface-secondary/30 p-2 text-[11px] leading-relaxed text-text-tertiary">
+            💡 The composer circle monitors in-memory context for this chat, while this badge monitors account-wide token consumption.
+          </div>
+
+          {/* Footer Action */}
+          <div className="border-t border-border-light pt-2 flex items-center justify-between text-xs text-text-secondary">
+            <span className="text-[11px] text-text-tertiary">Realtime Sync Active</span>
+            <button
+              type="button"
+              onClick={() => {
+                popover.hide();
+                setShowSettings(true);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              <SettingsIcon className="size-3.5" />
+              Settings
+            </button>
           </div>
         </div>
       </Ariakit.Popover>
+
+      {showSettings && <Settings open={showSettings} onOpenChange={setShowSettings} />}
     </>
   );
 }

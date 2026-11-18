@@ -40,7 +40,7 @@ export const useGetUserUsageStats = (
     ['userUsageStats', params?.startDate, params?.endDate],
     () => dataService.getUserUsageStats(params),
     {
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
       ...config,

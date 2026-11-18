@@ -143,9 +143,14 @@ router.use(requireJwtAuth, requireAdminSurface);
  * automatic end to end.
  *
  * Config (LibreChat .env):
- *   ONEAPI_BASE_URL            default http://127.0.0.1:4000
+ *   ONEAPI_BASE_URL            default https://gateway.satchida.com
+ *                              Override to http://127.0.0.1:4000 for local dev
+ *                              where One-API runs on the same machine.
  *   ONEAPI_ADMIN_ACCESS_TOKEN  an One-API admin/root user access_token
  *   ONEAPI_DEFAULT_TENANT      default satchida-master
+ *   ONEAPI_CF_CLIENT_ID        Cloudflare Access service token client ID
+ *                              (required when ONEAPI_BASE_URL is a public CF tunnel)
+ *   ONEAPI_CF_CLIENT_SECRET    Cloudflare Access service token secret
  * ------------------------------------------------------------------------ */
 
 const SEAT_TYPES = ['basic', 'standard', 'family', 'pro', 'pro_family', 'enterprise', 'privacy'];
@@ -164,11 +169,15 @@ const SEAT_POLICY_BY_TYPE = {
   privacy: { modes: 'chat,study,work,privacy', models: 'Chat,Study,Work,Privacy' },
 };
 
-const ONEAPI_BASE_URL = (process.env.ONEAPI_BASE_URL || 'http://127.0.0.1:4000').replace(
-  /\/+$/,
-  '',
-);
+// Default to the public Cloudflare tunnel so every tenant deployment works
+// out-of-the-box without any extra env var. Local dev (where One-API runs on
+// the same machine) overrides this in .env:  ONEAPI_BASE_URL=http://127.0.0.1:4000
+const ONEAPI_BASE_URL = (
+  process.env.ONEAPI_BASE_URL || 'https://gateway.satchida.com'
+).replace(/\/+$/, '');
+
 const ONEAPI_TENANT = process.env.ONEAPI_DEFAULT_TENANT || 'satchida-master';
+
 // Tenant-copy deployment mode: this LibreChat instance runs ON a tenant PC and
 // authenticates to One-API with THAT tenant's machine virtual key — never with
 // operator credentials. Seat minting then goes through One-API's self-service
@@ -177,15 +186,31 @@ const ONEAPI_TENANT = process.env.ONEAPI_DEFAULT_TENANT || 'satchida-master';
 const TENANT_COPY_MODE = process.env.SATCHIDA_TENANT_MODE === 'true';
 const TENANT_VK = process.env.SATCHIDA_TENANT_VK || '';
 
+// Cloudflare Access service token headers — required when ONEAPI_BASE_URL is
+// a public Cloudflare tunnel (gateway.satchida.com). The WAF on that tunnel
+// blocks all non-/v1/ paths unless the request carries a valid CF Access
+// service token. Set both vars in the tenant .env to enable:
+//   ONEAPI_CF_CLIENT_ID=<service-token-client-id>
+//   ONEAPI_CF_CLIENT_SECRET=<service-token-secret>
+// Leave blank for localhost (127.0.0.1) where no WAF is in the path.
+const CF_CLIENT_ID = process.env.ONEAPI_CF_CLIENT_ID || '';
+const CF_CLIENT_SECRET = process.env.ONEAPI_CF_CLIENT_SECRET || '';
+
 function oneApiConfigured() {
   return Boolean(process.env.ONEAPI_ADMIN_ACCESS_TOKEN);
 }
 
 function oneApiHeaders() {
-  return {
+  const headers = {
     Authorization: process.env.ONEAPI_ADMIN_ACCESS_TOKEN,
     'Content-Type': 'application/json',
   };
+  // Attach CF Access service token when talking to the public tunnel
+  if (CF_CLIENT_ID && CF_CLIENT_SECRET) {
+    headers['CF-Access-Client-Id'] = CF_CLIENT_ID;
+    headers['CF-Access-Client-Secret'] = CF_CLIENT_SECRET;
+  }
+  return headers;
 }
 
 async function oneApi(method, path, body) {
@@ -512,14 +537,334 @@ router.get('/csv-template', requireReadUsers, (req, res) => {
 });
 
 /**
+ * Syncs user tier and seat policy to One-API asynchronously.
+ * Uses the user's display name or username as the human-readable alias in One-API,
+ * so the operator can tally and discuss usage directly by user name without exposing sensitive PII.
+ */
+// ─── One-API Seat Token helpers ───────────────────────────────────────────────
+
+/**
+ * Find all active One-API seat tokens for a given alias and return their IDs.
+ */
+async function listActiveTokensForAlias(tenantId, aliasId) {
+  const list = await oneApi(
+    'GET',
+    `/api/tenant/${encodeURIComponent(tenantId)}/token?seat_alias=${encodeURIComponent(aliasId)}`,
+  ).catch(() => ({ data: [] }));
+  return (list.data || []).filter((t) => t.seat_alias === aliasId && t.status === 1);
+}
+
+/**
+ * Disable all active One-API seat tokens for a given alias (suspend/delete path).
+ */
+async function disableTokensForAlias(tenantId, aliasId) {
+  const active = await listActiveTokensForAlias(tenantId, aliasId);
+  await Promise.all(
+    active.map((t) =>
+      oneApi('PUT', `/api/tenant/${encodeURIComponent(tenantId)}/token/${t.id}/disable`).catch(
+        () => {},
+      ),
+    ),
+  );
+  return active.length;
+}
+
+// ─── Full lifecycle sync functions ────────────────────────────────────────────
+
+/**
+ * Upsert the seat policy on One-API for a user.
+ * Fires on: create, tier change, familyRole change, group membership change, name change.
+ * Also called after unsuspend to restore the policy entry.
+ */
+async function syncUserSeatToOneApi(userId, accountType, familyRole) {
+  try {
+    if (!oneApiConfigured()) return;
+    const user = await runAsSystem(() =>
+      db.getUserById(
+        userId,
+        'email username name satchidaSeatAlias accountType tenantId familyRole suspended',
+      ),
+    );
+    if (!user) return;
+
+    // Don't upsert policy for suspended users — their tokens are already disabled.
+    // The unsuspend path calls this explicitly after re-enabling tokens.
+    if (user.suspended) return;
+
+    const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
+    const effectiveType = accountType || user.accountType || 'basic';
+    const policy = SEAT_POLICY_BY_TYPE[effectiveType] || SEAT_POLICY_BY_TYPE.basic;
+
+    // Build / reuse seat alias — human-readable, zero PII.
+    let aliasId = user.satchidaSeatAlias;
+    if (!aliasId) {
+      const cleanName = (user.name || user.username || user.email?.split('@')[0] || 'user')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 32);
+      aliasId = `seat_${cleanName}_${user._id.toString().slice(-6)}`;
+      await runAsSystem(() => db.updateUser(userId, { satchidaSeatAlias: aliasId }));
+    }
+
+    const isChild = (familyRole || user.familyRole) === 'minor';
+
+    await oneApi('PUT', `/api/tenant/${encodeURIComponent(tenantId)}/seat-policy`, {
+      alias_id: aliasId,
+      seat_tier: effectiveType,
+      profile_type: isChild ? 'child' : 'adult',
+      account_type: effectiveType,
+      allowed_modes: policy.modes.split(','),
+      allowed_models: policy.models.split(','),
+    }).catch((err) => {
+      console.warn(
+        `[oneApi] seat-policy upsert failed for user ${userId} (tenant ${tenantId}):`,
+        err.message,
+      );
+    });
+  } catch (err) {
+    console.warn(`[oneApi] syncUserSeatToOneApi error for user ${userId}:`, err.message);
+  }
+}
+
+/**
+ * Suspend a seat on One-API: disables all active tokens for the alias.
+ * Fires on: admin sets suspended=true on a user.
+ */
+async function suspendSeatOnOneApi(userId) {
+  try {
+    if (!oneApiConfigured()) return;
+    const user = await runAsSystem(() =>
+      db.getUserById(userId, 'satchidaSeatAlias tenantId'),
+    );
+    if (!user?.satchidaSeatAlias) return;
+    const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
+    const disabled = await disableTokensForAlias(tenantId, user.satchidaSeatAlias);
+    console.info(
+      `[oneApi] Suspended seat ${user.satchidaSeatAlias} for user ${userId}: ${disabled} token(s) disabled`,
+    );
+  } catch (err) {
+    console.warn(`[oneApi] suspendSeatOnOneApi error for user ${userId}:`, err.message);
+  }
+}
+
+/**
+ * Restore a seat on One-API after unsuspend: re-upserts the seat policy so the
+ * user can mint a new token on next login. The old token was disabled on suspend
+ * so this effectively issues a fresh capability grant.
+ * Fires on: admin sets suspended=false on a previously suspended user.
+ */
+async function restoreSeatOnOneApi(userId) {
+  try {
+    if (!oneApiConfigured()) return;
+    const user = await runAsSystem(() =>
+      db.getUserById(
+        userId,
+        'email username name satchidaSeatAlias accountType tenantId familyRole',
+      ),
+    );
+    if (!user) return;
+    // Re-upsert policy directly (bypass the suspended guard in syncUserSeatToOneApi)
+    const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
+    const effectiveType = user.accountType || 'basic';
+    const policy = SEAT_POLICY_BY_TYPE[effectiveType] || SEAT_POLICY_BY_TYPE.basic;
+    let aliasId = user.satchidaSeatAlias;
+    if (!aliasId) {
+      const cleanName = (user.name || user.username || user.email?.split('@')[0] || 'user')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 32);
+      aliasId = `seat_${cleanName}_${user._id.toString().slice(-6)}`;
+      await runAsSystem(() => db.updateUser(userId, { satchidaSeatAlias: aliasId }));
+    }
+    await oneApi('PUT', `/api/tenant/${encodeURIComponent(tenantId)}/seat-policy`, {
+      alias_id: aliasId,
+      seat_tier: effectiveType,
+      profile_type: user.familyRole === 'minor' ? 'child' : 'adult',
+      account_type: effectiveType,
+      allowed_modes: policy.modes.split(','),
+      allowed_models: policy.models.split(','),
+    }).catch((err) => {
+      console.warn(`[oneApi] restore seat-policy failed for user ${userId}:`, err.message);
+    });
+    console.info(`[oneApi] Restored seat ${aliasId} for user ${userId}`);
+  } catch (err) {
+    console.warn(`[oneApi] restoreSeatOnOneApi error for user ${userId}:`, err.message);
+  }
+}
+
+/**
+ * Delete a seat from One-API: disables all tokens AND removes the alias row.
+ * Fires on: admin deletes a user account.
+ */
+async function deleteSeatOnOneApi(userId) {
+  try {
+    if (!oneApiConfigured()) return;
+    const user = await runAsSystem(() =>
+      db.getUserById(userId, 'satchidaSeatAlias tenantId'),
+    );
+    if (!user?.satchidaSeatAlias) return;
+    const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
+    // 1. Disable all active tokens first
+    await disableTokensForAlias(tenantId, user.satchidaSeatAlias).catch(() => {});
+    // 2. Delete the seat-policy alias row
+    await oneApi(
+      'DELETE',
+      `/api/tenant/${encodeURIComponent(tenantId)}/seat-policy/${encodeURIComponent(user.satchidaSeatAlias)}`,
+    ).catch((err) => {
+      // 404 is fine — alias may already be gone
+      if (!err.message?.includes('404')) {
+        console.warn(`[oneApi] seat-policy delete failed for ${user.satchidaSeatAlias}:`, err.message);
+      }
+    });
+    console.info(`[oneApi] Deleted seat ${user.satchidaSeatAlias} for user ${userId}`);
+  } catch (err) {
+    console.warn(`[oneApi] deleteSeatOnOneApi error for user ${userId}:`, err.message);
+  }
+}
+
+// ─── LibreChat Group Membership Sync ─────────────────────────────────────────
+
+/**
+ * Move a user to the LibreChat group that matches their new accountType.
+ *
+ * Rules:
+ *  - Remove the user from every OTHER accountType-based group they currently belong to.
+ *  - Add the user to the group whose `accountType` field matches `newAccountType`.
+ *  - Non-accountType groups (admin, custom) are left untouched.
+ *
+ * This fires synchronously (awaited) in the PATCH response wrapper so the
+ * admin panel Groups page reflects the change immediately on next load.
+ */
+async function moveUserToAccountTypeGroup(userId, newAccountType) {
+  try {
+    if (!newAccountType || !SEAT_TYPES.includes(newAccountType)) return;
+
+    // 1. Get all groups the user is currently a member of
+    const currentGroups = await runAsSystem(() => db.getUserGroups(userId)).catch(() => []);
+
+    // 2. Remove from every DIFFERENT accountType-based group
+    for (const g of currentGroups) {
+      const gType = g.accountType || g.seatType;
+      if (gType && SEAT_TYPES.includes(gType) && gType !== newAccountType) {
+        await runAsSystem(() =>
+          db.removeUserFromGroup(userId, g._id.toString()).catch(() => {}),
+        );
+      }
+    }
+
+    // 3. Find the target group for the new accountType (tenant-scoped first, then global)
+    const user = await runAsSystem(() =>
+      db.getUserById(userId, 'tenantId').catch(() => null),
+    );
+    const tenantId = user?.tenantId;
+
+    let targetGroup = null;
+    if (tenantId) {
+      targetGroup = await runAsSystem(() =>
+        db.findGroupByQuery({ accountType: newAccountType, tenantId }).catch(() => null),
+      );
+    }
+    if (!targetGroup) {
+      targetGroup = await runAsSystem(() =>
+        db.findGroupByQuery({ accountType: newAccountType }).catch(() => null),
+      );
+    }
+
+    // 4. Add to the matching group if not already a member
+    if (targetGroup?._id) {
+      const alreadyMember = currentGroups.some(
+        (g) => g._id.toString() === targetGroup._id.toString(),
+      );
+      if (!alreadyMember) {
+        await runAsSystem(() =>
+          db.addUserToGroup(userId, targetGroup._id.toString()).catch(() => {}),
+        );
+        console.info(
+          `[groups] Moved user ${userId} to group "${targetGroup.name}" (accountType=${newAccountType})`,
+        );
+      }
+    } else {
+      console.warn(
+        `[groups] No group found for accountType="${newAccountType}" — user ${userId} not added to any group`,
+      );
+    }
+  } catch (err) {
+    console.warn(`[groups] moveUserToAccountTypeGroup error for user ${userId}:`, err.message);
+  }
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+/**
  * POST /api/admin/users
  * Provision a single account. Delegates to the admin users handler so tenant
  * stamping, account type, quota and group membership share one implementation.
  */
-router.post('/', requireManageUsers, handlers.createUser);
+router.post('/', requireManageUsers, async (req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function (data) {
+    if (res.statusCode >= 200 && res.statusCode < 300 && data?.user?._id) {
+      const uid = data.user._id.toString();
+      const newType = req.body?.accountType;
+      // Sync One-API seat policy
+      syncUserSeatToOneApi(uid, newType, req.body?.familyRole).catch(() => {});
+      // Sync LibreChat group membership (createUser in users.ts already calls
+      // addUserToGroup via findGroupByName — this is a belt-and-braces guard).
+      if (newType) moveUserToAccountTypeGroup(uid, newType).catch(() => {});
+    }
+    return originalJson(data);
+  };
+  return handlers.createUser(req, res, next);
+});
 
-/** PATCH /api/admin/users/:id - partial update of a user in the caller's tenant. */
-router.patch('/:id', requireManageUsers, handlers.updateUser);
+/**
+ * PATCH /api/admin/users/:id
+ * Partial update — accountType change triggers both group re-assignment AND
+ * One-API seat-policy upsert, suspension change triggers seat enable/disable.
+ */
+router.patch('/:id', requireManageUsers, async (req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function (data) {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const { id } = req.params;
+      const newType = req.body?.accountType;
+      const newFamilyRole = req.body?.familyRole;
+      const suspendedField = req.body?.suspended;
+
+      // ── Group membership ────────────────────────────────────────────────────
+      // Move to the right LibreChat group immediately when accountType changes.
+      if (newType) {
+        moveUserToAccountTypeGroup(id, newType).catch(() => {});
+      }
+
+      // ── One-API seat lifecycle ──────────────────────────────────────────────
+      if (suspendedField === true) {
+        // Admin suspended the account — disable all active seat tokens
+        suspendSeatOnOneApi(id).catch(() => {});
+      } else if (suspendedField === false) {
+        // Admin un-suspended — restore seat policy so user can get a new token
+        restoreSeatOnOneApi(id).catch(() => {});
+      } else {
+        // Tier / name / familyRole change — upsert seat policy
+        syncUserSeatToOneApi(id, newType, newFamilyRole).catch(() => {});
+      }
+    }
+    return originalJson(data);
+  };
+  return handlers.updateUser(req, res, next);
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * On user deletion: revoke seat tokens and remove alias from One-API before
+ * the handler purges the MongoDB document.
+ */
+router.delete('/:id', requireManageUsers, async (req, res, next) => {
+  // Fire seat cleanup BEFORE the handler deletes the user (we still need the alias field)
+  const { id } = req.params;
+  deleteSeatOnOneApi(id).catch(() => {});
+  return handlers.deleteUser(req, res, next);
+});
 
 /** GET /api/admin/users/:id/groups - groups the user belongs to. */
 router.get('/:id/groups', requireReadUsers, handlers.getUserGroups);

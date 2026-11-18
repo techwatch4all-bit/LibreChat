@@ -709,6 +709,60 @@ describe('getUserUsageStats Tests', () => {
     expect(stats.totalTokens).toBe(250);
     expect(stats.transactionCount).toBe(1);
   });
+
+  test('correctly splits tokens between Local LLM and Cloud LLM', async () => {
+    const userId = new mongoose.Types.ObjectId();
+
+    // Local LLM (Privacy mode)
+    await Transaction.create({
+      user: userId,
+      model: 'Privacy',
+      tokenType: 'prompt',
+      rawAmount: -150,
+      inputTokens: -150,
+    });
+    await Transaction.create({
+      user: userId,
+      model: 'Privacy',
+      tokenType: 'completion',
+      rawAmount: -50,
+    });
+
+    // Cloud LLM (Chat / DeepSeek)
+    await Transaction.create({
+      user: userId,
+      model: 'Chat',
+      tokenType: 'prompt',
+      rawAmount: -2000,
+      inputTokens: -1200,
+      readTokens: -800,
+    });
+    await Transaction.create({
+      user: userId,
+      model: 'Chat',
+      tokenType: 'completion',
+      rawAmount: -400,
+    });
+
+    const stats = await getUserUsageStats(userId.toString());
+    expect(stats.local).toBeDefined();
+    expect(stats.local?.inputTokens).toBe(150);
+    expect(stats.local?.outputTokens).toBe(50);
+    expect(stats.local?.totalTokens).toBe(200);
+    expect(stats.local?.transactionCount).toBe(2);
+
+    expect(stats.cloud).toBeDefined();
+    expect(stats.cloud?.inputTokens).toBe(1200);
+    expect(stats.cloud?.outputTokens).toBe(400);
+    expect(stats.cloud?.cacheRead).toBe(800);
+    expect(stats.cloud?.totalTokens).toBe(2400);
+    expect(stats.cloud?.transactionCount).toBe(2);
+
+    expect(stats.inputTokens).toBe(1350);
+    expect(stats.outputTokens).toBe(450);
+    expect(stats.totalTokens).toBe(2600);
+    expect(stats.transactionCount).toBe(4);
+  });
 });
 
 describe('Partial endpointTokenConfig fallback', () => {

@@ -553,6 +553,16 @@ const startServer = async () => {
     }),
   );
 
+  // Studio Library page — the per-user gallery of every generated image and
+  // video. Serve it from client/public ahead of the SPA fallback, which would
+  // otherwise swallow this path and render the chat shell instead of the
+  // library. The source of truth stays in client/public so client rebuilds
+  // keep shipping it.
+  app.get(
+    '/studio-library.html',
+    express.static(appConfig.paths.publicPath),
+  );
+
   // Studio artifact home — stable directory OUTSIDE client/dist so client
   // rebuilds can never 404 a delivered creation. The montage server publishes
   // here and the Studio Library manifest lives alongside the artifacts.
@@ -579,6 +589,32 @@ const startServer = async () => {
       },
     }),
   );
+
+  // Per-user Studio Library manifest (operator request, 2026-11-17).
+  // Requires a signed-in session: media delivered in chat must be findable
+  // later from the /studio-library.html page. Returns the same manifest the
+  // static /generated/manifest.json exposes, but only for authenticated users.
+  app.get('/api/studio/library', optionalJwtAuth, (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Sign in to view your Studio Library' });
+    }
+    try {
+      const manifestPath = path.resolve(
+        'D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated\\manifest.json',
+      );
+      let entries = [];
+      if (fs.existsSync(manifestPath)) {
+        entries = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      }
+      const owner = (req.user && (req.user.name || req.user.username)) || '';
+      const scoped = entries.filter(
+        (e) => !e.user || e.user === owner || e.user === 'shared',
+      );
+      return res.json({ items: scoped, owner, total: entries.length });
+    } catch (err) {
+      return res.status(500).json({ error: 'Library manifest unavailable' });
+    }
+  });
 
   app.post('/api/explain', express.json(), async (req, res) => {
     try {

@@ -21,6 +21,7 @@ import os
 import io
 import json
 import re
+import uuid
 import mimetypes
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -68,6 +69,18 @@ ANYTHINGLLM_API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
 EXPORT_OUTPUT_DIR = os.environ.get("SATCHIDA_EXPORTS_DIR", "D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated")
 
 os.makedirs(EXPORT_OUTPUT_DIR, exist_ok=True)
+
+
+def _unique_output_name(name: str) -> str:
+    """Operator directive (2026-11-17): an output document may NEVER overwrite
+    an existing deliverable. A colliding name gets a timestamp+id suffix so
+    every /generated link keeps pointing at exactly what was delivered."""
+    base = os.path.basename(name)
+    candidate = os.path.join(EXPORT_OUTPUT_DIR, base)
+    if not os.path.exists(candidate):
+        return base
+    stem, ext = os.path.splitext(base)
+    return f"{stem}_{datetime.now().strftime('%Y%m%d-%H%M%S')}_{uuid.uuid4().hex[:4]}{ext}"
 
 mcp = MCPServer("satchida-knowledge-vault")
 
@@ -319,7 +332,7 @@ def create_formatted_document(
     safe_base = re.sub(r'[^a-zA-Z0-9_.-]', '_', clean_base)
     if not safe_base:
         safe_base = f"Document_{int(datetime.now().timestamp())}"
-    safe_name = f"{safe_base}.{ext}"
+    safe_name = _unique_output_name(f"{safe_base}.{ext}")
     
     file_path = os.path.join(EXPORT_OUTPUT_DIR, safe_name)
     doc_title = title or safe_base.replace("_", " ").title()
@@ -534,7 +547,7 @@ def enhance_existing_presentation(
         if not output_filename.lower().endswith(".pptx"):
             output_filename = f"{output_filename}.pptx"
 
-        dest_path = os.path.join(EXPORT_OUTPUT_DIR, os.path.basename(output_filename))
+        dest_path = os.path.join(EXPORT_OUTPUT_DIR, _unique_output_name(os.path.basename(output_filename)))
         prs.save(dest_path)
 
         res = [
@@ -590,7 +603,7 @@ def ingest_text_to_user_vault(
     immediately into the user's segregated AnythingLLM vector workspace.
     """
     safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', document_title)
-    fname = f"{safe_title}.md"
+    fname = _unique_output_name(f"{safe_title}.md")
     fpath = os.path.join(EXPORT_OUTPUT_DIR, fname)
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(text_content)

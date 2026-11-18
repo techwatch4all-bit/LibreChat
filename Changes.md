@@ -1,12 +1,56 @@
-## 2026-11-17 — Fix Token Usage Discrepancies Between Chat Gauge and Header Billing Gauge
+## 2026-11-17 — Media library verification pass + dead-manifest repair + thumbnail backfill
+
+- **Verification of the M1–M7 claims** (all confirmed against files, runtime, HTTP and Mongo): unique-filename helpers present in `satchida-montage-server.py` and `anythingllm_mcp_server.py`; reconciliation reports exist with billed = one-api = $1.9861; `/api/studio/library` live (401 anonymous, `optionalJwtAuth` at `api/server/index.js:587`); audio gates present in `video_generate`, `media_compose`, `animated_generate_local`; ComfyUI headless running on :8188 (uv CPython 3.12.9) with `extra_models_config.yaml` base_path → `D:\LAN-AI-Infra\Image-models`; re-run `fix_chat_links.py` audit: **24 OK / 0 REPAIRED / 0 BROKEN**; deleted conversation `125fc105…` confirmed absent in Mongo (0 conv + 0 msgs, 139 conversations remain).
+- **New `satchida/ops/backfill_thumbnails.py`**: (1) publishes manifest entries whose artifact only lived in legacy dirs (`exports/videos`, `client/public/generated`, AnythingLLM `documents/generated/videos`) into the stable studio home and rewrites their URLs to `/generated/<name>`; (2) backfills thumbnails — images serve as their own poster, videos get `<stem>_thumb.jpg` via ffmpeg (same args as `_make_video_thumbnail`). Result: **35/35 manifest entries now carry a thumbnail** and all URLs serve real content (verified: mp4/mp4/mp4/jpeg over HTTP). 10 previously dead manifest entries repaired; manifest backup `manifest.bak-20261117-100132.json`.
+- **Finding (open risk):** `/generated` is double-mounted — AnythingLLM docs (`index.js:517`) is registered *before* the studio mount (`index.js:564`), so `/generated/videos/steam_loco_arch_bridge_dusk_rain.mp4` is served from AnythingLLM storage (5.9 MB file, different render than the 2.1 MB copy in `exports/videos` with the same name). Chat links to it still serve fine, but any future studio artifact that collides with an AnythingLLM doc name would silently serve the wrong file. Recommend moving the studio mount above the AnythingLLM mount and renaming legacy duplicates.
+- **Not done:** per-user attribution exists on only 1/35 manifest entries — historical entries cannot be attributed retroactively without an operator decision on which user(s) to assign them to.
+
+## 2026-11-17 — Media pipeline: unique outputs, reconciliation, library, audio gate, local ComfyUI
+
+Plan: `satchida/plans/media-pipeline-improvements-2026-11-17.md`.
+
+- **M1 Unique output filenames (no overwrite collisions)**:
+  - `skill/satchida-montage-server.py`: added `_sanitize_stem()` + `_unique_media_name()` (caller stem + per-job hex suffix, always applied). `image_generate` now always suffixes; `_ffmpeg_run` outputs and `_make_video_thumbnail` use unique names; `_publish_artifact` collision-guards against the library manifest.
+  - `skill/anythingllm_mcp_server.py`: `_unique_output_name()` collision guard applied at all 3 write sites (`create_formatted_document`, pptx enhance, `ingest_text_to_user_vault`).
+  - `skill/satchida-scenemosaic-server.py`: audited — emits HTML artifacts inline only, writes no files.
+- **M2 Ledger reconciliation automation**: new `satchida/ops/media_reconciliation.py` (`--date`, `--no-publish`). Matches one-api ↔ Bifrost deterministically by `request_id = 'bifrost:<log id>'`; artifacts matched by file mtime ±8 s. Fresh reports: `Satchida-Studio/exports/media-reconciliation-2026-11-17.md` + `.csv` — 15 renders, 14 success, billed $1.9861 = one-api $1.9861, 0 missing settlements; auto-publishes unserved artifacts (recovered the 10:44 balloon render from legacy `client/public/generated`).
+- **M3 Library + thumbnails + auth'd route**:
+  - `_publish_artifact` generates video thumbnails at publish time; manifest entries carry `thumb`, `download`, optional `user`.
+  - Rewrote `client/public/studio-library.html`: poster thumbnails (incl. video), kind filter chips, selection checkboxes with "Copy selected names for chat compose", 401 handling.
+  - New JWT-auth'd `/api/studio/library` route in `api/server/index.js` (fork's inline-mount pattern) — verified 401 anonymous.
+  - Personas now pass `user` so per-user attribution works.
+- **M4 Audio-confirmation gate (users never pay for unrequested audio)**:
+  - `video_generate` already required `audio_mode`; new `media_compose` requires an explicit audio choice; new `animated_generate_local` requires `silent`|`ambient_sfx`.
+- **M5 Multi-image composition tools** (in `satchida-montage-server.py`, single-server personas already mount it):
+  - `library_list`: lists library files with kind/user filters for selection.
+  - `media_compose`: collage via Pillow (960×540 grid) or slideshow via ffmpeg xfade (1920×1080); music/narration/silent modes; unique output + publish + thumbnail.
+- **M6 Local Privacy image generation via ComfyUI**:
+  - Headless ComfyUI running on `:8188` (uv CPython 3.12.9, `Documents\ComfyUI\.venv`, extra-models config points at `D:\LAN-AI-Infra\Image-models`); custom nodes installed: ComfyUI-GGUF, ComfyUI-VideoHelperSuite, ComfyUI-MMAudio.
+  - Tools added: `comfy_status`, `image_generate_local`, `animated_generate_local`. VRAM guard falls back to `nvidia-smi` (this box's `system_stats` reports 0/0) and never touches the :8080 llama fleet. SD1.5 (realisticVisionV51) E2E verified → published `/generated/satchida_local_image_*.png`; FLUX/Wan gated until the chat model is unloaded (~6.4 GB free).
+  - "MEDIA PRIVACY INVARIANT" blocks added to OpenFilm, Motion (both personas) and Satchida-3D-Studio in `librechat.yaml`: Privacy tier/Privacy mode → ComfyUI local; ComfyUI down → try to start it, never silently fall back to cloud.
+- **M7 Past-chat link repair**: new `satchida/ops/fix_chat_links.py` (handles string + content-parts array content; `/generated/`, `/motion/`, and bare `D:\...\exports\videos\...` paths; `--fix` rewrites message content). Run with `--fix`: **24 links, 21 OK, 3 REPAIRED, 0 BROKEN**; report at `Satchida-Studio/exports/chat-link-audit-2026-11-17.md`. Verified in Mongo (db153efe train chat now serves `/generated/montage-0ffccbcf_youtube_1080p.mp4`). Operator-confirmed deletion of the single dead conversation `125fc105-8f96-51d5-a147-66c52fb75668` (1 conversation + 2 messages); no other chats touched.
+- **Reload**: `pm2 restart librechat` — `/api/studio/library` live, `/generated/*` 200, `satchida-montage` re-spawned with 13 tools including `library_list`, `media_compose`, `comfy_status`, `image_generate_local`, `animated_generate_local`.
+
+## 2026-11-17 — Fix Token Usage Discrepancies & Deploy Real-Time Header Balance Credit System (Option 2)
 
 **Problem.**
 1. The lower chat context popup reported 51.8L tokens ("Account Billing (30D)"), whereas the top-right header circular gauge displayed 25L (24,97,088 tokens, 148 requests) — exactly half the usage.
 2. In MongoDB aggregation for `getUserUsageStats` (`packages/data-schemas/src/methods/transaction.ts`), `rawAmount` for structured transactions (which already equals `inputTokens + readTokens + writeTokens`) was selected as `inputTokens`, and `readTokens` was additionally summed into `cacheRead`. `totalTokens` was then calculated as `inputTokens + outputTokens + cacheRead + cacheWrite`, double-counting cached tokens and inflating both the input prompt and total tokens (e.g. 51.8L instead of actual 32.5L).
 3. In `client/src/components/Chat/HeaderBillingGauge.tsx`, `dateRanges` computed `endDate: now.toISOString()` once at component mount inside `useMemo(..., [])`. Because `endDate` was frozen in the past (Nov 16th), all subsequent transactions from the active session were filtered out by the MongoDB `$lte: endDate` query, capping the header gauge at the stale 148-request / 25L snapshot. Meanwhile, `Breakdown.tsx` omitted `endDate`, fetching all 268 requests. Furthermore, unaligned milliseconds between components prevented React Query cache reuse.
-4. In `HeaderBillingGauge.tsx`, accounts without a balance refill quota (`!balanceData?.refillAmount`) fell back to a hardcoded divisor of `500,000` tokens, causing the circular gauge to hit 100% and turn red (`stroke-status-error`) for any normal active user.
+4. Users reported visual confusion between the circular gauge in the header (which measured account-wide monthly billing) and the circular gauge in the chat composer (which measures in-memory conversation context window). New users saw active context tokens in the chat box but zero tokens in the header circle, while active users saw a confusing false red error border.
 
 **Shipped.**
+- **Option 2: Header Balance & Credit System Pill Badge**:
+  - Replaced the ambiguous circular SVG meter in the header with a modern, high-visibility **Balance / Credit pill button** (`client/src/components/Chat/HeaderBillingGauge.tsx`).
+  - **Dynamic Contextual Display**:
+    - Users with active token credits display their live balance (e.g., `⚡ 50K CREDITS`).
+    - Users with monthly refill quotas display remaining balance (e.g., `⚡ 450K LEFT`).
+    - Standard / unlimited plan users display accurate monthly usage (e.g., `⚡ 25L MONTH` or `⚡ 0 MONTH` for brand-new users).
+  - **Rich Interactive Popover**:
+    - Displays available credit balance and auto-refill schedules (`refillAmount`, `refillIntervalValue`, `refillIntervalUnit`).
+    - Accurate timeframe tabs (`Current Month`, `Last 7 Days`, `30 Days`) with prompt, response, and cached read breakdowns.
+    - Explicit helper note explaining the distinction between the in-memory conversation context window and account billing tokens.
+    - One-click "Settings" button launching `SettingsDialog` to manage balance and preferences.
 - **Deduplicated Cache Read Tokens in `getUserUsageStats`**:
   - In `packages/data-schemas/src/methods/transaction.ts`, structured prompt tokens now prioritize `$inputTokens` (`$ifNull: ['$inputTokens', { $ifNull: ['$rawAmount', 0] }]`).
   - True input tokens, cache read tokens, and output tokens now sum cleanly to total tokens without double counting.
@@ -14,10 +58,13 @@
 - **Synchronized Date Ranges & Removed Frozen `endDate`**:
   - In `client/src/components/Chat/HeaderBillingGauge.tsx`, removed `endDate` from rolling to-date queries (`month`, `7days`, `30days`), allowing all real-time session transactions to be included.
   - Aligned `startDate` boundaries to midnight across `HeaderBillingGauge.tsx` and `Breakdown.tsx`, ensuring identical React Query keys (`['userUsageStats', thirtyDaysAgo, undefined]`) and synchronized cached state.
-- **Real-Time Invalidation**:
-  - Added query invalidation for `['userUsageStats']` in `TokenUsage/index.tsx` upon message submission completion and in `HeaderBillingGauge.tsx` upon popover open.
-- **Accurate Ring Status Styling**:
-  - Guarded gauge error and warning states in `HeaderBillingGauge.tsx` with `hasQuota` (`balanceData?.refillAmount > 0`), ensuring users without artificial quotas show an active `stroke-primary` ring instead of an erroneous red error ring.
+- **Local LLM vs Cloud LLM Compute Breakdown**:
+  - Enhanced `getUserUsageStats` aggregation in `packages/data-schemas/src/methods/transaction.ts` to compute in/out token metrics grouped by compute architecture in a single database aggregation pass.
+  - Automatically classifies on-premise local models (e.g. `Privacy` mode, local GPU) under `local` ($0 cloud COGS) and frontier gateway models (e.g. `Chat`, `Work`, `Study`, `Motion`, `DeepSeek`, `GLM`) under `cloud`.
+  - Added dedicated **Compute Distribution** cards in both `HeaderBillingGauge.tsx` (top-right header popover) and `Breakdown.tsx` (chat input token popover) displaying:
+    - **Local LLM**: Prompt In, Response Out, Total Tokens, and Requests.
+    - **Cloud LLM**: Prompt In, Response Out, Total Tokens, and Requests.
+  - Verified with comprehensive unit test in `packages/data-schemas/src/methods/transaction.spec.ts` (68/68 tests passing).
 
 ## 2026-11-16 â€” OpenMontage 3D YouTube Production Sequence Automation
 

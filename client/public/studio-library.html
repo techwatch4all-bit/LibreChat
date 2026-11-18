@@ -1,64 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Satchida Studio Library</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:#0d0b10; color:#e8e4f0; font-family:'Segoe UI', system-ui, sans-serif; }
-  header { padding:28px 32px 10px; }
-  h1 { margin:0; font-size:22px; font-weight:600; letter-spacing:.02em; }
-  p.sub { margin:6px 0 0; color:#9a92ad; font-size:13px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; padding:20px 32px 48px; }
-  .card { background:#17131f; border:1px solid #262035; border-radius:14px; overflow:hidden; }
-  .media { position:relative; aspect-ratio:16/10; background:#000; display:flex; align-items:center; justify-content:center; }
-  .media img, .media video { width:100%; height:100%; object-fit:cover; display:block; }
-  .badge { position:absolute; top:8px; left:8px; background:rgba(10,8,14,.75); border:1px solid #2e2840; color:#cfc6e2; font-size:10.5px; padding:2px 8px; border-radius:99px; letter-spacing:.06em; text-transform:uppercase; }
-  .meta { padding:10px 12px 12px; }
-  .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
-  .when { color:#8d85a3; font-size:11.5px; }
-  a.dl { color:#a78bfa; font-size:12.5px; text-decoration:none; font-weight:600; }
-  a.dl:hover { text-decoration:underline; }
-  .empty { padding:40px; color:#8d85a3; text-align:center; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satchida Studio Library</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#0d0b10; color:#e8e4f0; font-family:'Segoe UI', system-ui, sans-serif; }
+    header { padding:28px 32px 10px; }
+    h1 { margin:0; font-size:22px; font-weight:600; letter-spacing:.02em; }
+    p.sub { margin:6px 0 0; color:#9a92ad; font-size:13px; }
+    .bar { display:flex; gap:10px; align-items:center; padding:14px 32px 0; flex-wrap:wrap; }
+    .chip { background:#17131f; border:1px solid #262035; color:#cfc6e2; font-size:12.5px; padding:6px 14px; border-radius:99px; cursor:pointer; user-select:none; }
+    .chip.active { background:#2a2140; border-color:#7c5cff; color:#fff; }
+    .sel { margin-left:auto; color:#a78bfa; font-size:12.5px; min-height:18px; }
+    a.mini { color:#a78bfa; text-decoration:none; font-weight:600; cursor:pointer; }
+    a.mini:hover { text-decoration:underline; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; padding:20px 32px 48px; }
+    .card { background:#17131f; border:1px solid #262035; border-radius:14px; overflow:hidden; }
+    .card.selected { border-color:#7c5cff; box-shadow:0 0 0 1px #7c5cff inset; }
+    .media { position:relative; aspect-ratio:16/10; background:#000; display:flex; align-items:center; justify-content:center; }
+    .media img, .media video { width:100%; height:100%; object-fit:cover; display:block; }
+    .pick { position:absolute; top:8px; right:8px; width:22px; height:22px; accent-color:#7c5cff; cursor:pointer; }
+    .badge { position:absolute; top:8px; left:8px; background:rgba(10,8,14,.75); border:1px solid #2e2840; color:#cfc6e2; font-size:10.5px; padding:2px 8px; border-radius:99px; letter-spacing:.06em; text-transform:uppercase; }
+    .meta { padding:10px 12px 12px; }
+    .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .row { display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:8px; }
+    .when { color:#8d85a3; font-size:11.5px; }
+    a.dl { color:#a78bfa; font-size:12.5px; text-decoration:none; font-weight:600; white-space:nowrap; }
+    a.dl:hover { text-decoration:underline; }
+    .empty { padding:40px; color:#8d85a3; text-align:center; }
+    .owner { color:#7f76a0; font-size:11px; }
+  </style>
 </head>
 <body>
 <header>
   <h1>Studio Library</h1>
-  <p class="sub">Every image and video created with Satchida Studio — browse, play, and download. Your creations stay here even if a chat is deleted.</p>
+  <p class="sub">Every image, video and document created with Satchida Studio — browse, play, select, and download. Your creations stay here even if a chat is deleted.</p>
 </header>
+<div class="bar">
+  <span class="chip active" data-k="all">All</span>
+  <span class="chip" data-k="image">Images</span>
+  <span class="chip" data-k="video">Videos</span>
+  <span class="chip" data-k="document">Documents</span>
+  <span class="sel" id="sel"></span>
+  <a class="mini" id="copySel" style="display:none">Copy selected names for chat compose</a>
+</div>
 <div class="grid" id="grid"><div class="empty">Loading your creations…</div></div>
 <script>
+let items = [];
+let filter = 'all';
+const selected = new Set();
+
+function card(it) {
+  const sizeMB = (it.size / (1024 * 1024)).toFixed(2);
+  const kind = it.kind || (it.url.match(/\.(mp4|webm)$/i) ? 'video' : 'image');
+  const isVideo = kind === 'video';
+  const media = isVideo
+    ? `<video src="${it.url}" ${it.thumb ? `poster="${it.thumb}"` : ''} preload="metadata" controls muted></video>`
+    : `<img src="${it.thumb || it.url}" loading="lazy" alt="">`;
+  const owner = it.user ? `<span class="owner">${it.user}</span>` : '';
+  return `<div class="card" data-name="${it.name}">
+    <div class="media">${media}<span class="badge">${kind}</span>
+      <input class="pick" type="checkbox" data-name="${it.name}" title="Select for collage / slideshow"></div>
+    <div class="meta">
+      <div class="name" title="${it.name}">${it.name}</div>
+      <div class="row">
+        <span class="when">${it.created || ''} · ${sizeMB} MB ${owner}</span>
+        <a class="dl" href="${it.url}" download>Download</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const grid = document.getElementById('grid');
+  const shown = items.filter(it => filter === 'all' || (it.kind || '') === filter);
+  grid.innerHTML = shown.length ? shown.map(card).join('') :
+    `<div class="empty">No ${filter === 'all' ? 'creations' : filter + 's'} yet — generate one from any Satchida Studio chat.</div>`;
+  grid.querySelectorAll('input.pick').forEach(box => {
+    box.checked = selected.has(box.dataset.name);
+    box.onchange = () => {
+      box.checked ? selected.add(box.dataset.name) : selected.delete(box.dataset.name);
+      box.closest('.card').classList.toggle('selected', box.checked);
+      updateSel();
+    };
+  });
+}
+
+function updateSel() {
+  const el = document.getElementById('sel');
+  const link = document.getElementById('copySel');
+  el.textContent = selected.size ? `${selected.size} selected` : '';
+  link.style.display = selected.size ? 'inline' : 'none';
+}
+
+document.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  ch.classList.add('active');
+  filter = ch.dataset.k;
+  render();
+});
+
+document.getElementById('copySel').onclick = async () => {
+  const names = [...selected].join('", "');
+  try {
+    await navigator.clipboard.writeText(names);
+    document.getElementById('copySel').textContent = 'Copied! Paste into chat: build a collage / slideshow from "names"';
+    setTimeout(() => { document.getElementById('copySel').textContent = 'Copy selected names for chat compose'; }, 2500);
+  } catch (e) {
+    prompt('Copy these file names:', names);
+  }
+};
+
 async function load() {
   const grid = document.getElementById('grid');
   try {
-    const r = await fetch('/generated/manifest.json', { cache: 'no-store' });
-    const items = await r.json();
-    if (!Array.isArray(items) || items.length === 0) {
+    const r = await fetch('/api/studio/library', { credentials: 'include' });
+    if (r.status === 401) {
+      grid.innerHTML = '<div class="empty">Sign in to LibreChat, then open your Studio Library again.</div>';
+      return;
+    }
+    const data = await r.json();
+    items = data.items || [];
+    items.forEach(it => { it.kind = it.kind || ((it.url || '').match(/\.(mp4|webm)$/i) ? 'video' : 'image'); });
+    if (!items.length) {
       grid.innerHTML = '<div class="empty">No creations yet — generate one from any Satchida Studio chat.</div>';
       return;
     }
-    grid.innerHTML = items.map(it => {
-      const sizeMB = (it.size / (1024 * 1024)).toFixed(2);
-      const media = it.kind === 'video'
-        ? `<video src="${it.url}" preload="metadata" controls muted></video>`
-        : `<img src="${it.url}" loading="lazy" alt="">`;
-      return `<div class="card">
-        <div class="media">${media}<span class="badge">${it.kind}</span></div>
-        <div class="meta">
-          <div class="name" title="${it.name}">${it.name}</div>
-          <div class="row">
-            <span class="when">${it.created || ''} · ${sizeMB} MB</span>
-            <a class="dl" href="${it.url}" download>Download</a>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    render();
   } catch (e) {
-    grid.innerHTML = '<div class="empty">Could not load the library manifest.</div>';
+    grid.innerHTML = '<div class="empty">Could not load the library.</div>';
   }
 }
 load();

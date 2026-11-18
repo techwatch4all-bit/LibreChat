@@ -33,6 +33,7 @@ import time
 import uuid
 import base64
 import hashlib
+import random
 import shutil
 import threading
 import subprocess
@@ -77,6 +78,63 @@ VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 ACTIVE_JOBS: Dict[str, Dict[str, Any]] = {}
 JOB_LOCK = threading.Lock()
+
+# ── Per-job unique filenames (operator directive, 2026-11-17) ────────────────
+# Every media job owns its output file. Caller-supplied names keep their stem
+# but always receive a per-job suffix, so a re-render can never overwrite an
+# earlier deliverable (the 10:42/10:44 balloon renders were lost that way).
+def _sanitize_stem(raw: str, default_prefix: str) -> str:
+    stem = Path(raw.strip()).stem if raw.strip() else ""
+    stem = "".join(c if (c.isalnum() or c in "-_") else "_" for c in stem)[:64]
+    return stem or default_prefix
+
+
+def _unique_media_name(requested: str, default_prefix: str, ext: str) -> str:
+    """Collision-proof output filename: sanitized caller stem + per-job hex id."""
+    return f"{_sanitize_stem(requested, default_prefix)}_{uuid.uuid4().hex[:8]}{ext}"
+
+
+def _ffmpeg_run(args: List[str], timeout: int = 300) -> bool:
+    """Run an ffmpeg command, swallowing Windows console-handle noise."""
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        proc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"] + args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+            creationflags=flags,
+        )
+        return proc.returncode == 0
+    except Exception as e:
+        print(f"[satchida-montage] ffmpeg failed: {e}", file=sys.stderr)
+        return False
+
+
+def _make_video_thumbnail(video_path: Path, thumb_path: Optional[Path] = None) -> Optional[Path]:
+    """Grab a mid-clip frame as the library thumbnail. Best effort — returns
+    None when ffmpeg is unavailable rather than failing the publish."""
+    try:
+        thumb = thumb_path or video_path.with_name(video_path.stem + "_thumb.jpg")
+        cmd = [
+            "-ss", "1",
+            "-i", str(video_path),
+            "-frames:v", "1",
+            "-vf", "scale=640:-2",
+            "-q:v", "4",
+            str(thumb),
+        ]
+        if video_path.stat().st_size > 0 and _ffmpeg_run(cmd):
+            if thumb.exists() and thumb.stat().st_size > 512:
+                return thumb
+        # Short clips (<2 s): seek to 1 s finds no frame — retry from 0.
+        cmd[1] = "0"
+        if _ffmpeg_run(cmd) and thumb.exists() and thumb.stat().st_size > 512:
+            return thumb
+    except Exception as e:
+        print(f"[satchida-montage] thumbnail skipped: {e}", file=sys.stderr)
+    return None
 
 # ── Provider policy (operator directive, 2026-11-16) ─────────────────────────
 # Priority: (1) CheapInference — purchased credit, main test provider
@@ -1766,41 +1824,76 @@ def video_export_youtube_bundle(project_id: str) -> str:
     )
 
 
-def _publish_artifact(path: Path) -> str:
+def _publish_artifact(
+    path: Path, thumb_path: Optional[Path] = None, user: str = ""
+) -> str:
     """Publish a finished artifact to the STABLE studio home
     (D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated) which LibreChat
     serves at /generated via a dedicated express static route. This directory
     is outside client/dist, so client rebuilds can never 404 a delivered
     creation. Also maintains manifest.json for the Studio Library gallery.
     The manifest carries NO provider/model/cost data.
+
+    Collision rule (operator directive, 2026-11-17): an existing library file
+    is NEVER overwritten — a colliding name is republished under a suffixed
+    name and the returned URL points at that copy. Videos get a poster-frame
+    thumbnail next to the media so the library and chat embeds can show one.
     """
     try:
         stable_dir = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
         stable_dir.mkdir(parents=True, exist_ok=True)
+        is_video = path.name.lower().endswith((".mp4", ".webm"))
+        kind = "video" if is_video else "image"
         name = path.name
-        kind = "video" if name.lower().endswith((".mp4", ".webm")) else "image"
         dest = stable_dir / name
+        if dest.exists() and dest.stat().st_size != path.stat().st_size:
+            name = f"{Path(name).stem}_{uuid.uuid4().hex[:8]}{Path(name).suffix}"
+            dest = stable_dir / name
         shutil.copyfile(path, dest)
+
+        # Poster thumbnail for videos (images are their own thumbnail).
+        web_url = f"/generated/{name}"
+        thumb_url = ""
+        try:
+            if is_video:
+                if thumb_path and Path(thumb_path).exists():
+                    tname = f"{Path(name).stem}_thumb{Path(thumb_path).suffix or '.jpg'}"
+                    shutil.copyfile(thumb_path, stable_dir / tname)
+                    thumb_url = f"/generated/{tname}"
+                else:
+                    grabbed = _make_video_thumbnail(dest)
+                    if grabbed:
+                        thumb_url = f"/generated/{grabbed.name}"
+            elif name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+                thumb_url = web_url
+        except Exception as te:
+            print(f"[satchida-montage] thumbnail step skipped: {te}", file=sys.stderr)
+
         manifest_path = stable_dir / "manifest.json"
         try:
             entries = []
             if manifest_path.exists():
                 entries = json.loads(manifest_path.read_text(encoding="utf-8"))
             if not any(e.get("name") == name for e in entries):
-                entries.append({
+                entry = {
                     "name": name,
                     "kind": kind,
-                    "url": f"/generated/{name}",
+                    "url": web_url,
+                    "thumb": thumb_url,
+                    "download": web_url,
                     "created": datetime.datetime.now(datetime.timezone.utc).strftime(
                         "%Y-%m-%d %H:%M"
                     ),
                     "size": dest.stat().st_size,
-                })
+                }
+                if user.strip():
+                    entry["user"] = user.strip()[:64]
+                entries.append(entry)
             entries.sort(key=lambda e: e.get("created", ""), reverse=True)
             manifest_path.write_text(json.dumps(entries, indent=1), encoding="utf-8")
         except Exception as me:
             print(f"[satchida-montage] manifest update skipped: {me}", file=sys.stderr)
-        return f"/generated/{name}"
+        return web_url
     except Exception as e:
         print(f"[satchida-montage] artifact publish failed: {e}", file=sys.stderr)
         return ""
@@ -1854,7 +1947,7 @@ def _render_video_job(job_id: str, spec: dict) -> None:
             else:
                 audio_note = " (silent requested; model-embedded audio kept)"
 
-        web_url = _publish_artifact(out)
+        web_url = _publish_artifact(out, user=spec.get("user", ""))
         with _MEDIA_JOB_LOCK:
             MEDIA_JOBS[job_id].update({
                 "status": "done",
@@ -1882,6 +1975,8 @@ def video_generate(
     native_audio: bool = False,
     quality: str = "fast",
     image_url: str = "",
+    audio_mode: str = "",
+    user: str = "",
 ) -> str:
     """
     Start an async render job for one real AI video clip (cloud only), and
@@ -1900,17 +1995,32 @@ def video_generate(
             generate synchronized sound inside the clip itself.
         quality: 'fast' (cheapest first) or 'hd' (higher-fidelity first).
         image_url: Optional public image URL — switches to image-to-video.
+        user: The signed-in user's name/email — attribution for their library.
 
     Returns the job id and polling instructions, or a clear error message.
     """
     if not prompt.strip():
         return "Error: prompt is required."
+    mode = audio_mode.strip().lower()
+    if mode not in {"silent", "sfx_music", "spoken_narration"}:
+        return (
+            "Audio choice required before paid rendering. Ask the user to choose "
+            "one: Silent / Music & SFX / Spoken narration. Do not start the render yet."
+        )
+    if mode == "silent" and (native_audio or narration.strip()):
+        return "Audio settings conflict: silent was selected but audio was requested. Ask the user to clarify."
+    if mode == "spoken_narration" and not narration.strip():
+        return "Spoken narration was selected; obtain the narration text before rendering."
+    if mode == "sfx_music" and not native_audio:
+        native_audio = True
     name = filename.strip() or f"clip-{uuid.uuid4().hex[:8]}.mp4"
     if not name.lower().endswith(".mp4"):
         name += ".mp4"
-    name = Path(name).name
-
+    # Never permit a caller-supplied stable name to collide with an earlier or
+    # still-running render. Preserve the requested stem but suffix with job id.
+    requested_name = Path(name).stem
     job_id = f"vjob-{uuid.uuid4().hex[:8]}"
+    name = f"{requested_name}_{job_id}.mp4"
     spec = {
         "prompt": prompt.strip(),
         "duration_seconds": duration_seconds,
@@ -1918,8 +2028,10 @@ def video_generate(
         "filename": name,
         "narration": narration,
         "native_audio": native_audio,
+        "audio_mode": mode,
         "quality": quality,
         "image_url": image_url,
+        "user": user,
     }
     with _MEDIA_JOB_LOCK:
         MEDIA_JOBS[job_id] = {"id": job_id, "status": "queued", "spec": spec}
@@ -1974,6 +2086,7 @@ def image_generate(
     prompt: str,
     aspect_ratio: str = "16:9",
     filename: str = "",
+    user: str = "",
 ) -> str:
     """
     Generate a real AI image (cloud only).
@@ -1985,23 +2098,26 @@ def image_generate(
         prompt: Text description of the image to generate.
         aspect_ratio: '16:9', '9:16', or '1:1'.
         filename: Optional output filename (auto-generated if empty).
+        user: The signed-in user's name/email — attribution for their library.
 
     Returns the absolute path of the generated image, or a clear error message.
     """
     if not prompt.strip():
         return "Error: prompt is required."
-    name = filename.strip() or f"image-{uuid.uuid4().hex[:8]}.jpg"
-    if "." not in name:
-        name += ".jpg"
-    out = VIDEOS_DIR / Path(name).name
+    ext = ".png" if filename.strip().lower().endswith(".png") else ".jpg"
+    stem = _sanitize_stem(filename, "image")
+    name = f"{stem}_{uuid.uuid4().hex[:8]}{ext}"
+    out = VIDEOS_DIR / name
 
     ok = _generate_image_core(prompt, out, aspect_ratio)
     if ok:
         size_kb = out.stat().st_size / 1024
-        web_url = _publish_artifact(out)
+        web_url = _publish_artifact(out, user=user)
         url_line = (
             f"\n**Web URL (embed exactly this so the image displays in chat):**\n\n"
-            f"![generated image]({web_url})\n"
+            f"![generated image]({web_url})\n\n"
+            f"**Download link (include it in your reply):** [⬇ Download image]({web_url})\n"
+            f"\n**Also visible in the user's Studio Library:** `/library`\n"
             if web_url
             else ""
         )
@@ -2018,6 +2134,797 @@ def image_generate(
         "Error: image generation failed on the approved provider chain "
         "(CheapInference via Bifrost, DeepInfra direct). Check Bifrost "
         "(:8700) and this server's stderr logs."
+    )
+
+
+# ── Studio Library + multi-image composition (operator request, 2026-11-17) ──
+_STABLE_GENERATED_DIR = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
+_COMPOSABLE_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _library_manifest() -> list:
+    try:
+        manifest_path = _STABLE_GENERATED_DIR / "manifest.json"
+        if manifest_path.exists():
+            entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+            return entries if isinstance(entries, list) else []
+    except Exception:
+        pass
+    return []
+
+
+def _resolve_library_file(name: str) -> Optional[Path]:
+    base = Path(name.strip()).name
+    for d in (_STABLE_GENERATED_DIR, VIDEOS_DIR):
+        candidate = d / base
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+@mcp.tool()
+def library_list(kind: str = "all") -> str:
+    """
+    List the user's generated media (images/videos) from the Studio Library.
+
+    Use this whenever the user wants to build something from their existing
+    creations — show the numbered list, ask which items to use, then pass the
+    exact file names into media_compose.
+
+    Args:
+        kind: 'all', 'image', or 'video' to filter the listing.
+
+    Returns a numbered list with name, created date, size, and Web URL.
+    """
+    wanted = kind.strip().lower()
+    if wanted not in {"all", "image", "video"}:
+        return "Error: kind must be 'all', 'image', or 'video'."
+    entries = _library_manifest()
+    if wanted != "all":
+        entries = [e for e in entries if e.get("kind") == wanted]
+    if not entries:
+        return "The Studio Library is empty — generate media first."
+    lines = [f"### 🗂 Studio Library — {len(entries)} item(s)"]
+    for i, e in enumerate(entries, 1):
+        mb = e.get("size", 0) / (1024 * 1024)
+        lines.append(
+            f"{i}. **{e.get('name')}** · {e.get('kind')} · {e.get('created', '')} · "
+            f"{mb:.2f} MB · {e.get('url', '')}"
+        )
+    lines.append(
+        "Ask the user which numbers to use, then call media_compose with the "
+        "exact file names. Never compose without the user's explicit selection."
+    )
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def media_compose(
+    compose_type: str,
+    files: List[str],
+    output_name: str = "",
+    audio_mode: str = "",
+    seconds_per_image: float = 4.0,
+    transition: str = "fade",
+    music_file: str = "",
+    narration: str = "",
+    user: str = "",
+) -> str:
+    """
+    Build a collage or a slideshow video from media the user SELECTED from their
+    Studio Library (call library_list first, let the user pick, then pass the
+    exact file names).
+
+    Args:
+        compose_type: 'collage' (single grid image from 2+ images) or
+            'slideshow' (MP4 video from 2+ images, with your audio choice).
+        files: Selected library file names, e.g. ['a.png', 'b.jpg'].
+        output_name: Optional readable name (a per-job unique suffix is always
+            appended, so nothing is ever overwritten).
+        audio_mode: REQUIRED for 'slideshow' — ask the user to choose first:
+            'silent' | 'music' (music_file required) | 'narration'
+            (narration text required, free neural TTS). Never guess audio; a
+            paid wrong choice costs the user money.
+        seconds_per_image: Slideshow per-image duration (2–10 s).
+        transition: Slideshow transition: fade | wipeleft | slideright | circleopen.
+        music_file: Absolute path or /generated/ name of a music/audio file.
+        narration: Narration text when audio_mode is 'narration'.
+        user: The signed-in user's name/email — attribution for their library.
+
+    Returns job-style status with the Web URL, download link, and thumbnail.
+    """
+    c_type = compose_type.strip().lower()
+    if c_type not in {"collage", "slideshow"}:
+        return "Error: compose_type must be 'collage' or 'slideshow'."
+    names = [f.strip() for f in files if f and f.strip()]
+    if len(names) < 2:
+        return "Error: select at least 2 items (call library_list and ask the user which to use)."
+    resolved = []
+    missing = []
+    for n in names:
+        p = _resolve_library_file(n)
+        if p and p.suffix.lower() in _COMPOSABLE_IMAGE_EXTS:
+            resolved.append(p)
+        else:
+            missing.append(n)
+    if missing:
+        return (
+            "Error: not found or not a composable image: "
+            + ", ".join(missing)
+            + " — run library_list and use exact names."
+        )
+    out_stem = _sanitize_stem(output_name, f"{c_type}")
+    ext = ".png" if c_type == "collage" else ".mp4"
+    out = VIDEOS_DIR / f"{out_stem}_{uuid.uuid4().hex[:8]}{ext}"
+
+    if c_type == "collage":
+        try:
+            from PIL import Image
+        except ImportError:
+            return "Error: Pillow unavailable in this runtime; cannot build a collage."
+        try:
+            imgs = [Image.open(p).convert("RGB") for p in resolved]
+            n = len(imgs)
+            cols = max(1, int(n ** 0.5 + 0.999))
+            rows = -(-n // cols)
+            cell_w, cell_h, gap = 960, 540, 8
+            canvas = Image.new(
+                "RGB",
+                (cols * cell_w + (cols + 1) * gap, rows * cell_h + (rows + 1) * gap),
+                (13, 11, 16),
+            )
+            for idx, im in enumerate(imgs):
+                r, c = divmod(idx, cols)
+                thumb = im.copy()
+                thumb.thumbnail((cell_w, cell_h))
+                x = gap + c * (cell_w + gap) + (cell_w - thumb.width) // 2
+                y = gap + r * (cell_h + gap) + (cell_h - thumb.height) // 2
+                canvas.paste(thumb, (x, y))
+            canvas.save(out, quality=92)
+        except Exception as e:
+            return f"Error: collage failed: {e}"
+        web_url = _publish_artifact(out, user=user)
+        if not web_url:
+            return "Error: collage built but publish failed (check stderr)."
+        return (
+            f"### 🧩 Collage ready\n\n"
+            f"**Web URL:** {web_url}\n"
+            f"![collage]({web_url})\n"
+            f"**Download:** [⬇ Download collage]({web_url})\n"
+            f"{out.name} · {out.stat().st_size / 1024:.0f} KB · "
+            f"from {len(resolved)} selected images. Show the image, keep the "
+            f"download link, and stop — no option menus."
+        )
+
+    # ── slideshow ────────────────────────────────────────────────────────────
+    mode = audio_mode.strip().lower()
+    if mode not in {"silent", "music", "narration"}:
+        return (
+            "Audio choice required BEFORE building the slideshow. Ask the user: "
+            "Silent / Background music / Spoken narration? Do not compose yet — "
+            "the user must never pay for audio they never asked for."
+        )
+    if mode == "music" and not music_file.strip():
+        return "Music selected but music_file is empty — provide the audio file path or /generated/ name."
+    if mode == "narration" and not narration.strip():
+        return "Narration selected but narration text is empty — provide the narration script."
+    music_src = _resolve_library_file(music_file) if music_file.strip() else None
+    if mode == "music":
+        if music_src is None:
+            return f"Error: music file not found: {music_file}"
+        if not (music_src.suffix.lower() in {".mp3", ".wav", ".m4a", ".aac", ".ogg"}):
+            return f"Error: {music_src.name} is not an audio file."
+
+    d = max(2.0, min(10.0, float(seconds_per_image)))
+    n = len(resolved)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    cmd: List[str] = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
+    fparts: List[str] = []
+    for i, p in enumerate(resolved):
+        cmd += ["-loop", "1", "-t", f"{d:.2f}", "-framerate", "30", "-i", str(p)]
+        fparts.append(
+            f"[{i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#0d0b10,setsar=1,"
+            f"format=yuv420p,fps=30[v{i}]"
+        )
+    if n == 1:
+        return "Error: slideshow needs at least 2 images."
+    if n == 2:
+        fparts.append("[v0][v1]xfade=transition=fade:duration=0.5:offset=" f"{d - 0.5:.2f}[vout]")
+    else:
+        prev = "v0"
+        off = d - 0.5
+        for i in range(1, n):
+            nxt = f"x{i}" if i < n - 1 else "vout"
+            fparts.append(
+                f"[{prev}][v{i}]xfade=transition={transition}:duration=0.5:offset={off:.2f}[{nxt}]"
+            )
+            prev = nxt
+            off += d - 0.5
+    # xfade shortens the stream; total ≈ n*d - (n-1)*0.5
+    total = n * d - (n - 1) * 0.5
+    if mode == "music":
+        cmd += ["-i", str(music_src)]
+        fparts.append(f"[{n}:a]atrim=0:{total:.2f},volume=1.0[my_aud]")
+        cmd += ["-map", "[vout]", "-map", "[my_aud]", "-c:a", "aac", "-b:a", "160k"]
+    else:
+        cmd += ["-map", "[vout]", "-an"]
+    cmd += [
+        "-filter_complex", ";".join(fparts),
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-t", f"{total:.2f}",
+        str(out),
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=420,
+                              stdin=subprocess.DEVNULL, creationflags=flags)
+        ok = proc.returncode == 0 and out.exists() and out.stat().st_size > 10240
+        if not ok:
+            err = (proc.stderr or "")[-300:]
+            return f"Error: slideshow render failed: {err or 'no output'}"
+    except Exception as e:
+        return f"Error: slideshow render failed: {e}"
+
+    audio_note = " with background music" if mode == "music" else " (silent, no audio track)"
+    if mode == "narration":
+        audio_path = out.with_suffix(".narration.mp3")
+        muxed = out.with_name(out.stem + "_vo" + out.suffix)
+        if _tts_edge(narration.strip(), audio_path) and _mux_audio(out, audio_path, muxed):
+            out.unlink(missing_ok=True)
+            out = muxed
+            audio_note = " with synchronized narration"
+        else:
+            audio_note = " (narration requested but TTS/mux failed — silent clip)"
+
+    thumb = _make_video_thumbnail(out)
+    web_url = _publish_artifact(out, thumb, user)
+    if not web_url:
+        return "Error: slideshow rendered but publish failed (check stderr)."
+    return (
+        f"### 🎞 Slideshow ready\n\n"
+        f"**Web URL:** {web_url}\n"
+        f"Deliver now: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n"
+        f"**Download:** [⬇ Download slideshow]({web_url})\n"
+        f"{out.name} · {out.stat().st_size / (1024 * 1024):.2f} MB · {n} images · "
+        f"{total:.1f} s{audio_note}. Then STOP — no option menus."
+    )
+
+
+# ── Local Privacy media — ComfyUI :8188 (phase-4, 2026-11-17) ─────────────────
+# Decision (operator): ComfyUI wins over OpenMontage for local media — the
+# models are staged in ComfyUI layout (D:\LAN-AI-Infra\Image-models) and the
+# desktop install already carries the extra-models config. OpenMontage stays
+# the orchestration layer for cloud production pipelines only.
+#
+# HARD INVARIANT: the port-8080 llama fleet owns CUDA 0 too — we NEVER kill,
+# restart, or re-configure it. When free VRAM is too small for a local media
+# job we REFUSE and ask the user to unload the chat model via the Tauri UI.
+COMFYUI_URL: str = os.environ.get("SATCHIDA_COMFYUI_URL", "http://127.0.0.1:8188")
+COMFYUI_PY = os.environ.get(
+    "SATCHIDA_COMFYUI_PY", r"C:\Users\WinDiesel\Documents\ComfyUI\.venv\Scripts\python.exe"
+)
+COMFYUI_MAIN = os.environ.get(
+    "SATCHIDA_COMFYUI_MAIN",
+    r"C:\Users\WinDiesel\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py",
+)
+COMFYUI_MODELS_CFG = os.environ.get(
+    "SATCHIDA_COMFYUI_MODELS_CFG",
+    os.path.expandvars(r"%APPDATA%\ComfyUI\extra_models_config.yaml"),
+)
+COMFYUI_LOG = _STUDIO_ROOT / "logs" / "comfyui.log"
+COMFYUI_PID_FILE = _STUDIO_ROOT / "tmp" / "comfyui.pid"
+COMFYUI_START_COOLDOWN = 120.0
+_COMFY_LAST_START = [0.0]
+
+# SD checkpoints staged in Image-models (ComfyUI 'checkpoints' dir):
+#   realisticVisionV51_v51VAE  (SD1.5, ~2.1 GB — always fits next to the fleet)
+#   DreamShaper_8_pruned       (SD1.5, ~2.1 GB)
+#   anything_v5_pruned         (SD1.5 anime, ~2.1 GB)
+#   sd_xl_base_1.0             (SDXL,  ~6.9 GB — needs the chat model unloaded)
+#   stable-diffusion-v3-5-large-turbo-pure-Q4_0.gguf (needs ComfyUI-GGUF)
+LOCAL_SD15_CHECKPOINTS = [
+    "realisticVisionV51_v51VAE.safetensors",
+    "DreamShaper_8_pruned.safetensors",
+    "anything_v5_pruned.safetensors",
+]
+LOCAL_SDXL_CHECKPOINTS = ["sd_xl_base_1.0.safetensors"]
+
+_COMFY_CLIENT_ID = uuid.uuid4().hex
+
+
+def _comfy_request(
+    method: str,
+    path: str,
+    body: Optional[dict] = None,
+    timeout: float = 30.0,
+    raw: bool = False,
+):
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        COMFYUI_URL + path,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        payload = resp.read()
+        return payload if raw else json.loads(payload.decode("utf-8"))
+
+
+def _comfy_up() -> bool:
+    try:
+        _comfy_request("GET", "/system_stats", timeout=4)
+        return True
+    except Exception:
+        return False
+
+
+def _comfy_start() -> bool:
+    """Cold-start ComfyUI headless if it is down. Rate-limited; NEVER kills a
+    live instance and NEVER touches anything on port 8080."""
+    now = time.time()
+    if now - _COMFY_LAST_START[0] < COMFYUI_START_COOLDOWN:
+        return _comfy_up()
+    _COMFY_LAST_START[0] = now
+    if _comfy_up():
+        return True
+    if not (Path(COMFYUI_PY).exists() and Path(COMFYUI_MAIN).exists()):
+        print("[satchida-montage] comfy start skipped: paths missing", file=sys.stderr)
+        return False
+    try:
+        COMFYUI_LOG.parent.mkdir(parents=True, exist_ok=True)
+        log_handle = open(COMFYUI_LOG, "ab")
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | \
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+        proc = subprocess.Popen(
+            [
+                COMFYUI_PY, "-s", COMFYUI_MAIN,
+                "--port", "8188",
+                "--listen", "127.0.0.1",
+                "--extra-model-paths-config", COMFYUI_MODELS_CFG,
+                "--output-directory",
+                r"C:\Users\WinDiesel\Documents\ComfyUI\output",
+            ],
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            creationflags=flags,
+        )
+        COMFYUI_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+        COMFYUI_PID_FILE.write_text(str(proc.pid), encoding="utf-8")
+        print(f"[satchida-montage] comfy cold-start pid {proc.pid}", file=sys.stderr)
+    except Exception as e:
+        print(f"[satchida-montage] comfy start failed: {e}", file=sys.stderr)
+        return False
+    for _ in range(30):
+        time.sleep(2)
+        if _comfy_up():
+            return True
+    return False
+
+
+def _comfy_free_vram_mb() -> Optional[int]:
+    try:
+        stats = _comfy_request("GET", "/system_stats", timeout=8)
+        devices = stats.get("devices") or []
+        if devices:
+            free = int(devices[0].get("free_memory", 0)) // (1024 * 1024)
+            total = int(devices[0].get("total_memory", 0)) // (1024 * 1024)
+            if free > 0 or total > 0:
+                return free
+    except Exception:
+        pass
+    # This box reports 0/0 through pynvml (known WMI/nvidia-smi VRAM quirk,
+    # see agent_handover) — fall back to nvidia-smi directly.
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=20, creationflags=flags)
+        return int(proc.stdout.strip().splitlines()[0])
+    except Exception:
+        return None
+
+
+def _comfy_has_class(class_type: str) -> bool:
+    try:
+        info = _comfy_request("GET", f"/object_info/{class_type}", timeout=10)
+        return bool(info.get(class_type))
+    except urllib.error.HTTPError:
+        return False
+    except Exception:
+        return False
+
+
+def _comfy_wait(prompt_id: str, max_seconds: float = 420.0) -> Optional[dict]:
+    deadline = time.time() + max_seconds
+    while time.time() < deadline:
+        time.sleep(3)
+        try:
+            hist = _comfy_request("GET", f"/history/{prompt_id}", timeout=15)
+            entry = hist.get(prompt_id)
+            if not entry:
+                continue
+            if entry.get("status", {}).get("status_str") in ("error", "success"):
+                return entry if entry["status"]["status_str"] == "success" else None
+        except Exception:
+            continue
+    return None
+
+
+def _comfy_fetch_output(entry: dict, desired_stem: str = "") -> Optional[str]:
+    """Download the first output artifact of a finished job into VIDEOS_DIR."""
+    outputs = entry.get("outputs", {})
+    for node_out in outputs.values():
+        items = node_out.get("images") or node_out.get("gifs") or node_out.get("videos") or []
+        if items:
+            it = items[0]
+            qs = urllib.parse.urlencode({
+                "filename": it.get("filename", ""),
+                "subfolder": it.get("subfolder", ""),
+                "type": it.get("type", "output"),
+            })
+            try:
+                data = _comfy_request("GET", f"/view?{qs}", timeout=120, raw=True)
+            except Exception as e:
+                print(f"[satchida-montage] comfy view failed: {e}", file=sys.stderr)
+                return None
+            src_ext = Path(it.get("filename", ".comfy")).suffix or ".png"
+            name = _unique_media_name(desired_stem or Path(it.get("filename", "comfy")).stem,
+                                      "comfy", src_ext)
+            out = VIDEOS_DIR / name
+            out.write_bytes(data)
+            return str(out)
+    return None
+
+
+def _comfy_sd_image_workflow(
+    prompt: str, negative: str, size: tuple, checkpoint: str,
+    steps: int, cfg: float, seed: int,
+) -> dict:
+    w, h = size
+    return {
+        "1": {"inputs": {"ckpt_name": checkpoint}, "class_type": "CheckpointLoaderSimple"},
+        "2": {"inputs": {"text": prompt, "clip": ["1", 1]}, "class_type": "CLIPTextEncode"},
+        "3": {"inputs": {"text": negative, "clip": ["1", 1]}, "class_type": "CLIPTextEncode"},
+        "4": {"inputs": {"width": w, "height": h, "batch_size": 1},
+              "class_type": "EmptyLatentImage"},
+        "5": {"inputs": {
+            "seed": seed, "steps": steps, "cfg": cfg,
+            "sampler_name": "dpmpp_2m", "scheduler": "karras", "denoise": 1.0,
+            "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
+            "latent_image": ["4", 0]}, "class_type": "KSampler"},
+        "6": {"inputs": {"samples": ["5", 0], "vae": ["1", 2]}, "class_type": "VAEDecode"},
+        "7": {"inputs": {"filename_prefix": "satchida_local_image",
+                         "images": ["6", 0]}, "class_type": "SaveImage"},
+    }
+
+
+def _comfy_flux_image_workflow(
+    prompt: str, size: tuple, seed: int,
+) -> Optional[dict]:
+    if not _comfy_has_class("UnetLoaderGGUF"):
+        return None
+    w, h = size
+    return {
+        "1": {"inputs": {"unet_name": "flux1-schnell-Q4_K_S.gguf"},
+              "class_type": "UnetLoaderGGUF"},
+        "2": {"inputs": {"clip_name1": "t5-v1_1-xxl-encoder-Q4_K_M.gguf",
+                         "clip_name2": "clip_l.safetensors", "type": "flux"},
+              "class_type": "DualCLIPLoaderGGUF"},
+        "3": {"inputs": {"vae_name": "ae.safetensors"}, "class_type": "VAELoader"},
+        "4": {"inputs": {"width": w, "height": h, "batch_size": 1},
+              "class_type": "EmptySD3LatentImage"},
+        "5": {"inputs": {"text": prompt, "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
+        "6": {"inputs": {"text": "", "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
+        "7": {"inputs": {"seed": seed, "steps": 4, "cfg": 1.0,
+                         "sampler_name": "euler", "scheduler": "simple",
+                         "denoise": 1.0, "model": ["1", 0], "positive": ["5", 0],
+                         "negative": ["6", 0], "latent_image": ["4", 0]},
+              "class_type": "KSampler"},
+        "8": {"inputs": {"samples": ["7", 0], "vae": ["3", 0]}, "class_type": "VAEDecode"},
+        "9": {"inputs": {"filename_prefix": "satchida_local_flux",
+                         "images": ["8", 0]}, "class_type": "SaveImage"},
+    }
+
+
+def _comfy_wan_workflow(
+    prompt: str, negative: str, seed: int, with_audio: bool, audio_prompt: str,
+) -> Optional[dict]:
+    """Wan2.1 T2V GGUF animated clip (49 frames ≈ 2 s @ 24 fps).
+    with_audio=False → silent WebP/MP4; True → MMAudio-synchronized audio."""
+    if not _comfy_has_class("UnetLoaderGGUF"):
+        return None
+    if not _comfy_has_class("VHS_VideoCombine"):
+        return None
+    if with_audio and not _comfy_has_class("MMAudioSampler"):
+        return None
+    wf = {
+        "1": {"inputs": {"unet_name": "wan2.1-t2v-14b-Q3_K_M.gguf"},
+              "class_type": "UnetLoaderGGUF"},
+        "2": {"inputs": {"clip_name": "umt5-xxl-encoder-Q4_K_M.gguf", "type": "wan"},
+              "class_type": "CLIPLoaderGGUF"},
+        "3": {"inputs": {"vae_name": "wan_2.1_vae.safetensors"}, "class_type": "VAELoader"},
+        "4": {"inputs": {"model": ["1", 0], "shift": 8.0}, "class_type": "ModelSamplingSD3"},
+        "5": {"inputs": {"vae": ["3", 0], "width": 512, "height": 512,
+                         "length": 49, "batch_size": 1},
+              "class_type": "Wan22ImageToVideoLatent"},
+        "6": {"inputs": {"text": prompt, "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
+        "7": {"inputs": {"text": negative or "blur, distortion, oversaturated, low quality",
+                         "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
+        "8": {"inputs": {"seed": seed, "steps": 15, "cfg": 6.0,
+                         "sampler_name": "uni_pc", "scheduler": "simple",
+                         "denoise": 1.0, "model": ["4", 0], "positive": ["6", 0],
+                         "negative": ["7", 0], "latent_image": ["5", 0]},
+              "class_type": "KSampler"},
+        "9": {"inputs": {"samples": ["8", 0], "vae": ["3", 0]}, "class_type": "VAEDecode"},
+        "10": {"inputs": {"images": ["9", 0], "frame_rate": 24, "loop_count": 0,
+                          "filename_prefix": "satchida_local_animated",
+                          "format": "image/webp", "pingpong": False,
+                          "save_output": True},
+               "class_type": "VHS_VideoCombine"},
+    }
+    if with_audio:
+        wf["10"]["inputs"]["format"] = "video/h264-mp4"
+        wf["10"]["inputs"]["audio"] = ["13", 0]
+        wf["11"] = {
+            "inputs": {"mmaudio_model": "mmaudio_large_44k_v2_fp16.safetensors",
+                       "base_precision": "fp16"},
+            "class_type": "MMAudioModelLoader"}
+        wf["12"] = {
+            "inputs": {"vae_model": "mmaudio_vae_44k_fp16.safetensors",
+                       "synchformer_model": "mmaudio_synchformer_fp16.safetensors",
+                       "clip_model": "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors",
+                       "mode": "44k", "precision": "fp16"},
+            "class_type": "MMAudioFeatureUtilsLoader"}
+        wf["13"] = {
+            "inputs": {"mmaudio_model": ["11", 0], "feature_utils": ["12", 0],
+                       "duration": 2.04, "steps": 25, "cfg": 4.5, "seed": seed,
+                       "prompt": audio_prompt or prompt,
+                       "negative_prompt": "noise, talking, distorted, music",
+                       "mask_away_clip": False, "force_offload": True,
+                       "images": ["9", 0]},
+            "class_type": "MMAudioSampler"},
+    return wf
+
+
+def _estimate_model_mb(model_name: str) -> int:
+    for base in (Path(r"D:\LAN-AI-Infra\Image-models\checkpoints"),
+                 Path(r"D:\LAN-AI-Infra\Image-models\unet")):
+        p = base / model_name
+        if p.exists():
+            return int(p.stat().st_size / (1024 * 1024)) + 2048
+    return 4096
+
+
+@mcp.tool()
+def comfy_status() -> str:
+    """
+    Report the local ComfyUI media server (:8188): up/down, free VRAM, queue,
+    and which local pipelines are available. Use it before offering local
+    (Privacy-mode) media generation so the user is never surprised.
+    """
+    up = _comfy_up() or _comfy_start()
+    if not up:
+        return "ComfyUI :8188 is down and cold-start failed — check logs/comfyui.log."
+    free = _comfy_free_vram_mb()
+    try:
+        queue = _comfy_request("GET", "/queue", timeout=8)
+        running = len(queue.get("queue_running", []))
+        pending = len(queue.get("queue_pending", []))
+    except Exception:
+        running = pending = -1
+    lines = [
+        "### 🖥 Local ComfyUI media engine (:8188)",
+        f"Status: running · Free VRAM: {free} MB · Queue: {running} running, {pending} pending",
+        f"SD1.5 photoreal images: available (steps fit next to the chat fleet)",
+        f"SDXL images: {'fits if the chat model is unloaded' if (free or 0) >= 8000 else 'needs ~8 GB — unload the chat model first'}",
+        f"FLUX Schnell local: {'available' if _comfy_has_class('UnetLoaderGGUF') else 'needs ComfyUI-GGUF custom node'}",
+        f"Animated (Wan) silent: {'available' if _comfy_has_class('VHS_VideoCombine') else 'needs VideoHelperSuite custom node'}",
+        f"Animated (Wan) with audio: {'available' if _comfy_has_class('MMAudioSampler') else 'needs ComfyUI-MMAudio custom node'}",
+        "Privacy note: local generation keeps prompts and images on this machine.",
+    ]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def image_generate_local(
+    prompt: str,
+    aspect_ratio: str = "16:9",
+    model: str = "",
+    steps: int = 28,
+    negative: str = "",
+    filename: str = "",
+    user: str = "",
+) -> str:
+    """
+    Generate an image 100% locally (Privacy mode) via ComfyUI on this machine.
+
+    Use ONLY when the chat is in Privacy mode or the user explicitly asks for
+    local/sovereign generation. Default chain: SD1.5 checkpoints (always fit
+    beside the chat fleet); SDXL or FLUX Schnell when VRAM allows.
+
+    Args:
+        prompt: Image description.
+        aspect_ratio: '16:9', '9:16', or '1:1'.
+        model: Optional checkpoint name (default: realisticVision V5.1).
+        steps: Sampler steps (SD1.5 25–35; FLUX forces 4).
+        negative: Negative prompt (optional).
+        filename: Optional readable stem — a per-job unique suffix is always added.
+        user: Signed-in user's name/email for library attribution.
+
+    Returns the embed + download markdown, or a clear VRAM/unavailability error.
+    """
+    if not prompt.strip():
+        return "Error: prompt is required."
+    if not (_comfy_up() or _comfy_start()):
+        return "Error: local ComfyUI is not running and cold-start failed (check logs/comfyui.log)."
+
+    ratio = aspect_ratio.strip()
+    sizes = {"16:9": (1024, 576), "9:16": (576, 1024), "1:1": (768, 768)}
+    sd15_size = sizes.get(ratio, (1024, 576))
+    sdxl_size = {"16:9": (1216, 684), "9:16": (684, 1216), "1:1": (1024, 1024)}.get(
+        ratio, (1216, 684))
+    flux_size = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1024, 1024)}.get(
+        ratio, (1280, 720))
+
+    free = _comfy_free_vram_mb() or 0
+    checkpoint = (model or "").strip()
+    workflow = None
+    engine = ""
+    if checkpoint.endswith(".gguf") and "schnell" in checkpoint.lower():
+        workflow = _comfy_flux_image_workflow(prompt, flux_size, random.randint(0, 2**31 - 1))
+        engine = f"FLUX Schnell local ({checkpoint})"
+        need = _estimate_model_mb(checkpoint) + 4500
+    elif checkpoint in LOCAL_SDXL_CHECKPOINTS:
+        workflow = _comfy_sd_image_workflow(
+            prompt, negative, sdxl_size, checkpoint, max(20, steps), 7.0,
+            random.randint(0, 2**31 - 1))
+        engine = f"SDXL local ({checkpoint})"
+        need = _estimate_model_mb(checkpoint) + 1500
+    else:
+        checkpoint = checkpoint if checkpoint in LOCAL_SD15_CHECKPOINTS else \
+            LOCAL_SD15_CHECKPOINTS[0]
+        workflow = _comfy_sd_image_workflow(
+            prompt, negative, sd15_size, checkpoint, max(12, min(40, steps)), 6.5,
+            random.randint(0, 2**31 - 1))
+        engine = f"SD1.5 local ({checkpoint})"
+        need = _estimate_model_mb(checkpoint)
+
+    if free < need:
+        return (
+            f"Not enough free VRAM for local generation: {free} MB free, "
+            f"~{need} MB needed. Ask the user to unload the chat model in the "
+            f"Satchida desktop app (this never kills the :8080 fleet), then retry. "
+            f"Cloud generation stays available meanwhile."
+        )
+    if workflow is None:
+        return (
+            "FLUX Schnell local needs the ComfyUI-GGUF custom node which is not "
+            "installed yet. Use the SD1.5 chain (default) or ask the operator to "
+            "install ComfyUI-GGUF."
+        )
+
+    try:
+        resp = _comfy_request("POST", "/prompt", {
+            "prompt": workflow, "client_id": _COMFY_CLIENT_ID}, timeout=30)
+    except urllib.error.HTTPError as he:
+        detail = ""
+        try:
+            detail = he.read().decode("utf-8", "replace")[:400]
+        except Exception:
+            pass
+        return f"Error: ComfyUI rejected the local job: HTTP {he.code} {detail}"
+    except Exception as e:
+        return f"Error: ComfyUI rejected the local job: {e}"
+    entry = _comfy_wait(resp.get("prompt_id", ""))
+    out_path = _comfy_fetch_output(entry, "local_image") if entry else None
+    if not out_path:
+        return (
+            "Error: local generation failed (ComfyUI history shows an error — "
+            "check logs/comfyui.log). Try fewer steps or the SD1.5 checkpoint."
+        )
+    out = Path(out_path)
+    web_url = _publish_artifact(out, user=user)
+    if not web_url:
+        return "Error: local image rendered but publish failed (check stderr)."
+    size_kb = out.stat().st_size / 1024
+    return (
+        f"### 🖼 Local image generated (Privacy — nothing left this machine)\n\n"
+        f"**File:** `{out}` ({size_kb:.0f} KB) · Engine: {engine}\n\n"
+        f"**Web URL (embed exactly this):**\n\n"
+        f"![generated image]({web_url})\n\n"
+        f"**Download:** [⬇ Download image]({web_url}) · "
+        f"Also in the user's Studio Library: `/library`"
+    )
+
+
+@mcp.tool()
+def animated_generate_local(
+    prompt: str,
+    audio_mode: str = "",
+    audio_prompt: str = "",
+    seed: int = -1,
+    filename: str = "",
+    user: str = "",
+) -> str:
+    """
+    Generate a short LOCAL animated clip (Wan2.1 T2V, ~2 s, 512×512) on
+    ComfyUI — Privacy mode animated media.
+
+    AUDIO GATE (mandatory, operator directive): a local animated render is
+    compute-billed the same way cloud renders cost money — NEVER choose the
+    audio variant without the user's explicit choice. audio_mode must be
+    'silent' or 'ambient_sfx' (MMAudio-synchronized sound). Ask when unclear.
+
+    Args:
+        prompt: Scene description for the animation.
+        audio_mode: REQUIRED — 'silent' or 'ambient_sfx'.
+        audio_prompt: Sound description when ambient_sfx (defaults to the scene prompt).
+        seed: Optional sampler seed (-1 = random).
+        filename: Optional readable stem (unique suffix always appended).
+        user: Signed-in user's name/email for library attribution.
+
+    Returns a job-style result with embed + download, or a VRAM/capability error.
+    """
+    if not prompt.strip():
+        return "Error: prompt is required."
+    mode = audio_mode.strip().lower()
+    if mode not in {"silent", "ambient_sfx"}:
+        return (
+            "Audio choice required before local animation. Ask the user: Silent "
+            "or Ambient sound & SFX (local MMAudio)? Do not render yet."
+        )
+    if not (_comfy_up() or _comfy_start()):
+        return "Error: local ComfyUI is not running and cold-start failed."
+    free = _comfy_free_vram_mb() or 0
+    need = _estimate_model_mb("wan2.1-t2v-14b-Q3_K_M.gguf") + (3000 if mode == "ambient_sfx" else 1500)
+    if free < need:
+        return (
+            f"Not enough free VRAM for local animation: {free} MB free, ~{need} MB "
+            f"needed. The Wan model must be loaded alone — ask the user to unload "
+            f"the chat model in the Satchida desktop app, then retry."
+        )
+    workflow = _comfy_wan_workflow(
+        prompt.strip(), "", seed if seed >= 0 else random.randint(0, 2**31 - 1),
+        with_audio=(mode == "ambient_sfx"), audio_prompt=audio_prompt)
+    if workflow is None:
+        missing = []
+        if not _comfy_has_class("UnetLoaderGGUF"):
+            missing.append("ComfyUI-GGUF")
+        if not _comfy_has_class("VHS_VideoCombine"):
+            missing.append("ComfyUI-VideoHelperSuite")
+        if mode == "ambient_sfx" and not _comfy_has_class("MMAudioSampler"):
+            missing.append("ComfyUI-MMAudio")
+        return (
+            "Local animation is not installed yet — missing custom node(s): "
+            + ", ".join(missing)
+            + ". The operator must install them into Documents\\ComfyUI\\custom_nodes."
+        )
+    try:
+        resp = _comfy_request("POST", "/prompt", {
+            "prompt": workflow, "client_id": _COMFY_CLIENT_ID}, timeout=30)
+    except Exception as e:
+        return f"Error: ComfyUI rejected the local animation job: {e}"
+    entry = _comfy_wait(resp.get("prompt_id", ""), max_seconds=900.0)
+    out_path = _comfy_fetch_output(entry, "local_animated") if entry else None
+    if not out_path:
+        return "Error: local animation failed (check logs/comfyui.log)."
+    out = Path(out_path)
+    audio_note = (" with MMAudio-synchronized ambient sound"
+                  if mode == "ambient_sfx" else " (silent clip)")
+    thumb = _make_video_thumbnail(out)
+    web_url = _publish_artifact(out, thumb, user)
+    if not web_url:
+        return "Error: local animation rendered but publish failed."
+    return (
+        f"### 🎞 Local animated clip ready (Privacy — nothing left this machine)\n\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n\n"
+        f"**Download:** [⬇ Download clip]({web_url})\n"
+        f"{out.name} · {out.stat().st_size / (1024 * 1024):.2f} MB · "
+        f"49 frames @ 24 fps{audio_note}. Then STOP."
     )
 
 

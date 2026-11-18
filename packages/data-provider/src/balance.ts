@@ -50,6 +50,14 @@ export function getRefillEligibilityDate(
   }
 }
 
+export type TUsageTierBreakdown = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheRead: number;
+  totalTokens: number;
+  transactionCount: number;
+};
+
 export type TUserUsageStats = {
   inputTokens: number;
   outputTokens: number;
@@ -57,5 +65,7 @@ export type TUserUsageStats = {
   cacheWrite: number;
   totalTokens: number;
   transactionCount: number;
+  local?: TUsageTierBreakdown;
+  cloud?: TUsageTierBreakdown;
 };
 

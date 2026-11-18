@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Spinner } from '@librechat/client';
-import { Constants } from 'librechat-data-provider';
+import { Constants, QueryKeys } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import type { CurrencyConfig } from '~/utils';
 import useCompactConversation, { supportsCompaction } from '~/hooks/Chat/useCompactConversation';
@@ -55,11 +55,12 @@ function TokenUsageIndicator({
   const disclosureRef = useRef<HTMLButtonElement>(null);
   const conversationId = conversation?.conversationId ?? '';
 
-  // Invalidate userUsageStats when submission finishes so billing numbers refresh
+  // Invalidate userUsageStats and balance when submission finishes so billing numbers refresh in real time
   const prevIsSubmitting = useRef(isSubmitting);
   useEffect(() => {
     if (prevIsSubmitting.current && !isSubmitting) {
       queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.balance] });
     }
     prevIsSubmitting.current = isSubmitting;
   }, [isSubmitting, queryClient]);
@@ -68,6 +69,7 @@ function TokenUsageIndicator({
   useEffect(() => {
     if (popoverOpen) {
       queryClient.invalidateQueries({ queryKey: ['userUsageStats'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.balance] });
     }
   }, [popoverOpen, queryClient]);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

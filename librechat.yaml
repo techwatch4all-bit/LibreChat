@@ -148,7 +148,7 @@ User message:
       defaultParamsEndpoint: custom
       paramDefinitions:
       - key: max_tokens
-        default: 4096
+        default: 16384
     tokenConfig:
       Chat:
         prompt: 0

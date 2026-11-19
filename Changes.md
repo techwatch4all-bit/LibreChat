@@ -3003,6 +3003,50 @@ phase begins.
 in `D:\LAN-AI-Infra\Image-models`; fix the cosmetic `widgetInputs.js` deprecation by updating the
 offending custom node. CheapInference media unlocks with one dashboard action (Bugs.md B-new 1).
 
+## 2026-11-19 — Satchida Fleet Ops: Realtime Error Telemetry, AI Root-Cause Engine & Gated Auto-Patch Dispatcher
+
+**Context:** The operator requested an autonomous, non-technical human dashboard with integrated AI that
+captures error telemetry from all tenant nodes (operating behind symmetric CGNAT), translates raw logs
+into plain English, diagnoses root causes, formulates minimal safe patches, and deploys them to tenant
+nodes with one click and automatic local verification/rollback.
+
+**Delivered & Verified (100% Real, Zero Mock):**
+1. **`ops-scripts/fleet-ai-engine.mjs`**:
+   - Integrated with Satchida Gateway (`http://127.0.0.1:4000/v1` via `SATCHIDA_GATEWAY_VK`).
+   - Translates technical runtime faults into non-technical narratives for human operators (e.g. school
+     administrators or SMB owners).
+   - Diagnoses root causes, identifies affected files, classifies safety (`safe_auto_deploy` vs
+     `requires_review`), generates exact string diffs and verification commands.
+   - Tested live against `deepseek-ai/DeepSeek-V4.1-Flash` with verified structured JSON output.
+2. **`ops-scripts/control-plane.mjs`**:
+   - Zero-dependency native Node engine (`node:http`) listening on port 8443 (fleet control & tunnel
+     ingress) and port 8444 (dedicated Operator Dashboard).
+   - Ingests HMAC/tenant heartbeats (`/api/v1/fleet/heartbeat`) and direct incidents (`/api/v1/fleet/incident`).
+   - Server-Sent Events (SSE) stream (`/api/v1/fleet/stream`) for real-time dashboard pushes without polling.
+   - Dispatches patch tasks to tenants and records verification outcomes in central MongoDB (`fleet_tenants`,
+     `fleet_incidents`, `fleet_tasks`).
+   - PM2 daemon ID 17 (`satchida-control-plane`), online and saved in PM2 dump.
+3. **`ops-scripts/dashboard/index.html`**:
+   - Non-technical human dashboard with Satchida dark glassmorphism aesthetic.
+   - Real-time fleet health counters, incident cards with plain-English summaries, user impact counters,
+     root-cause breakdown, and one-click **"🚀 Deploy Patch"** modal.
+   - Live EventSource connection for instant UI updates when edge nodes report issues.
+   - Accessible at `http://localhost:8443/dashboard` and `http://localhost:8444`.
+4. **`ops-scripts/fleet-sync-agent.mjs`**:
+   - Edge agent running on tenant nodes under PM2 ID 18 (`satchida-fleet-sync`).
+   - Transmits host metrics (RAM, CPU, uptime) and pulls queued patch tasks over outbound HTTPS.
+   - **Gated Execution Contract:** Creates timestamped safety backups in `ops-scripts/backups/`, applies
+     patch, executes local verification command (`verifyCommand`), and triggers instant auto-rollback
+     if verification returns non-zero.
+5. **`ops-scripts/satchida-error-sentinel.mjs`**:
+   - Enhanced to push detected incidents directly to the Control Plane in real-time.
+   - PM2 daemon ID 16 restarted and running live.
+6. **E2E Verification (`ops-scripts/test-e2e-fleet.mjs`)**:
+   - Simulated live incident from tenant `school-delhi-01`.
+   - Verified automated AI analysis generation via gateway.
+   - Verified patch dispatch, tenant backup creation, local verification execution, disk patch application,
+     and automatic resolution transition in Control Plane. All 8 verification stages passed cleanly.
+
 ## 2026-11-19 — Real-Time Error Sentinel Daemon (satchida-error-sentinel)
 
 **Context:** User requested a real, production-safe server-side process to automatically capture all errors

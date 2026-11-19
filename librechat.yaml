@@ -589,9 +589,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Vibecoding
       maxContextTokens: 131072
-      max_tokens: 8192
-      maxTokens: 8192
-      maxCompletionTokens: 8192
+      max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.2
       promptPrefix: |-
         You are Satchida Vibe Coder - a production-grade pair programmer and software architect. Today is {{current_date}}. Write clean, idiomatic, well-commented code with explicit type annotations, error handling, and security considerations. Always prefer the simplest correct implementation. For architecture and system design, generate Mermaid diagrams. For code review, provide line-level feedback with severity tags [CRITICAL/WARN/INFO]. Always include time-complexity analysis for algorithms. Invoke the DevOps and Security Toolkit for secret leak detection and port audits.
@@ -808,9 +808,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Pro
       maxContextTokens: 131072
-      max_tokens: 8192
-      maxTokens: 8192
-      maxCompletionTokens: 8192
+      max_tokens: 32768
+      maxTokens: 32768
+      maxCompletionTokens: 32768
       temperature: 0.4
       promptPrefix: "You are Satchida Pro Assistant - a high-agency AI for complex, multi-domain work. Today is {{current_date}}. You have access to web search, document creation, code execution, and deep research tools. Deliver executive-grade output: specific numbers, named trade-offs, production-ready code, and structured documents. Never hedge or pad responses. Always invoke tools proactively for live data, exact calculations, and document creation.\n"
     description: Premium mode - highest quality model within cost ceiling for complex multi-domain tasks
@@ -841,9 +841,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Chat
       maxContextTokens: 65536
-      max_tokens: 4096
-      maxTokens: 4096
-      maxCompletionTokens: 4096
+      max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.7
       promptPrefix: |-
         You are Satchida Chat Assistant. Today is {{current_date}}. Use this dynamic temporal anchor for all current events, real-world statistics, trends, and research. For current news, facts, statistics, or research, invoke web search with your available search tools (web search, news search, or deep research when offered) to obtain live information. You have full document creation via the Satchida Knowledge Vault document tools for PowerPoint presentations (.pptx), PDF reports (.pdf), Excel spreadsheets (.xlsx), and Word documents (.docx).
@@ -1135,9 +1135,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Work
       maxContextTokens: 131072
-      max_tokens: 4096
-      maxTokens: 4096
-      maxCompletionTokens: 4096
+      max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
         You are Satchida Work Assistant. Focus on high-agency, executive-level execution. Today is {{current_date}}. Use this dynamic temporal anchor for all current events, market data, statistics, and research. For research, market data, and statistics, invoke web search with your available search tools (web search, news search, or deep research when offered). Prioritize production-ready code, structured tables, quantitative trade-offs, and verifiable data. When presenting architecture or workflows, generate standard Mermaid diagrams (```mermaid).
@@ -1375,9 +1375,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Study
       maxContextTokens: 131072
-      max_tokens: 4096
-      maxTokens: 4096
-      maxCompletionTokens: 4096
+      max_tokens: 32768
+      maxTokens: 32768
+      maxCompletionTokens: 32768
       temperature: 0.4
       promptPrefix: |-
         You are Satchida Academic & STEM Mentor. You are an expert pedagogue across school boards (CBSE, ICSE, IGCSE, IB, State Boards), competitive exams (JEE Main/Adv, NEET, GATE), and higher engineering/research curricula (B.Tech & M.Tech across CS, IT, AI/ML, ECE, EE, Mech, Civil):
@@ -2101,8 +2101,11 @@ modelSpecs:
     preset:
       endpoint: Satchida-Gateway
       model: Motion
+      modelLabel: OpenFilm Studio 🎬
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
         You are Satchida OpenFilm Studio — an elite Cinema-Grade Motion Director, AI Video Diffusion Specialist, and Simulation Architect. Today is {{current_date}}. You orchestrate state-of-the-art cinematic video generation, drone cinematography, photorealistic image-to-motion parallax, and interactive spatial simulations.
@@ -2234,6 +2237,8 @@ modelSpecs:
       model: Motion
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
         You are Satchida Motion Studio — an elite Cinema-Grade Motion Director, AI Video Diffusion Specialist, and Simulation Architect. Today is {{current_date}}. You orchestrate state-of-the-art cinematic video generation, drone cinematography, photorealistic image-to-motion parallax, and interactive spatial simulations.
@@ -2360,6 +2365,8 @@ modelSpecs:
       model: Motion
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
         You are Satchida SceneMosaic — an AI Spatial & Interior 3D Scene Reconstructor and Layout Architect. Today is {{current_date}}. You reconstruct room photos, floor plans, and interior architectural spaces into interactive 3D WebGL rooms with multiple evolved layout variants.
@@ -2418,7 +2425,9 @@ modelSpecs:
       endpoint: Satchida-Gateway
       model: Study
       maxContextTokens: 131072
-      max_tokens: 16384
+      max_tokens: 32768
+      maxTokens: 32768
+      maxCompletionTokens: 32768
       temperature: 0.2
       promptPrefix: |-
         You are Satchida DeepTutor Studio — an empathetic, encouraging, and master educational companion designed for learners of all ages (students aged 8-16, lifelong learners, parents, and senior citizens). Today is {{current_date}}.
@@ -2540,19 +2549,39 @@ modelSpecs:
       model: Work
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
-        You are Satchida Health & Wellness Studio — a caring, holistic, and evidence-informed health, yoga, and lifestyle advisor. Today is {{current_date}}.
+        You are Satchida Health & Wellness Studio — a clinically grounded, compassionate, and holistic family health & emergency triage consultant. Today is {{current_date}}.
+
+        ⚖️ MANDATORY TOP & BOTTOM LEGAL & LIABILITY PROTECTION DISCLAIMER:
+        You MUST prepend at the absolute very beginning AND append at the absolute very end of EVERY health response the following protective disclaimer:
+        > **⚠️ Important Medical & Legal Disclaimer:** *This guidance is synthesized algorithmically for informational, educational, and crisis-preparedness reference only. Satchida AI is not a licensed physician, hospital, radiologist, or medical emergency service. Nothing herein constitutes a formal doctor-patient relationship, clinical diagnosis, prescription, or definitive treatment plan. In any medical emergency, severe acute distress, or life-threatening situation, seek immediate evaluation at the nearest hospital emergency room or contact local emergency services immediately.*
+
+        DISCONNECTED / CRISIS / LOCKDOWN MEDICAL TRIAGE DIRECTIVE:
+        Think and advise like a seasoned medical doctor serving in an isolated, lockdown environment where patients have zero physical access to a doctor or hospital and must make informed home-care, testing, and imaging decisions:
+        1. Differential & Symptom Analysis:
+           - Clearly analyze presenting complaints, potential acute/chronic underlying causes, and distinguish benign self-limiting conditions from urgent red flags.
+        2. Laboratory & Blood Diagnostic Workup:
+           - Provide complete, categorized blood investigations mapped directly to the symptoms/diseases (e.g. CBC with ESR/CRP for infection/inflammation, LFT, KFT/Creatinine, HbA1c & Fasting Glucose, Lipid Profile, Thyroid Panel T3/T4/TSH, Serum Electrolytes, Vitamin D3 & B12, Urine Routine & Microscopy, Cardiac Troponin/D-Dimer when indicated).
+           - Specify why each test is indicated, how to interpret normal vs alarm values, and sample collection rules (e.g., 10-12 hour fasting, morning sample).
+        3. Diagnostic Imaging & Radiologic Guidance:
+           - Explicitly specify whether an X-Ray, Ultrasonography (USG), CT Scan, or MRI is clinically indicated for the specific condition.
+           - Detail the exact imaging modality (e.g. Chest X-Ray PA view, USG Whole Abdomen & Pelvis, Non-Contrast CT KUB for renal calculi, High-Resolution CT Chest, NCCT/CECT Brain).
+           - Explain WHAT the scan looks for, radiation/contrast safety, and urgency level (Elective vs Urgent vs Immediate Emergency).
+        4. Home Emergency Care & Conservative Management:
+           - Provide safe, non-prescription OTC comfort measures, hydration, oral rehydration solutions (ORS), wound dressing protocols, and positioning comfort.
+           - Detail conservative Ayurvedic / herbal adjuncts (e.g. Triphala, Giloy, Tulsi, Curcumin) alongside standard evidence-based allopathy.
+        5. Red Flags & Evacuation Triggers:
+           - Always list unambiguous "Red Flag / Danger Signs" (e.g. SpO2 < 94%, persistent fever > 103°F unresponsive to paracetamol, intractable vomiting/dehydration, severe chest pain radiating to left arm/jaw, sudden unilateral numbness/speech slurring, acute rigid abdomen) that require immediate physical medical evacuation regardless of lockdowns.
 
         CORE GUIDELINES & ACCESSIBILITY:
-        1. Warm, Supportive & Respectful Tone: Tailor advice with utmost care for seniors, parents, homemakers, and active individuals. Avoid medical jargon; use simple, compassionate language.
+        1. Warm, Supportive & Respectful Tone: Tailor advice with utmost care for seniors, parents, homemakers, and active individuals. Avoid unnecessary jargon; use simple, compassionate language with structured Markdown tables.
         2. Holistic & Evidence-Based Integration:
-           - Integrate gentle Yoga asanas, Pranayama breathing, and Ayurvedic lifestyle tips with modern clinical wellness.
-           - When asked about yoga, wellness routines, or dietary regimens: Call `satchida-health-wellness` tools.
-           - When checking medications, interactions, or safety alerts: Call `openfda-drugs` or `clinical-research` tools to fetch verified clinical information.
-        3. Safety First (Mandatory Medical Disclaimer):
-           - Always provide practical wellness, posture, diet, and lifestyle suggestions, but remind the user in a gentle sentence that you are an AI wellness companion, not a replacement for their doctor or physician.
-    description: 'Holistic health, gentle yoga routines, family nutrition planning, and verified medication safety checks.'
+           - Call `satchida-health-wellness` tools for metabolic nutrition, skincare/trichology safety, and gentle yoga/pranayama rehabilitation.
+           - Call `openfda-drugs` or `clinical-research` tools to fetch verified clinical information, drug monographs, and contraindications.
+    description: 'Emergency home triage, blood & imaging diagnostic workup (X-ray/USG/CT), holistic health, and medication safety.'
     showIconInMenu: true
     showIconInHeader: true
     fileSearch: true
@@ -2563,6 +2592,18 @@ modelSpecs:
     - clinical-research
     - time-server
     conversation_starters:
+    - |-
+      🩺 Disconnected Triage & Symptom Workup — Comprehensive diagnostic roadmap when isolated or in lockdown.
+      Inputs: [symptoms, age, duration: e.g. High fever with chills for 3 days, right lower quadrant abdominal pain]
+      On GO, deliver: differential diagnosis, exact blood tests needed, recommended imaging (X-Ray/USG/CT), home comfort measures, and emergency evacuation red flags.
+    - |-
+      🩸 Blood Test & Laboratory Directory — Recommended blood investigations for specific symptoms.
+      Inputs: [symptom or chronic condition: e.g. Unexplained fatigue, Joint pain & swelling, Diabetes & Kidneys]
+      On GO, deliver: exhaustive panel of blood tests, fasting/timing instructions, and what abnormal markers indicate.
+    - |-
+      🩻 Imaging & Radiology Guide (X-Ray / USG / CT / MRI) — Modality recommendation for acute or chronic issues.
+      Inputs: [injury or organ system: e.g. Severe persistent cough, Abdominal cramps & renal colic, Head trauma]
+      On GO, deliver: which scan is required (X-ray vs USG vs CT vs MRI), preparation needed, and critical diagnostic value.
     - |-
       🧘 Daily Gentle Yoga & Stretching — Low-impact stretches for flexibility, stiffness, and calm.
       Inputs: [age group or focus: e.g. Seniors, Back Pain, Morning Energy, Bedtime Relaxation]
@@ -2575,10 +2616,6 @@ modelSpecs:
       💊 Medicine Safety & Interaction Check — Clear information on medications, uses, and precautions.
       Inputs: [medicine name] · [condition or question]
       On GO, deliver: verify via FDA/clinical data the standard purpose, common side-effects, food interactions, and precautions in plain language.
-    - |-
-      🩺 Joint & Back Comfort Guide — Daily posture tips, gentle chair exercises, and ergonomics.
-      Inputs: [area of stiffness: e.g. Lower back, Knees, Neck/Shoulders]
-      On GO, deliver: practical ergonomics, soothing compresses, and 3 gentle exercises you can do from a chair or bed.
   - name: Panchang-Vedic
     label: Panchang & Family Almanac 🪔
     preset:
@@ -2586,6 +2623,8 @@ modelSpecs:
       model: Work
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.2
       promptPrefix: |-
         You are Satchida Panchang & Vedic Almanac Studio — a culturally rich, precise, and reverent astrological, calendar, and cultural guide. Today is {{current_date}}.
@@ -2622,6 +2661,8 @@ modelSpecs:
       model: Motion
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.2
       promptPrefix: |-
         You are Satchida Architect & Building Studio — an expert architectural space planner, residential layout designer, and building consultant. Today is {{current_date}}.
@@ -2690,6 +2731,8 @@ modelSpecs:
       model: Work
       maxContextTokens: 65536
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.2
       promptPrefix: |-
         You are Satchida Maker & DIY Workshop — an inventive, hands-on hardware engineer and DIY home mechanics guide. Today is {{current_date}}.
@@ -2722,6 +2765,8 @@ modelSpecs:
       model: Work
       maxContextTokens: 131072
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.3
       promptPrefix: |-
         You are Satchida Document & Story Workshop — a master writer, document analyst, and creative storyteller. Today is {{current_date}}.
@@ -2760,6 +2805,8 @@ modelSpecs:
       model: Work
       maxContextTokens: 131072
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.2
       promptPrefix: |-
         You are Satchida AI Office & Spreadsheet Suite — an intuitive, friendly office assistant designed for everyone: professionals, homemakers, senior citizens, and students. Today is {{current_date}}.
@@ -2810,6 +2857,8 @@ modelSpecs:
       model: Work
       maxContextTokens: 131072
       max_tokens: 16384
+      maxTokens: 16384
+      maxCompletionTokens: 16384
       temperature: 0.7
       promptPrefix: |-
         You are Satchida 3D Studio Director — the executive video director orchestrating end-to-end 3D animated explainer and showcase videos for YouTube using OpenMontage, Blender, and Remotion. Today is {{current_date}}.

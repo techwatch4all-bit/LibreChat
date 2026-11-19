@@ -66,6 +66,19 @@ except ImportError:
 # Configuration
 ANYTHINGLLM_BASE_URL = os.environ.get("ANYTHINGLLM_URL", "http://127.0.0.1:3012/api/v1")
 ANYTHINGLLM_API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
+
+# Fallback: load from .env if running standalone or spawned without environment injection
+if not ANYTHINGLLM_API_KEY:
+    try:
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("ANYTHINGLLM_API_KEY="):
+                        ANYTHINGLLM_API_KEY = line.split("=", 1)[1].strip()
+                        break
+    except Exception:
+        pass
 EXPORT_OUTPUT_DIR = os.environ.get("SATCHIDA_EXPORTS_DIR", "D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\documents\\generated")
 
 os.makedirs(EXPORT_OUTPUT_DIR, exist_ok=True)
@@ -97,7 +110,17 @@ def _resolve_user_workspace_slug(user_identifier: Optional[str] = None) -> str:
     (e.g., 'vault-user-alice' or 'vault-usr123').
     If a workspace doesn't exist, it is dynamically created on-the-fly.
     """
-    if not user_identifier or user_identifier.strip().lower() in ["default", "public", "anonymous", "none"]:
+    if not user_identifier or user_identifier.strip().lower() in ["default", "public", "anonymous", "none", "system", "law", "legal"]:
+        # If no user specified or querying global legal knowledge, default to shared indian acts workspace if available
+        try:
+            res = requests.get(f"{ANYTHINGLLM_BASE_URL}/workspaces", headers=_headers(), timeout=4)
+            if res.status_code == 200:
+                workspaces = res.json().get("workspaces", [])
+                for ws in workspaces:
+                    if ws.get("slug") == "indian-acts-and-statutes":
+                        return "indian-acts-and-statutes"
+        except Exception:
+            pass
         return "my-workspace"
     
     clean_id = re.sub(r'[^a-zA-Z0-9_-]', '-', user_identifier.strip().lower())
@@ -156,19 +179,63 @@ def list_user_knowledge_vaults(user_identifier: Optional[str] = None) -> str:
     except Exception as e:
         return f"Error retrieving vaults: {str(e)}"
 
+GLOBAL_STATUTES_WORKSPACE = "indian-acts-and-statutes"
+GLOBAL_MEDICAL_WORKSPACE = "medical-health-guidance"
+
+def _audit_vault_access(actor: Optional[str], target_vault: str, action: str):
+    """
+    Operator Security Exemption Directive (2026-11-19):
+    NEVER log actions of the central operator (admin@satchida.com or role 'admin').
+    ONLY log actions of tenant administrators (managers) inspecting or querying user vaults.
+    """
+    if not actor:
+        return
+    actor_clean = str(actor).strip().lower()
+    # Explicitly exempt operator
+    if actor_clean in ["admin@satchida.com", "admin", "operator", "central-admin"]:
+        return
+    # Log tenant manager access
+    if "manager" in actor_clean or "tenant-admin" in actor_clean:
+        try:
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = os.path.join(log_dir, "tenant_manager_vault_audit.jsonl")
+            entry = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "actor": actor,
+                "target_vault": target_vault,
+                "action": action,
+                "audit_type": "TENANT_MANAGER_INSPECTION"
+            }
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
+        except Exception:
+            pass
+
 @mcp.tool()
 def search_vault_documents(
     query: str,
     user_identifier: Optional[str] = None,
     specific_workspace_slug: Optional[str] = None,
+    include_statutes: bool = True,
     top_k: int = 4
 ) -> str:
     """
     Executes a vector similarity search across LanceDB vector embeddings in AnythingLLM.
-    Respects user segregation: searches the user's private workspace unless a specific shared workspace is requested.
-    Returns excerpts, relevance scores, and document titles.
+    Dual-Tier Architecture:
+    1. If user_identifier is provided and not global, searches the user's isolated vault.
+    2. If include_statutes is True (default) or no private results are found, also searches
+       the pre-indexed sovereign legal corpus ('indian-acts-and-statutes').
+    Returns merged excerpts, relevance scores, and document titles.
     """
+    if specific_workspace_slug and specific_workspace_slug.strip().lower() in ["none", "null", "undefined", ""]:
+        specific_workspace_slug = None
+
     target_slug = specific_workspace_slug or _resolve_user_workspace_slug(user_identifier)
+    
+    outputs = []
+    
+    # 1. Search primary target workspace
     try:
         payload = {"query": query, "topN": top_k}
         res = requests.post(
@@ -179,19 +246,42 @@ def search_vault_documents(
         )
         if res.status_code == 200:
             results = res.json().get("results", [])
-            if not results:
-                return f"No matching passages found in vault '{target_slug}' for query: '{query}'"
-            
-            output = [f"### Vault Search Results (`{target_slug}`):\n"]
-            for idx, r in enumerate(results, 1):
-                source = r.get("title", "Document")
-                text = r.get("text", "").strip()
-                score = round(r.get("score", 0), 3)
-                output.append(f"**[{idx}] {source}** *(Relevance Score: {score})*\n> {text}\n")
-            return "\n---\n".join(output)
-        return f"Vector search error from AnythingLLM: HTTP {res.status_code}"
+            if results:
+                outputs.append(f"### Vault Search Results (`{target_slug}`):\n")
+                for idx, r in enumerate(results, 1):
+                    source = r.get("title", "Document")
+                    text = r.get("text", "").strip()
+                    score = round(r.get("score", 0), 3)
+                    outputs.append(f"**[{idx}] {source}** *(Relevance Score: {score})*\n> {text}\n")
     except Exception as e:
-        return f"Vault search failed: {str(e)}"
+        logger.warning(f"Error searching target vault {target_slug}: {e}")
+
+    # 2. Dual-tier query: Also search global statutes if target was private workspace
+    if include_statutes and target_slug != GLOBAL_STATUTES_WORKSPACE:
+        try:
+            payload = {"query": query, "topN": top_k}
+            res_statutes = requests.post(
+                f"{ANYTHINGLLM_BASE_URL}/workspace/{GLOBAL_STATUTES_WORKSPACE}/vector-search",
+                json=payload,
+                headers=_headers(),
+                timeout=12
+            )
+            if res_statutes.status_code == 200:
+                results_s = res_statutes.json().get("results", [])
+                if results_s:
+                    outputs.append(f"\n### Sovereign Statutes Corpus (`{GLOBAL_STATUTES_WORKSPACE}`):\n")
+                    for idx, r in enumerate(results_s, 1):
+                        source = r.get("title", "Bare Act")
+                        text = r.get("text", "").strip()
+                        score = round(r.get("score", 0), 3)
+                        outputs.append(f"**[Statute {idx}] {source}** *(Relevance Score: {score})*\n> {text}\n")
+        except Exception as e:
+            logger.warning(f"Error searching global statutes: {e}")
+
+    if not outputs:
+        return f"No matching passages found in vault for query: '{query}'"
+    
+    return "\n---\n".join(outputs)
 
 @mcp.tool()
 def query_vault_rag_with_citations(
@@ -201,11 +291,29 @@ def query_vault_rag_with_citations(
 ) -> str:
     """
     Executes an end-to-end RAG inquiry using AnythingLLM's internal retrieval and synthesis pipeline.
+    Dual-Tier Fallback:
+    If specific_workspace_slug is not provided, defaults to the user's isolated workspace.
+    If the user's workspace yields no answer or refusal, seamlessly queries the sovereign
+    'indian-acts-and-statutes' workspace.
     Returns the comprehensive synthesized answer with verified source citations.
     """
-    target_slug = specific_workspace_slug or _resolve_user_workspace_slug(user_identifier)
+    if specific_workspace_slug and specific_workspace_slug.strip().lower() in ["none", "null", "undefined", ""]:
+        specific_workspace_slug = None
+
+    # Detect if inquiry is medical/health-related
+    medical_keywords = ["medical", "health", "doctor", "triage", "symptom", "pain", "splint", "fracture", "bleed", "burn", "chok", "fever", "diarrhea", "rabies", "snake", "wound", "cpr", "resuscitat", "bone", "ulcer", "tonsil", "gerd", "urine", "stone", "poison"]
+    is_medical_query = any(k in question.lower() for k in medical_keywords)
+
+    if specific_workspace_slug:
+        target_slug = specific_workspace_slug
+    elif is_medical_query:
+        target_slug = GLOBAL_MEDICAL_WORKSPACE
+    else:
+        target_slug = _resolve_user_workspace_slug(user_identifier)
     try:
-        payload = {"message": question, "mode": "query"}
+        # Isolated query session to prevent conversational backfill / injection leakage
+        inquiry_session = f"rag-{uuid.uuid4().hex[:12]}"
+        payload = {"message": question, "mode": "query", "sessionId": inquiry_session}
         res = requests.post(
             f"{ANYTHINGLLM_BASE_URL}/workspace/{target_slug}/chat",
             json=payload,
@@ -217,12 +325,28 @@ def query_vault_rag_with_citations(
             reply = data.get("textResponse", "")
             sources = data.get("sources", [])
             
+            # If the user's private workspace doesn't have an answer
+            if (not sources or "no relevant information" in reply.lower()) and target_slug != GLOBAL_STATUTES_WORKSPACE and target_slug != GLOBAL_MEDICAL_WORKSPACE:
+                # Try medical first if query appears medical, else try statutes
+                fallback_slug = GLOBAL_MEDICAL_WORKSPACE if is_medical_query else GLOBAL_STATUTES_WORKSPACE
+                res_fallback = requests.post(
+                    f"{ANYTHINGLLM_BASE_URL}/workspace/{fallback_slug}/chat",
+                    json=payload,
+                    headers=_headers(),
+                    timeout=40
+                )
+                if res_fallback.status_code == 200:
+                    data = res_fallback.json()
+                    reply = data.get("textResponse", "")
+                    sources = data.get("sources", [])
+                    target_slug = fallback_slug
+
             if sources:
                 citations_text = "\n".join([
                     f"- **[{s.get('title', 'Ref')}]**: {s.get('text', '')[:140]}..."
                     for s in sources
                 ])
-                return f"{reply}\n\n**Verified Citations & Sources:**\n{citations_text}"
+                return f"{reply}\n\n**Verified Citations & Sources (`{target_slug}`):**\n{citations_text}"
             return reply
         return f"RAG execution returned HTTP {res.status_code}"
     except Exception as e:

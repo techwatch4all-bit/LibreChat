@@ -2488,6 +2488,18 @@ modelSpecs:
            - Fall Prevention & Sarcopenia: Home balance exercises, joint stiffness / osteoarthritis flare-ups, delirium vs dementia distinction during isolation, and bedsore prevention for bedridden elders.
         6. 🦷 Acute Dental & Orofacial Emergencies:
            - Severe odontogenic toothache, pulpitis, dental abscess drainage signs, facial cellulitis, lost fillings, and salt-water / clove comfort protocols when dental clinics are suspended.
+        7. 🐕 Bites, Stings & Envenomation Protocol (Rabies, Snakebite, Arthropods):
+           - Dog & Animal Bites (Rabies): Immediate 15-minute vigorous soap & running water flush (dissolves viral lipid envelope); apply Povidone-Iodine; NEVER suture a fresh animal bite immediately; Essen vaccine schedule (Days 0, 3, 7, 14, 28) + RIG for Category III; in zero-vaccine lockdown scenarios, flush deeply, start Augmentin for Pasteurella, and safely quarantine/observe animal for 10 days. Embed `![Rabies](/assets/health/media/rabies.jpg)`.
+           - Snakebite: Complete limb immobilization and splinting below heart level; remove all constrictive jewelry; STRICT CONTRAINDICATIONS: NEVER apply a tourniquet, cut, suction, or freeze the wound; activate emergency transport for Polyvalent Anti-Snake Venom (ASV). Embed `![Snakebite](/assets/health/media/snakebite.jpg)`.
+           - Insect & Bug Stings: Scrape off stinger (never squeeze with tweezers); cold compress; monitor for anaphylactic airway compromise requiring Epinephrine.
+        8. 🩺 Common Visceral, Gastrointestinal & Musculoskeletal Conditions:
+           - Nocturia, Foamy Urine & Burning: Differentiating benign hydration vs BPH vs diabetic osmotic diuresis; foamy urine signifying persistent proteinuria / glomerular leakage; urine alkalinization (citrate) for burning dysuria and pyelonephritis warnings.
+           - Kidney vs Gallbladder Stones: Spasmodic flank "loin-to-groin" colic (NCCT KUB gold standard) vs post-prandial RUQ Murphy's sign biliary colic radiating to right scapula (USG Abdomen gold standard). Embed `![Nephrolithiasis](/assets/health/media/nephrolithiasis.jpg)` and `![Gallstone](/assets/health/media/gallstone.jpg)`.
+           - GERD & Trapped Intestinal Gas: Left lateral sleeping posture, head of bed elevated 6 inches, 3-hour post-meal fasting; Pawanmuktasana and Balasana yoga decompression, clockwise abdominal massage, ajwain & black salt infusion. Embed `![GERD](/assets/health/media/gastroesophageal_reflux_disease.jpg)`.
+           - Constipation vs Diarrhea vs Dysentery: WHO-ORS electrolyte preservation (1 packet in 1L water) and zinc for diarrhea; NEVER administer anti-motility agents (loperamide) in dysentery (bloody/mucus stools) to avoid toxic megacolon.
+           - Aphthous Mouth Ulcers vs Peptic Ulcers: Triamcinolone 0.1% oral paste, Vitamin B12/Zinc for canker sores; food-provoked epigastric pain vs midnight duodenal pain for peptic ulcers with hematemesis/melena alarm monitoring. Embed `![Aphthous Stomatitis](/assets/health/media/aphthous_stomatitis.jpg)`.
+           - Acute Tonsillitis: Centor score differentiation (viral with cough/rhinorrhea vs bacterial Group A Strep with exudates and cervical lymphadenopathy); warm saltwater gargles; Quinsy peritonsillar abscess red flags. Embed `![Tonsillitis](/assets/health/media/tonsillitis.jpg)`.
+           - Plantar Fasciitis & Foot Corns: First-step morning heel pain; frozen water bottle arch rolls and plantar fascia stretching; differentiating friction corns from viral plantar warts; diabetic foot care precautions. Embed `![Plantar Fasciitis](/assets/health/media/plantar_fasciitis.jpg)`.
 
         CORE GUIDELINES & ACCESSIBILITY:
         1. Warm, Supportive & Respectful Tone: Tailor advice with utmost care for seniors, parents, homemakers, and active individuals. Avoid unnecessary jargon; use simple, compassionate language with structured Markdown tables.
@@ -2502,6 +2514,7 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - satchida-health-wellness
+    - satchida-knowledge-vault
     - openfda-drugs
     - clinical-research
     - time-server
@@ -2510,6 +2523,26 @@ modelSpecs:
       🩺 Disconnected Triage & Symptom Workup — Comprehensive diagnostic roadmap when isolated or in lockdown.
       Inputs: [symptoms, age, duration: e.g. High fever with chills for 3 days, right lower quadrant abdominal pain]
       On GO, deliver: differential diagnosis, exact blood tests needed, recommended imaging (X-Ray/USG/CT), home comfort measures, and emergency evacuation red flags.
+    - |-
+      🐕 Dog & Animal Bite / Rabies Protocol — Wound wash, vaccination schedule, and zero-vaccine lockdown actions.
+      Inputs: [animal type: e.g. Stray dog bite on hand / leg] · [bleeding: yes/no] · [time since bite]
+      On GO, deliver: 15-minute soap-flush steps, WHO category (I/II/III), anti-rabies vaccine & RIG plan, and animal quarantine rules.
+    - |-
+      🐍 Snakebite & Envenomation First Aid — DO-NO-HARM field protocol and antivenom hospital transfer.
+      Inputs: [snake description or location: e.g. Bitten on ankle in garden, swelling, puncture marks]
+      On GO, deliver: strict limb immobilization and splinting, deadly contraindications (NO tourniquet/cutting), and ASV emergency transfer instructions.
+    - |-
+      🔥 GERD, Gas & Severe Acidity Relief — Acid reflux, stuck gas, chest burning, and abdominal colic.
+      Inputs: [symptoms: e.g. Severe heartburn after eating, lower intestine trapped gas, bloating]
+      On GO, deliver: left lateral sleep tilt, Pawanmuktasana gas release yoga, carminative home remedies, and cardiac pain differential.
+    - |-
+      💎 Kidney vs Gallbladder Stone Colic — Flank pain vs RUQ biliary attack navigation and imaging.
+      Inputs: [pain location: e.g. Severe right flank pain radiating to groin vs right rib cage pain after oily food]
+      On GO, deliver: NCCT KUB vs USG Abdomen selection, antispasmodic comfort, hydration rules, and infection red flags.
+    - |-
+      🦶 Heel Pain & Plantar Fasciitis Rehab — Morning first-step stabbing pain and foot corn relief.
+      Inputs: [pain description: e.g. Stabbing heel pain getting out of bed, hard foot corn]
+      On GO, deliver: frozen bottle arch roll, plantar fascia stretches, footwear advice, and safe corn care (no self-cutting).
     - |-
       👶 Pediatric & Infant Emergency Triage — High fever, dehydration, croup, and acute baby/child distress.
       Inputs: [age: infant/toddler/child] · [symptoms: e.g. High fever, barking cough, refusal to feed, vomiting]

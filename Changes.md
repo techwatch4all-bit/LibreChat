@@ -1,3 +1,20 @@
+## 2026-11-19 — Satchida Fleet Operations: One-API Dynamic Metadata & OpenHands Vibecoding Integration
+
+- **Commit**: `c300c9e4c` (`feat(admin): live fleet ops with One-API metadata and OpenHands worktree integration`)
+- **Real Tenant Extraction**:
+  - Created `ops-scripts/get_oneapi_tenants.py` to query `d:/LAN-AI-Infra/one-api/one-api.db` directly using Python's standard library.
+  - Dynamically resolved tenant display names ("Emami City", "HGRWA", "Family", "Satchida HQ"), subscription tiers, and seat limits instead of displaying raw technical IDs.
+- **LibreChat Admin Dashboard Overhaul**:
+  - Completely redesigned `client/src/components/Admin/TenantDashboard.tsx` with a dual-mode tab switcher (`Autonomous Healing` vs `Token Consumption`).
+  - Added real-time edge node telemetry cards, active incident monitors with plain-English summaries, user impact assessments, and technical root-cause diffs.
+  - Built direct action triggers: `Vibecode in OpenHands` (launches isolated git worktree) and `Deploy Fix` (dispatches verified patch to remote edge nodes).
+- **OpenHands Worktree Bridge**:
+  - Implemented `ops-scripts/openhands-bridge.mjs` to create isolated git worktrees (`d:/LAN-AI-Infra/worktrees/fix-<fingerprint>`) and generate `SATCHIDA_INCIDENT_BRIEF.md` containing runtime stacktraces, file contexts, and verification commands.
+- **Verification & Build**:
+  - Client compiled successfully via `npm run build:client` (Rolldown/Vite bundle in `client/dist`).
+  - Tested 8-stage E2E telemetry & remediation lifecycle via `ops-scripts/test-e2e-fleet.mjs` with 100% success.
+  - LibreChat restarted under PM2 (ID 10) to serve live backend endpoints `/api/admin/tenants/fleet-ops` and `/api/admin/tenants/launch-openhands`.
+
 ## 2026-11-17 — Media library verification pass + dead-manifest repair + thumbnail backfill
 
 - **Verification of the M1–M7 claims** (all confirmed against files, runtime, HTTP and Mongo): unique-filename helpers present in `satchida-montage-server.py` and `anythingllm_mcp_server.py`; reconciliation reports exist with billed = one-api = $1.9861; `/api/studio/library` live (401 anonymous, `optionalJwtAuth` at `api/server/index.js:587`); audio gates present in `video_generate`, `media_compose`, `animated_generate_local`; ComfyUI headless running on :8188 (uv CPython 3.12.9) with `extra_models_config.yaml` base_path → `D:\LAN-AI-Infra\Image-models`; re-run `fix_chat_links.py` audit: **24 OK / 0 REPAIRED / 0 BROKEN**; deleted conversation `125fc105…` confirmed absent in Mongo (0 conv + 0 msgs, 139 conversations remain).

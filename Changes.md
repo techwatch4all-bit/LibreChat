@@ -3003,6 +3003,36 @@ phase begins.
 in `D:\LAN-AI-Infra\Image-models`; fix the cosmetic `widgetInputs.js` deprecation by updating the
 offending custom node. CheapInference media unlocks with one dashboard action (Bugs.md B-new 1).
 
+## 2026-11-19 — Real-Time Error Sentinel Daemon (satchida-error-sentinel)
+
+**Context:** User requested a real, production-safe server-side process to automatically capture all errors
+across all tenants and all users in real-time, with zero risk of breaking the platform.
+
+**What was delivered:**
+
+**`ops-scripts/satchida-error-sentinel.mjs`** — A new PM2 daemon (ID 16, `satchida-error-sentinel`):
+- **Real log tail:** Reads PM2's `librechat-error.log` byte-by-byte from the current EOF, polling
+  every 5 seconds for new lines. Zero file locking, zero risk.
+- **Real MongoDB poll:** Every 60 seconds queries `messages` collection for `{error: true}` documents
+  updated since last poll. Catches errors that don't appear in logs (e.g., model routing failures,
+  `illegal_model_request`, bad provider responses stored as message text).
+- **Real fingerprinting:** SHA-256 of normalized `(errorType + message)` with timestamps/IDs/ports
+  stripped. Deduplicates across all users.
+- **Real MongoDB write:** `system_errors` collection with TTL index (30 days self-cleaning), upsert
+  by fingerprint (`$inc count`, `$set lastSeen`).
+- **Real alerting:** When a fingerprint exceeds 2 hits within 1 hour, writes a structured JSON
+  incident file to `ops-scripts/incidents/` AND emits `[INCIDENT]` to the PM2 error log stream.
+- **Eight error patterns watched:** `tool_not_found`, `mcp_timeout`, `provider_error`,
+  `json_parse_error`, `auth_error`, `rate_limit`, `module_not_found`, `unhandled_reject`.
+- **Safety contract:** NEVER modifies any source file, DB record, or live process. Purely
+  observational + append-only writes to its own collection.
+
+**Verified live:**
+- `system_errors` collection created with 5 indexes (`fingerprint_1`, `errorType_1`, `tenantId_1`,
+  `firstSeen_1`, `expiredAt_1`).
+- PM2 process ID 16 running online, clean stdout, empty stderr.
+- PM2 dump saved (`pm2 save`) for autostart persistence across reboots.
+
 ## 2026-11-17 — Bare-to-Bound MCP Tool Auto-Resolution & Brand Error Defense
 
 **Context:** User reported a prominent red UI failure badge (`Failed: get_verified_market_rates Tool get_verified_market_rates not found · failed`) in conversation `1c3b2940-9df8-5c65-b9a6-b747183325ae`. The user requested proactive prevention of all such brand-damaging errors across the platform.

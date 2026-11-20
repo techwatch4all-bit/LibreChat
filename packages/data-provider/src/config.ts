@@ -3163,6 +3163,30 @@ export const openIdDiscoverySchema = z.object({
 
 export type TOpenIdDiscoveryConfig = z.infer<typeof openIdDiscoverySchema>;
 
+export const OPENCODE_DEFAULT_BASE_URL = 'http://127.0.0.1:4096';
+export const OPENCODE_DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024;
+export const OPENCODE_DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+export const opencodeConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  baseUrl: z.string().url().default(OPENCODE_DEFAULT_BASE_URL),
+  allowedRoots: z.array(z.string().min(1)).default([]),
+  maxFileBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(50 * 1024 * 1024)
+    .default(OPENCODE_DEFAULT_MAX_FILE_BYTES),
+  requestTimeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(300_000)
+    .default(OPENCODE_DEFAULT_REQUEST_TIMEOUT_MS),
+});
+
+export type TOpenCodeConfig = z.infer<typeof opencodeConfigSchema>;
+
 /** Maximum CAS attempts per ACL document, including the initial attempt. */
 export const permissionWriteAttemptsSchema = z.number().int().min(1).max(100).default(3);
 
@@ -3173,6 +3197,7 @@ export const configSchema = z.object({
   ocr: ocrSchema.optional(),
   webSearch: webSearchSchema.optional(),
   langfuse: langfuseConfigSchema.optional(),
+  opencode: opencodeConfigSchema.optional(),
   memory: memorySchema.optional(),
   summarization: summarizationConfigSchema.optional(),
   skillSync: skillSyncConfigSchema,

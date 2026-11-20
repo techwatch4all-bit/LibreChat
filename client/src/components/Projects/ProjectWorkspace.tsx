@@ -3,19 +3,19 @@ import { useRecoilValue } from 'recoil';
 import * as Ariakit from '@ariakit/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Constants, QueryKeys } from 'librechat-data-provider';
-import { ArrowLeft, ArrowUpDown, Check, Folder, Pencil, Plus, Trash2, Terminal, Code2 } from 'lucide-react';
+import { Constants, PermissionTypes, Permissions, QueryKeys } from 'librechat-data-provider';
 import { Button, Spinner, DropdownPopup, TooltipAnchor, useMediaQuery } from '@librechat/client';
+import { ArrowLeft, ArrowUpDown, Check, Folder, Pencil, Plus, Trash2, Code2 } from 'lucide-react';
 import type { ConversationListResponse } from 'librechat-data-provider';
 import type { MenuItemProps, RenderProp } from '~/common';
 import { useConversationsInfiniteQuery, useProjectQuery } from '~/data-provider';
+import { useHasAccess, useLocalize, useNewConvo } from '~/hooks';
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import ProjectDeleteDialog from './ProjectDeleteDialog';
 import ProjectEditDialog from './ProjectEditDialog';
-import VibeWorkspace from './VibeWorkspace';
-import { useLocalize, useNewConvo } from '~/hooks';
 import { cn, clearMessagesCache } from '~/utils';
 import ProjectChatList from './ProjectChatList';
+import VibeWorkspace from './VibeWorkspace';
 import store from '~/store';
 
 type ChatSortField = 'updatedAt' | 'createdAt';
@@ -40,8 +40,13 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { projectId = '' } = useParams();
+  const hasOpenCodeAccess = useHasAccess({
+    permissionType: PermissionTypes.OPENCODE,
+    permission: Permissions.USE,
+  });
   const [sortBy, setSortBy] = useState<ChatSortField>('updatedAt');
-  const [viewMode, setViewMode] = useState<'chats' | 'vibe'>('vibe');
+  const [viewMode, setViewMode] = useState<'chats' | 'vibe' | null>(null);
+  const activeViewMode = hasOpenCodeAccess ? (viewMode ?? 'vibe') : 'chats';
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const sortMenuId = useId();
@@ -137,10 +142,109 @@ export default function ProjectWorkspace() {
     );
   }
 
+  if (activeViewMode === 'vibe') {
+    return (
+      <main className="flex h-full min-h-0 flex-col overflow-hidden bg-presentation text-text-primary">
+        <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border-light bg-surface-secondary px-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {isSmallScreen ? <OpenSidebar className="size-8 shrink-0" /> : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/projects')}
+              className="h-7 px-2 text-xs text-text-secondary hover:text-text-primary"
+            >
+              <ArrowLeft className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              {localize('com_ui_all_projects')}
+            </Button>
+            <span className="text-border-medium" aria-hidden="true">
+              /
+            </span>
+            <Folder className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
+            <h1 className="truncate text-sm font-semibold text-text-primary">{project.name}</h1>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 rounded-md border border-border-light bg-surface-primary p-0.5">
+            {hasOpenCodeAccess ? (
+              <Button
+                type="button"
+                variant={activeViewMode === 'vibe' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('vibe')}
+                className="h-6 gap-1.5 px-2.5 text-xs"
+              >
+                <Code2 className="size-3.5" aria-hidden="true" />
+                {localize('com_opencode_tab_vibe')}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant={activeViewMode === 'chats' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('chats')}
+              className="h-6 px-2.5 text-xs"
+            >
+              {localize('com_opencode_tab_chats')} ({project.conversationCount})
+            </Button>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-0.5">
+            <TooltipAnchor
+              description={localize('com_ui_edit_project')}
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-text-secondary hover:text-text-primary"
+                  aria-label={localize('com_ui_edit_project')}
+                  onClick={() => setIsEditOpen(true)}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipAnchor
+              description={localize('com_ui_delete_project_action')}
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-text-secondary hover:text-text-destructive"
+                  aria-label={localize('com_ui_delete_project_action')}
+                  onClick={() => setIsDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              }
+            />
+          </div>
+        </header>
+
+        <ProjectEditDialog open={isEditOpen} onOpenChange={setIsEditOpen} project={project} />
+        <ProjectDeleteDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} project={project} />
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          <VibeWorkspace
+            projectId={project._id}
+            projectName={project.name}
+            localPath={project.localPath}
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-presentation text-text-primary">
-      <header className="sticky top-0 z-10 border-b border-border-light bg-presentation">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-4 md:h-16 md:px-6">
+      <header className="shrink-0 border-b border-border-light bg-presentation">
+        <div
+          className={`mx-auto flex h-12 w-full items-center gap-2 px-4 md:px-6 ${
+            activeViewMode === 'vibe' ? 'max-w-[1600px]' : 'max-w-6xl'
+          }`}
+        >
           {isSmallScreen ? <OpenSidebar className="size-9 shrink-0" /> : null}
           <Button
             type="button"
@@ -155,7 +259,11 @@ export default function ProjectWorkspace() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10 pt-6 md:px-6 md:pt-8">
+      <div
+        className={`mx-auto flex w-full flex-1 flex-col px-4 pb-6 pt-4 md:px-6 ${
+          activeViewMode === 'vibe' ? 'max-w-[1600px]' : 'max-w-6xl'
+        }`}
+      >
         <div className="flex items-start gap-3.5">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface-secondary text-text-secondary">
             <Folder className="h-6 w-6" aria-hidden="true" />
@@ -217,27 +325,29 @@ export default function ProjectWorkspace() {
 
         <div className="mt-6 flex items-center justify-between border-b border-border-light pb-3">
           <div className="flex items-center gap-2">
+            {hasOpenCodeAccess ? (
+              <Button
+                type="button"
+                variant={activeViewMode === 'vibe' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('vibe')}
+                className="gap-1.5"
+              >
+                <Code2 className="size-4" aria-hidden="true" />
+                {localize('com_opencode_tab_vibe')}
+              </Button>
+            ) : null}
             <Button
               type="button"
-              variant={viewMode === 'vibe' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('vibe')}
-              className="gap-1.5"
-            >
-              <Code2 className="size-4" />
-              Vibe Coding & OpenCode
-            </Button>
-            <Button
-              type="button"
-              variant={viewMode === 'chats' ? 'default' : 'ghost'}
+              variant={activeViewMode === 'chats' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('chats')}
               className="gap-1.5"
             >
-              Chats ({project.conversationCount})
+              {localize('com_opencode_tab_chats')} ({project.conversationCount})
             </Button>
           </div>
-          {viewMode === 'chats' && (
+          {activeViewMode === 'chats' && (
             <Button
               type="button"
               variant="outline"
@@ -245,14 +355,14 @@ export default function ProjectWorkspace() {
               onClick={startProjectChat}
               className="gap-1.5"
             >
-              <Plus className="size-4" />
-              New Chat
+              <Plus className="size-4" aria-hidden="true" />
+              {localize('com_opencode_new_chat')}
             </Button>
           )}
         </div>
 
-        {viewMode === 'vibe' ? (
-          <div className="mt-5 flex-1 min-h-[580px] flex flex-col">
+        {activeViewMode === 'vibe' ? (
+          <div className="mt-5 flex min-h-[580px] flex-1 flex-col">
             <VibeWorkspace
               projectId={project._id}
               projectName={project.name}
@@ -283,7 +393,9 @@ export default function ProjectWorkspace() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="flex items-baseline gap-2 text-sm font-medium text-text-primary">
                   {localize('com_ui_chats')}
-                  <span className="tabular-nums text-text-secondary">{project.conversationCount}</span>
+                  <span className="tabular-nums text-text-secondary">
+                    {project.conversationCount}
+                  </span>
                 </h2>
                 <DropdownPopup
                   portal={true}

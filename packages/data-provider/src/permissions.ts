@@ -72,6 +72,10 @@ export enum PermissionTypes {
    * Type for Scheduled Chats Permissions
    */
   SCHEDULES = 'SCHEDULES',
+  /**
+   * Type for OpenCode Vibe Coding Workspace Permissions
+   */
+  OPENCODE = 'OPENCODE',
 }
 
 /**
@@ -97,6 +101,7 @@ export const PERMISSION_TYPE_INTERFACE_FIELDS: Record<PermissionTypes, string> =
   [PermissionTypes.SKILLS]: 'skills',
   [PermissionTypes.SHARED_LINKS]: 'sharedLinks',
   [PermissionTypes.SCHEDULES]: 'schedules',
+  [PermissionTypes.OPENCODE]: 'opencode',
 };
 
 /** Set of interface config field names that correspond to role permissions. */
@@ -272,6 +277,11 @@ export const sharedLinksPermissionsSchema = z.object({
 });
 export type TSharedLinksPermissions = z.infer<typeof sharedLinksPermissionsSchema>;
 
+export const opencodePermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(false),
+});
+export type TOpenCodePermissions = z.infer<typeof opencodePermissionsSchema>;
+
 // Define a single permissions schema that holds all permission types.
 export const permissionsSchema = z.object({
   [PermissionTypes.PROMPTS]: promptPermissionsSchema,
@@ -291,4 +301,5 @@ export const permissionsSchema = z.object({
   [PermissionTypes.SKILLS]: skillPermissionsSchema,
   [PermissionTypes.SHARED_LINKS]: sharedLinksPermissionsSchema,
   [PermissionTypes.SCHEDULES]: schedulesPermissionsSchema,
+  [PermissionTypes.OPENCODE]: opencodePermissionsSchema,
 });

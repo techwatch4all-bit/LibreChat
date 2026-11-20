@@ -70,6 +70,8 @@ export interface AppConfig {
   messageFilter?: TCustomConfig['messageFilter'];
   /** Langfuse tracing configuration */
   langfuse?: TCustomConfig['langfuse'];
+  /** OpenCode local coding agent configuration */
+  opencode?: TCustomConfig['opencode'];
   /** Skill sync configuration */
   skillSync?: SkillSyncConfig;
   /** File storage strategy ('local', 's3', 'firebase', 'azure_blob', 'cloudfront') */

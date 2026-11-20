@@ -132,6 +132,23 @@ export function createRoleMethods(
         }
       }
       await role.save();
+
+      // Backfill newly added default permission blocks onto existing tenant-scoped system roles
+      // without overwriting any explicitly configured values.
+      for (const permType of Object.keys(defaultPerms)) {
+        const defaultBlock = defaultPerms[permType as keyof typeof defaultPerms];
+        // eslint-disable-next-line no-restricted-syntax -- Startup system-role migration across tenant-scoped copies.
+        await Role.collection.updateMany(
+          {
+            name: roleName,
+            tenantId: { $exists: true, $ne: null },
+            [`permissions.${permType}`]: { $exists: false },
+          },
+          {
+            $set: { [`permissions.${permType}`]: defaultBlock },
+          },
+        );
+      }
     }
   }
 

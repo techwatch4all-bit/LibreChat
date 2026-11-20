@@ -1,6 +1,8 @@
+import { Sparkles } from 'lucide-react';
 import { Input, Label } from '@librechat/client';
 import { Controller, useWatch, useFormContext } from 'react-hook-form';
 import type { AgentForm } from '~/common';
+import AssistantConversationStarters from '~/components/SidePanel/Builder/AssistantConversationStarters';
 import { ResolvedProviderIcon } from '~/components/Endpoints/ResolvedProviderIcon';
 import AgentCategorySelector from './AgentCategorySelector';
 import { useLocalize, useAgentCapabilities } from '~/hooks';
@@ -15,6 +17,54 @@ import AgentAvatar from './AgentAvatar';
 import { Panel } from '~/common';
 
 const fieldClass = 'h-9';
+
+const QUICK_AGENT_TEMPLATES = [
+  {
+    label: '🔍 Research Analyst',
+    name: 'Deep Research & Insights Analyst',
+    description: 'Synthesizes market, technical, and competitive research with clear takeaways.',
+    instructions:
+      'You are an executive research analyst. Break complex topics into structured findings, cite verifiable facts, compare trade-offs in tables, and end with actionable recommendations.',
+    starters: [
+      'Compare the top 3 solutions for this problem with pros, cons, and costs',
+      'Summarize the latest trends and risks in this industry',
+    ],
+  },
+  {
+    label: '💻 Coding Partner',
+    name: 'Full-Stack Architecture & Code Partner',
+    description:
+      'Designs, debugs, and reviews production TypeScript, Node.js, React, and Python code.',
+    instructions:
+      'You are a principal software architect. Write clean, modular, secure, production-ready code with explicit error handling and clear explanations.',
+    starters: [
+      'Review this code for bugs, security risks, and performance bottlenecks',
+      'Design a clean full-stack architecture for a real-time web application',
+    ],
+  },
+  {
+    label: '📈 Business Ops',
+    name: 'Business & Operations Strategist',
+    description: 'Drafts SOPs, proposals, client communications, and financial/operational plans.',
+    instructions:
+      'You are a senior business operations advisor. Draft crisp, professional documents, SOPs, and proposals tailored for Indian and global SMB workflows.',
+    starters: [
+      'Draft a professional client proposal and project milestone schedule',
+      'Create a step-by-step standard operating procedure (SOP) for our team',
+    ],
+  },
+  {
+    label: '🎓 Study Tutor',
+    name: 'Interactive Concept & Exam Tutor',
+    description: 'Explains complex subjects step-by-step with examples and practice quizzes.',
+    instructions:
+      'You are an encouraging master tutor. Explain concepts from first principles using analogies, worked examples, and short comprehension checks.',
+    starters: [
+      'Explain this topic step-by-step using a real-world analogy',
+      'Quiz me with 5 progressive questions on this subject',
+    ],
+  },
+];
 
 export default function AgentConfig() {
   const localize = useLocalize();
@@ -38,8 +88,44 @@ export default function AgentConfig() {
     endpointsConfig,
   });
 
+  const applyQuickTemplate = (tpl: (typeof QUICK_AGENT_TEMPLATES)[number]) => {
+    methods.setValue('name', tpl.name, { shouldDirty: true, shouldValidate: true });
+    methods.setValue('description', tpl.description, { shouldDirty: true });
+    methods.setValue('instructions', tpl.instructions, { shouldDirty: true });
+    methods.setValue('conversation_starters', tpl.starters, { shouldDirty: true });
+    if (!providerValue) {
+      methods.setValue('provider', 'Satchida', { shouldDirty: true });
+    }
+    if (!model) {
+      methods.setValue('model', 'Work', { shouldDirty: true });
+    }
+    if (!methods.getValues('category')) {
+      methods.setValue('category', 'general', { shouldDirty: true });
+    }
+  };
+
   return (
     <div className="h-auto pt-1">
+      {/* 1-CLICK SMART AGENT TEMPLATES */}
+      <div className="mb-3 rounded-xl border border-border-light bg-surface-secondary/50 p-2.5">
+        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-text-primary">
+          <Sparkles className="size-3.5 text-text-secondary" aria-hidden="true" />
+          <span>{localize('com_ui_smart_agent_templates')}</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_AGENT_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.label}
+              type="button"
+              onClick={() => applyQuickTemplate(tpl)}
+              className="rounded-lg border border-border-light bg-surface-primary px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:border-border-heavy hover:bg-surface-hover"
+            >
+              {tpl.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* IDENTITY — flat header, always visible, avatar inline */}
       <div className="mb-3 mt-1 flex items-center gap-3">
         <div className="flex-shrink-0">
@@ -144,6 +230,26 @@ export default function AgentConfig() {
 
       {/* INSTRUCTIONS */}
       <Instructions />
+
+      {/* CONVERSATION STARTERS / ONE-CLICK ACTIONS */}
+      <div className="mb-3">
+        <Controller
+          name="conversation_starters"
+          control={control}
+          render={({ field }) => (
+            <AssistantConversationStarters
+              field={{
+                value: Array.isArray(field.value) ? field.value : [],
+                onChange: field.onChange,
+              }}
+              inputClass={cn(
+                'w-full rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:border-border-heavy focus:outline-none focus:ring-0',
+              )}
+              labelClass="mb-1 block text-[11px] font-medium uppercase tracking-wide text-text-secondary"
+            />
+          )}
+        />
+      </div>
 
       {/* TOOLS — unified built-ins / tools / actions / mcp / skills */}
       <ToolsSection agentId={agent_id} />

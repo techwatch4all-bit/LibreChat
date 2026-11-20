@@ -57,8 +57,8 @@ export const darkBlackTheme: ThemeDefinition = {
         'rgb-surface-tertiary-alt': '42 42 42', // #2a2a2a
         'rgb-surface-dialog': '18 18 18', // #121212
         'rgb-surface-overlay': '0 0 0', // #000000
-        'rgb-surface-submit': '255 255 255', // Pure white submit button like ChatGPT dark
-        'rgb-surface-submit-hover': '215 215 215',
+        'rgb-surface-submit': '4 120 87', // #047857 high-contrast emerald submit button under white text-on-status
+        'rgb-surface-submit-hover': '6 95 70', // #065f46
         'rgb-surface-destructive': '153 27 27',
         'rgb-surface-destructive-hover': '127 29 29',
         'rgb-surface-chat': '0 0 0', // #000000 pure black chat canvas

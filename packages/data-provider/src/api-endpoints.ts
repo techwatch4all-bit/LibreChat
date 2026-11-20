@@ -622,3 +622,58 @@ export const getAllEffectivePermissions = (resourceType: ResourceType) =>
 // SharePoint Graph API Token
 export const graphToken = (scopes: string) =>
   `${BASE_URL}/api/auth/graph-token?scopes=${encodeURIComponent(scopes)}`;
+
+/* OpenCode Vibe Coding Workspace */
+export const opencodeStatus = () => `${BASE_URL}/api/opencode/status`;
+export const opencodeWorkspace = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/workspace`;
+export const opencodeTree = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/tree`;
+export const opencodeFile = (projectId: string, filePath?: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/file${
+    filePath ? `?path=${encodeURIComponent(filePath)}` : ''
+  }`;
+export const opencodePty = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/pty`;
+export const opencodePtyResize = (projectId: string, ptyId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/pty/${encodeURIComponent(ptyId)}/resize`;
+export const opencodePtyConnectToken = (projectId: string, ptyId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/pty/${encodeURIComponent(ptyId)}/connect-token`;
+export const opencodeSessions = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/sessions`;
+export const opencodeSessionPrompt = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/prompt`;
+export const opencodeSessionAbort = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/abort`;
+export const opencodeSessionMessages = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/messages`;
+export const opencodeSessionDiff = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/diff`;
+export const opencodeSessionRevert = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/revert`;
+export const opencodeSessionUnrevert = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/unrevert`;
+export const opencodeEvents = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/events`;
+export const opencodeProviders = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/providers`;
+export const opencodeAgents = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/agents`;
+export const opencodePermissions = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/permissions`;
+export const opencodePermissionReply = (projectId: string, requestId: string) =>
+  `${opencodePermissions(projectId)}/${encodeURIComponent(requestId)}`;
+export const opencodeQuestions = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/questions`;
+export const opencodeQuestionReply = (projectId: string, requestId: string) =>
+  `${opencodeQuestions(projectId)}/${encodeURIComponent(requestId)}/reply`;
+export const opencodeQuestionReject = (projectId: string, requestId: string) =>
+  `${opencodeQuestions(projectId)}/${encodeURIComponent(requestId)}/reject`;
+export const opencodeVcs = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/vcs`;
+export const opencodePreviewStatus = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/status`;
+export const opencodePreviewStart = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/start`;
+export const opencodePreviewStop = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/stop`;

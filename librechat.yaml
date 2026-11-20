@@ -1,4 +1,15 @@
 version: 1.3.17
+opencode:
+  enabled: true
+  baseUrl: http://127.0.0.1:4096
+  allowedRoots:
+    - D:\LAN-AI-Infra\vibe-apps
+    - D:\LAN-AI-Infra
+    - C:\LAN-AI-Infra
+    - D:\LAN-AI-Infra\sample-vibe-project
+    - D:\LAN-AI-Infra\workspace
+  maxFileBytes: 2097152
+  requestTimeoutMs: 30000
 registration:
   enabled: false
   socialLogins: []
@@ -48,7 +59,7 @@ memory:
   - user_goals
   - user_context
   agent:
-    enabled: false
+    enabled: true
     provider: Satchida
     model: Work
     instructions: 'Extract durable facts about the user: stated preferences, profile
@@ -2236,6 +2247,10 @@ modelSpecs:
     conversation_starters:
     - "Alpine Sunrise Drone Flight — 4K cinematic flythrough of a mountain valley with rushing river and birdsong"
     - "Neon Cyberpunk Metropolis — Rain-soaked streets, holographic billboards, flying speeders and synthwave foley"
+    - "📱 Create TikTok / YouTube Shorts (9:16) — Convert video to 9:16 vertical short with auto-face tracking and captions"
+    - "💻 App & UI Demo Simulation — Smooth simulated walkthrough of a terminal, app, or website without recording your screen"
+    - "🏛️ NASA & Historical Stock Footage — Search and download authentic archive clips directly into your studio library"
+    - "✂️ Smart Timeline Editor & Trimmer — Cut, trim, change speed, and stitch multiple video clips seamlessly"
     - "Quantum Qubit Explainer — 60 FPS kinetic typography with 3D Bloch sphere simulation for YouTube education"
     - "Photo to 3D Parallax Motion — Upload any still image to reconstruct camera push-in and spatial depth"
   - name: SceneMosaic
@@ -2880,6 +2895,18 @@ modelSpecs:
     - filesystem-shared
     - time-server
     conversation_starters:
+    - |-
+      📱 TikTok / YouTube Shorts Maker (9:16) — Reframe any video to vertical format with face-tracking and auto-captions.
+      Inputs: [video from library or topic] · [style: Dynamic Shorts / Minimal Reels]
+      On GO, deliver: smart vertical 9:16 video rendered and cataloged in your library with #shorts tags.
+    - |-
+      💻 App & UI Demo Simulation — Professional animated walkthrough of a terminal, web app, or software UI without screen recording.
+      Inputs: [title / product name] · [list of steps or commands to demonstrate]
+      On GO, deliver: 60fps simulated UI walk-through video with window chrome and typing animation.
+    - |-
+      🏛️ Historical & Space Archive Footage — Fetch and catalog real NASA and Archive.org footage into your studio library.
+      Inputs: [search query: e.g. Apollo Moon Missions, Nebula Flythrough, 1930s Film]
+      On GO, deliver: downloaded high-res clips with public domain metadata ready for instant timeline editing.
     - |-
       🎬 3D Science Explainer — Create an engaging 2-minute 3D animation explaining Quantum Superposition for YouTube.
       Inputs: [topic or concept] · [target audience: e.g. High School, General Public, Engineering]

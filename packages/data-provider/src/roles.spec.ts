@@ -174,4 +174,20 @@ describe('roleDefaults', () => {
       expect(userMcp[Permissions.CONFIGURE_OBO]).toBe(false);
     });
   });
+
+  describe('OPENCODE.USE defaults', () => {
+    it('grants ADMIN OPENCODE.USE by default', () => {
+      const adminOpenCode = roleDefaults[SystemRoles.ADMIN].permissions[
+        PermissionTypes.OPENCODE
+      ] as Record<string, boolean>;
+      expect(adminOpenCode[Permissions.USE]).toBe(true);
+    });
+
+    it('does not grant OPENCODE.USE to USER by default — prevents default host shell access', () => {
+      const userOpenCode = roleDefaults[SystemRoles.USER].permissions[
+        PermissionTypes.OPENCODE
+      ] as Record<string, boolean>;
+      expect(userOpenCode[Permissions.USE]).toBe(false);
+    });
+  });
 });

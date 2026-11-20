@@ -1,193 +1,162 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const WebSocket = require('ws');
+const { runAsSystem } = require('@librechat/data-schemas');
+const {
+  generateCheckAccess,
+  createOpenCodeHttpHandlers,
+  createOpenCodePtyRegistry,
+  createOpenCodePreviewManager,
+} = require('@librechat/api');
+const { PermissionTypes, Permissions } = require('librechat-data-provider');
+const { promptUsageLimiter } = require('~/server/middleware/limiters');
+const { getAppConfig } = require('~/server/services/Config');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 const db = require('~/models');
 
 const router = express.Router();
+const ptyRegistry = createOpenCodePtyRegistry();
+const previewManager = createOpenCodePreviewManager();
+let handlers;
+
+function getHandlers() {
+  if (handlers == null) {
+    handlers = createOpenCodeHttpHandlers({
+      getAppConfig,
+      getChatProject: db.getChatProject,
+      updateChatProject: db.updateChatProject,
+      ptyRegistry,
+      previewManager,
+      createUpstreamWebSocket: (wsUrl, opts) => new WebSocket(wsUrl, opts),
+      verifyJwt: (token) => {
+        const secrets = [process.env.JWT_SECRET, process.env.JWT_REFRESH_SECRET].filter(Boolean);
+        for (const secret of secrets) {
+          try {
+            const decoded = jwt.verify(token, secret);
+            if (decoded && typeof decoded === 'object' && typeof decoded.id === 'string') {
+              return { id: decoded.id, tenantId: decoded.tenantId };
+            }
+          } catch {
+            /* try next secret */
+          }
+        }
+        return null;
+      },
+      enforcePlatformAdminForPty: true,
+      isUserInPlatformAdminGroup: (userId) =>
+        runAsSystem(async () => {
+          const Group = mongoose.models.Group;
+          if (!Group) {
+            return false;
+          }
+          const found = await Group.findOne({
+            name: /^admin$/i,
+            $or: [{ tenantId: 'satchida-master' }, { tenantId: { $exists: false } }],
+            memberIds: userId,
+          }).lean();
+          return Boolean(found);
+        }),
+      getUserSeatCredential: (userId) =>
+        runAsSystem(async () => {
+          const User = mongoose.models.User;
+          if (!User) {
+            return null;
+          }
+          return User.findById(userId)
+            .select('+seatToken accountType tenantId role familyRole')
+            .lean();
+        }),
+    });
+  }
+  return handlers;
+}
+
+const checkOpenCodeAccess = generateCheckAccess({
+  permissionType: PermissionTypes.OPENCODE,
+  permissions: [Permissions.USE],
+  getRoleByName: db.getRoleByName,
+});
+
+/* Internal seat-attributing LLM proxy for opencode-serve -> Satchida Gateway (one-api :4000 -> Bifrost :8700) */
+router.use('/llm-proxy/v1', (req, res) => getHandlers().proxyLlmToGateway(req, res));
+
+/* Same-origin preview iframe proxy (enforces owner-scoped HttpOnly preview cookie or Bearer JWT) */
+router.use('/:projectId/preview/proxy', (req, res) => getHandlers().proxyPreview(req, res));
+
+/* Built-in Satchida Headless Reader endpoint for loopback vibecoded apps & authenticated users */
+router.get('/reader', (req, res) => getHandlers().readUrlContent(req, res));
+
 router.use(requireJwtAuth);
+router.use(checkOpenCodeAccess);
 
-const OPENCODE_PORT = process.env.OPENCODE_PORT || 4096;
-const OPENCODE_BASE = `http://127.0.0.1:${OPENCODE_PORT}`;
+router.get('/status', (req, res) => getHandlers().getStatus(req, res));
 
-/** Helper to verify and get project directory */
-async function getProjectDir(req, projectId) {
-  const userId = req.user?.id || req.user?._id?.toString();
-  const project = await db.getChatProject(userId, projectId);
-  if (!project) {
-    return null;
-  }
-  let localPath = project.localPath;
-  if (!localPath || !fs.existsSync(localPath)) {
-    // If localPath is not specified or doesn't exist, default to project-specific storage or cwd
-    localPath = process.cwd();
-  }
-  return { project, localPath };
-}
+/* Workspace files & 1-click export */
+router.post('/:projectId/workspace', (req, res) => getHandlers().provisionWorkspace(req, res));
+router.get('/:projectId/export-zip', (req, res) => getHandlers().exportProjectZip(req, res));
+router.get('/:projectId/tree', (req, res) => getHandlers().getTree(req, res));
+router.get('/:projectId/file', (req, res) => getHandlers().readFile(req, res));
+router.post('/:projectId/file', (req, res) => getHandlers().writeFile(req, res));
 
-/** Recursively read directory tree (up to maxDepth) */
-function readDirTree(dirPath, currentDepth = 0, maxDepth = 3) {
-  if (currentDepth > maxDepth || !fs.existsSync(dirPath)) {
-    return [];
-  }
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    const items = [];
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') && entry.name !== '.env.example') {
-        continue;
-      }
-      if (['node_modules', 'dist', 'build', '.git', 'coverage'].includes(entry.name)) {
-        continue;
-      }
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        items.push({
-          name: entry.name,
-          path: fullPath,
-          type: 'directory',
-          children:
-            currentDepth < maxDepth ? readDirTree(fullPath, currentDepth + 1, maxDepth) : [],
-        });
-      } else if (entry.isFile()) {
-        items.push({
-          name: entry.name,
-          path: fullPath,
-          type: 'file',
-          size: fs.statSync(fullPath).size,
-        });
-      }
-    }
-    return items.sort((a, b) => {
-      if (a.type === b.type) return a.name.localeCompare(b.name);
-      return a.type === 'directory' ? -1 : 1;
-    });
-  } catch {
-    return [];
-  }
-}
+/* PTY sessions */
+router.post('/:projectId/pty', (req, res) => getHandlers().createPty(req, res));
+router.put('/:projectId/pty/:ptyId/resize', (req, res) => getHandlers().resizePty(req, res));
+router.post('/:projectId/pty/:ptyId/connect-token', (req, res) =>
+  getHandlers().createPtyConnectToken(req, res),
+);
 
-/** GET /api/opencode/:projectId/tree - List directory tree */
-router.get('/:projectId/tree', async (req, res) => {
-  try {
-    const resolved = await getProjectDir(req, req.params.projectId);
-    if (!resolved) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    const tree = readDirTree(resolved.localPath, 0, 4);
-    return res.json({
-      rootPath: resolved.localPath,
-      projectName: resolved.project.name,
-      tree,
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+/* Chat loop & sessions */
+router.get('/:projectId/sessions', (req, res) => getHandlers().listSessions(req, res));
+router.post('/:projectId/sessions', (req, res) => getHandlers().createSession(req, res));
+router.post('/:projectId/sessions/:sessionId/prompt', promptUsageLimiter, (req, res) =>
+  getHandlers().sendPrompt(req, res),
+);
+router.post('/:projectId/sessions/:sessionId/abort', (req, res) =>
+  getHandlers().abortSession(req, res),
+);
+router.get('/:projectId/sessions/:sessionId/messages', (req, res) =>
+  getHandlers().getSessionMessages(req, res),
+);
+router.get('/:projectId/sessions/:sessionId/diff', (req, res) =>
+  getHandlers().getSessionDiff(req, res),
+);
+router.post('/:projectId/sessions/:sessionId/revert', (req, res) =>
+  getHandlers().revertSession(req, res),
+);
+router.post('/:projectId/sessions/:sessionId/unrevert', (req, res) =>
+  getHandlers().unrevertSession(req, res),
+);
 
-/** GET /api/opencode/:projectId/file - Read file content */
-router.get('/:projectId/file', async (req, res) => {
-  try {
-    const resolved = await getProjectDir(req, req.params.projectId);
-    if (!resolved) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    const targetPath = req.query.path;
-    if (!targetPath || typeof targetPath !== 'string') {
-      return res.status(400).json({ error: 'path is required' });
-    }
-    // Prevent directory traversal outside allowed roots
-    const normalized = path.normalize(targetPath);
-    if (!fs.existsSync(normalized)) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-    const stats = fs.statSync(normalized);
-    if (stats.size > 2 * 1024 * 1024) {
-      return res.status(400).json({ error: 'File too large to edit (>2MB)' });
-    }
-    const content = fs.readFileSync(normalized, 'utf8');
-    return res.json({
-      path: normalized,
-      content,
-      size: stats.size,
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+/* Live SSE event relay */
+router.get('/:projectId/events', (req, res) => getHandlers().streamEvents(req, res));
 
-/** POST /api/opencode/:projectId/file - Save file content */
-router.post('/:projectId/file', async (req, res) => {
-  try {
-    const resolved = await getProjectDir(req, req.params.projectId);
-    if (!resolved) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    const { path: targetPath, content } = req.body;
-    if (!targetPath || typeof content !== 'string') {
-      return res.status(400).json({ error: 'path and content are required' });
-    }
-    const normalized = path.normalize(targetPath);
-    fs.mkdirSync(path.dirname(normalized), { recursive: true });
-    fs.writeFileSync(normalized, content, 'utf8');
-    return res.json({ ok: true, path: normalized });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+/* Models, agents, permissions & questions */
+router.get('/:projectId/providers', (req, res) => getHandlers().getProviders(req, res));
+router.get('/:projectId/agents', (req, res) => getHandlers().listAgents(req, res));
+router.get('/:projectId/permissions', (req, res) => getHandlers().listPermissions(req, res));
+router.post('/:projectId/permissions/:requestId', (req, res) =>
+  getHandlers().replyPermission(req, res),
+);
+router.get('/:projectId/questions', (req, res) => getHandlers().listQuestions(req, res));
+router.post('/:projectId/questions/:requestId/reply', (req, res) =>
+  getHandlers().replyQuestion(req, res),
+);
+router.post('/:projectId/questions/:requestId/reject', (req, res) =>
+  getHandlers().rejectQuestion(req, res),
+);
 
-/** POST /api/opencode/:projectId/pty - Create PTY session for project */
-router.post('/:projectId/pty', async (req, res) => {
-  try {
-    const resolved = await getProjectDir(req, req.params.projectId);
-    if (!resolved) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    const response = await fetch(`${OPENCODE_BASE}/pty`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cwd: resolved.localPath,
-        command: req.body?.command,
-        args: req.body?.args || [],
-      }),
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(response.status).send(errText);
-    }
-    const ptyData = await response.json();
-    return res.json(ptyData);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+/* Phase 4: VCS (Git Changes) & Preview lifecycle */
+router.get('/:projectId/vcs', (req, res) => getHandlers().getVcs(req, res));
+router.get('/:projectId/preview/status', (req, res) => getHandlers().getPreviewStatus(req, res));
+router.post('/:projectId/preview/start', (req, res) => getHandlers().startPreview(req, res));
+router.post('/:projectId/preview/stop', (req, res) => getHandlers().stopPreview(req, res));
 
-/** POST /api/opencode/:projectId/prompt - Send prompt to opencode run */
-router.post('/:projectId/prompt', async (req, res) => {
-  try {
-    const resolved = await getProjectDir(req, req.params.projectId);
-    if (!resolved) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    const { prompt } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ error: 'prompt is required' });
-    }
-    // We create or find a session in OpenCode
-    const sessRes = await fetch(`${OPENCODE_BASE}/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: `${resolved.project.name} Task`,
-        directory: resolved.localPath,
-      }),
-    });
-    const session = await sessRes.json();
-    return res.json({ session, project: resolved.project });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+/* Legacy one-shot prompt creation */
+router.post('/:projectId/prompt', promptUsageLimiter, (req, res) =>
+  getHandlers().createSessionPrompt(req, res),
+);
+
+router.ptyRegistry = ptyRegistry;
 
 module.exports = router;

@@ -52,6 +52,7 @@ export * from './types/traces';
 export * from './types/subagents';
 export * from './types/background';
 export * from './types/queuedTurns';
+export * from './types/opencode';
 /* access permissions */
 export * from './accessPermissions';
 /* query/mutation keys */

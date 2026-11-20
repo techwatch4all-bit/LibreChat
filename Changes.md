@@ -1,3 +1,115 @@
+## 2026-11-20 — Satchida Code Rebrand, Dual-Mode Vibe UX, Multi-User Seat Attribution & Privacy ZDR → Local Fallback Chain
+
+- **User-Facing Rebrand to "Satchida Code" (`client/src/locales/en/translation.json`)**:
+  - Updated user-facing OpenCode localization strings (`com_opencode_tab_vibe`, `com_opencode_workspace_title`, `com_opencode_status_disabled`, `com_opencode_status_unreachable`, `com_opencode_empty_messages`, `com_opencode_question_title`, `com_opencode_terminal_title`, `com_opencode_terminal_mode_tui`, `com_opencode_error_generic`) from `"OpenCode"` to `"Satchida Code"` while keeping the underlying `opencode.exe` binary unmodified for upstream protocol compatibility.
+- **Dark-Black Theme Submit Button Contrast Fix (`packages/client/src/theme/themes/darkBlack.ts`)**:
+  - Fixed `'rgb-surface-submit'` (`'4 120 87'`, `#047857`) and `'rgb-surface-submit-hover'` (`'6 95 70'`, `#065f46`) in `darkBlackTheme` so `<Button variant="submit">` (including "Save" in `ProjectEditDialog.tsx` and "Create project" in `ProjectCreateDialog.tsx`) has crisp white text (`rgb-text-on-status: 255 255 255`) instead of white-on-white / gray-on-gray.
+- **Terminal Bottom Clipping Fix & Self-Healing Live Preview (`client/src/components/Projects/{OpenCodeTerminal,VibeWorkspace}.tsx`, `opencode/OpenCodePreviewPanel.tsx`, `packages/api/src/opencode/{preview,http}.ts`, `api/server/routes/opencode.js`)**:
+  - Separated outer padding from `terminalRef` in `OpenCodeTerminal.tsx` so `@xterm/addon-fit` measures exact inner dimensions without clipping the bottom row, and defaulted the Developer-mode bottom drawer (`showTerminal`) to closed on initial load while full-height `Satchida Code TUI` tab remains available in one click.
+  - Added self-healing preview recovery in `proxyPreview` (`http.ts`) and `preview.ts`: authenticates via `opencode_preview_<projectId>` OR `req.cookies.refreshToken` (`JWT_SECRET` / `JWT_REFRESH_SECRET`), auto-starts stopped preview servers on the fly if the project contains `package.json` or `server.mjs`, invalidates dead sessions on upstream socket errors, renders a dark/light auto-refreshing HTML reconnection page instead of raw JSON, and restarts the preview server automatically after AI build/edit turns.
+- **Simultaneous Multi-User Seat Attribution & Platform Admin Exception (`packages/api/src/opencode/http.ts`, `D:\LAN-AI-Infra\ops-scripts\opencode-serve.mjs`)**:
+  - Routed `opencode-serve`'s `satchida` provider through `/api/opencode/llm-proxy/v1` with concurrent multi-user session attribution (`callersByUserId`, `callersByProjectId`, `callersByProjectRoot` + `[Satchida-Context: projectId=... userId=...]` tag) so simultaneous vibecoding users on a shared tenant host PC each authenticate with their exact `user.seatToken` + `X-Satchida-Mode: Vibecoding` at `one-api` (`:4000`) → `Bifrost` (`:8700`).
+  - Restricted `opencode` (Zen Free), `opencode-go` (Go Free), and raw PTY terminal access strictly to LibreChat Platform Admins (`tenantId: 'satchida-master'` with `role: 'ADMIN'` or platform `admin` group membership); Tenant Admins (`role: 'ADMIN'` on customer tenants) and regular users are blocked (`403`).
+- **Daily ZDR Double-Fallback + Local `llama.cpp` (`:8080`) → `Ollama` (`:11434`) Tail Fallback (`D:\LAN-AI-Infra\Bifrost\tools\daily_model_router_sync.py`)**:
+  - Updated `daily_model_router_sync.py` so `Privacy` tier on non-`Privacy` modes routes via Cloud ZDR double-fallback (Top-2 cheapest ZDR models on DeepInfra ↔ Top-2 on CheapInference + CommandCode Go balancer), and if all Cloud ZDR models fail, falls back in-flight and at channel level to the local in-memory `llama.cpp` model on port `:8080` (`Ternary-Bonsai-2-9B-PQ2_0-MTP-Q8_0`) and finally to local `Ollama` (`:11434`, `granite4_1_8b_ctx32k:latest`) — never to non-ZDR cloud.
+
+## 2026-11-20 — OpenCode CLI Integration: One-API Gateway Lock, 3-Pane Vibe IDE & Live Docked Terminal Fix
+
+- **100% One-API Gateway Routing (`D:\LAN-AI-Infra\ops-scripts\opencode-serve.mjs`, `packages/api/src/opencode/http.ts`)**:
+  - Locked `opencode.json` to `"enabled_providers": ["satchida"]` with `"model": "satchida/Vibecoding"` and `"baseURL": "http://127.0.0.1:4000/v1"`, ensuring 100% of vibecoding traffic routes through Satchida's one-api autorouter (`:4000`) → Bifrost (`:8700`) with zero direct provider bypasses.
+  - Filtered `GET /api/opencode/providers` to the `satchida` gateway provider when present, reducing the model selector from 2,029 raw upstream entries to the 9 live one-api routes with `Satchida Gateway (one-api): Vibecoding` selected by default.
+- **3-Pane Vibe-Coding IDE Upgrade (`client/src/components/Projects/VibeWorkspace.tsx`, `ProjectWorkspace.tsx`, `OpenCodeChatPanel.tsx`)**:
+  - Rebuilt `VibeWorkspace.tsx` as a 3-pane full-stack IDE: Left = OpenCode Agent Chat (`step-start`/`step-finish` telemetry noise hidden); Top-Right = File Explorer + dark-mode Monaco Editor (`vs-dark`) / Preview / Changes / Diffs; Bottom-Right = always-visible collapsible live OpenCode Terminal (`>_ Terminal` toggle).
+  - Widened `ProjectWorkspace.tsx` to `max-w-[1600px]` and fixed header/tab overlap so the full IDE fits cleanly without clipping.
+- **Live OpenCode TUI Terminal, Hard-Reload `/projects/:id`, Tab-Race & Auto-Workspace Fixes (`packages/api/src/opencode/{http,paths}.ts`, `api/server/index.js`, `client/src/components/Projects/{OpenCodeTerminal,ProjectWorkspace,VibeWorkspace}.tsx`)**:
+  - Updated `POST /api/opencode/:projectId/pty` (`http.ts`) and `OpenCodeTerminal.tsx` to launch the real interactive **OpenCode TUI** (`opencode.exe attach http://127.0.0.1:4096 --dir <projectRoot>`) by default, with an **`OpenCode TUI` | `Shell`** toggle in the docked terminal header and `ResizeObserver` auto-fit.
+  - Fixed both OpenFilm `/projects` interceptors in `api/server/index.js` (lines 458 and 597) so direct navigation / hard reload (`Ctrl+Shift+R`) on `/projects` and `/projects/<24-hex ObjectId>` serves LibreChat's SPA instead of OpenFilm Studio.
+  - Fixed the `ProjectWorkspace.tsx` tab-state race (`useState(null)` deriving `'vibe'` when `hasOpenCodeAccess` resolves) and added idempotent auto-workspace provisioning (`ensureProjectWorkspace`, `POST /api/opencode/:projectId/workspace`, auto-triggered in `VibeWorkspace.tsx` for existing projects without `localPath`).
+  - Verified live directly on `http://127.0.0.1:3080/projects/6aff947ee8a625048a891919`: hard reload returns LibreChat (`0` console errors), 3-pane IDE loads with dark Monaco editor and live **OpenCode TUI** (`Auto-Router · Vibecoding Satchida Gateway (one-api)`), and `packages/api/src/opencode` Jest suite passes **47/47**.
+
+- **Live Terminal WebSocket Fix (`api/server/routes/openfilm.js`, `api/server/routes/ide.js`, `api/server/index.js`, `packages/api/src/opencode/ws.ts`)**:
+  - Set `ws: false` on `openfilmProxy`, `vscoderProxy`, and `comfyProxy` (`http-proxy-middleware`) because all three are already upgraded explicitly in `api/server/index.js`; leaving `ws: true` without a `pathFilter` caused `http-proxy-middleware` to auto-hook `server.on('upgrade')` globally and corrupt `/api/opencode/pty/*/connect` frames (`RSV1 must be clear` / `write after end`).
+  - Wrapped `getChatProject` in `runAsSystem(...)` on WS upgrade, disabled `perMessageDeflate` on `ptyWss` and upstream WS, and forwarded non-binary `Buffer` frames as UTF-8 strings for `xterm.js`.
+  - Verified live: `WS OPENED!` + `WS GOT ECHO!`, Playwright 3-pane IDE screenshot shows `Live` docked PowerShell terminal (`PS D:\LAN-AI-Infra\workspace\...>`), dark Monaco editor, `Satchida Gateway (one-api): Vibecoding`, `0` page errors, and `45/45` `packages/api/src/opencode` Jest tests passing.
+
+## 2026-11-20 — OpenCode CLI Integration: Phase 4 Full-Stack Loop (Preview Proxy & Git Changes)
+
+- **Live Dev-Server Preview Runner & Same-Origin Proxy (`packages/api/src/opencode/preview.ts`, `http.ts`, `api/server/routes/opencode.js`)**:
+  - Added `createOpenCodePreviewManager`, `detectPortFromOutput` (strips ANSI, detects real listening loopback ports from live PTY stdout, rejects privileged `<1024` and reserved node service ports `3080, 4000, 4096, 4099, 4747, 8080, 8188, 8700, 27017`), and `proxyOpenCodePreviewRequest`.
+  - Added `GET /:projectId/preview/status`, `POST /:projectId/preview/start`, `POST /:projectId/preview/stop` (`DELETE /pty/{ptyID}`), and authenticated same-origin `ALL /:projectId/preview/proxy/*` (enforces owner-scoped HttpOnly `opencode_preview_<projectId>` cookie via timing-safe SHA-256 or owner Bearer JWT; anonymous requests rejected with `401`).
+- **Git Changes Panel (`GET /:projectId/vcs`, `OpenCodeChangesPanel.tsx`)**:
+  - Added spec-cited `getVcsInfo` (`GET /vcs`), `getVcsStatus` (`GET /vcs/status`), `getVcsDiff` (`GET /vcs/diff`), and `removePty` (`DELETE /pty/{ptyID}`) to `packages/api/src/opencode/client.ts`.
+  - Built `OpenCodeChangesPanel.tsx` and `OpenCodePreviewPanel.tsx` integrated into `VibeWorkspace.tsx` with English localization keys (`com_opencode_view_changes`, `com_opencode_view_preview`, `com_opencode_vcs_*`, `com_opencode_preview_*`), auto-invalidating `opencodeVcs` on `file.edited` and `session.idle` SSE events.
+- **Gate 4 Verification**:
+  - `packages/api`: 45/45 Jest tests passing (including `detectPortFromOutput` unit tests), `api_tsc: 0`, `client_projects_tsc: 0`, `GREP_GATE: CLEAN (0 hits across 20 files)`, `npm run build:client` (`✓ built in 8.06s`).
+  - Live Gate 4 E2E + Playwright: scaffolded full-stack Node HTTP + HTML/JSON app via OpenCode chat (`Vibecoding`), started preview (`port: 55823` dynamically detected from stdout), confirmed anonymous proxy returns `401`, confirmed authenticated proxy serves `Vibe App v1` + `/api/ping` JSON, performed follow-up chat edit to `Vibe App v2`, verified live update inside Playwright `iframe[title="Live project preview"]` (`iframeHasV2: true`) and Git Changes tab (`branch: master`, `index.html` listed), and stopped preview cleanly (`stopped: true`).
+
+## 2026-11-20 — OpenCode CLI Integration: Phases 1–3 (Managed Service, Chat Loop, Role Gating)
+
+- **Phase 1 — Managed PM2 Service & Health (`D:\LAN-AI-Infra\ops-scripts\opencode-serve.mjs`, `librechat.yaml`, `.env`)**:
+  - Created `opencode-serve.mjs` and started PM2 process `opencode-serve` bound strictly to `127.0.0.1:4096` with `OPENCODE_SERVER_PASSWORD` Basic auth and `windowsHide: true` (no `detached`).
+  - Dynamically discovers live models from Satchida AutoRouter (`http://127.0.0.1:4000/v1/models`) and generates `D:\LAN-AI-Infra\opencode\opencode.json` referencing `"env": ["SATCHIDA_GATEWAY_VK"]` (zero secrets on disk, zero hardcoded model lists).
+  - Added `GET /api/opencode/status` reporting `{ enabled, reachable, version }` from live `GET /global/health`. Verified Gate 1 lifecycle (`401` anonymous, `reachable: true` / `1.19.5` up → `pm2 stop` → `reachable: false` → `pm2 start` → `reachable: true`).
+- **Phase 2 — Full Chat Loop, SSE Relay, & Hermes-Style Vibe Workspace**:
+  - Expanded `packages/api/src/opencode/client.ts` with spec-cited methods for sessions (`list`, `get`, `create`, `prompt_async`, `abort`, `messages`, `diff`, `revert`, `unrevert`), permissions (`list`, `reply`), questions (`list`, `reply`, `reject`), providers (`getProviders`), agents (`listAgents`), and SSE (`openEventStream`).
+  - Built leak-free `packages/api/src/opencode/sse.ts` (`relayOpenCodeEvents`) filtering events strictly to project/session, forwarding frames verbatim, emitting 15s heartbeats, supporting `Last-Event-ID`, and aborting upstream on client disconnect (`getActiveOpenCodeSseCount()` returns to `0`).
+  - Added full session/permission/question IDOR guards in `packages/api/src/opencode/http.ts` and wired thin routes with `promptUsageLimiter` in `api/server/routes/opencode.js`.
+  - Added shared OpenCode DTOs, `QueryKeys`, `MutationKeys`, endpoints, and `dataService` helpers in `packages/data-provider`.
+  - Built `client/src/components/Projects/opencode/{atoms.ts,useOpenCodeEvents.ts,OpenCodeChatPanel.tsx,OpenCodeDiffPanel.tsx}` using Jotai + React Query + semantic theme tokens + `useLocalize` (`com_opencode_*` keys in `client/src/locales/en/translation.json`), updated `VibeWorkspace.tsx` (Split/Chat/Editor/Diffs/Terminal) and `OpenCodeTerminal.tsx` (authenticated `dataService.createOpenCodePty` + `?ticket=`).
+- **Phase 3 — Role Permission Gating & Tenant Role Backfill**:
+  - Added `PermissionTypes.OPENCODE` (`Permissions.USE`) across `packages/data-provider/{permissions,roles}.ts`, `packages/data-schemas/src/{schema,types}/role.ts`, server-side `generateCheckAccess` in `api/server/routes/opencode.js`, and UI tab gating in `client/src/components/Projects/ProjectWorkspace.tsx`.
+  - Added non-destructive tenant-scoped system-role backfill in `initializeRoles()` (`packages/data-schemas/src/methods/role.ts`) so existing tenant `ADMIN`/`USER` roles receive newly added default permission blocks without overwriting explicit overrides.
+  - All OpenCode LLM traffic routes through Satchida AutoRouter (`127.0.0.1:4000`), applying existing balance/quota enforcement with no second ledger.
+- **Verification**:
+  - `packages/api` Jest suite: 2 suites, 42/42 tests passing (unit + live `opencode serve` PTY WS, cross-user IDOR, and SSE leak checks); `packages/data-provider` `roles.spec.ts`: 8/8 passing.
+  - `npx tsc --noEmit`: `packages/data-provider` (0), `packages/data-schemas` (0), `packages/api` (0), `client` `src/components/Projects` (0 errors); `npm run build:client` succeeded (`✓ built in 12.72s`).
+  - Live Gate 2 E2E against `LibreChat :3080 → opencode-serve :4096 → AutoRouter :4000`: created project & session, verified cross-user IDOR (`404`), streamed live SSE events (`server.connected`, `message.part.updated`, `message.part.delta`, `session.diff`, `session.idle`), verified `hello.txt` created on disk containing `ok`, verified `/tree`, `/file`, `/messages`, `/diff`, and `/abort`.
+
+- **Post-Verification Security & UI Fix-ups**:
+  - Changed default `PermissionTypes.OPENCODE` (`USE`) for `USER` role to `false` (opt-in only; `ADMIN` remains `true`) in `packages/data-provider/{permissions,roles}.ts`, updated live MongoDB `USER` roles, and added `OPENCODE.USE defaults` unit tests in `roles.spec.ts`. Verified live HTTP: `ADMIN` → `200`, `USER` → `403`.
+  - Eliminated path existence oracle in `resolveInsideRoot` (`packages/api/src/opencode/paths.ts`): both existing and non-existent paths outside the project root now uniformly return `403 PATH_OUTSIDE_ROOT` while non-existent paths strictly inside root return `404 FILE_NOT_FOUND`.
+  - Removed cookie-based JWT fallback from `packages/api/src/opencode/ws.ts` (`extractJwtToken`) so PTY WebSocket upgrades accept only single-use `?ticket=` or explicit Bearer/query JWT.
+  - Verified live `VibeWorkspace` in headless Chromium via Playwright (`0` page errors, live `v1.19.5` badge, SSE `Live` indicator, file tree, Monaco editor load), fixed React Query v4 empty-session loading guard (`Boolean(activeSessionId) && messagesQuery.isLoading`), and prioritized the `satchida` AutoRouter provider in the model picker.
+
+## 2026-11-19 — OpenCode CLI Integration: Phase 0 Security Hardening & Spec-Grounded Client
+
+- **Config Schema (`packages/data-provider`, `packages/data-schemas`)**:
+  - Added `opencodeConfigSchema` (`enabled: false`, `baseUrl: 'http://127.0.0.1:4096'`, `allowedRoots: []`, `maxFileBytes: 2 MiB`, `requestTimeoutMs: 30_000`) to `configSchema` and wired `loadOpenCodeConfig` into `AppService`.
+- **OpenAPI Spec & Generated Types (`packages/api/src/opencode/`)**:
+  - Committed real OpenCode 1.19.5 OpenAPI spec fixture at `packages/api/src/opencode/__fixtures__/openapi.json` and generated `packages/api/src/opencode/generated.ts` via `openapi-typescript@7.13.0`.
+- **Path Safety & Error Sanitization (`paths.ts`, `errors.ts`, `http.ts`)**:
+  - Implemented `resolveProjectRoot` (requires existing directory inside `allowedRoots`, zero `process.cwd()` fallback, returns `409 PROJECT_PATH_INVALID`).
+  - Implemented `resolveInsideRoot` using `fs.realpathSync.native` canonicalization to block traversal, absolute escapes, UNC/device prefixes, trailing dot/space segments, NUL bytes, and escaping symlinks/junctions.
+  - Implemented `assertWritablePath` to block `.git/` and `.env*` writes (case-insensitive) and enforced `maxFileBytes` (`413 FILE_TOO_LARGE`) on reads and writes.
+  - Replaced raw `err.message` responses with stable machine-readable error codes and `getSafeErrorMetadata` logging.
+- **Typed Upstream Client (`client.ts`) & Thin Route Wiring (`api/server/routes/opencode.js`)**:
+  - Built `createOpenCodeClient` with HTTP Basic auth (`opencode` / `OPENCODE_SERVER_PASSWORD`), timeouts, `AbortSignal`, and spec-compliant `directory` query params for `POST /session` and `POST /pty` (fixing D3/D5).
+  - Reduced `api/server/routes/opencode.js` to minimal CJS wiring calling `createOpenCodeHttpHandlers`.
+- **Gate 0 Verification & Fix-ups (post-review)**:
+  - Secured `/api/opencode/pty/:ptyId/connect` WebSocket upgrade via `packages/api/src/opencode/{ptyRegistry,ws}.ts` (thin wiring in `api/server/index.js`): enforces single-use 60s `connectTicket` or owner JWT + `getChatProject` ownership verification, rejects unauthenticated (401) and cross-user (403) upgrades, and authenticates loopback upstream WS with HTTP Basic auth (`Authorization` header).
+  - Hardened fail-closed auth: `createOpenCodeClient`, HTTP handlers, and WS upgrade handler refuse upstream requests (`503 OPENCODE_MISCONFIGURED`) when `OPENCODE_SERVER_PASSWORD` is unset.
+  - Hardened path checks: blocked Windows drive-relative paths (`C:foo`) and existing-directory write targets (`400 PATH_INVALID` instead of `500 EISDIR`).
+  - Expanded `paths.spec.ts` (36 tests including real-disk `writeFile`/`readFile`/`getTree` happy paths, mixed-case segments, ADS, reserved names, sibling-prefix roots) and `client.integration.spec.ts` (4 live `opencode serve` tests including authenticated PTY WebSocket I/O, 401/403/503 rejections, and single-use ticket replay protection).
+  - Documented OpenCode 1.19.5 upstream `POST /pty/{ptyID}/connect-token` 403 `PtyForbiddenError` observation in `packages/api/src/opencode/OPEN_QUESTIONS.md`.
+
+## 2026-11-19 — OpenFilm Studio & In-App Studio Library Integration
+
+- **In-App Studio Library Drawer**:
+  - Integrated `StudioLibrarySidePanel` directly into LibreChat's Right Panel (`ExpandedPanel.tsx`), eliminating popup tab disconnections and enabling concurrent chatting while browsing past creations.
+  - Implemented sample motivational templates and per-user privacy scoping (`scoped.filter(e => !e.user || e.user === owner || e.user === 'shared' || e.user === 'template')`).
+- **Interactive Studio Loading from Library**:
+  - Added `openInFilmStudio(item)` handler: clicking any video card, title, or the "Edit" button creates an OpenFilm artifact with the chosen asset and transitions directly into OpenFilm Studio.
+  - Added automated `project-sync` backend route (`/api/openfilm/project-sync`) that automatically copies selected media into `Videos/OpenFilm/Projects/<name>/assets/` and syncs OpenFilm project state.
+- **Iframe & Subresource Embedding Resolution**:
+  - Fixed blank viewport in `Studio Workbench` by stripping `X-Frame-Options`, `Cross-Origin-Opener-Policy`, and `Cross-Origin-Embedder-Policy` headers across `/assets`, `/projects`, and `/p/*` media routes in `api/server/index.js`.
+  - Added explicit `Cross-Origin-Resource-Policy: cross-origin` and `Access-Control-Allow-Origin: *` to enable safe iframe subresource loading.
+- **Dual Studio View Modes**:
+  - `Studio Workbench`: Full 4-Editor suite (Screening, Edit, Canvas, Color & Library) embedded directly within LibreChat.
+  - `Omni-Motion View`: Direct WebGL / HTML5 video playback stage with real-time timeline scrubber, frame-by-frame stepping, and client-side hardware-accelerated video export.
+- **Verification & Deployment**:
+  - Client bundle rebuilt (`npm run build` in `client/` finished cleanly).
+  - LibreChat reloaded in PM2 (process ID 10) with verified `CORP: cross-origin` headers across project assets.
+
 ## 2026-11-19 — Satchida Fleet Operations: One-API Dynamic Metadata & OpenHands Vibecoding Integration
 
 - **Commit**: `c300c9e4c` (`feat(admin): live fleet ops with One-API metadata and OpenHands worktree integration`)

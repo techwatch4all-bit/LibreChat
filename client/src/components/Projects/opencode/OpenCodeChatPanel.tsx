@@ -885,16 +885,27 @@ export default function OpenCodeChatPanel({
                   type="button"
                   disabled={!reachable || sendPromptMutation.isLoading}
                   onClick={() => sendPromptMutation.mutate({ text: tpl.prompt })}
-                  className="rounded-lg border border-border-light bg-surface-secondary p-2.5 text-left text-xs transition-colors hover:border-border-heavy hover:bg-surface-hover disabled:opacity-50"
+                  className="group flex gap-2.5 overflow-hidden rounded-lg border border-border-light bg-surface-secondary p-2 text-left text-xs transition-colors hover:border-border-heavy hover:bg-surface-hover disabled:opacity-50"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-text-primary">{tpl.title}</span>
-                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
-                      {tpl.badge}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 line-clamp-2 text-[11px] text-text-secondary">
-                    {tpl.subtitle}
+                  <img
+                    src={`/templates/thumbnails/${tpl.id}.png`}
+                    alt={tpl.title}
+                    className="h-14 w-20 shrink-0 rounded border border-border-light object-cover object-top"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="truncate font-semibold text-text-primary">{tpl.title}</span>
+                      <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+                        {tpl.badge}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 line-clamp-2 text-[11px] text-text-secondary">
+                      {tpl.subtitle}
+                    </div>
                   </div>
                 </button>
               ))}

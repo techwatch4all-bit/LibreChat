@@ -2109,6 +2109,10 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         if (!caller) {
           caller = activeLlmCaller;
         }
+        if (process.env.SATCHIDA_TENANT_MODE === 'true' && !caller?.seatToken) {
+          sendError(res, { code: 'OPENCODE_UNAUTHORIZED', status: 403 });
+          return;
+        }
         const effectiveToken = caller?.seatToken || expectedVk;
 
         const fetchFn = deps.fetchImpl ?? fetch;
@@ -2119,6 +2123,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
             'Content-Type': 'application/json',
             Authorization: `Bearer ${effectiveToken}`,
             'X-Satchida-Mode': 'Vibecoding',
+            'X-Tenant-Id': caller?.tenantId || 'satchida-master',
           },
           ...(!isGetOrHead && req.body ? { body: JSON.stringify(req.body) } : {}),
         });

@@ -297,7 +297,8 @@ export function createOpenCodePreviewManager(): OpenCodePreviewManager {
             }
           }
 
-          if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+          const fileStat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+          if (!fileStat || !fileStat.isFile()) {
             res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
             res.end(`File not found: ${relPath}`);
             return;
@@ -307,6 +308,7 @@ export function createOpenCodePreviewManager(): OpenCodePreviewManager {
           const contentType = STATIC_MIME_TYPES[ext] || 'application/octet-stream';
           res.writeHead(200, {
             'Content-Type': contentType,
+            'Content-Length': String(fileStat.size),
             'Cache-Control': 'no-store',
           });
           fs.createReadStream(filePath).pipe(res);

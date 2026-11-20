@@ -19,6 +19,18 @@ const SMART_MEMORY_TEMPLATES = [
     value: 'Product and technology leader building full-stack applications and AI workflows.',
   },
   {
+    key: 'metals_market_interest',
+    label: 'Metals & Commodity Tracking',
+    value:
+      'Frequently tracking live gold, silver, and commodities pricing; format commodity quotes with 24h change and USD/INR equivalents.',
+  },
+  {
+    key: 'breaking_news_focus',
+    label: 'High-Signal News Briefings',
+    value:
+      'Focus on high-signal breaking tech, AI, and macro market headlines with concise executive bullet points.',
+  },
+  {
     key: 'user_context',
     label: 'Preferred Tech Stack',
     value: 'Primary stack: TypeScript, Node.js, React, Python, and self-contained modern web apps.',

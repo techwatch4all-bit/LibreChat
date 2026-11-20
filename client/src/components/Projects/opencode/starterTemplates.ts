@@ -15,6 +15,7 @@ export interface StarterTemplateItem {
   title: string;
   subtitle: string;
   prompt: string;
+  thumbnail?: string;
 }
 
 export const STARTER_DOMAIN_TABS: Array<{ id: StarterDomainId; label: string }> = [

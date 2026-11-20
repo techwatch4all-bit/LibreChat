@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import { useDeferredValue, useEffect, useId, useMemo, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,9 +12,15 @@ import {
   Pencil,
   Search,
   Trash2,
+  LayoutGrid,
 } from 'lucide-react';
 import type { TChatProject } from 'librechat-data-provider';
 import type { LocalizeFunction, MenuItemProps, RenderProp } from '~/common';
+import {
+  STARTER_DOMAIN_TABS,
+  VIBE_STARTER_TEMPLATES,
+  type StarterDomainId,
+} from './opencode/starterTemplates';
 import { useProjectsInfiniteQuery } from '~/data-provider';
 import ProjectCreateDialog from './ProjectCreateDialog';
 import ProjectDeleteDialog from './ProjectDeleteDialog';
@@ -194,6 +201,8 @@ export default function ProjectsView() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<ProjectSort>('lastConversationAt');
   const [isCreating, setIsCreating] = useState(searchParams.get('new') === '1');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedDomain, setSelectedDomain] = useState<StarterDomainId>('all');
   const sortMenuId = useId();
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -251,11 +260,118 @@ export default function ProjectsView() {
     }
   };
 
+  const filteredTemplates = useMemo(() => {
+    if (selectedDomain === 'all') return VIBE_STARTER_TEMPLATES;
+    return VIBE_STARTER_TEMPLATES.filter((tpl) => tpl.domain === selectedDomain);
+  }, [selectedDomain]);
+
   return (
     <main className="flex h-full min-h-0 flex-col overflow-auto bg-presentation text-text-primary">
-      <ProjectsNavBar onCreate={() => setIsCreating(true)} onOpenFolder={() => setIsCreating(true)} />
+      <ProjectsNavBar
+        onCreate={() => setIsCreating(true)}
+        onOpenFolder={() => setIsCreating(true)}
+        onOpenTemplates={() => setShowTemplates((prev) => !prev)}
+      />
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10 pt-6 md:px-6 md:pt-8">
+        {/* TOP BANNER: 1-Click Multi-Domain Starter Gallery */}
+        <div className="mb-6 rounded-2xl border border-border-light bg-surface-secondary/70 p-4 shadow-sm transition-all">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-surface-tertiary text-text-primary">
+                <LayoutGrid className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">
+                  1-Click Multi-Domain Starter Templates ({VIBE_STARTER_TEMPLATES.length})
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Jumpstart full-stack business apps, live scrapers, CRM, clinic portals & analytics
+                  with instant code generation.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTemplates((prev) => !prev)}
+              className="shrink-0 text-xs"
+            >
+              {showTemplates ? 'Hide Gallery' : 'Explore All Templates'}
+            </Button>
+          </div>
+
+          {showTemplates && (
+            <div className="mt-4 border-t border-border-light pt-3">
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {STARTER_DOMAIN_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedDomain(tab.id)}
+                    className={cn(
+                      'rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
+                      selectedDomain === tab.id
+                        ? 'bg-text-primary text-surface-primary'
+                        : 'border border-border-light bg-surface-primary text-text-secondary hover:bg-surface-hover hover:text-text-primary',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredTemplates.map((tpl) => (
+                  <div
+                    key={tpl.id}
+                    className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border-light bg-surface-primary transition-all hover:border-border-heavy hover:shadow-md"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden border-b border-border-light bg-surface-secondary">
+                      <img
+                        src={`/templates/thumbnails/${tpl.id}.png`}
+                        alt={tpl.title}
+                        className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        onError={(e) => {
+                          // Fallback if image load fails
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="backdrop-blur-xs shadow-xs absolute left-2.5 top-2.5 rounded-md bg-surface-primary/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-primary">
+                        {tpl.badge}
+                      </span>
+                    </div>
+
+                    <div className="p-3">
+                      <h4 className="text-xs font-semibold text-text-primary">{tpl.title}</h4>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-text-secondary">
+                        {tpl.subtitle}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-border-light/60 px-3 py-2">
+                      <span className="text-[10px] text-text-tertiary">Real Working App</span>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        className="h-6 gap-1 px-2.5 text-[11px]"
+                        onClick={() => {
+                          setIsCreating(true);
+                        }}
+                      >
+                        Use Template
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">{localize('com_ui_search_projects')}</span>

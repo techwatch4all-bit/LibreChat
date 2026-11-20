@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>CRM</title><style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:16px;margin-bottom:24px}
+.title{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px}
+.badge{background:#3b82f6;color:#fff;font-size:12px;padding:3px 8px;border-radius:4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#1e293b;padding:16px;border-radius:12px;border:1px solid #334155}
+.stat-val{font-size:24px;font-weight:700;color:#60a5fa}
+.stat-lbl{font-size:12px;color:#94a3b8;margin-top:4px}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.col{background:#1e293b;border-radius:12px;padding:16px;border:1px solid #334155}
+.col-header{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;justify-content:space-between}
+.deal{background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;margin-bottom:10px}
+.deal-name{font-size:13px;font-weight:600}
+.deal-val{font-size:12px;color:#10b981;margin-top:4px}
+.deal-client{font-size:11px;color:#94a3b8;margin-top:2px}
+</style></head><body>
+<div class="header"><div class="title">💼 Sales Pipeline CRM <span class="badge">Active</span></div><div><button style="background:#3b82f6;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer">+ Add Lead</button></div></div>
+<div class="stats">
+<div class="stat-card"><div class="stat-val">$184,500</div><div class="stat-lbl">Pipeline Value</div></div>
+<div class="stat-card"><div class="stat-val">42</div><div class="stat-lbl">Active Leads</div></div>
+<div class="stat-card"><div class="stat-val">68%</div><div class="stat-lbl">Win Rate</div></div>
+<div class="stat-card"><div class="stat-val">$42,800</div><div class="stat-lbl">Closed Won (Nov)</div></div>
+</div>
+<div class="board">
+<div class="col"><div class="col-header"><span>New Leads</span><span>(14)</span></div>
+<div class="deal"><div class="deal-name">Cloud Migration</div><div class="deal-val">$24,000</div><div class="deal-client">Apex Solutions Inc</div></div>
+<div class="deal"><div class="deal-name">ERP Customization</div><div class="deal-val">$15,000</div><div class="deal-client">Metro Logistics</div></div>
+</div>
+<div class="col"><div class="col-header"><span>Qualified</span><span>(11)</span></div>
+<div class="deal"><div class="deal-name">AI Fleet License</div><div class="deal-val">$38,500</div><div class="deal-client">Global Logistics Ltd</div></div>
+</div>
+<div class="col"><div class="col-header"><span>Proposal Sent</span><span>(9)</span></div>
+<div class="deal"><div class="deal-name">Govt Secure Portal</div><div class="deal-val">$62,000</div><div class="deal-client">State Education Dept</div></div>
+</div>
+<div class="col"><div class="col-header"><span>Won Deals</span><span>(8)</span></div>
+<div class="deal"><div class="deal-name">Mobile App Retainer</div><div class="deal-val">$45,000</div><div class="deal-client">Zenith Retailers</div></div>
+</div>
+</div>
+</body></html>

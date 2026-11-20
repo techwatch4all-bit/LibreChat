@@ -20,6 +20,32 @@ const fieldClass = 'h-9';
 
 const QUICK_AGENT_TEMPLATES = [
   {
+    label: '🥇 Live Metals Ticker',
+    name: 'Live Metals & Commodity Ticker',
+    description:
+      'Pulls live gold, silver, and metals prices/futures and formats clean market updates.',
+    instructions:
+      'You are a real-time commodities and metals analyst. Fetch and dump live spot, bid/ask, and futures settlement rates for Gold (XAU), Silver (XAG), Platinum, and Copper. Format output in clean, structured Markdown tables with 24h change, currency conversion (USD & INR), and market commentary.',
+    starters: [
+      'Dump live Gold & Silver spot prices with bid/ask and day change',
+      'What are the latest gold futures contracts and settlement prices?',
+      'Summarize today commodity price movements in USD and INR',
+    ],
+  },
+  {
+    label: '📰 News Alert Streamer',
+    name: 'Live Breaking News & Intelligence Agent',
+    description:
+      'Extracts top stories, breaking alerts, and executive briefings with high signal-to-noise ratio.',
+    instructions:
+      'You are a real-time news intelligence monitor. Pull and extract the top stories across technology, business, and world markets. Deliver structured bullet briefings with headline, 2-line summary, impact assessment, and verifiable source references. Filter out clickbait and fluff.',
+    starters: [
+      'Extract top breaking news stories right now in bullet format',
+      'Give me an executive briefing on today global market and tech headlines',
+      'Set an alert summary for the latest AI and semiconductor developments',
+    ],
+  },
+  {
     label: '🔍 Research Analyst',
     name: 'Deep Research & Insights Analyst',
     description: 'Synthesizes market, technical, and competitive research with clear takeaways.',

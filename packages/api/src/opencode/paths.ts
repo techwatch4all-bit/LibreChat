@@ -629,6 +629,19 @@ export function ensureProjectWorkspace(
     if (!fs.statSync(canonicalCreated).isDirectory()) {
       return err('PROJECT_PATH_INVALID', 409);
     }
+
+    // Auto-seed template if directory is newly created and empty, and matches a starter template slug
+    const starterSlug = sanitizeWorkspaceSlug(projectName);
+    const starterTplDir = path.join(process.cwd(), 'templates', 'starters', starterSlug);
+    const existingEntries = fs.readdirSync(canonicalCreated);
+    if (existingEntries.length === 0 && fs.existsSync(starterTplDir)) {
+      try {
+        fs.cpSync(starterTplDir, canonicalCreated, { recursive: true });
+      } catch {
+        /* ignore non-fatal starter seed error */
+      }
+    }
+
     return ok(canonicalCreated);
   } catch {
     return err('PROJECT_PATH_INVALID', 409);

@@ -910,6 +910,20 @@ def log_media_to_bifrost(
         )
         canonical_provider = "CheapInference" if provider.lower() == "cheapinference" else provider
         vk_id = "1f8097a4-0791-40b4-865e-9081937f4840"
+        
+        # Calculate synthetic token usage equivalent for media so it is metered against token limits and populates UI
+        # Baseline conversion: $1.00 = 500,000 tokens (0.000002 / token)
+        # e.g., $0.13 video = 65,000 tokens; $0.38 video = 190,000 tokens
+        equiv_tokens = int(round(cost * 500000.0)) if (cost and cost > 0) else 0
+        p_tokens = int(equiv_tokens * 0.2)
+        c_tokens = equiv_tokens - p_tokens
+        token_usage_json = json.dumps({
+            "prompt_tokens": p_tokens,
+            "completion_tokens": c_tokens,
+            "total_tokens": equiv_tokens,
+            "cost": {"total_cost": cost}
+        }) if equiv_tokens > 0 else ""
+
         metadata_json = json.dumps({
             "customer_id": attr["customer_id"],
             "customer_name": attr["customer_name"],
@@ -922,6 +936,7 @@ def log_media_to_bifrost(
             "account_type": attr["account_type"],
             "mode": attr["mode"],
             "billing_unit": "per_clip_second" if "video" in object_type else "per_image",
+            "synthetic_tokens": equiv_tokens,
         })
 
         c.execute("""
@@ -932,6 +947,7 @@ def log_media_to_bifrost(
                 user_id, user_name,
                 team_id, team_name, customer_id, customer_name,
                 tenant_id, tenant_name, metadata,
+                token_usage, prompt_tokens, completion_tokens, total_tokens,
                 user_agent, app, error_details, created_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
@@ -940,6 +956,7 @@ def log_media_to_bifrost(
                 ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?,
+                ?, ?, ?, ?,
                 ?, ?, ?, ?
             )
         """, (
@@ -949,6 +966,7 @@ def log_media_to_bifrost(
             attr["user_id"], attr["user_name"],
             attr["team_id"], attr["team_name"], attr["customer_id"], attr["customer_name"],
             attr["tenant_id"], attr["tenant_name"], metadata_json,
+            token_usage_json, p_tokens, c_tokens, equiv_tokens,
             "LibreChat-Montage/1.0", "LibreChat", error_details, now
         ))
         conn.commit()

@@ -1,15 +1,23 @@
 import fs from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
 import path from 'node:path';
 import type { Request, Response } from 'express';
+import type { AddressInfo } from 'node:net';
 import {
   assertWritablePath,
   ensureProjectWorkspace,
   readSafeDirTree,
   resolveInsideRoot,
   resolveProjectRoot,
+  sanitizeWindowsUserFolder,
 } from './paths';
-import { createOpenCodePreviewManager, detectPortFromOutput, stripAnsi } from './preview';
+import {
+  createOpenCodePreviewManager,
+  detectPortFromOutput,
+  proxyOpenCodePreviewRequest,
+  stripAnsi,
+} from './preview';
 import { createOpenCodePtyRegistry } from './ptyRegistry';
 import { createOpenCodeHttpHandlers } from './http';
 
@@ -842,9 +850,67 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
         expect(status.running).toBe(true);
         expect(status.port).toBe(session!.port);
         expect(status.proxyPath).toBe('/api/opencode/proj-static-1/preview/proxy/');
+
+        // Verify proxyOpenCodePreviewRequest injects error bridge without sending conflicting Transfer-Encoding + Content-Length
+        const proxyServer = http.createServer((req, res) => {
+          proxyOpenCodePreviewRequest(
+            req as unknown as Request,
+            res as unknown as Response,
+            session!,
+          );
+        });
+        await new Promise<void>((resolve) => proxyServer.listen(0, '127.0.0.1', resolve));
+        try {
+          const proxyPort = (proxyServer.address() as AddressInfo).port;
+          const proxiedRes = await fetch(`http://127.0.0.1:${proxyPort}/`);
+          expect(proxiedRes.status).toBe(200);
+          expect(proxiedRes.headers.get('transfer-encoding')).toBeNull();
+          expect(proxiedRes.headers.get('content-length')).not.toBeNull();
+          const proxiedBody = await proxiedRes.text();
+          expect(proxiedBody).toContain('Hello Static');
+          expect(proxiedBody).toContain('SATCHIDA_PREVIEW_ERROR');
+        } finally {
+          proxyServer.close();
+        }
       } finally {
         manager.invalidateSession('proj-static-1');
       }
+    });
+  });
+
+  describe('Per-user Windows-safe folder isolation', () => {
+    it('sanitizes emails, special characters, and Windows reserved names safely', () => {
+      expect(sanitizeWindowsUserFolder('arjun.sharma+dev@company.co.in', '69fd64a226b18593')).toBe(
+        'arjun-sharma-dev_26b18593',
+      );
+      expect(sanitizeWindowsUserFolder('CON@satchida.com', 'abcdef123456')).toBe('u-con_ef123456');
+      expect(sanitizeWindowsUserFolder('nul', '99998888')).toBe('u-nul_99998888');
+      expect(sanitizeWindowsUserFolder('  @@@  ', '11223344')).toBe('user_11223344');
+    });
+
+    it('provisions per-user project workspaces inside users/<safeUserFolder>/projects with sibling media dirs', () => {
+      const result = ensureProjectWorkspace(
+        '6aff1234567890abcdef1234',
+        'GST Invoice App',
+        [allowedRoot],
+        {
+          userId: '69fd64a226b18593',
+          email: 'priya.nair@clinic.in',
+        },
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      const canonicalAllowed = (fs.realpathSync.native ?? fs.realpathSync)(allowedRoot);
+      const userRoot = path.join(canonicalAllowed, 'users', 'priya-nair_26b18593');
+      expect(result.value.toLowerCase()).toBe(
+        path.join(userRoot, 'projects', 'gst-invoice-app-cdef1234').toLowerCase(),
+      );
+      expect(fs.existsSync(result.value)).toBe(true);
+      expect(fs.existsSync(path.join(userRoot, 'media', 'videos'))).toBe(true);
+      expect(fs.existsSync(path.join(userRoot, 'media', 'images'))).toBe(true);
+      expect(fs.existsSync(path.join(userRoot, 'media', 'projects'))).toBe(true);
     });
   });
 });

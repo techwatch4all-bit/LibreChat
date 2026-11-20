@@ -569,11 +569,26 @@ fileConfig:
       - image/gif
       - image/webp
       - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/msword
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - application/vnd.ms-excel
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - text/csv
       - text/plain
       - text/markdown
+      - application/json
+      - text/html
+      - text/xml
       defaultLLMDeliveryPath:
         overrides:
           application/pdf: text
+          application/vnd.openxmlformats-officedocument.wordprocessingml.document: text
+          application/msword: text
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: text
+          application/vnd.ms-excel: text
+          application/vnd.openxmlformats-officedocument.presentationml.presentation: text
+          text/csv: text
     Satchida-Gateway:
       fileLimit: 10
       totalSizeLimit: 25
@@ -583,11 +598,26 @@ fileConfig:
       - image/gif
       - image/webp
       - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/msword
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - application/vnd.ms-excel
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - text/csv
       - text/plain
       - text/markdown
+      - application/json
+      - text/html
+      - text/xml
       defaultLLMDeliveryPath:
         overrides:
           application/pdf: text
+          application/vnd.openxmlformats-officedocument.wordprocessingml.document: text
+          application/msword: text
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: text
+          application/vnd.ms-excel: text
+          application/vnd.openxmlformats-officedocument.presentationml.presentation: text
+          text/csv: text
   serverFileSizeLimit: 25
   avatarSizeLimit: 2
 modelSpecs:

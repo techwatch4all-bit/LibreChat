@@ -470,14 +470,105 @@ function sanitizeWorkspaceSlug(name: string | undefined): string {
   return raw;
 }
 
+export interface UserFolderIdentity {
+  userId?: string;
+  username?: string | null;
+  email?: string | null;
+}
+
+export interface UserDataLayout {
+  userFolder: string;
+  userRoot: string;
+  projectsDir: string;
+  mediaDir: string;
+  videosDir: string;
+  imagesDir: string;
+}
+
+/**
+ * Produces a deterministic, Windows-safe per-user directory name.
+ * Strips email domains, replaces invalid Windows path characters (`@`, `.`, `+`, `:`, etc.),
+ * guards against Windows reserved device names (`CON`, `NUL`, `COM1`, ...), and suffixes
+ * with the last 8 alphanumeric characters of `userId` to prevent collisions.
+ */
+export function sanitizeWindowsUserFolder(
+  usernameOrEmail: string | null | undefined,
+  userId?: string,
+): string {
+  const trimmed = (usernameOrEmail ?? '').trim().toLowerCase();
+  const localPart = trimmed.includes('@') ? trimmed.split('@')[0] : trimmed;
+  let slug = localPart
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+  if (!slug) {
+    slug = 'user';
+  }
+  if (WINDOWS_RESERVED_BASENAMES.has(slug)) {
+    slug = `u-${slug}`;
+  }
+  const uidClean = (userId ?? '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(-8)
+    .toLowerCase();
+  return uidClean ? `${slug}_${uidClean}` : slug;
+}
+
+/**
+ * Creates and returns the isolated per-user data tree under `<baseRoot>/users/<safeUserFolder>/`
+ * containing both `projects/` (vibecoding apps) and `media/{videos,images,projects}` so backup
+ * and restore for any user is a single directory copy.
+ */
+export function ensureUserDataLayout(
+  canonicalBase: string,
+  identity: UserFolderIdentity,
+): OpenCodeResult<UserDataLayout> {
+  const userFolder = sanitizeWindowsUserFolder(
+    identity.username || identity.email || identity.userId,
+    identity.userId,
+  );
+  const userRoot = path.join(canonicalBase, 'users', userFolder);
+  if (!isPathInsideRoot(canonicalBase, userRoot)) {
+    return err('PATH_OUTSIDE_ROOT', 403);
+  }
+  const projectsDir = path.join(userRoot, 'projects');
+  const mediaDir = path.join(userRoot, 'media');
+  const videosDir = path.join(mediaDir, 'videos');
+  const imagesDir = path.join(mediaDir, 'images');
+  const mediaProjectsDir = path.join(mediaDir, 'projects');
+  try {
+    fs.mkdirSync(projectsDir, { recursive: true });
+    fs.mkdirSync(videosDir, { recursive: true });
+    fs.mkdirSync(imagesDir, { recursive: true });
+    fs.mkdirSync(mediaProjectsDir, { recursive: true });
+    const canonicalUserRoot = canonicalizePath(userRoot);
+    if (!isPathInsideRoot(canonicalBase, canonicalUserRoot)) {
+      return err('PATH_OUTSIDE_ROOT', 403);
+    }
+    return ok({
+      userFolder,
+      userRoot: canonicalUserRoot,
+      projectsDir: path.join(canonicalUserRoot, 'projects'),
+      mediaDir: path.join(canonicalUserRoot, 'media'),
+      videosDir: path.join(canonicalUserRoot, 'media', 'videos'),
+      imagesDir: path.join(canonicalUserRoot, 'media', 'images'),
+    });
+  } catch {
+    return err('PROJECT_PATH_INVALID', 409);
+  }
+}
+
 /**
  * Idempotently provisions a canonical workspace directory inside the first configured
  * `allowedRoots` entry for an existing project that does not yet have a valid `localPath`.
+ * When `userIdentity` is provided, provisions inside `<baseRoot>/users/<safeUserFolder>/projects/`
+ * so all of a user's vibecoding projects and media artifacts remain isolated in one user folder.
  */
 export function ensureProjectWorkspace(
   projectId: string,
   projectName: string | undefined,
   allowedRoots: readonly string[],
+  userIdentity?: UserFolderIdentity,
 ): OpenCodeResult<string> {
   if (!projectId || allowedRoots.length === 0) {
     return err('PROJECT_PATH_INVALID', 409);
@@ -512,9 +603,18 @@ export function ensureProjectWorkspace(
     return err('PROJECT_PATH_INVALID', 409);
   }
 
+  let parentDir = canonicalBase;
+  if (userIdentity && (userIdentity.userId || userIdentity.username || userIdentity.email)) {
+    const layout = ensureUserDataLayout(canonicalBase, userIdentity);
+    if (!layout.ok) {
+      return layout;
+    }
+    parentDir = layout.value.projectsDir;
+  }
+
   const shortId = projectId.replace(/[^a-zA-Z0-9]/g, '').slice(-8) || 'ws';
   const folderName = `${sanitizeWorkspaceSlug(projectName)}-${shortId}`;
-  const candidate = path.join(canonicalBase, folderName);
+  const candidate = path.join(parentDir, folderName);
 
   if (!isPathInsideRoot(canonicalBase, candidate)) {
     return err('PATH_OUTSIDE_ROOT', 403);

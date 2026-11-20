@@ -1,3 +1,16 @@
+## 2026-11-20 — Multimodal Auto-Routing, Media Attribution/Cost Guard, Per-User Windows-Safe Folders & Multi-Domain Starter Gallery
+
+- **Video/Media Attribution & Cost Guard (`skill/satchida-montage-server.py`, `D:\LAN-AI-Infra\Bifrost\data\logs.db`)**:
+  - Populated full tenant/customer/user/account_type/mode (`Motion`) attribution in BOTH SQL columns and the JSON `metadata` column in `log_media_to_bifrost()` and `_bifrost_call()` headers, and backfilled 85 historical media rows in Bifrost `logs.db` (`0` remaining blank attribution rows).
+  - Enforced `if not check_video_approval(...): return False` (fixes ignored deny return), corrected per-clip cost estimates (`MODEL_ESTIMATED_COSTS`), lowered default daily cap to `SATCHIDA_DAILY_VIDEO_CAP_USD` (`$0.50`), and prioritized DeepInfra `FastVideo/FastWan-QAD-FP8-1.3B` (`$0.0125/5s`, 15x cheaper) ahead of CheapInference (`$0.13–$0.23/clip`) for standard fast clips.
+- **Multimodal Attachment Auto-Routing (`librechat.yaml`, `one-api/middleware/{satchida_enforcer,distributor}.go`, `Bifrost/tools/daily_model_router_sync.py`)**:
+  - Enabled full document MIME support in `librechat.yaml` (`fileConfig.endpoints.{Satchida,Satchida-Gateway}`): PDF, Word (`.docx`/`.doc`), Excel/Spreadsheets (`.xlsx`/`.xls`/`.csv`), PowerPoint (`.pptx`), JSON, HTML, XML (auto-extracted to text via `defaultLLMDeliveryPath.overrides`), plus images (`png`/`jpg`/`gif`/`webp`).
+  - Added `DetectRequestMedia()` in `one-api` to auto-upgrade image/binary-document requests to tier-scoped vision chains (`ZDR-Vision` on Channel #4 → Bifrost `rule-privacy-cloud-zdr-vision` `deepinfra/google/gemma-3-12b-it` → `CheapInference/deepseek-v4.1-flash` → `deepinfra/google/gemma-3-27b-it` → local `ollama/qwen3-vl:4b-instruct`; `Vision` on Channels #1/#5 → `openrouter/nvidia/nemotron-3.5-super-vl:free`; `Privacy:vision` on Channel #2 → local `ollama/qwen3-vl:4b-instruct`), while text-only requests stay on the cheapest text model (`deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731`). Fixed Bifrost `routing_rules.fallbacks` serialization to native string array `["provider/model", ...]`.
+- **Per-User Windows-Safe Folder Isolation (`packages/api/src/opencode/{paths,http,paths.spec}.ts`, `skill/satchida-montage-server.py`)**:
+  - Added `sanitizeWindowsUserFolder()` and `ensureUserDataLayout()` so new user vibecoding workspaces and media outputs are isolated inside `<baseRoot>/users/<safeUserFolder>/{projects/<slug>-<id>, media/{videos,images,projects}}` (sanitizing email IDs like `arjun.sharma+dev@company.co.in` → `arjun-sharma-dev_26b18593` and guarding Windows reserved names `CON`/`NUL`/`COM1..9`).
+- **Multi-Domain 1-Click Starter Templates Gallery (`client/src/components/Projects/opencode/{starterTemplates.ts,OpenCodeChatPanel.tsx}`, `translation.json`)**:
+  - Expanded starter templates to 14 profession-specific full-stack apps across 7 filterable domains (Business & Sales, Finance & Live Data, Healthcare & Clinic, Education & Schools, E-Commerce & Retail, Legal & Compliance, Operations & HR) with live search filtering.
+
 ## 2026-11-20 — Satchida Code Rebrand, Dual-Mode Vibe UX, Multi-User Seat Attribution & Privacy ZDR → Local Fallback Chain
 
 - **User-Facing Rebrand to "Satchida Code" (`client/src/locales/en/translation.json`)**:

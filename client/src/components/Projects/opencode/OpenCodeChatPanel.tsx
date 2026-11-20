@@ -23,6 +23,7 @@ import type {
   OpenCodePromptImageAttachment,
   OpenCodeQuestionRequestDto,
 } from 'librechat-data-provider';
+import type { StarterDomainId } from './starterTemplates';
 import {
   activeOpenCodeSessionIdAtom,
   openCodeDiffsAtom,
@@ -37,6 +38,7 @@ import {
   selectedOpenCodeAgentAtom,
   selectedOpenCodeModelAtom,
 } from './atoms';
+import { STARTER_DOMAIN_TABS, VIBE_STARTER_TEMPLATES } from './starterTemplates';
 import { extractOpenCodeErrorMessage } from './useOpenCodeEvents';
 import { useLocalize } from '~/hooks';
 
@@ -347,6 +349,8 @@ export default function OpenCodeChatPanel({
   const todos = useAtomValue(openCodeTodosAtom);
 
   const [promptInput, setPromptInput] = useState('');
+  const [starterDomain, setStarterDomain] = useState<StarterDomainId>('all');
+  const [starterSearch, setStarterSearch] = useState('');
   const [attachedImages, setAttachedImages] = useState<OpenCodePromptImageAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -455,10 +459,11 @@ export default function OpenCodeChatPanel({
         return a.localeCompare(b);
       });
       for (const [modelID, modelInfo] of entries) {
+        const displayProvider = provider.name.replace(/opencode/gi, 'Satchida');
         options.push({
           providerID: provider.id,
           modelID,
-          label: `${provider.name}: ${modelInfo?.name || modelID}`,
+          label: `${displayProvider}: ${modelInfo?.name || modelID}`,
         });
       }
     }
@@ -480,7 +485,9 @@ export default function OpenCodeChatPanel({
   }, [modelOptions, selectedModel, setSelectedModel]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'auto' });
+    if (messages.length > 0 || permissions.length > 0 || questions.length > 0) {
+      endRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
   }, [messages.length, permissions.length, questions.length]);
 
   const createSessionMutation = useMutation(
@@ -821,41 +828,73 @@ export default function OpenCodeChatPanel({
           </div>
         ) : null}
         {!(Boolean(activeSessionId) && messagesQuery.isLoading) && messages.length === 0 ? (
-          <div className="space-y-4 py-6 text-center text-sm text-text-secondary">
-            <p>{localize('com_opencode_empty_messages')}</p>
-            <div className="grid grid-cols-1 gap-2 text-left">
-              {[
-                {
-                  title: '🌐 Live Web & Price Monitor',
-                  prompt:
-                    'Build a real-time web monitor and price tracker dashboard with live automatic updates, top stories extraction, and clean metrics.',
-                },
-                {
-                  title: '📊 CRM & Lead Tracker',
-                  prompt:
-                    'Build a modern CRM dashboard to manage leads, status stages, notes, and instant search with a live backend.',
-                },
-                {
-                  title: '📋 Team Kanban Board',
-                  prompt:
-                    'Build an interactive Kanban task board with To-Do, In Progress, and Completed columns and persistent server storage.',
-                },
-                {
-                  title: '⚡ REST API & Live Analytics',
-                  prompt:
-                    'Build a live analytics dashboard with interactive charts, real-time metrics, and a REST API backend.',
-                },
-              ].map((tpl) => (
+          <div className="space-y-3 py-4 text-left text-sm text-text-secondary">
+            <div className="space-y-1 text-center">
+              <p className="text-sm font-medium text-text-primary">
+                {localize('com_opencode_starter_gallery_title')}
+              </p>
+              <p className="text-xs text-text-secondary">
+                {localize('com_opencode_empty_messages')}
+              </p>
+            </div>
+            <input
+              type="text"
+              value={starterSearch}
+              onChange={(e) => setStarterSearch(e.target.value)}
+              placeholder={localize('com_opencode_starter_search_placeholder')}
+              aria-label={localize('com_opencode_starter_search_placeholder')}
+              className="w-full rounded-md border border-border-light bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-tertiary focus:border-border-heavy focus:outline-none"
+            />
+            <div className="flex flex-wrap gap-1">
+              {STARTER_DOMAIN_TABS.map((tab) => {
+                const isActive = starterDomain === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStarterDomain(tab.id)}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      isActive
+                        ? 'border-border-heavy bg-surface-tertiary text-text-primary'
+                        : 'border-border-light bg-surface-secondary text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {VIBE_STARTER_TEMPLATES.filter((tpl) => {
+                const domainMatch = starterDomain === 'all' || tpl.domain === starterDomain;
+                if (!domainMatch) {
+                  return false;
+                }
+                const q = starterSearch.trim().toLowerCase();
+                if (!q) {
+                  return true;
+                }
+                return (
+                  tpl.title.toLowerCase().includes(q) ||
+                  tpl.subtitle.toLowerCase().includes(q) ||
+                  tpl.badge.toLowerCase().includes(q)
+                );
+              }).map((tpl) => (
                 <button
-                  key={tpl.title}
+                  key={tpl.id}
                   type="button"
                   disabled={!reachable || sendPromptMutation.isLoading}
                   onClick={() => sendPromptMutation.mutate({ text: tpl.prompt })}
-                  className="rounded-lg border border-border-light bg-surface-secondary p-2.5 text-left text-xs transition-colors hover:border-border-heavy hover:bg-surface-hover"
+                  className="rounded-lg border border-border-light bg-surface-secondary p-2.5 text-left text-xs transition-colors hover:border-border-heavy hover:bg-surface-hover disabled:opacity-50"
                 >
-                  <div className="font-semibold text-text-primary">{tpl.title}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text-primary">{tpl.title}</span>
+                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+                      {tpl.badge}
+                    </span>
+                  </div>
                   <div className="mt-0.5 line-clamp-2 text-[11px] text-text-secondary">
-                    {tpl.prompt}
+                    {tpl.subtitle}
                   </div>
                 </button>
               ))}

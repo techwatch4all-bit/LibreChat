@@ -126,6 +126,8 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id?: string;
     _id?: { toString(): string };
+    username?: string;
+    email?: string;
     tenantId?: string;
     role?: string;
     accountType?: string;
@@ -2042,7 +2044,11 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           return res.json({ localPath: existing.value, created: false });
         }
 
-        const ensured = ensureProjectWorkspace(projectId, project.name, config.allowedRoots);
+        const ensured = ensureProjectWorkspace(projectId, project.name, config.allowedRoots, {
+          userId,
+          username: authReq.user?.username,
+          email: authReq.user?.email,
+        });
         if (!ensured.ok) {
           return sendError(res, ensured.error);
         }

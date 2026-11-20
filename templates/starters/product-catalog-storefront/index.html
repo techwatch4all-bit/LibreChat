@@ -1,13 +1,21 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Storefront</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.item{background:#1e293b;border-radius:12px;border:1px solid #334155;overflow:hidden}
-.img{height:120px;background:#334155;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:14px}
-.desc{padding:16px}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Storefront</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--orange:#ea580c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 50% 0%, #431407 0%, var(--bg) 50%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:20px}
+.prod{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.prod-img{height:140px;background:linear-gradient(135deg,#1f293d,#0f1523);display:flex;align-items:center;justify-content:center;font-size:36px}
+.prod-body{padding:18px}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
-<h2 style="margin-top:0">🛍️ Premium Hardware Storefront</h2>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><div style="font-size:22px;font-weight:800">🛍️ Neural Hardware & Appliance Storefront</div><div style="font-size:12px;color:#94a3b8">ENTERPRISE HARDWARE CATALOG</div></div>
+<button style="background:var(--orange);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700">View Cart (2)</button>
+</div>
 <div class="grid">
-<div class="item"><div class="img">🖥️ Studio Display Pro</div><div class="desc"><div style="font-weight:700">27" 5K Retina Monitor</div><div style="color:#ea580c;font-weight:700;margin:6px 0">$1,299.00</div><div style="font-size:12px;color:#94a3b8">Factory color calibrated with Thunderbolt 4.</div></div></div>
-<div class="item"><div class="img">🎧 Studio ANC Headphones</div><div class="desc"><div style="font-weight:700">Wireless Spatial Audio</div><div style="color:#ea580c;font-weight:700;margin:6px 0">$349.00</div><div style="font-size:12px;color:#94a3b8">Lossless audio stream with 40h battery.</div></div></div>
-<div class="item"><div class="img">⌨️ Custom Ergonomic Board</div><div class="desc"><div style="font-weight:700">Split Gasket Mount</div><div style="color:#ea580c;font-weight:700;margin:6px 0">$220.00</div><div style="font-size:12px;color:#94a3b8">Hot-swappable switches with aluminum frame.</div></div></div>
+<div class="prod"><div class="prod-img">🖥️</div><div class="prod-body"><div style="font-weight:700">Studio Retina Display Pro</div><div class="mono" style="color:#fb923c;font-size:18px;font-weight:700;margin:6px 0">$1,499.00</div><div style="font-size:12px;color:#94a3b8">Factory 5K calibrated IPS panel with dual TB4.</div></div></div>
+<div class="prod"><div class="prod-img">🎛️</div><div class="prod-body"><div style="font-weight:700">Audio DSP Broadcast Master</div><div class="mono" style="color:#fb923c;font-size:18px;font-weight:700;margin:6px 0">$899.00</div><div style="font-size:12px;color:#94a3b8">Hardware 32-bit float preamp with zero jitter.</div></div></div>
+<div class="prod"><div class="prod-img">⌨️</div><div class="prod-body"><div style="font-weight:700">Custom CNC Mechanical Board</div><div class="mono" style="color:#fb923c;font-size:18px;font-weight:700;margin:6px 0">$340.00</div><div style="font-size:12px;color:#94a3b8">Anodized 6063 aerospace alloy gasket mount.</div></div></div>
 </div></body></html>

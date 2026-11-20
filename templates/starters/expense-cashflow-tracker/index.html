@@ -1,25 +1,33 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Expense Tracker</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-.card{background:#1e293b;padding:20px;border-radius:12px;border:1px solid #334155}
-.val{font-size:24px;font-weight:700;margin-top:4px}
-table{width:100%;border-collapse:collapse;margin-top:20px;background:#1e293b;border-radius:12px;overflow:hidden;border:1px solid #334155}
-th,td{padding:12px 16px;text-align:left;font-size:13px;border-bottom:1px solid #334155}
-th{background:#0f172a;color:#94a3b8}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Treasury Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--green:#10b981;--red:#f43f5e;--purple:#a855f7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 20% 0%, #311042 0%, var(--bg) 50%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px}
+.k-card{background:rgba(15,21,35,0.85);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:22px}
+.val{font-size:32px;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0 4px}
+table{width:100%;border-collapse:collapse;background:rgba(15,21,35,0.8);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
+th{background:#171f33;padding:12px 16px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600}
+td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-<h2 style="margin:0">📊 Expense & Cashflow Analytics</h2>
-<button style="background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600">Export CSV</button>
+<header>
+<div><div style="font-size:22px;font-weight:800">📊 Corporate Treasury & Cashflow Engine</div><div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">FISCAL 2026-27 • REAL-TIME GAAP COMPLIANT</div></div>
+<button style="background:linear-gradient(135deg,#9333ea,#4f46e5);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Download Audit CSV</button>
+</header>
+<div class="kpis">
+<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Total Net Inflows (Nov)</div><div class="val" style="color:var(--green)">$428,950.00</div><div style="color:var(--green);font-size:12px">↑ +24.8% YoY growth</div></div>
+<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Total Operational Outflows</div><div class="val" style="color:var(--red)">$112,400.00</div><div style="color:#94a3b8;font-size:12px">Under budget by 8.4%</div></div>
+<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Net Operating Free Cashflow</div><div class="val" style="color:#38bdf8">+$316,550.00</div><div style="color:#38bdf8;font-size:12px">⚡ 73.8% Profit Margin</div></div>
 </div>
-<div class="grid">
-<div class="card"><div style="color:#94a3b8;font-size:12px">Total Income (Nov)</div><div class="val" style="color:#10b981">$34,250.00</div></div>
-<div class="card"><div style="color:#94a3b8;font-size:12px">Total Operating Expenses</div><div class="val" style="color:#f43f5e">$12,480.00</div></div>
-<div class="card"><div style="color:#94a3b8;font-size:12px">Net Cashflow Margin</div><div class="val" style="color:#60a5fa">+$21,770.00 (63.5%)</div></div>
-</div>
-<table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Type</th><th>Amount</th></tr></thead>
+<table>
+<thead><tr><th>Transaction ID</th><th>Category</th><th>Description</th><th class="mono">Amount</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>20 Nov 2026</td><td>Cloud Hosting</td><td>GPU Dedicated Compute Cluster</td><td style="color:#f43f5e">Expense</td><td>-$1,250.00</td></tr>
-<tr><td>19 Nov 2026</td><td>Client Retainer</td><td>Enterprise AI Agent Suite</td><td style="color:#10b981">Income</td><td>+$8,500.00</td></tr>
-<tr><td>18 Nov 2026</td><td>Office & Power</td><td>Dedicated Fiber & Electricity</td><td style="color:#f43f5e">Expense</td><td>-$480.00</td></tr>
-</tbody></table>
+<tr><td class="mono">TX-89241</td><td>GPU Cluster Lease</td><td>NVIDIA H200 8-Node Bare Metal</td><td class="mono" style="color:var(--red)">-$28,500.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Reconciled</span></td></tr>
+<tr><td class="mono">TX-89242</td><td>Govt Enterprise SaaS</td><td>State Smart City AI Architecture License</td><td class="mono" style="color:var(--green)">+$185,000.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Settled (RTGS)</span></td></tr>
+<tr><td class="mono">TX-89243</td><td>Datacenter Power</td><td>Renewable Dedicated Solar Feed</td><td class="mono" style="color:var(--red)">-$4,820.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Reconciled</span></td></tr>
+</tbody>
+</table>
 </body></html>

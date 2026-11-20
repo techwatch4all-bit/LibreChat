@@ -1,23 +1,32 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>POS</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.pos-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}
-.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
-.sku-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
-.sku{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;cursor:pointer}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>POS Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--orange:#f97316;--green:#10b981}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 10% 0%, #431407 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:24px}
+.sku-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+.sku-card{background:#151d30;border:1px solid var(--border);border-radius:12px;padding:16px}
+.cart-card{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:24px}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
-<div class="pos-grid">
-<div class="card"><h3 style="margin-top:0">📦 Quick SKU Product Catalog</h3>
+<div class="grid">
+<div>
+<div style="font-size:22px;font-weight:800;margin-bottom:6px">📦 Warehouse SKU Catalog & Barcode Scanner</div>
+<div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">TERMINAL #03 • LIVE STOCK SYNCHRONIZED</div>
 <div class="sku-grid">
-<div class="sku"><div style="font-weight:600">USB-C Hub 7-in-1</div><div style="color:#10b981;font-weight:700;margin-top:4px">$34.99</div><div style="font-size:11px;color:#94a3b8">Stock: 48 pcs</div></div>
-<div class="sku"><div style="font-weight:600">Mechanical Keyboard</div><div style="color:#10b981;font-weight:700;margin-top:4px">$89.00</div><div style="font-size:11px;color:#94a3b8">Stock: 12 pcs</div></div>
-<div class="sku"><div style="font-weight:600">4K Ultra Webcam</div><div style="color:#10b981;font-weight:700;margin-top:4px">$65.00</div><div style="font-size:11px;color:#f43f5e">Stock: 2 pcs (LOW)</div></div>
-</div></div>
-<div class="card"><h3 style="margin-top:0">🛒 Current Cart (3 items)</h3>
-<div style="font-size:13px;line-height:1.8">
-<div style="display:flex;justify-content:space-between"><span>USB-C Hub (x2)</span><span>$69.98</span></div>
-<div style="display:flex;justify-content:space-between"><span>4K Webcam (x1)</span><span>$65.00</span></div>
-<hr style="border-color:#334155;margin:12px 0">
-<div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;color:#10b981"><span>Total</span><span>$134.98</span></div>
-<button style="width:100%;background:#f97316;color:#fff;border:none;padding:10px;border-radius:8px;font-weight:700;margin-top:16px;cursor:pointer">Charge Customer</button>
-</div></div>
+<div class="sku-card"><div style="font-size:13px;font-weight:700">Edge Inference Server</div><div class="mono" style="color:var(--orange);font-size:16px;font-weight:700;margin:6px 0">$2,400.00</div><div style="font-size:11px;color:#94a3b8">Stock: 14 units</div></div>
+<div class="sku-card"><div style="font-size:13px;font-weight:700">RTX-6000 Ada GPU</div><div class="mono" style="color:var(--orange);font-size:16px;font-weight:700;margin:6px 0">$6,800.00</div><div style="font-size:11px;color:#94a3b8">Stock: 6 units</div></div>
+<div class="sku-card" style="border-color:rgba(244,63,94,0.4)"><div style="font-size:13px;font-weight:700">10GbE Fiber Switch</div><div class="mono" style="color:var(--orange);font-size:16px;font-weight:700;margin:6px 0">$890.00</div><div style="font-size:11px;color:#f43f5e;font-weight:700">Stock: 1 unit (LOW)</div></div>
+</div>
+</div>
+<div class="cart-card">
+<div style="font-size:18px;font-weight:800;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px">🛒 Active POS Cart</div>
+<div style="font-size:13px;line-height:2">
+<div style="display:flex;justify-content:space-between"><span>Edge Server (x1)</span><span class="mono">$2,400.00</span></div>
+<div style="display:flex;justify-content:space-between"><span>Fiber Switch (x1)</span><span class="mono">$890.00</span></div>
+<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;display:flex;justify-content:space-between;font-size:18px;font-weight:800;color:var(--green)"><span>Total:</span><span class="mono">$3,290.00</span></div>
+</div>
+<button style="width:100%;background:linear-gradient(135deg,#ea580c,#f97316);color:#fff;border:none;padding:12px;border-radius:10px;font-weight:800;margin-top:20px;cursor:pointer">Collect Payment (NFC / Card)</button>
+</div>
 </div></body></html>

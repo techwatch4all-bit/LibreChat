@@ -1,19 +1,24 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Compliance Audit</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
-.progress{background:#0f172a;height:12px;border-radius:6px;overflow:hidden;margin:12px 0}
-.fill{background:#14b8a6;height:100%;width:92%}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Compliance</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--teal:#14b8a6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 90% 0%, #042f2e 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.card{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
+.bar{height:12px;background:rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;margin:16px 0}
+.fill{height:100%;width:94%;background:linear-gradient(90deg,#0d9488,#14b8a6)}
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:13px}
 </style></head><body>
 <div class="card">
 <div style="display:flex;justify-content:space-between;align-items:center">
-<h2 style="margin:0">🛡️ ISO 27001 & DPDP Act Compliance Readiness</h2>
-<span style="font-size:18px;font-weight:800;color:#14b8a6">92% READY</span>
+<div><div style="font-size:22px;font-weight:800">🛡️ ISO 27001 & DPDP Act Compliance Readiness</div><div style="font-size:12px;color:#94a3b8">AUDIT AUDIT CERTIFICATION 2026</div></div>
+<div style="font-size:24px;font-weight:900;color:var(--teal);font-family:'JetBrains Mono',monospace">94% PASSED</div>
 </div>
-<div class="progress"><div class="fill"></div></div>
-<div style="font-size:13px;line-height:2;margin-top:16px">
-<div>✅ <b>Physical Tenant Isolation:</b> Dedicated SQLite/Mongo instance per customer verified.</div>
-<div>✅ <b>Zero Cloud VPS / Zero VPN:</b> Cloudflare Named Tunnels verified active.</div>
-<div>✅ <b>Zero-Knowledge Credentials:</b> Master API keys stripped from client machines.</div>
-<div>⚠️ <b>Disaster Recovery Drill:</b> Scheduled for 25 Nov 2026 (Pending sign-off).</div>
+<div class="bar"><div class="fill"></div></div>
+<div style="margin-top:20px">
+<div class="row"><span>✅ <b>Physical Tenant Isolation:</b> Dedicated standalone databases verified per client.</span><span style="color:var(--teal);font-weight:700">COMPLIANT</span></div>
+<div class="row"><span>✅ <b>Zero Cloud VPS & Zero VPN Directive:</b> Tunnel outbound-only over HTTPS.</span><span style="color:var(--teal);font-weight:700">COMPLIANT</span></div>
+<div class="row"><span>✅ <b>Master Credential Protection:</b> Master API keys stripped from edge clients.</span><span style="color:var(--teal);font-weight:700">COMPLIANT</span></div>
+<div class="row"><span>⚠️ <b>Quarterly Disaster Recovery Simulation:</b> Scheduled for 26 Nov 2026.</span><span style="color:#facc15;font-weight:700">IN PROGRESS</span></div>
 </div>
 </div></body></html>

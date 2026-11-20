@@ -1,19 +1,27 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gradebook</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #334155}
-th{background:#0f172a;color:#94a3b8}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Gradebook</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--purple:#a855f7;--green:#10b981}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 20% 0%, #2e1065 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.card{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}
+table{width:100%;border-collapse:collapse}
+th{background:#151d30;padding:12px 14px;text-align:left;font-size:12px;color:#94a3b8}
+td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
 <div class="card">
-<div style="display:flex;justify-content:space-between;align-items:center">
-<h2 style="margin:0">📚 Class 10-A Attendance & Marks Gradebook</h2>
-<div style="font-size:12px;color:#94a3b8">Term 1 Examination</div>
-</div>
-<table><thead><tr><th>Roll #</th><th>Student Name</th><th>Attendance</th><th>Maths (100)</th><th>Science (100)</th><th>English (100)</th><th>GPA / Grade</th></tr></thead>
+<header>
+<div><div style="font-size:22px;font-weight:800">🎓 Academic Semester Gradebook & Roll Call</div><div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">GRADE 11-A • ADVANCED COMPUTING & MATHEMATICS</div></div>
+<div><span style="background:rgba(168,85,247,0.15);color:var(--purple);font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px">SEMESTER 1 RESULTS</span></div>
+</header>
+<table>
+<thead><tr><th>Roll #</th><th>Student Name</th><th class="mono">Attendance</th><th class="mono">Calculus</th><th class="mono">AI & CS</th><th class="mono">Physics</th><th>GPA (10.0)</th></tr></thead>
 <tbody>
-<tr><td>101</td><td>Aarav Patil</td><td style="color:#10b981">96%</td><td>92</td><td>88</td><td>85</td><td><b>A+ (9.1)</b></td></tr>
-<tr><td>102</td><td>Bhavna Sen</td><td style="color:#10b981">92%</td><td>85</td><td>91</td><td>89</td><td><b>A+ (9.0)</b></td></tr>
-<tr><td>103</td><td>Chirag Verma</td><td style="color:#facc15">81%</td><td>74</td><td>68</td><td>72</td><td><b>B+ (7.4)</b></td></tr>
-</tbody></table>
+<tr><td class="mono">#101</td><td><b>Aarav Singhania</b></td><td class="mono" style="color:var(--green)">98.5%</td><td class="mono">96</td><td class="mono">98</td><td class="mono">94</td><td><b style="color:var(--green)">9.8 (A+)</b></td></tr>
+<tr><td class="mono">#102</td><td><b>Ananya Iyer</b></td><td class="mono" style="color:var(--green)">96.0%</td><td class="mono">92</td><td class="mono">95</td><td class="mono">91</td><td><b style="color:var(--green)">9.4 (A+)</b></td></tr>
+<tr><td class="mono">#103</td><td><b>Devansh Mehta</b></td><td class="mono" style="color:#facc15">84.2%</td><td class="mono">81</td><td class="mono">88</td><td class="mono">76</td><td><b>8.2 (B+)</b></td></tr>
+</tbody>
+</table>
 </div></body></html>

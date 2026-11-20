@@ -1,22 +1,40 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Lab Portal</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.panel{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-th,td{padding:12px;text-align:left;border-bottom:1px solid #334155}
-th{background:#0f172a;color:#94a3b8}
-.high{color:#f43f5e;font-weight:700}
-.normal{color:#10b981;font-weight:600}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Lab Diagnostics</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--red:#f43f5e;--green:#10b981;--cyan:#06b6d4}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 80% 0%, #083344 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.box{max-width:960px;margin:0 auto;background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th{background:#151d30;padding:12px 14px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600}
+td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
+.flag{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.flag-high{background:rgba(244,63,94,0.18);color:var(--red)}
+.flag-norm{background:rgba(16,185,129,0.18);color:var(--green)}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
-<div class="panel">
-<div style="display:flex;justify-content:space-between;align-items:center">
-<div><h2 style="margin:0">🧪 Clinical Lab Report & Diagnostic Panel</h2><div style="font-size:12px;color:#94a3b8;margin-top:4px">Patient ID: PT-98214 • Date: 20 Nov 2026</div></div>
-<button style="background:#06b6d4;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600">Print Report</button>
-</div>
-<table><thead><tr><th>Test Name</th><th>Observed Value</th><th>Unit</th><th>Reference Range</th><th>Status</th></tr></thead>
+<div class="box">
+<header>
+<div><div style="font-size:22px;font-weight:800;color:#fff">🧪 Pathological Blood Analysis & Prescription</div><div style="font-size:12px;color:#94a3b8;margin-top:4px;font-family:'JetBrains Mono',monospace">PATIENT: PT-29401 (VIKRAM RAO, 52Y) • SPECIMEN: FASTING VENOUS</div></div>
+<button style="background:var(--cyan);color:#07090e;border:none;padding:10px 18px;border-radius:8px;font-weight:800;cursor:pointer">Print Clinical Summary</button>
+</header>
+<table>
+<thead><tr><th>Biomarker Test</th><th class="mono">Observed Value</th><th>Standard Units</th><th class="mono">Normal Reference</th><th>Diagnostic Flag</th></tr></thead>
 <tbody>
-<tr><td>Fasting Blood Sugar</td><td class="high">138</td><td>mg/dL</td><td>70 - 99</td><td><span style="background:#881337;color:#fda4af;padding:2px 8px;border-radius:4px">HIGH</span></td></tr>
-<tr><td>HbA1c</td><td class="high">6.8</td><td>%</td><td>4.0 - 5.6</td><td><span style="background:#881337;color:#fda4af;padding:2px 8px;border-radius:4px">ELEVATED</span></td></tr>
-<tr><td>Total Cholesterol</td><td class="normal">184</td><td>mg/dL</td><td>125 - 200</td><td><span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px">NORMAL</span></td></tr>
-<tr><td>Hemoglobin</td><td class="normal">14.2</td><td>g/dL</td><td>13.5 - 17.5</td><td><span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px">NORMAL</span></td></tr>
-</tbody></table>
-</div></body></html>
+<tr><td><b>Fasting Blood Glucose</b></td><td class="mono" style="color:var(--red);font-weight:700">148.0</td><td>mg/dL</td><td class="mono">70.0 - 99.0</td><td><span class="flag flag-high">HIGH (ALERT)</span></td></tr>
+<tr><td><b>Glycated Hemoglobin (HbA1c)</b></td><td class="mono" style="color:var(--red);font-weight:700">7.2</td><td>%</td><td class="mono">4.0 - 5.6</td><td><span class="flag flag-high">ELEVATED</span></td></tr>
+<tr><td><b>Lipid: Serum Triglycerides</b></td><td class="mono" style="color:var(--green);font-weight:700">132.0</td><td>mg/dL</td><td class="mono"> &lt; 150.0</td><td><span class="flag flag-norm">NORMAL</span></td></tr>
+<tr><td><b>Kidney: Serum Creatinine</b></td><td class="mono" style="color:var(--green);font-weight:700">0.95</td><td>mg/dL</td><td class="mono">0.70 - 1.20</td><td><span class="flag flag-norm">OPTIMAL</span></td></tr>
+</tbody>
+</table>
+<div style="background:#151d30;border-radius:12px;padding:18px;border:1px solid var(--border);margin-top:20px">
+<div style="font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:8px">💊 Physician Prescription Rx</div>
+<div style="font-size:13px;line-height:1.7;color:#e2e8f0">
+1. <b>Metformin HCl 500mg</b> — 1 tablet with breakfast and dinner (Oral)<br>
+2. <b>Atorvastatin 10mg</b> — 1 tablet before bedtime (Oral)<br>
+3. Dietary advice: Low glycemic index nutrition, 45-minute daily brisk cardio.
+</div>
+</div>
+</div>
+</body></html>

@@ -1,16 +1,26 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Case Docket</title><style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:24px}
-.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #334155}
-th{background:#0f172a;color:#94a3b8}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Case Docket</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--yellow:#eab308;--red:#f43f5e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at 10% 0%, #422006 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
+.card{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th{background:#151d30;padding:12px 14px;text-align:left;font-size:12px;color:#94a3b8}
+td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
+.mono{font-family:'JetBrains Mono',monospace}
 </style></head><body>
 <div class="card">
-<h2 style="margin-top:0">⚖️ Legal Case Docket & Hearing Calendar</h2>
-<table><thead><tr><th>Case Suit #</th><th>Matter Title</th><th>Court / Forum</th><th>Next Hearing</th><th>Stage / Priority</th></tr></thead>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><div style="font-size:22px;font-weight:800">⚖️ High Court & Tribunal Case Docket</div><div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">CHAMBERS OF SENIOR ADVOCATE • ACTIVE LITIGATION</div></div>
+<button style="background:var(--yellow);color:#07090e;border:none;padding:10px 18px;border-radius:8px;font-weight:800">+ Add Court Matter</button>
+</div>
+<table>
+<thead><tr><th>Suit / Petition #</th><th>Matter Title</th><th>Court / Forum</th><th class="mono">Next Hearing</th><th>Stage & Priority</th></tr></thead>
 <tbody>
-<tr><td>WP 1402/2026</td><td>Tata Motors vs Union of India</td><td>Bombay High Court</td><td style="color:#f43f5e;font-weight:700">22 Nov 2026 (Urgent)</td><td>Final Arguments</td></tr>
-<tr><td>ARB 88/2026</td><td>Reliance Retail vs Infra Ltd</td><td>Arbitral Tribunal</td><td>28 Nov 2026</td><td>Cross-Examination</td></tr>
-<tr><td>CS 412/2025</td><td>Sharma Property Partition</td><td>City Civil Court</td><td>05 Dec 2026</td><td>Evidence Recording</td></tr>
-</tbody></table>
+<tr><td class="mono">WP 1402/2026</td><td><b>Tata Motors vs Union of India</b></td><td>Bombay High Court (DB-1)</td><td class="mono" style="color:var(--red);font-weight:700">22 Nov 2026 (URGENT)</td><td><span style="background:rgba(244,63,94,0.18);color:var(--red);padding:3px 8px;border-radius:4px;font-weight:700;font-size:11px">Final Arguments</span></td></tr>
+<tr><td class="mono">ARB 88/2026</td><td><b>Reliance Retail vs Infrastructure Corp</b></td><td>Arbitral Tribunal (New Delhi)</td><td class="mono">28 Nov 2026</td><td>Cross-Examination</td></tr>
+<tr><td class="mono">CS 412/2025</td><td><b>Sharma Family Estate Partition</b></td><td>City Civil Court (Court 4)</td><td class="mono">05 Dec 2026</td><td>Evidence Recording</td></tr>
+</tbody>
+</table>
 </div></body></html>

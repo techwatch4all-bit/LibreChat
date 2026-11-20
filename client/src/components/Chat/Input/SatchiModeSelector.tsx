@@ -31,8 +31,8 @@ import {
   satchiThinkAtom,
   type SatchiMode,
 } from '~/store/satchiStore';
+import { useGetStartupConfig, useProjectsInfiniteQuery } from '~/data-provider';
 import { useLocalize, useAuthContext } from '~/hooks';
-import { useGetStartupConfig } from '~/data-provider';
 import SatchiUpgradeModal from './SatchiUpgradeModal';
 import { cn, getModelSpec } from '~/utils';
 
@@ -171,6 +171,10 @@ function SatchiModeSelector({
   const setStyle = useSetAtom(satchiStyleAtom);
   const setThink = useSetAtom(satchiThinkAtom);
   const { data: startupConfig } = useGetStartupConfig();
+  const { data: projectsData } = useProjectsInfiniteQuery(
+    { sortBy: 'updatedAt', sortDirection: 'desc', limit: 10 },
+    { enabled: canUseWorkTools },
+  );
 
   const handleSelectMode = (mode: SatchiMode) => {
     if (disabled) return;
@@ -227,6 +231,20 @@ function SatchiModeSelector({
           endpoint: targetEndpoint,
         };
       });
+    }
+
+    if (mode === 'VibeCoder') {
+      const activeProjId = conversation?.chatProjectId;
+      if (activeProjId) {
+        navigate(`/projects/${activeProjId}`);
+      } else {
+        const availableProjects = projectsData?.pages?.[0]?.projects || [];
+        if (availableProjects.length > 0) {
+          navigate(`/projects/${availableProjects[0]._id}`);
+        } else {
+          navigate('/projects');
+        }
+      }
     }
   };
 

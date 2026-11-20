@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
+import { adminFetch } from './client';
 
 export const RECONCILIATION_QUERY_KEY = ['admin', 'reconciliation'] as const;
 
@@ -66,9 +67,7 @@ export function useReconciliationLedgerQuery(
       if (filters.plan) params.set('plan', filters.plan);
       if (filters.search) params.set('search', filters.search);
 
-      const res = await fetch(`/api/admin/reconciliation?${params.toString()}`, {
-        credentials: 'same-origin',
-      });
+      const res = await adminFetch(`/api/admin/reconciliation?${params.toString()}`);
       if (!res.ok) {
         throw await readError(res);
       }
@@ -86,10 +85,9 @@ export function useApprovePaymentMutation(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (paymentId: string) => {
-      const res = await fetch(`/api/admin/reconciliation/${paymentId}/approve`, {
+      const res = await adminFetch(`/api/admin/reconciliation/${paymentId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
       });
       if (!res.ok) {
         throw await readError(res);
@@ -110,11 +108,10 @@ export function useRejectPaymentMutation(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
-      const res = await fetch(`/api/admin/reconciliation/${paymentId}/reject`, {
+      const res = await adminFetch(`/api/admin/reconciliation/${paymentId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
-        credentials: 'same-origin',
       });
       if (!res.ok) {
         throw await readError(res);

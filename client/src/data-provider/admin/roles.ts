@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
+import { adminFetch } from './client';
 
 export const ROLES_QUERY_KEY = ['admin', 'roles'] as const;
 
@@ -55,19 +56,19 @@ async function readError(response: Response): Promise<Error> {
 }
 
 export async function fetchRoles(signal?: AbortSignal): Promise<RolesResponse> {
-  const response = await fetch('/api/admin/roles', { signal });
+  const response = await adminFetch('/api/admin/roles', { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as RolesResponse;
 }
 
 export async function fetchRole(name: string, signal?: AbortSignal): Promise<{ role: any }> {
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(name)}`, { signal });
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(name)}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { role: any };
 }
 
 export async function createRole(payload: CreateRolePayload): Promise<{ role: any }> {
-  const response = await fetch('/api/admin/roles', {
+  const response = await adminFetch('/api/admin/roles', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -80,7 +81,7 @@ export async function updateRolePermissions(
   name: string,
   permissions: Record<string, Record<string, boolean>>,
 ): Promise<{ role: any }> {
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(name)}/permissions`, {
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(name)}/permissions`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ permissions }),
@@ -90,7 +91,7 @@ export async function updateRolePermissions(
 }
 
 export async function deleteRole(name: string): Promise<{ success: boolean }> {
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(name)}`, { method: 'DELETE' });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { success: boolean };
 }
@@ -104,13 +105,13 @@ export async function fetchRoleMembers(
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(name)}/members${suffix}`, { signal });
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(name)}/members${suffix}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as RoleMembersResponse;
 }
 
 export async function addRoleMember(roleName: string, userId: string): Promise<{ success: boolean }> {
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(roleName)}/members`, {
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(roleName)}/members`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId }),
@@ -120,7 +121,7 @@ export async function addRoleMember(roleName: string, userId: string): Promise<{
 }
 
 export async function removeRoleMember(roleName: string, userId: string): Promise<{ success: boolean }> {
-  const response = await fetch(`/api/admin/roles/${encodeURIComponent(roleName)}/members/${userId}`, {
+  const response = await adminFetch(`/api/admin/roles/${encodeURIComponent(roleName)}/members/${userId}`, {
     method: 'DELETE',
   });
   if (!response.ok) throw await readError(response);

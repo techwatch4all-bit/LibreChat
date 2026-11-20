@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { adminFetch } from './client';
 
 export const VAULTS_QUERY_KEY = ['admin', 'vaults'] as const;
 
@@ -18,7 +19,7 @@ export type VaultsResponse = {
 };
 
 export async function fetchAdminVaults(signal?: AbortSignal): Promise<VaultsResponse> {
-  const response = await fetch('/api/admin/vaults', { signal });
+  const response = await adminFetch('/api/admin/vaults', { signal });
   if (!response.ok) {
     throw new Error(`Failed to fetch vaults: HTTP ${response.status}`);
   }

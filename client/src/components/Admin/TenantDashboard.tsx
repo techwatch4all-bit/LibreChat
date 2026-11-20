@@ -33,6 +33,7 @@ import {
   type TenantConsumptionRecord,
   type FleetIncident,
 } from '~/data-provider/admin/tenants';
+import { adminFetch } from '~/data-provider/admin/client';
 import { cn } from '~/utils';
 
 export default function TenantDashboard(): JSX.Element {
@@ -76,7 +77,7 @@ export default function TenantDashboard(): JSX.Element {
   const handleLaunchOpenHands = async (inc: FleetIncident) => {
     setLaunchingVibecodingFp(inc.fingerprint);
     try {
-      const res = await fetch('/api/admin/tenants/launch-openhands', {
+      const res = await adminFetch('/api/admin/tenants/launch-openhands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,7 +104,7 @@ export default function TenantDashboard(): JSX.Element {
   const handleDeployPatch = async (inc: FleetIncident) => {
     setDeployingPatchFp(inc.fingerprint);
     try {
-      const res = await fetch('/api/admin/tenants/deploy-patch', {
+      const res = await adminFetch('/api/admin/tenants/deploy-patch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

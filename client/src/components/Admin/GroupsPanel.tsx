@@ -48,6 +48,8 @@ export default function GroupsPanel({
   onClearInitialCreate,
 }: GroupsPanelProps) {
   const localize = useLocalize();
+  const capsQuery = useEffectiveCapabilitiesQuery();
+  const canManageGroups = canManage(capsQuery.data?.capabilities);
   const groupsQuery = useGroupsQuery();
   const deleteMutation = useDeleteGroupMutation();
 

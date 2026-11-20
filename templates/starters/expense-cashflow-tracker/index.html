@@ -1,33 +1,123 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Treasury Flow</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--green:#10b981;--red:#f43f5e;--purple:#a855f7}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at 20% 0%, #311042 0%, var(--bg) 50%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:18px}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px}
-.k-card{background:rgba(15,21,35,0.85);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:22px}
-.val{font-size:32px;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0 4px}
-table{width:100%;border-collapse:collapse;background:rgba(15,21,35,0.8);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
-th{background:#171f33;padding:12px 16px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600}
-td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px}
-.mono{font-family:'JetBrains Mono',monospace}
-</style></head><body>
-<header>
-<div><div style="font-size:22px;font-weight:800">📊 Corporate Treasury & Cashflow Engine</div><div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">FISCAL 2026-27 • REAL-TIME GAAP COMPLIANT</div></div>
-<button style="background:linear-gradient(135deg,#9333ea,#4f46e5);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Download Audit CSV</button>
-</header>
-<div class="kpis">
-<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Total Net Inflows (Nov)</div><div class="val" style="color:var(--green)">$428,950.00</div><div style="color:var(--green);font-size:12px">↑ +24.8% YoY growth</div></div>
-<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Total Operational Outflows</div><div class="val" style="color:var(--red)">$112,400.00</div><div style="color:#94a3b8;font-size:12px">Under budget by 8.4%</div></div>
-<div class="k-card"><div style="color:#94a3b8;font-size:12px;font-weight:600">Net Operating Free Cashflow</div><div class="val" style="color:#38bdf8">+$316,550.00</div><div style="color:#38bdf8;font-size:12px">⚡ 73.8% Profit Margin</div></div>
-</div>
-<table>
-<thead><tr><th>Transaction ID</th><th>Category</th><th>Description</th><th class="mono">Amount</th><th>Status</th></tr></thead>
-<tbody>
-<tr><td class="mono">TX-89241</td><td>GPU Cluster Lease</td><td>NVIDIA H200 8-Node Bare Metal</td><td class="mono" style="color:var(--red)">-$28,500.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Reconciled</span></td></tr>
-<tr><td class="mono">TX-89242</td><td>Govt Enterprise SaaS</td><td>State Smart City AI Architecture License</td><td class="mono" style="color:var(--green)">+$185,000.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Settled (RTGS)</span></td></tr>
-<tr><td class="mono">TX-89243</td><td>Datacenter Power</td><td>Renewable Dedicated Solar Feed</td><td class="mono" style="color:var(--red)">-$4,820.00</td><td><span style="background:rgba(16,185,129,0.15);color:var(--green);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">Reconciled</span></td></tr>
-</tbody>
-</table>
-</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Treasury · VC Runway & GAAP Cashflow Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 80% 20%, #2e0854 0%, #150326 50%, #080110 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .ambient-glow-amethyst {
+        position: fixed; top: -100px; right: 10%; width: 600px; height: 600px;
+        background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, transparent 70%);
+        filter: blur(100px); pointer-events: none;
+      }
+      .violet-glass {
+        background: rgba(30, 10, 52, 0.72);
+        backdrop-filter: blur(28px) saturate(200%);
+        border: 1px solid rgba(192, 132, 252, 0.28);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(233, 213, 255, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div class="ambient-glow-amethyst"></div>
+      <div style="max-width: 1280px; margin: 0 auto; position: relative; z-index: 2;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.35); font-size: 11px; font-weight: 700; color: #d8b4fe;">
+              Series B Runway Engine · SOC-1 Audited Ledger
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">GAAP Cashflow & Cloud Outlay Treasury</h1>
+          </div>
+          <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #a855f7, #7e22ce); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(168, 85, 247, 0.35);">Export GAAP CSV</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 28px;">
+          <div class="violet-glass" style="padding: 24px;">
+            <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase;">Available Liquid Runway</div>
+            <div class="mono" style="font-size: 36px; font-weight: 800; color: #f3e8ff; margin: 10px 0;">26.4 Months</div>
+            <div style="font-size: 12px; color: #4ade80;">Net Burn: $82,400/month</div>
+          </div>
+          <div class="violet-glass" style="padding: 24px;">
+            <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase;">Current Cash Balance</div>
+            <div class="mono" style="font-size: 36px; font-weight: 800; color: #fff; margin: 10px 0;">$2,175,000</div>
+            <div style="font-size: 12px; color: #38bdf8;">Across JPMorgan & Silicon Valley Bank</div>
+          </div>
+          <div class="violet-glass" style="padding: 24px;">
+            <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase;">GPU & Cloud Infrastructure</div>
+            <div class="mono" style="font-size: 36px; font-weight: 800; color: #f43f5e; margin: 10px 0;">$34,250</div>
+            <div style="font-size: 12px; color: #94a3b8;">14% decrease vs previous cycle</div>
+          </div>
+        </div>
+
+        <div class="violet-glass" style="padding: 24px;">
+          <div style="font-size: 13px; font-weight: 700; color: #d8b4fe; text-transform: uppercase; margin-bottom: 16px;">November 2026 Outlay Schedule</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="color: #c084fc; border-bottom: 1px solid rgba(192, 132, 252, 0.2); text-align: left;">
+                <th style="padding: 10px 0;">Date</th>
+                <th>Category</th>
+                <th>Vendor / Allocation</th>
+                <th>Type</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody class="mono" style="color: #e2e8f0;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px 0;">20-Nov-2026</td>
+                <td style="font-family:'Plus Jakarta Sans';">Dedicated Compute</td>
+                <td style="font-family:'Plus Jakarta Sans'; color: #fff; font-weight: 600;">8x NVIDIA H100 SXM5 Cluster</td>
+                <td><span style="padding: 2px 8px; border-radius: 4px; background: rgba(244, 63, 94, 0.15); color: #fb7185; font-size: 11px;">OPEX</span></td>
+                <td style="text-align: right; color: #fb7185; font-weight: 700;">-$18,400.00</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px 0;">18-Nov-2026</td>
+                <td style="font-family:'Plus Jakarta Sans';">Enterprise ARR</td>
+                <td style="font-family:'Plus Jakarta Sans'; color: #fff; font-weight: 600;">Lockheed Intelligence Contract</td>
+                <td><span style="padding: 2px 8px; border-radius: 4px; background: rgba(52, 211, 153, 0.15); color: #34d399; font-size: 11px;">REVENUE</span></td>
+                <td style="text-align: right; color: #34d399; font-weight: 700;">+$142,500.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    
+</body>
+</html>

@@ -1,39 +1,119 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Clinic Queue</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--pink:#ec4899;--cyan:#06b6d4}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at 10% 0%, #4a044e 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:18px}
-.grid{display:grid;grid-template-columns:1fr 2fr;gap:24px}
-.token-card{background:rgba(15,21,35,0.9);border:1px solid rgba(236,72,153,0.3);border-radius:20px;padding:32px;text-align:center;box-shadow:0 0 40px rgba(236,72,153,0.15)}
-.big-token{font-size:80px;font-weight:900;color:var(--pink);font-family:'JetBrains Mono',monospace;letter-spacing:-0.05em;margin:16px 0}
-.list-card{background:rgba(15,21,35,0.85);border:1px solid var(--border);border-radius:20px;padding:24px}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;padding:10px 14px;color:#94a3b8;font-size:12px;border-bottom:1px solid var(--border)}
-td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
-</style></head><body>
-<header>
-<div><div style="font-size:22px;font-weight:800">🏥 Outpatient Clinic Token & Vitals Queue</div><div style="font-size:12px;color:#94a3b8">MAX HEALTHCARE • OP-DEPARTMENT A</div></div>
-<div><span style="font-size:12px;background:rgba(6,182,212,0.15);color:var(--cyan);padding:4px 12px;border-radius:999px;font-weight:700">3 CONSULTANTS ONLINE</span></div>
-</header>
-<div class="grid">
-<div class="token-card">
-<div style="font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">NOW IN CONSULTATION</div>
-<div class="big-token">#042</div>
-<div style="font-size:16px;font-weight:700">Dr. Sunita Rao, MD (Cardiology)</div>
-<div style="font-size:12px;color:#94a3b8;margin-top:4px">Room 104 • Patient: Mr. K. Singhania (62y)</div>
-</div>
-<div class="list-card">
-<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:#38bdf8">Next Scheduled Walk-in & Appointment Queue</div>
-<table>
-<thead><tr><th>Token</th><th>Patient Name</th><th>Age / Sex</th><th>Vitals (BP / HR)</th><th>Status</th></tr></thead>
-<tbody>
-<tr><td style="font-weight:800;color:var(--pink);font-family:'JetBrains Mono',monospace">#043</td><td><b>Rohan Sengupta</b></td><td>45 / M</td><td>128/84 • 74 bpm</td><td><span style="background:rgba(250,204,21,0.2);color:#facc15;padding:3px 8px;border-radius:4px;font-weight:700;font-size:11px">CALLING NEXT</span></td></tr>
-<tr><td style="font-weight:800;color:#94a3b8;font-family:'JetBrains Mono',monospace">#044</td><td><b>Meena Kumari</b></td><td>58 / F</td><td>138/90 • 82 bpm</td><td>Waiting (8 mins)</td></tr>
-<tr><td style="font-weight:800;color:#94a3b8;font-family:'JetBrains Mono',monospace">#045</td><td><b>Aarush Deshmukh</b></td><td>12 / M</td><td>110/70 • 78 bpm</td><td>Waiting (16 mins)</td></tr>
-</tbody>
-</table>
-</div>
-</div>
-</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Health · Emergency & Clinical Triage Queue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 20% 20%, #24051a 0%, #10020c 50%, #050004 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .ambient-glow-fuchsia {
+        position: fixed; top: -80px; left: 10%; width: 550px; height: 550px;
+        background: radial-gradient(circle, rgba(236, 72, 153, 0.22) 0%, transparent 70%);
+        filter: blur(90px); pointer-events: none;
+      }
+      .triage-card {
+        background: rgba(26, 6, 20, 0.75);
+        backdrop-filter: blur(28px) saturate(210%);
+        border: 1px solid rgba(244, 114, 182, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(251, 207, 232, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div class="ambient-glow-fuchsia"></div>
+      <div style="max-width: 1280px; margin: 0 auto; position: relative; z-index: 2;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.4); font-size: 11px; font-weight: 700; color: #f472b6;">
+              ● Level-1 Trauma & Super-Speciality Triage Board
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">Patient Flow & Token Dispatch Deck</h1>
+          </div>
+          <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #ec4899, #be185d); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(236, 72, 153, 0.4);">+ Issue Emergency Token</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
+          <!-- Active Token Calling -->
+          <div class="triage-card" style="padding: 32px; text-align: center; border: 2px solid #ec4899;">
+            <div style="font-size: 12px; font-weight: 800; color: #f472b6; letter-spacing: 2px; text-transform: uppercase;">Now In Consultation</div>
+            <div class="mono" style="font-size: 72px; font-weight: 900; color: #fff; text-shadow: 0 0 35px rgba(236, 72, 153, 0.6); margin: 16px 0;">#024</div>
+            <div style="font-size: 18px; font-weight: 700; color: #fbcfe8;">Dr. Rajesh Mehta, MD</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Cabin 3 · Cardiology & Echo Lab</div>
+            <div style="margin-top: 24px; padding: 12px; background: rgba(236, 72, 153, 0.15); border-radius: 12px; font-size: 12px; color: #f472b6; font-weight: 600;">
+              Duration: 12m 45s · Patient Vitals Stable (BP 124/82)
+            </div>
+          </div>
+
+          <!-- Queue Table -->
+          <div class="triage-card" style="padding: 24px;">
+            <div style="font-size: 13px; font-weight: 700; color: #f472b6; text-transform: uppercase; margin-bottom: 16px;">Next In Queue (Walk-in & Scheduled)</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="color: #f472b6; border-bottom: 1px solid rgba(244, 114, 182, 0.2); text-align: left;">
+                  <th style="padding: 10px 0;">Token</th>
+                  <th>Patient Name</th>
+                  <th>Age/Gender</th>
+                  <th>Department</th>
+                  <th style="text-align: right;">Status</th>
+                </tr>
+              </thead>
+              <tbody class="mono" style="color: #e2e8f0;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-weight: 800; color: #38bdf8;">#025</td>
+                  <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Ananya Deshmukh</td>
+                  <td>34 / F</td>
+                  <td style="font-family:'Plus Jakarta Sans';">Cardiology</td>
+                  <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(34, 197, 94, 0.2); color: #4ade80; font-weight: 700;">NEXT CALL</span></td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-weight: 800; color: #f472b6;">#026</td>
+                  <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Vikram Malhotra</td>
+                  <td>58 / M</td>
+                  <td style="font-family:'Plus Jakarta Sans';">Neurology</td>
+                  <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(234, 179, 8, 0.2); color: #facc15; font-weight: 700;">WAITING</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

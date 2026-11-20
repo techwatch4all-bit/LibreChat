@@ -330,7 +330,7 @@ export default function ProjectsView() {
                   >
                     <div className="relative aspect-video w-full overflow-hidden border-b border-border-light bg-surface-secondary">
                       <img
-                        src={`/templates/thumbnails/${tpl.id}.png`}
+                        src={`/templates/thumbnails/${tpl.id}.png?v=${Date.now()}`}
                         alt={tpl.title}
                         className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"

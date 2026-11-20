@@ -1,27 +1,104 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Gradebook</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--purple:#a855f7;--green:#10b981}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at 20% 0%, #2e1065 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
-.card{background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}
-table{width:100%;border-collapse:collapse}
-th{background:#151d30;padding:12px 14px;text-align:left;font-size:12px;color:#94a3b8}
-td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
-.mono{font-family:'JetBrains Mono',monospace}
-</style></head><body>
-<div class="card">
-<header>
-<div><div style="font-size:22px;font-weight:800">🎓 Academic Semester Gradebook & Roll Call</div><div style="font-size:12px;color:#94a3b8;font-family:'JetBrains Mono',monospace">GRADE 11-A • ADVANCED COMPUTING & MATHEMATICS</div></div>
-<div><span style="background:rgba(168,85,247,0.15);color:var(--purple);font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px">SEMESTER 1 RESULTS</span></div>
-</header>
-<table>
-<thead><tr><th>Roll #</th><th>Student Name</th><th class="mono">Attendance</th><th class="mono">Calculus</th><th class="mono">AI & CS</th><th class="mono">Physics</th><th>GPA (10.0)</th></tr></thead>
-<tbody>
-<tr><td class="mono">#101</td><td><b>Aarav Singhania</b></td><td class="mono" style="color:var(--green)">98.5%</td><td class="mono">96</td><td class="mono">98</td><td class="mono">94</td><td><b style="color:var(--green)">9.8 (A+)</b></td></tr>
-<tr><td class="mono">#102</td><td><b>Ananya Iyer</b></td><td class="mono" style="color:var(--green)">96.0%</td><td class="mono">92</td><td class="mono">95</td><td class="mono">91</td><td><b style="color:var(--green)">9.4 (A+)</b></td></tr>
-<tr><td class="mono">#103</td><td><b>Devansh Mehta</b></td><td class="mono" style="color:#facc15">84.2%</td><td class="mono">81</td><td class="mono">88</td><td class="mono">76</td><td><b>8.2 (B+)</b></td></tr>
-</tbody>
-</table>
-</div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Academy · K-12 Honors Transcript & Attendance Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 80% 80%, #0f1c3f 0%, #070e24 55%, #020512 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .cobalt-glass {
+        background: rgba(12, 24, 60, 0.75);
+        backdrop-filter: blur(28px) saturate(200%);
+        border: 1px solid rgba(96, 165, 250, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(191, 219, 254, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div style="max-width: 1280px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(96, 165, 250, 0.15); border: 1px solid rgba(96, 165, 250, 0.4); font-size: 11px; font-weight: 700; color: #93c5fd;">
+              Grade 12 Advanced STEM Cohort · Term-1 Official Roster
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">Student Performance & Attendance Registry</h1>
+          </div>
+          <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);">+ Mark Daily Roll Call</button>
+        </div>
+
+        <div class="cobalt-glass" style="padding: 28px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="color: #93c5fd; border-bottom: 1px solid rgba(96, 165, 250, 0.25); text-align: left;">
+                <th style="padding: 12px 0;">Roll #</th>
+                <th>Student Full Name</th>
+                <th>Term Attendance</th>
+                <th>Maths (100)</th>
+                <th>Physics (100)</th>
+                <th>Computer Science (100)</th>
+                <th style="text-align: right;">Cumulative GPA</th>
+              </tr>
+            </thead>
+            <tbody class="mono" style="color: #e2e8f0;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 14px 0; color: #93c5fd; font-weight: 700;">#101</td>
+                <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Aarav Patil</td>
+                <td style="color: #4ade80;">96% (Present)</td>
+                <td>95</td>
+                <td>92</td>
+                <td>98</td>
+                <td style="text-align: right; color: #fbbf24; font-weight: 800; font-size: 15px;">9.8 / 10 (A+)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 14px 0; color: #93c5fd; font-weight: 700;">#102</td>
+                <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Bhavna Sen</td>
+                <td style="color: #4ade80;">94% (Present)</td>
+                <td>88</td>
+                <td>90</td>
+                <td>94</td>
+                <td style="text-align: right; color: #fbbf24; font-weight: 800; font-size: 15px;">9.4 / 10 (A)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    
+</body>
+</html>

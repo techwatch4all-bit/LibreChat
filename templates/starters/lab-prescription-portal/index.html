@@ -1,40 +1,122 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Lab Diagnostics</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#07090e;--card:#0f1523;--border:rgba(255,255,255,0.08);--red:#f43f5e;--green:#10b981;--cyan:#06b6d4}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at 80% 0%, #083344 0%, var(--bg) 45%);color:#f8fafc;font-family:'Plus Jakarta Sans',sans-serif;padding:24px 32px;min-height:100vh}
-.box{max-width:960px;margin:0 auto;background:rgba(15,21,35,0.9);border:1px solid var(--border);border-radius:20px;padding:32px}
-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}
-table{width:100%;border-collapse:collapse;margin:20px 0}
-th{background:#151d30;padding:12px 14px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600}
-td{padding:14px;border-bottom:1px solid var(--border);font-size:13px}
-.flag{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700}
-.flag-high{background:rgba(244,63,94,0.18);color:var(--red)}
-.flag-norm{background:rgba(16,185,129,0.18);color:var(--green)}
-.mono{font-family:'JetBrains Mono',monospace}
-</style></head><body>
-<div class="box">
-<header>
-<div><div style="font-size:22px;font-weight:800;color:#fff">🧪 Pathological Blood Analysis & Prescription</div><div style="font-size:12px;color:#94a3b8;margin-top:4px;font-family:'JetBrains Mono',monospace">PATIENT: PT-29401 (VIKRAM RAO, 52Y) • SPECIMEN: FASTING VENOUS</div></div>
-<button style="background:var(--cyan);color:#07090e;border:none;padding:10px 18px;border-radius:8px;font-weight:800;cursor:pointer">Print Clinical Summary</button>
-</header>
-<table>
-<thead><tr><th>Biomarker Test</th><th class="mono">Observed Value</th><th>Standard Units</th><th class="mono">Normal Reference</th><th>Diagnostic Flag</th></tr></thead>
-<tbody>
-<tr><td><b>Fasting Blood Glucose</b></td><td class="mono" style="color:var(--red);font-weight:700">148.0</td><td>mg/dL</td><td class="mono">70.0 - 99.0</td><td><span class="flag flag-high">HIGH (ALERT)</span></td></tr>
-<tr><td><b>Glycated Hemoglobin (HbA1c)</b></td><td class="mono" style="color:var(--red);font-weight:700">7.2</td><td>%</td><td class="mono">4.0 - 5.6</td><td><span class="flag flag-high">ELEVATED</span></td></tr>
-<tr><td><b>Lipid: Serum Triglycerides</b></td><td class="mono" style="color:var(--green);font-weight:700">132.0</td><td>mg/dL</td><td class="mono"> &lt; 150.0</td><td><span class="flag flag-norm">NORMAL</span></td></tr>
-<tr><td><b>Kidney: Serum Creatinine</b></td><td class="mono" style="color:var(--green);font-weight:700">0.95</td><td>mg/dL</td><td class="mono">0.70 - 1.20</td><td><span class="flag flag-norm">OPTIMAL</span></td></tr>
-</tbody>
-</table>
-<div style="background:#151d30;border-radius:12px;padding:18px;border:1px solid var(--border);margin-top:20px">
-<div style="font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:8px">💊 Physician Prescription Rx</div>
-<div style="font-size:13px;line-height:1.7;color:#e2e8f0">
-1. <b>Metformin HCl 500mg</b> — 1 tablet with breakfast and dinner (Oral)<br>
-2. <b>Atorvastatin 10mg</b> — 1 tablet before bedtime (Oral)<br>
-3. Dietary advice: Low glycemic index nutrition, 45-minute daily brisk cardio.
-</div>
-</div>
-</div>
-</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Pathology · Genomic & Biomarker Lab Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 10% 80%, #03252e 0%, #021217 55%, #01080a 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .ambient-glow-teal {
+        position: fixed; top: -100px; right: -50px; width: 600px; height: 600px;
+        background: radial-gradient(circle, rgba(20, 184, 166, 0.25) 0%, transparent 70%);
+        filter: blur(100px); pointer-events: none;
+      }
+      .teal-glass {
+        background: rgba(4, 28, 36, 0.75);
+        backdrop-filter: blur(28px) saturate(200%);
+        border: 1px solid rgba(45, 212, 191, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(204, 251, 241, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div class="ambient-glow-teal"></div>
+      <div style="max-width: 1280px; margin: 0 auto; position: relative; z-index: 2;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(20, 184, 166, 0.15); border: 1px solid rgba(45, 212, 191, 0.4); font-size: 11px; font-weight: 700; color: #2dd4bf;">
+              NABL & CAP Accredited High-Complexity Pathology
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">Automated Biomarker & Diagnostic Panel</h1>
+          </div>
+          <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #14b8a6, #0d9488); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(20, 184, 166, 0.35);">Print Verified PDF</button>
+        </div>
+
+        <div class="teal-glass" style="padding: 28px;">
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(45, 212, 191, 0.2); padding-bottom: 16px; margin-bottom: 20px;">
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: #fff;">Patient: Mr. Arvind Kulkarni</div>
+              <div class="mono" style="font-size: 12px; color: #99f6e4;">UHID: 9812-4019 · Sample: Whole Blood EDTA (Fasting)</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; color: #2dd4bf; font-weight: 700;">Analyzed: Roche Cobas 8000</div>
+              <div class="mono" style="font-size: 12px; color: #94a3b8;">Ref Doctor: Dr. S. K. Joshi</div>
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="color: #2dd4bf; border-bottom: 1px solid rgba(45, 212, 191, 0.3); text-align: left;">
+                <th style="padding: 12px 0;">Biomarker Test</th>
+                <th>Observed Value</th>
+                <th>Units</th>
+                <th>Biological Reference Interval</th>
+                <th style="text-align: right;">Clinical Flag</th>
+              </tr>
+            </thead>
+            <tbody class="mono" style="color: #e2e8f0;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Fasting Plasma Glucose (Hexokinase)</td>
+                <td style="color: #f43f5e; font-weight: 800; font-size: 15px;">138</td>
+                <td style="color: #94a3b8;">mg/dL</td>
+                <td>70 - 99</td>
+                <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-weight: 800;">HIGH ALERT</span></td>
+              </tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Glycated Hemoglobin (HbA1c) HPLC</td>
+                <td style="color: #fbbf24; font-weight: 800; font-size: 15px;">6.8</td>
+                <td style="color: #94a3b8;">%</td>
+                <td>&lt; 5.7</td>
+                <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-weight: 800;">ELEVATED</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Serum Creatinine (Enzymatic)</td>
+                <td style="color: #2dd4bf; font-weight: 800; font-size: 15px;">0.92</td>
+                <td style="color: #94a3b8;">mg/dL</td>
+                <td>0.70 - 1.20</td>
+                <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(45, 212, 191, 0.2); color: #2dd4bf; font-weight: 800;">NORMAL</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    
+</body>
+</html>

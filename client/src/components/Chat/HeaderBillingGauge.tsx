@@ -408,9 +408,16 @@ export default function HeaderBillingGauge() {
                 <ArrowUpRight className="size-3.5 text-blue-500" />
                 Input (Prompt)
               </span>
-              <span className="font-semibold text-text-primary">
-                {isLoading ? '...' : formatTokens(currentStats?.inputTokens ?? 0)}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-text-primary">
+                  {isLoading ? '...' : formatTokens(currentStats?.inputTokens ?? 0)}
+                </span>
+                {currentStats?.local?.inputTokens ? (
+                  <span className="text-[10px] text-text-tertiary">
+                    (Cloud {formatTokens(currentStats?.cloud?.inputTokens ?? 0)} + Local {formatTokens(currentStats?.local?.inputTokens ?? 0)})
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <div className="flex items-center justify-between py-0.5">
@@ -418,9 +425,16 @@ export default function HeaderBillingGauge() {
                 <ArrowDownLeft className="size-3.5 text-green-500" />
                 Output (Response)
               </span>
-              <span className="font-semibold text-text-primary">
-                {isLoading ? '...' : formatTokens(currentStats?.outputTokens ?? 0)}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-text-primary">
+                  {isLoading ? '...' : formatTokens(currentStats?.outputTokens ?? 0)}
+                </span>
+                {currentStats?.local?.outputTokens ? (
+                  <span className="text-[10px] text-text-tertiary">
+                    (Cloud {formatTokens(currentStats?.cloud?.outputTokens ?? 0)} + Local {formatTokens(currentStats?.local?.outputTokens ?? 0)})
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             {currentStats != null && currentStats.cacheRead > 0 && (
@@ -492,6 +506,14 @@ export default function HeaderBillingGauge() {
                     {isLoading ? '...' : formatTokens(currentStats?.cloud?.inputTokens ?? 0)}
                   </span>
                 </div>
+                {Boolean(currentStats?.cloud?.cacheRead) && (
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-text-secondary">Cache:</span>
+                    <span className="font-semibold text-purple-500">
+                      {formatTokens(currentStats!.cloud!.cacheRead)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[11px]">
                   <span className="text-text-secondary">Out:</span>
                   <span className="font-semibold text-text-primary">

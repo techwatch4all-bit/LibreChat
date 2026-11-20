@@ -67,6 +67,16 @@ const SPEC_META: Record<string, SpecMetadata> = {
     badgeClass: 'bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30',
     cardGlow: 'hover:border-fuchsia-500/40',
   },
+  openfilm: {
+    badge: 'OpenFilm 4-Editor Suite',
+    badgeClass: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+    cardGlow: 'hover:border-violet-500/40',
+  },
+  'satchida-3d-studio': {
+    badge: '3D Video Studio',
+    badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    cardGlow: 'hover:border-rose-500/40',
+  },
   scenemosaic: {
     badge: '3D Spatial Room',
     badgeClass: 'bg-orange-500/15 text-orange-400 border-orange-500/30',

@@ -585,12 +585,16 @@ const startServer = async () => {
       return next();
     }
 
-    // LibreChat's own Chat Projects API must NOT be intercepted by OpenFilm Studio.
-    // A referer of /projects/ alone is NOT enough — LibreChat's own Projects page has that URL.
-    // Only treat the request as studio-originated if the referer contains /api/openfilm/ OR
-    // the referer explicitly contains the studio key query parameter.
+    // LibreChat's own Chat Projects use 24-hex MongoDB ObjectIds; OpenFilm Studio uses short alphanumeric IDs
+    // (e.g. PQhJ7O71SYVE) and may strip ?key= from the iframe URL after initial load.
+    const isOpenFilmRefererPath =
+      /\/projects\/(?!([0-9a-f]{24})(\/|\?|$))[A-Za-z0-9_-]{6,20}(\/|\?|$)/i.test(referer);
     const isStudioReferer =
-      referer.includes('/api/openfilm/') || (studioKey && referer.includes(`key=${studioKey}`));
+      referer.includes('/api/openfilm/') ||
+      isOpenFilmRefererPath ||
+      Boolean(studioKey && referer.includes(`key=${studioKey}`));
+    const isOpenFilmProjectIdPath =
+      /^\/api\/projects\/(?!([0-9a-f]{24})(\/|$))[A-Za-z0-9_-]{6,20}(\/|$)/i.test(p);
     const isDirectOpenfilmApi = p.startsWith('/api/openfilm/');
     const isOpenfilmSpecificApi =
       p.startsWith('/api/version') ||
@@ -610,9 +614,10 @@ const startServer = async () => {
       studioKey && (req.query?.key === studioKey || req.headers['x-studio-key'] === studioKey),
     );
 
-    // Only route /api/projects to OpenFilm if the request originated from OpenFilm Studio UI (referer) or explicit query/header key
+    // Route /api/projects to OpenFilm if it targets an OpenFilm short project ID, originated from OpenFilm Studio, or carries studio key
     const isOpenFilmProjectCall =
-      p.startsWith('/api/projects') && (isStudioReferer || hasStudioKey);
+      p.startsWith('/api/projects') &&
+      (isOpenFilmProjectIdPath || isStudioReferer || hasStudioKey);
 
     if (isDirectOpenfilmApi || isOpenfilmSpecificApi || isOpenFilmProjectCall) {
       return routes.openfilm.openfilmProxy(req, res, next);

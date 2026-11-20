@@ -15,6 +15,7 @@ const adminAuditLog = require('./admin/audit');
 const adminReconciliation = require('./admin/reconciliation');
 const adminEntitlements = require('./admin/entitlements');
 const adminVaults = require('./admin/vaults');
+const adminTenants = require('./admin/tenants');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
 const messages = require('./messages');
@@ -23,6 +24,7 @@ const presets = require('./presets');
 const projects = require('./projects');
 const opencode = require('./opencode');
 const ide = require('./ide');
+const openfilm = require('./openfilm');
 const prompts = require('./prompts');
 const schedules = require('./schedules');
 const skills = require('./skills');
@@ -68,6 +70,7 @@ module.exports = {
   adminReconciliation,
   adminEntitlements,
   adminVaults,
+  adminTenants,
   keys,
   apiKeys,
   user,
@@ -86,6 +89,7 @@ module.exports = {
   models,
   prompts,
   projects,
+  openfilm,
   opencode,
   ide,
   schedules,

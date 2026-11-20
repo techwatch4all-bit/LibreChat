@@ -519,10 +519,10 @@ def yoga_asana_and_pranayama_guide(
 @mcp.tool()
 def fetch_medical_visuals(topic: str, media_type: str = "diagram") -> str:
     """
-    Finds and downloads a verified medical illustration, anatomical diagram, or medicinal plant photograph
+    Finds and downloads a verified medical illustration, anatomical cross-section diagram, or clinical chart
     from Wikimedia Commons/Wikipedia and saves it locally in the public media directory.
     Returns the ready-to-render Markdown image tag (e.g. ![Topic](/assets/health/media/topic.jpg)).
-    topic: The anatomical structure, organ, or medicinal plant to search (e.g. 'appendix anatomy', 'kidney anatomy', 'curcuma longa', 'human heart').
+    topic: The anatomical structure, organ, or medical issue (e.g. 'burn depth cross section', 'appendix anatomy', 'kidney anatomy', 'hand bones').
     media_type: 'diagram', 'anatomy', 'plant', or 'organ'
     """
     import os
@@ -534,6 +534,61 @@ def fetch_medical_visuals(topic: str, media_type: str = "diagram") -> str:
         clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', topic.lower()).strip('_')
         out_dir = r"d:\LAN-AI-Infra\LibreChat\client\public\assets\health\media"
         os.makedirs(out_dir, exist_ok=True)
+
+        # Curated anatomical & cross-sectional mappings for acute medical conditions
+        curated_mappings = {
+            "burn": "burn_degree_depth_cross_section.jpg",
+            "burns": "burn_degree_depth_cross_section.jpg",
+            "hand_burn": "hand_burn_degrees_clinical_comparison.jpg",
+            "burnt_hand": "hand_burn_degrees_clinical_comparison.jpg",
+            "burn_degrees": "hand_burn_degrees_clinical_comparison.jpg",
+            "burn_comparison": "hand_burn_degrees_clinical_comparison.jpg",
+            "skin_burn": "burn_degree_depth_cross_section.jpg",
+            "burn_depth": "burn_degree_depth_cross_section.jpg",
+            "hand": "hand_anatomy.jpg",
+            "hand_anatomy": "hand_anatomy.jpg",
+            "fracture": "bone_fracture.jpg",
+            "choking": "choking.jpg",
+            "cpr": "cardiopulmonary_resuscitation.jpg",
+            "bleeding": "bleeding.jpg",
+            "snake_bite": "snakebite.jpg",
+            "snakebite": "snakebite.jpg",
+            "dog_bite": "rabies.jpg",
+            "rabies": "rabies.jpg",
+            "kidney_stones": "nephrolithiasis.jpg",
+            "gallstones": "gallstone.jpg",
+            "gerd": "gastroesophageal_reflux_disease.jpg",
+            "tonsillitis": "tonsillitis.jpg",
+            "mouth_ulcers": "aphthous_stomatitis.jpg",
+            "plantar_fasciitis": "plantar_fasciitis.jpg",
+            "foot_pain": "plantar_fasciitis.jpg",
+        }
+
+        # Check curated mapping in order of specificity (longest key match first)
+        mapped_file = None
+        for key in sorted(curated_mappings.keys(), key=len, reverse=True):
+            if key in clean_name:
+                mapped_file = curated_mappings[key]
+                break
+        if not mapped_file:
+            for key in sorted(curated_mappings.keys(), key=len, reverse=True):
+                if clean_name in key:
+                    mapped_file = curated_mappings[key]
+                    break
+
+        if mapped_file:
+            local_mapped_path = os.path.join(out_dir, mapped_file)
+            if os.path.exists(local_mapped_path) and os.path.getsize(local_mapped_path) > 5000:
+                public_mapped_url = f"/assets/health/media/{mapped_file}"
+                return json.dumps({
+                    "status": "success",
+                    "cached": True,
+                    "curated": True,
+                    "markdown_embed": f"![{topic.title()} Cross-Section Diagram]({public_mapped_url})",
+                    "image_url": public_mapped_url,
+                    "topic": topic
+                })
+
         out_filename = f"{clean_name}.jpg"
         local_path = os.path.join(out_dir, out_filename)
         public_url = f"/assets/health/media/{out_filename}"
@@ -550,12 +605,12 @@ def fetch_medical_visuals(topic: str, media_type: str = "diagram") -> str:
             
         headers = {'User-Agent': 'SatchidaHealthBot/1.0 (info@satchida.com)'}
         
-        # Search Wikipedia articles for the topic
+        # Search Wikipedia articles with cross-section / diagram emphasis
         candidates = [topic]
-        # Clean topic terms
         topic_clean = topic.replace("human", "").replace("anatomy", "").replace("diagram", "").strip()
         if topic_clean and topic_clean.lower() != topic.lower():
-            candidates.append(topic_clean)
+            candidates.append(f"{topic_clean} diagram")
+            candidates.append(f"{topic_clean} cross section")
         if "anatomy" not in topic.lower():
             candidates.append(f"{topic_clean} anatomy")
             

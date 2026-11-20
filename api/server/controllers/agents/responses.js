@@ -772,6 +772,8 @@ const executeResponse = async (envelope, { req, res }) => {
         getAccessibleMcpServerNames,
         updateFilesUsage: db.updateFilesUsage,
         getUserKeyValues: db.getUserKeyValues,
+        getPrivacyAssertion: db.getPrivacyAssertion,
+        isPrivacyLocalReady: db.isPrivacyLocalReady,
         getUserCodeFiles: db.getUserCodeFiles,
         getDeferredProvisionFiles: db.getDeferredProvisionFiles,
         checkSessionsAlive,

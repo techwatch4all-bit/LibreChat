@@ -120,7 +120,26 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
     isFilmArtifact(props.artifact.type, props.artifact.content) ||
     props.artifact.type === SATCHIDA_FILM_ARTIFACT_TYPE
   ) {
-    return <OpenFilmStudio artifact={props.artifact} />;
+    return (
+      <div className="flex h-full w-full flex-col">
+        <Tabs.Content
+          value="code"
+          id="artifacts-film-code"
+          className="h-full w-full flex-grow overflow-auto"
+          tabIndex={-1}
+        >
+          <ArtifactCodeEditor artifact={props.artifact} readOnly={props.isSharedConvo === true} />
+        </Tabs.Content>
+        <Tabs.Content
+          value="preview"
+          id="artifacts-film-preview"
+          className="h-full w-full flex-grow overflow-hidden"
+          tabIndex={-1}
+        >
+          <OpenFilmStudio artifact={props.artifact} />
+        </Tabs.Content>
+      </div>
+    );
   }
 
   /* Multi-file project artifacts get their own IDE renderer (file tree +

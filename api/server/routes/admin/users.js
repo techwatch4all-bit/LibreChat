@@ -166,7 +166,10 @@ const SEAT_POLICY_BY_TYPE = {
     modes: 'chat,study,work,privacy,vibecoding',
     models: 'Chat,Study,Work,Privacy,Vibecoding',
   },
-  privacy: { modes: 'chat,study,work,privacy', models: 'Chat,Study,Work,Privacy' },
+  privacy: {
+    modes: 'chat,study,work,privacy,vibecoding',
+    models: 'Chat,Study,Work,Privacy,Vibecoding',
+  },
 };
 
 // Default to the public Cloudflare tunnel so every tenant deployment works
@@ -582,7 +585,7 @@ async function syncUserSeatToOneApi(userId, accountType, familyRole) {
     const user = await runAsSystem(() =>
       db.getUserById(
         userId,
-        'email username name satchidaSeatAlias accountType tenantId familyRole suspended',
+        'email username name seatToken satchidaSeatTokenId satchidaSeatAlias accountType tenantId familyRole suspended',
       ),
     );
     if (!user) return;
@@ -593,6 +596,7 @@ async function syncUserSeatToOneApi(userId, accountType, familyRole) {
 
     const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
     const effectiveType = accountType || user.accountType || 'basic';
+    const tierChanged = Boolean(accountType && user.accountType && accountType !== user.accountType);
     const policy = SEAT_POLICY_BY_TYPE[effectiveType] || SEAT_POLICY_BY_TYPE.basic;
 
     // Build / reuse seat alias — human-readable, zero PII.
@@ -621,6 +625,56 @@ async function syncUserSeatToOneApi(userId, accountType, familyRole) {
         err.message,
       );
     });
+
+    // Auto-mint or rotate the tenant-scoped seat token (tk_<tenant>_...) so the user
+    // immediately follows tenant_account_plans & tenant_quota_rules instead of falling back.
+    if (!user.seatToken || tierChanged) {
+      let mintedKey;
+      let mintedId = null;
+      if (TENANT_COPY_MODE) {
+        if (user.satchidaSeatTokenId) {
+          await oneApi(
+            'PUT',
+            `/api/tenant/${encodeURIComponent(tenantId)}/seat/${user.satchidaSeatTokenId}/disable`,
+          ).catch(() => {});
+        }
+        const created = await oneApi('POST', `/api/tenant/${encodeURIComponent(tenantId)}/seat`, {
+          group: effectiveType,
+          seat_alias: aliasId,
+          models: policy.models,
+          channels: '',
+          unlimited_quota: true,
+        });
+        mintedKey = created?.data?.key;
+        mintedId = created?.data?.id ?? null;
+      } else {
+        if (user.satchidaSeatAlias) {
+          await disableSeatTokenByAlias(user.satchidaSeatAlias).catch(() => {});
+        }
+        const created = await oneApi('POST', `/api/tenant/${encodeURIComponent(tenantId)}/token`, {
+          group: effectiveType,
+          seat_alias: aliasId,
+          models: policy.models,
+          channels: '',
+          unlimited_quota: true,
+        });
+        mintedKey = created?.data?.key;
+        mintedId = created?.data?.id ?? null;
+      }
+      if (mintedKey) {
+        await runAsSystem(() =>
+          db.updateUser(userId, {
+            seatToken: mintedKey,
+            satchidaSeatTokenId: mintedId,
+            satchidaSeatAlias: aliasId,
+            accountType: effectiveType,
+          }),
+        );
+        if (typeof invalidateUserDocCache === 'function') {
+          invalidateUserDocCache(userId);
+        }
+      }
+    }
   } catch (err) {
     console.warn(`[oneApi] syncUserSeatToOneApi error for user ${userId}:`, err.message);
   }

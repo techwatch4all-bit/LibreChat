@@ -58,20 +58,44 @@ function card(it) {
   const kind = it.kind || (it.url.match(/\.(mp4|webm)$/i) ? 'video' : 'image');
   const isVideo = kind === 'video';
   const media = isVideo
-    ? `<video src="${it.url}" ${it.thumb ? `poster="${it.thumb}"` : ''} preload="metadata" controls muted></video>`
+    ? `<video src="${it.url}" ${it.thumb ? `poster="${it.thumb}"` : ''} preload="metadata" muted></video>`
     : `<img src="${it.thumb || it.url}" loading="lazy" alt="">`;
   const owner = it.user ? `<span class="owner">${it.user}</span>` : '';
+  const studioSyncUrl = `/api/openfilm/project-sync?name=${encodeURIComponent(it.name.replace(/[^a-zA-Z0-9_-]/g, ''))}&media=${encodeURIComponent(it.url)}`;
   return `<div class="card" data-name="${it.name}">
-    <div class="media">${media}<span class="badge">${kind}</span>
-      <input class="pick" type="checkbox" data-name="${it.name}" title="Select for collage / slideshow"></div>
+    <div class="media" style="cursor:pointer;" onclick="launchStudio('${encodeURIComponent(it.name)}', '${encodeURIComponent(it.url)}')">
+      ${media}
+      <span class="badge">${kind}</span>
+      <input class="pick" type="checkbox" data-name="${it.name}" title="Select for collage / slideshow" onclick="event.stopPropagation()">
+    </div>
     <div class="meta">
-      <div class="name" title="${it.name}">${it.name}</div>
+      <div class="name" title="${it.name}" style="cursor:pointer;" onclick="launchStudio('${encodeURIComponent(it.name)}', '${encodeURIComponent(it.url)}')">${it.name}</div>
       <div class="row">
         <span class="when">${it.created || ''} · ${sizeMB} MB ${owner}</span>
-        <a class="dl" href="${it.url}" download>Download</a>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <a class="dl" href="javascript:void(0)" onclick="launchStudio('${encodeURIComponent(it.name)}', '${encodeURIComponent(it.url)}')" style="color:#a78bfa;font-size:11.5px;font-weight:600;">🎬 Open Studio</a>
+          <a class="dl" href="${it.url}" download>Download</a>
+        </div>
       </div>
     </div>
   </div>`;
+}
+
+async function launchStudio(nameEnc, urlEnc) {
+  const name = decodeURIComponent(nameEnc);
+  const mediaUrl = decodeURIComponent(urlEnc);
+  const cleanName = name.replace(/[^a-zA-Z0-9_-]/g, '') || 'StudioProject';
+  try {
+    const res = await fetch(`/api/openfilm/project-sync?name=${encodeURIComponent(cleanName)}&media=${encodeURIComponent(mediaUrl)}`);
+    const data = await res.json();
+    if (data.studioUrl) {
+      window.location.href = data.studioUrl;
+      return;
+    }
+  } catch (e) {
+    console.warn('Direct project-sync redirect failed, opening default project', e);
+  }
+  window.location.href = '/projects/DawnValley';
 }
 
 function render() {
@@ -117,12 +141,21 @@ document.getElementById('copySel').onclick = async () => {
 async function load() {
   const grid = document.getElementById('grid');
   try {
+    let data;
     const r = await fetch('/api/studio/library', { credentials: 'include' });
-    if (r.status === 401) {
-      grid.innerHTML = '<div class="empty">Sign in to LibreChat, then open your Studio Library again.</div>';
-      return;
+    if (r.ok) {
+      data = await r.json();
+    } else {
+      // Fallback: If session cookie is not yet attached or unauthenticated, load public manifest
+      const fallback = await fetch('/generated/manifest.json');
+      if (fallback.ok) {
+        const raw = await fallback.json();
+        data = { items: raw };
+      } else {
+        grid.innerHTML = '<div class="empty">Sign in to LibreChat, then open your Studio Library again.</div>';
+        return;
+      }
     }
-    const data = await r.json();
     items = data.items || [];
     items.forEach(it => { it.kind = it.kind || ((it.url || '').match(/\.(mp4|webm)$/i) ? 'video' : 'image'); });
     if (!items.length) {

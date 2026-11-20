@@ -6,7 +6,7 @@ import { useLocalize } from '~/hooks';
 interface SatchiUpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  featureName: 'work' | 'study' | 'vibecoding' | 'research' | 'privacy' | 'studio' | 'voice';
+  featureName: 'work' | 'study' | 'vibecoding' | 'research' | 'privacy' | 'studio' | 'voice' | 'vault';
 }
 
 function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeModalProps) {
@@ -28,12 +28,15 @@ function SatchiUpgradeModal({ open, onOpenChange, featureName }: SatchiUpgradeMo
               'On-device sovereign privacy mode is reserved for Enterprise and Privacy accounts plus a healthy local model. Upgrade to \'Pro\' or Privacy tier by contacting your site administrator.'
             : featureName === 'studio'
               ? localize('com_satchi_upgrade_pro_studio') ||
-                'Satchida Studios (DeepTutor, Motion Studio, SceneMosaic, Architect BIM, Office & Maker Suites) are reserved for Pro, Pro_Family, and Privacy tiers. Upgrade to \'Pro\' by contacting your site administrator (RWA committee, school/college office, or organization administrator).'
+                'Satchida Studios (DeepTutor, OpenFilm Studio, SceneMosaic, Architect BIM, Office & Maker Suites) are reserved for Pro, Pro_Family, and Privacy tiers. Upgrade to \'Pro\' by contacting your site administrator (RWA committee, school/college office, or organization administrator).'
               : featureName === 'voice'
                 ? localize('com_satchi_upgrade_pro_voice') ||
                   'Live Realtime Conversational Voice is reserved for Pro, Pro_Family, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator (RWA committee, school/college office, or workplace administrator) to experience zero-lag, human-like voice conversations.'
-                : localize('com_satchi_upgrade_pro_research') ||
-                  'Deep Research is reserved for Pro, Enterprise, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator.';
+                : featureName === 'vault'
+                  ? localize('com_satchi_upgrade_pro_vault') ||
+                    'Creating multiple personal knowledge vaults and accessing the Sovereign Central Bare Acts & Regulations corpus is reserved for Pro, Pro_Family, and Privacy accounts. Basic and Standard accounts have access to one personal vault.'
+                  : localize('com_satchi_upgrade_pro_research') ||
+                    'Deep Research is reserved for Pro, Enterprise, and Privacy accounts. Upgrade to \'Pro\' by contacting your site administrator.';
 
   return (
     <OGDialog open={open} onOpenChange={onOpenChange}>

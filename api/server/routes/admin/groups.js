@@ -20,10 +20,11 @@ async function syncMemberSeatAfterGroupChange(userId) {
 
     if (!ONEAPI_TOKEN) return;
 
+    const TENANT_COPY_MODE = process.env.SATCHIDA_TENANT_MODE === 'true';
     const user = await runAsSystem(() =>
       db.getUserById(
         userId,
-        'name username email satchidaSeatAlias accountType tenantId familyRole suspended',
+        'name username email seatToken satchidaSeatTokenId satchidaSeatAlias accountType tenantId familyRole suspended',
       ),
     );
     if (!user || user.suspended) return;
@@ -38,7 +39,10 @@ async function syncMemberSeatAfterGroupChange(userId) {
         modes: 'chat,study,work,privacy,vibecoding',
         models: 'Chat,Study,Work,Privacy,Vibecoding',
       },
-      privacy: { modes: 'chat,study,work,privacy', models: 'Chat,Study,Work,Privacy' },
+      privacy: {
+        modes: 'chat,study,work,privacy,vibecoding',
+        models: 'Chat,Study,Work,Privacy,Vibecoding',
+      },
     };
 
     const tenantId = (user.tenantId || ONEAPI_TENANT).trim();
@@ -77,6 +81,41 @@ async function syncMemberSeatAfterGroupChange(userId) {
     }).catch((err) =>
       console.warn(`[oneApi/groups] seat-policy sync failed for user ${userId}:`, err.message),
     );
+
+    // Auto-mint/rotate the tenant seat token so group assignment immediately binds a real tk_<tenant>_... seat
+    if (TENANT_COPY_MODE && user.satchidaSeatTokenId) {
+      await fetch(
+        `${ONEAPI_BASE_URL}/api/tenant/${encodeURIComponent(tenantId)}/seat/${user.satchidaSeatTokenId}/disable`,
+        { method: 'PUT', headers },
+      ).catch(() => {});
+    }
+    const mintEndpoint = TENANT_COPY_MODE
+      ? `${ONEAPI_BASE_URL}/api/tenant/${encodeURIComponent(tenantId)}/seat`
+      : `${ONEAPI_BASE_URL}/api/tenant/${encodeURIComponent(tenantId)}/token`;
+    const mintRes = await fetch(mintEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        group: effectiveType,
+        seat_alias: aliasId,
+        models: policy.models,
+        channels: '',
+        unlimited_quota: true,
+      }),
+    }).catch(() => null);
+    if (mintRes && mintRes.ok) {
+      const created = await mintRes.json().catch(() => null);
+      const mintedKey = created?.data?.key;
+      if (mintedKey) {
+        await runAsSystem(() =>
+          db.updateUser(userId, {
+            seatToken: mintedKey,
+            satchidaSeatTokenId: created?.data?.id ?? null,
+            satchidaSeatAlias: aliasId,
+          }),
+        );
+      }
+    }
   } catch (err) {
     console.warn(`[oneApi/groups] syncMemberSeatAfterGroupChange error:`, err.message);
   }

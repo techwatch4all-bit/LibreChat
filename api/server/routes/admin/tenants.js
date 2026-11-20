@@ -392,4 +392,55 @@ router.post('/launch-openhands', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/tenants/deploy-patch
+ * Gated patch deployment to edge nodes (internal backend proxy to avoid mixed-content/CORS)
+ */
+router.post('/deploy-patch', async (req, res) => {
+  try {
+    const { fingerprint, targetTenant = 'all', customPatch = null } = req.body;
+    const db = mongoose.connection.db;
+    if (!db) return res.status(500).json({ error: 'Database unavailable' });
+
+    let incident = null;
+    if (fingerprint) {
+      incident = await db.collection('fleet_incidents').findOne({ fingerprint });
+    }
+
+    const ai = incident?.aiAnalysis || {};
+    const taskRecord = {
+      type: 'apply_patch',
+      tenantId: targetTenant,
+      fingerprint: fingerprint || 'manual_patch',
+      patchType: customPatch?.patchType || ai.patchType || 'config',
+      targetFile: customPatch?.targetFile || ai.affectedFile || '',
+      patchAction: customPatch?.patchAction || ai.patchAction || 'yaml_update',
+      targetString: customPatch?.targetString || ai.suggestedPatch?.targetString || '',
+      replacementString: customPatch?.replacementString || ai.suggestedPatch?.replacementString || '',
+      fullContent: customPatch?.fullContent || null,
+      verifyCommand: customPatch?.verifyCommand || ai.verifyCommand || '',
+      status: 'pending',
+      createdAt: new Date(),
+    };
+
+    const result = await db.collection('fleet_tasks').insertOne(taskRecord);
+    if (incident) {
+      await db.collection('fleet_incidents').updateOne(
+        { fingerprint },
+        { $set: { status: 'patch_queued', patchTaskId: result.insertedId } },
+      );
+    }
+
+    logger.info(`[admin/tenants/deploy-patch] Patch task ${result.insertedId} queued for ${targetTenant}`);
+    return res.status(200).json({ ok: true, taskId: result.insertedId, task: taskRecord });
+  } catch (err) {
+    logger.error('[admin/tenants/deploy-patch] Error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+const { createApplyTenantContractHandler } = require('@librechat/api');
+const applyTenantContractHandler = createApplyTenantContractHandler();
+router.post('/:tenantId/contract', (req, res) => applyTenantContractHandler(req, res));
+
 module.exports = router;

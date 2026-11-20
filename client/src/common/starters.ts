@@ -75,7 +75,7 @@ export interface StarterCategory {
   label: string;
   labelKey: TranslationKeys;
   group?: MotionStudioGroupId;
-  modes?: string[]; // Allowed modes: 'Chat', 'Work', 'Study', 'Study-Local', 'Privacy', 'Motion'
+  modes?: string[]; // Allowed modes: 'Chat', 'Work', 'Study', 'Study-Local', 'Privacy', 'OpenFilm'
   starters: StarterItem[];
 }
 
@@ -142,6 +142,7 @@ export const starter = ({
 export interface StarterSlot {
   start: number;
   end: number;
+  label: string;
 }
 
 /**
@@ -156,7 +157,7 @@ export const findStarterSlots = (text: string): StarterSlot[] => {
   while (match !== null) {
     const end = match.index + match[0].length;
     if (text[end] !== '(') {
-      slots.push({ start: match.index, end });
+      slots.push({ start: match.index, end, label: match[1] });
     }
     match = pattern.exec(text);
   }
@@ -503,7 +504,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'architect_plans',
     label: '📐 Floor Plans & Layouts',
     labelKey: 'starters_cat_architect_plans',
-    modes: ['Architect-Studio', 'SceneMosaic', 'Motion'],
+    modes: ['Architect-Studio', 'SceneMosaic', 'OpenFilm'],
     starters: [
       starter({
         title: '📐 Residential Floor Plan Planner',
@@ -669,6 +670,39 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     labelKey: 'starters_cat_family_health',
     modes: ['Health-Wellness', 'Chat'],
     starters: [
+      starter({
+        title: 'Disconnected Crisis Triage',
+        description: 'Crisis triage, differential workup, labs, imaging, and red-flag triggers when isolated.',
+        inputs: ['symptoms, age, duration: e.g. High fever with chills for 3 days, right lower quadrant abdominal pain'],
+        deliver:
+          'differential diagnosis, exact blood tests needed, recommended imaging (X-Ray/USG/CT), home comfort measures, and emergency evacuation red flags.',
+        contract: `${CLINICAL_CONTRACT} In an emergency, seek physical hospital care immediately regardless of isolation.`,
+        badge: 'Crisis Triage',
+        badgeKey: 'starters_badge_clinical_ddx',
+        mcpServers: ['satchida-health-wellness', 'openfda-drugs', 'clinical-research'],
+      }),
+      starter({
+        title: 'Blood Test & Diagnostic Panel',
+        description: 'Exhaustive blood investigations, fasting rules, and biomarker interpretations for conditions.',
+        inputs: ['symptom or chronic condition: e.g. Unexplained fatigue, Joint pain & swelling, Diabetes & Kidneys'],
+        deliver:
+          'exhaustive panel of blood tests (CBC, ESR/CRP, LFT, KFT, HbA1c, Lipids, Thyroid, Electrolytes, Vitamins), sample timing/fasting instructions, and what abnormal markers indicate.',
+        contract: `${CLINICAL_CONTRACT} Verify all lab reports with a certified pathologist or physician.`,
+        badge: 'Diagnostic Labs',
+        badgeKey: 'starters_badge_clinical_ddx',
+        mcpServers: ['satchida-health-wellness', 'clinical-research'],
+      }),
+      starter({
+        title: 'Imaging & Radiology Guide',
+        description: 'Modality recommendation (X-Ray vs USG vs CT vs MRI), preparation, and clinical indications.',
+        inputs: ['injury, symptom, or organ system: e.g. Persistent severe cough, Acute flank pain & hematuria, Head trauma'],
+        deliver:
+          'which imaging scan is indicated (X-ray vs USG vs CT vs MRI), anatomical projection, patient preparation, radiation/contrast safety, and urgency level.',
+        contract: `${CLINICAL_CONTRACT} Imaging requires a registered radiologist interpretation.`,
+        badge: 'Radiology / Scans',
+        badgeKey: 'starters_badge_clinical_ddx',
+        mcpServers: ['satchida-health-wellness', 'clinical-research'],
+      }),
       starter({
         title: 'Generic Medicine Prices',
         description: 'NPPA ceiling and PMBJP generic price for one medicine.',
@@ -1643,7 +1677,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏛️ Floor Plans & Arch',
     labelKey: 'starters_cat_motion_architecture',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: '2D-to-3D Architectural Floor Plan',
@@ -1743,7 +1777,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🚁 Drones & UAV',
     labelKey: 'starters_cat_motion_drones',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Multirotor TWR & Propulsion Lab',
@@ -1826,7 +1860,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌉 Civil & Supply Chains',
     labelKey: 'starters_cat_motion_civil_logistics',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Bridge Truss Stress & Load Sim',
@@ -1903,7 +1937,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🤖 Robotics & Kinematics',
     labelKey: 'starters_cat_motion_robotics',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: '6-DOF Robotic Arm IK & Torque Lab',
@@ -1977,7 +2011,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '⚙️ How Things Work',
     labelKey: 'starters_cat_motion_how_it_works',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Engine & Drivetrain Cutaway Lab',
@@ -2091,7 +2125,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🔌 Circuits & AI Silicon',
     labelKey: 'starters_cat_motion_electronics',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Circuit Simulator & Oscilloscope',
@@ -2171,7 +2205,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🎓 STEM, Chem & Coding',
     labelKey: 'starters_cat_motion_education',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Physics Forces & Wave-Field Lab',
@@ -2313,7 +2347,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌐 Networks & Cyber',
     labelKey: 'starters_cat_motion_networks',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'DNS, TCP & TLS 1.3 Packet Journey',
@@ -2393,7 +2427,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌌 Space, Earth & Sound',
     labelKey: 'starters_cat_motion_earth_space',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Orbital & Hohmann Transfer Sim',
@@ -2472,7 +2506,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏛️ History & Early Learning',
     labelKey: 'starters_cat_motion_history_kids',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Historical Atlas & Trade Timeline',
@@ -2548,7 +2582,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '📊 Executive & Metrics',
     labelKey: 'starters_cat_motion_executive',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: '3D Executive QBR & Revenue Deck',
@@ -2603,7 +2637,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '💼 Professional & SOPs',
     labelKey: 'starters_cat_motion_productivity',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Animated Workflow & SOP Replay',
@@ -2694,7 +2728,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '⚡ Kinetic Typography',
     labelKey: 'starters_cat_motion_kinetic',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Kinetic Typography Manifesto',
@@ -2756,7 +2790,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '✨ Product & SaaS Launch',
     labelKey: 'starters_cat_motion_product',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Dark-Mode SaaS Hero Launch',
@@ -2820,7 +2854,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🎨 Art, Cartoon & Sketch',
     labelKey: 'starters_cat_motion_creative',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: '2D Rigged Character Walk-Cycle',
@@ -2913,7 +2947,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🎬 Teasers & Video Render',
     labelKey: 'starters_cat_motion_media',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Brand Intro & 3D Logo Stinger',
@@ -2969,7 +3003,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🫀 Medical & Clinical',
     labelKey: 'starters_cat_motion_medical',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Disease & Anatomical Progression',
@@ -3074,7 +3108,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🥗 Fitness, Yoga & Diet',
     labelKey: 'starters_cat_motion_wellness',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Exercise Form & Joint Angle Lab',
@@ -3178,7 +3212,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏡 Home, Interior & Living',
     labelKey: 'starters_cat_motion_home',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Room Layout & Festive Makeover',
@@ -3266,7 +3300,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '👵 Golden Years & Living',
     labelKey: 'starters_cat_motion_elderly',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['OpenFilm'],
     starters: [
       starter({
         title: 'Large-Print Medicine & Water',

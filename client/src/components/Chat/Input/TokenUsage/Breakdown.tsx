@@ -692,10 +692,10 @@ export default function Breakdown({
                     </span>
                   </div>
                   <Row label={localize('com_ui_input')} value={billingStats.inputTokens} />
-                  <Row label={localize('com_ui_output')} value={billingStats.outputTokens} />
                   {billingStats.cacheRead > 0 && (
                     <Row label={localize('com_ui_cache_read')} value={billingStats.cacheRead} />
                   )}
+                  <Row label={localize('com_ui_output')} value={billingStats.outputTokens} />
                   {billingStats.local && billingStats.local.totalTokens > 0 && (
                     <div className="flex items-center justify-between text-[11px] text-text-tertiary pt-1 border-t border-border-light/50">
                       <span>Local GPU (Privacy):</span>

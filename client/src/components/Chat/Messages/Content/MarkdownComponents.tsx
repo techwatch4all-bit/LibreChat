@@ -330,6 +330,23 @@ export const img: React.ElementType = memo(function MarkdownImage({
     return toAbsoluteFilePath(resolved, baseURL);
   }, [src, baseURL, attachmentsByName]);
 
-  return <img src={fixedSrc} alt={alt} title={title} className={className} style={style} />;
+  // Clean, responsive styling for illustrations & diagrams so they do not overpower chat
+  const combinedClassName = [
+    'my-3 max-h-72 max-w-full md:max-w-md rounded-lg border border-border-light object-contain shadow-sm transition-all hover:opacity-95',
+    className ?? '',
+  ]
+    .join(' ')
+    .trim();
+
+  return (
+    <span className="block my-2 overflow-hidden">
+      <img src={fixedSrc} alt={alt} title={title} className={combinedClassName} style={style} loading="lazy" />
+      {alt && (
+        <span className="block mt-1 text-xs text-text-secondary italic">
+          {alt}
+        </span>
+      )}
+    </span>
+  );
 });
 img.displayName = 'MarkdownImage';

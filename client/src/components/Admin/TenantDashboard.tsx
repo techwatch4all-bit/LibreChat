@@ -24,7 +24,9 @@ import {
   ChevronDown,
   ChevronRight,
   Terminal,
+  FileUp,
 } from 'lucide-react';
+import TenantContractModal from './TenantContractModal';
 import {
   useTenantConsumptionQuery,
   useFleetOpsQuery,
@@ -43,6 +45,7 @@ export default function TenantDashboard(): JSX.Element {
   const [expandedIncidentFp, setExpandedIncidentFp] = useState<string | null>(null);
   const [launchingVibecodingFp, setLaunchingVibecodingFp] = useState<string | null>(null);
   const [deployingPatchFp, setDeployingPatchFp] = useState<string | null>(null);
+  const [contractModalOpen, setContractModalOpen] = useState(false);
   const [deployStatusMsg, setDeployStatusMsg] = useState<{ [key: string]: string }>({});
 
   const { data, isLoading, isFetching, refetch } = useTenantConsumptionQuery(periodDays);
@@ -100,7 +103,7 @@ export default function TenantDashboard(): JSX.Element {
   const handleDeployPatch = async (inc: FleetIncident) => {
     setDeployingPatchFp(inc.fingerprint);
     try {
-      const res = await fetch('http://127.0.0.1:8443/api/v1/fleet/deploy-patch', {
+      const res = await fetch('/api/admin/tenants/deploy-patch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,6 +179,15 @@ export default function TenantDashboard(): JSX.Element {
 
           <button
             type="button"
+            onClick={() => setContractModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-secondary px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-tertiary"
+          >
+            <FileUp className="h-3.5 w-3.5" />
+            Upload Contract
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               refetch();
               refetchFleet();
@@ -190,6 +202,16 @@ export default function TenantDashboard(): JSX.Element {
           </button>
         </div>
       </div>
+
+      <TenantContractModal
+        open={contractModalOpen}
+        onClose={() => setContractModalOpen(false)}
+        tenants={tenants.map((t) => ({ tenantId: t.tenantId, displayName: t.displayName }))}
+        defaultTenantId={activeTenant?.tenantId}
+        onApplied={() => {
+          refetch();
+        }}
+      />
 
       {activeSubTab === 'fleet_healing' ? (
         /* FLEET HEALING & OPENHANDS VIBECODING TAB */

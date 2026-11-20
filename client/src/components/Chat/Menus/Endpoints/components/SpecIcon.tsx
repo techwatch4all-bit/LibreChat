@@ -42,6 +42,8 @@ const SPEC_ICONS: Record<
   'study-local': { icon: GraduationCap, color: 'text-teal-400' },
   privacy: { icon: ShieldCheck, color: 'text-amber-400' },
   motion: { icon: Film, color: 'text-fuchsia-400' },
+  openfilm: { icon: Film, color: 'text-violet-400' },
+  'satchida-3d-studio': { icon: Film, color: 'text-rose-400' },
   scenemosaic: { icon: Home, color: 'text-orange-400' },
   deeptutor: { icon: BookOpen, color: 'text-teal-300' },
   'health-wellness': { icon: HeartPulse, color: 'text-rose-400' },

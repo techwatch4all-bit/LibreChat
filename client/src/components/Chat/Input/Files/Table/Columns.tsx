@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { FileSources, FileContext } from 'librechat-data-provider';
-import { ArrowUpDown, ArrowUp, ArrowDown, Database } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Database, Download } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -290,6 +290,36 @@ export const columns: ColumnDef<TFile>[] = [
       }
 
       return `${value}${suffix}`;
+    },
+  },
+  {
+    id: 'actions',
+    size: 50,
+    header: () => (
+      <span className="text-xs font-medium text-text-secondary">Action</span>
+    ),
+    cell: ({ row }) => {
+      const file = row.original;
+      const downloadUrl = `/api/files/download/${file.user}/${file.file_id}`;
+
+      return (
+        <TooltipAnchor
+          description="Download to your device"
+          side="left"
+          render={
+            <a
+              href={downloadUrl}
+              download={file.filename}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Download ${file.filename}`}
+              className="inline-flex items-center justify-center rounded-md p-1.5 text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <Download className="size-4" />
+            </a>
+          }
+        />
+      );
     },
   },
 ];

@@ -15,6 +15,7 @@ import {
   Scale,
   ShieldCheck,
   Shield,
+  Clapperboard,
 } from 'lucide-react';
 import { ArchivedChatsModal } from '~/components/Nav/SettingsTabs/General/ArchivedChatsModal';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
@@ -240,6 +241,14 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
             privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
             onShowShortcuts={() => setShowShortcutsDialog(true)}
           />
+          <Menu.MenuItem
+            onClick={() => window.open('/studio-library.html', '_blank')}
+            className="select-item text-sm"
+            data-testid="nav-studio-library"
+          >
+            <Clapperboard className="icon-md" aria-hidden="true" />
+            Studio Library
+          </Menu.MenuItem>
           <Menu.MenuItem onClick={() => setShowArchived(true)} className="select-item text-sm">
             <Archive className="icon-md" aria-hidden="true" />
             {localize('com_nav_archived_chats')}

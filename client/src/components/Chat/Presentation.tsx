@@ -18,6 +18,7 @@ import store from '~/store';
 
 const Artifacts = lazy(() => import('~/components/Artifacts/Artifacts'));
 const SubagentThreadPanel = lazy(() => import('~/components/Chat/Subagents/SubagentThreadPanel'));
+const StudioLibrarySidePanel = lazy(() => import('~/components/SidePanel/StudioLibrarySidePanel'));
 
 export default function Presentation({
   children,
@@ -28,6 +29,7 @@ export default function Presentation({
 }) {
   const artifacts = useRecoilValue(store.artifactsState);
   const artifactsVisibility = useRecoilValue(store.artifactsVisibility);
+  const showStudioLibrary = useRecoilValue(store.showStudioLibraryPanel);
   // Render-gating the panel on `currentArtifactId != null` (in addition
   // to visibility + non-empty artifacts) means the side panel only opens
   // when *something* is actively focused. Conversation navigation
@@ -145,7 +147,18 @@ export default function Presentation({
     );
   }, [conversationId, selectedSubagent]);
 
-  const panelElement = artifactsElement ?? subagentElement;
+  const studioLibraryElement = useMemo(() => {
+    if (!showStudioLibrary) {
+      return null;
+    }
+    return (
+      <Suspense fallback={null}>
+        <StudioLibrarySidePanel />
+      </Suspense>
+    );
+  }, [showStudioLibrary]);
+
+  const panelElement = studioLibraryElement ?? artifactsElement ?? subagentElement;
 
   return (
     <DragDropWrapper className="satchida-chat-surface relative flex w-full grow overflow-hidden bg-presentation">

@@ -1,4 +1,15 @@
 version: 1.3.17
+opencode:
+  enabled: true
+  baseUrl: http://127.0.0.1:4096
+  allowedRoots:
+    - D:\LAN-AI-Infra\vibe-apps
+    - D:\LAN-AI-Infra
+    - C:\LAN-AI-Infra
+    - D:\LAN-AI-Infra\sample-vibe-project
+    - D:\LAN-AI-Infra\workspace
+  maxFileBytes: 2097152
+  requestTimeoutMs: 30000
 registration:
   enabled: false
   socialLogins: []

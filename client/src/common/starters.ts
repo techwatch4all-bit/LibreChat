@@ -168,7 +168,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'office_sheets',
     label: '📊 Family & Business Sheets',
     labelKey: 'starters_cat_office_sheets',
-    modes: ['Office-Suite', 'Work', 'Pro'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: '📊 Family & Home Budget Tracker',
@@ -1643,7 +1643,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏛️ Floor Plans & Arch',
     labelKey: 'starters_cat_motion_architecture',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: '2D-to-3D Architectural Floor Plan',
@@ -1743,7 +1743,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🚁 Drones & UAV',
     labelKey: 'starters_cat_motion_drones',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Multirotor TWR & Propulsion Lab',
@@ -1826,7 +1826,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌉 Civil & Supply Chains',
     labelKey: 'starters_cat_motion_civil_logistics',
     group: 'arch_engineering',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Bridge Truss Stress & Load Sim',
@@ -1903,7 +1903,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🤖 Robotics & Kinematics',
     labelKey: 'starters_cat_motion_robotics',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: '6-DOF Robotic Arm IK & Torque Lab',
@@ -1977,7 +1977,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '⚙️ How Things Work',
     labelKey: 'starters_cat_motion_how_it_works',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Engine & Drivetrain Cutaway Lab',
@@ -2091,7 +2091,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🔌 Circuits & AI Silicon',
     labelKey: 'starters_cat_motion_electronics',
     group: 'robotics_how',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Circuit Simulator & Oscilloscope',
@@ -2171,7 +2171,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🎓 STEM, Chem & Coding',
     labelKey: 'starters_cat_motion_education',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Physics Forces & Wave-Field Lab',
@@ -2313,7 +2313,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌐 Networks & Cyber',
     labelKey: 'starters_cat_motion_networks',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'DNS, TCP & TLS 1.3 Packet Journey',
@@ -2393,7 +2393,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🌌 Space, Earth & Sound',
     labelKey: 'starters_cat_motion_earth_space',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Orbital & Hohmann Transfer Sim',
@@ -2472,7 +2472,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏛️ History & Early Learning',
     labelKey: 'starters_cat_motion_history_kids',
     group: 'stem_tech',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Historical Atlas & Trade Timeline',
@@ -2548,7 +2548,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '📊 Executive & Metrics',
     labelKey: 'starters_cat_motion_executive',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: '3D Executive QBR & Revenue Deck',
@@ -2603,7 +2603,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '💼 Professional & SOPs',
     labelKey: 'starters_cat_motion_productivity',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Animated Workflow & SOP Replay',
@@ -2694,7 +2694,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '⚡ Kinetic Typography',
     labelKey: 'starters_cat_motion_kinetic',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Kinetic Typography Manifesto',
@@ -2756,7 +2756,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '✨ Product & SaaS Launch',
     labelKey: 'starters_cat_motion_product',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Dark-Mode SaaS Hero Launch',
@@ -2819,8 +2819,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     id: 'motion_creative',
     label: '🎨 Art, Cartoon & Sketch',
     labelKey: 'starters_cat_motion_creative',
-    group: 'business_creative',
-    modes: ['Motion', 'OpenFilm', 'Chat'],
+    modes: ['Chat', 'Motion', 'OpenFilm', 'Work'],
     starters: [
       starter({
         title: 'Procedural Watercolor & Wash Art',
@@ -2968,7 +2967,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🎬 Teasers & Video Render',
     labelKey: 'starters_cat_motion_media',
     group: 'business_creative',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Brand Intro & 3D Logo Stinger',
@@ -3024,7 +3023,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🫀 Medical & Clinical',
     labelKey: 'starters_cat_motion_medical',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Disease & Anatomical Progression',
@@ -3129,7 +3128,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🥗 Fitness, Yoga & Diet',
     labelKey: 'starters_cat_motion_wellness',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Exercise Form & Joint Angle Lab',
@@ -3233,7 +3232,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '🏡 Home, Interior & Living',
     labelKey: 'starters_cat_motion_home',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Room Layout & Festive Makeover',
@@ -3321,7 +3320,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
     label: '👵 Golden Years & Living',
     labelKey: 'starters_cat_motion_elderly',
     group: 'care_living',
-    modes: ['Motion'],
+    modes: ['Motion', 'OpenFilm'],
     starters: [
       starter({
         title: 'Large-Print Medicine & Water',

@@ -41,22 +41,55 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   const [loading, setLoading] = useState(true);
   const [copiedName, setCopiedName] = useState<string | null>(null);
 
-  const openInFilmStudio = useCallback(async (item: MediaItem) => {
-    const cleanName = item.name.replace(/[^a-zA-Z0-9_-]/g, '') || 'StudioProject';
-    try {
-      const res = await fetch(
-        `/api/openfilm/project-sync?name=${encodeURIComponent(cleanName)}&media=${encodeURIComponent(item.url)}`,
-      );
-      const data = await res.json();
-      if (data.studioUrl) {
-        window.open(data.studioUrl, '_blank');
-        return;
-      }
-    } catch (e) {
-      console.warn('Direct project-sync redirect failed, opening default studio', e);
-    }
-    window.open('/projects/DawnValley', '_blank');
-  }, []);
+  const openInFilmStudio = useCallback((item: MediaItem) => {
+    const isVideo = item.kind === 'video' || Boolean(item.url?.match(/\.(mp4|webm)$/i));
+    const artifactId = `studio-${item.name.replace(/[^a-zA-Z0-9_-]/g, '') || Date.now()}`;
+    const cleanTitle = item.name.replace(/\.[a-zA-Z0-9]+$/, '').replace(/[_-]/g, ' ') || 'Studio Deliverable';
+
+    const contentHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+    ${isVideo ? 'video { max-width: 100%; max-height: 100%; object-fit: contain; }' : 'img { max-width: 100%; max-height: 100%; object-fit: contain; }'}
+  </style>
+</head>
+<body>
+  ${
+    isVideo
+      ? `<video src="${item.url}" ${item.thumb ? `poster="${item.thumb}"` : ''} controls autoplay playsinline loop></video>`
+      : `<img src="${item.url}" alt="${item.name}" />`
+  }
+  <script>
+    window.film = {
+      duration: 10.0,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      frame: function(t) {},
+      setMuted: function(m) {}
+    };
+  </script>
+</body>
+</html>`;
+
+    // Stage artifact into LibreChat's native side-panel
+    setArtifacts((prev) => ({
+      ...(prev || {}),
+      [artifactId]: {
+        id: artifactId,
+        title: cleanTitle,
+        type: 'application/vnd.satchida.film',
+        content: contentHtml,
+        lastUpdateTime: Date.now(),
+      },
+    }));
+    setCurrentArtifactId(artifactId);
+    setArtifactsVisibility(true);
+    // Dismiss library panel so the editor artifact immediately takes focus in-place
+    setShowStudioLibrary(false);
+  }, [setArtifacts, setCurrentArtifactId, setArtifactsVisibility, setShowStudioLibrary]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);

@@ -736,6 +736,12 @@ const startServer = async () => {
   });
   app.use('/comfyui', comfyProxy);
 
+  // Serve template assets (thumbnails, demos) from client/public/templates
+  const templatesDir = path.resolve(__dirname, '..', '..', 'client', 'public', 'templates');
+  if (fs.existsSync(templatesDir)) {
+    app.use('/templates', express.static(templatesDir));
+  }
+
   // Studio Library page — the per-user gallery of every generated image and
   // video. Serve it from client/public ahead of the SPA fallback, which would
   // otherwise swallow this path and render the chat shell instead of the

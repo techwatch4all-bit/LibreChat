@@ -2453,15 +2453,41 @@ _STABLE_GENERATED_DIR = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated
 _COMPOSABLE_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
-def _library_manifest() -> list:
+def _library_manifest(user: str = "") -> list:
+    entries = []
+    # 1. Load stable generated artifacts
     try:
         manifest_path = _STABLE_GENERATED_DIR / "manifest.json"
         if manifest_path.exists():
-            entries = json.loads(manifest_path.read_text(encoding="utf-8"))
-            return entries if isinstance(entries, list) else []
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                entries.extend(data)
     except Exception:
         pass
-    return []
+
+    # 2. Load user storage manifests (uploads & generated items)
+    try:
+        user_storage_root = Path(r"D:\LAN-AI-Infra\LibreChat\storage\users")
+        if user_storage_root.exists():
+            for udir in user_storage_root.glob("*"):
+                if user and user.strip() and udir.name != user.strip():
+                    continue
+                mpath = udir / "manifest.json"
+                if mpath.exists():
+                    udata = json.loads(mpath.read_text(encoding="utf-8"))
+                    items = udata.get("items", [])
+                    for it in items:
+                        entries.append({
+                            "name": it.get("name"),
+                            "kind": "image" if it.get("name", "").lower().endswith((".png", ".jpg", ".jpeg", ".webp")) else it.get("kind", "upload"),
+                            "url": it.get("path"),
+                            "created": it.get("modified", ""),
+                            "size": it.get("size", 0),
+                            "tags": [it.get("kind", "upload"), udir.name]
+                        })
+    except Exception:
+        pass
+    return entries
 
 
 def _resolve_library_file(name: str) -> Optional[Path]:

@@ -314,6 +314,7 @@ router.get('/', async function (req, res) {
       'VibeCoder',
       'Study',
       'Privacy',
+      'OpenFilm',
       'Motion',
       'SceneMosaic',
       'DeepTutor',
@@ -322,6 +323,8 @@ router.get('/', async function (req, res) {
       'Architect-Studio',
       'Maker-Hardware',
       'Document-Vault',
+      'Office-Suite',
+      'Satchida-3D-Studio',
     ];
     const semanticModelSpecs = fullModelSpecs
       ? {

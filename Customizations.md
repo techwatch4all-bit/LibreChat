@@ -9,6 +9,19 @@ auditable as it accumulates.
 
 ---
 
+## H. Tiered Storage Quotas, Ephemeral Upload Purge & Studio Library Indexing (2026-11-21)
+
+Persistent per-user storage allocation (`storage/users/<username>/`), background LRU quota sentinel (`scripts/satchida-storage-sentinel.mjs`), Studio Library integration, and dropdown model spec synchronization.
+
+| #   | Divergence | Upstream behaviour | Reason |
+| --- | --- | --- | --- |
+| H1  | Automated tier-based storage quota allocation: Standard (50 MB), Standard Family (100 MB), Pro (100 MB), Pro Family (200 MB), Privacy (200 MB), Enterprise (Custom/NAS, exempt from auto-purge) | Unbounded local file uploads without storage tiering or auto-eviction | Provides hard disk safety and fair resource allocation on edge nodes without manual administrator cleanup. |
+| H2  | Background storage sentinel daemon (`scripts/satchida-storage-sentinel.mjs`, PM2 `satchida-storage-sentinel` cron `*/10 * * * *`) | No background storage eviction or manifest tracking | Scans user folders, generates `manifest.json`, and selectively purges ephemeral user uploads oldest-first when exceeding quota while strictly protecting final generated deliverables (`generated/`). |
+| H3  | On-demand Studio Library indexing (`skill/satchida-montage-server.py` `_library_manifest()`) without raw prompt injection | Upstream attachments do not maintain a queryable multi-turn library manifest | Allows LLMs and Studio tools (`library_list`) to inspect past generated media and uploaded assets dynamically on demand, preventing massive prompt and context flooding on every turn. |
+| H4  | Sovereign Tools & Studios dropdown filter alignment (`api/server/routes/config.js` and `librechat.yaml`) | Generic ungrouped model specs list without Studio tiering | Ensures `OpenFilm`, `Motion`, `SceneMosaic`, `DeepTutor`, `Health-Wellness`, `Panchang-Vedic`, `Architect-Studio`, `Maker-Hardware`, `Document-Vault`, `Office-Suite`, and `Satchida-3D-Studio` are registered in `DESIRED_MODES` and visible in the top-left dropdown for authorized users. |
+
+---
+
 ## G. OpenCode CLI Integration — Phases 0–4 (2026-11-19 / 2026-11-20)
 
 Full local OpenCode server integration (`packages/api/src/opencode/`, thin CJS wiring in `api/server/routes/opencode.js` & `api/server/index.js`, PM2 service `D:\LAN-AI-Infra\ops-scripts\opencode-serve.mjs`, and React/Jotai/React-Query workspace under `client/src/components/Projects/`).
@@ -41,6 +54,8 @@ multimodal inference architecture with strict production quality controls.
 | F5  | Multimodal image/frame inspection for camera trajectory planning | Image inputs in Motion mode were previously unhandled or threw 400 | Allows users to upload any photo or video frame to generate dynamic camera dolly, crane, or drone parallax video prompts. |
 | F6  | Studio tools (SceneMosaic, Architect Studio) aligned to `Motion` multimodal routing and valid `_mcp_satchida-tools` server suffixes | Routed to text-only `Work` and referenced unmounted MCP servers (`_mcp_satchida-scenemosaic`, `_mcp_satchida-architect`) | Prevents HTTP 400 crashes when users upload room photos or site plans, and ensures tool calls resolve to the mounted Satchida Unified Hub. |
 | F7  | Direct OpenFilm Studio UI launch actions & automatic `window.film` artifact recognition | No visual timeline studio or direct studio button; artifacts strictly tied to exact MIME types | Enables users to open OpenFilm Studio directly from toolbar/dropdowns with 1 click, and automatically routes any film/animation artifact into the visual timeline and MP4 exporter. |
+| F8  | Dedicated `satchida-art` MCP server & pruned `satchida-unified-hub` | Default auto-discovery indiscriminately mounted 113 tools across all 21 skill servers into every persona | Reduces default hub to 18 general tools, isolating creative/fine-art tools (`generate_procedural_art`, `generate_ambient_music`, `create_kinetic_motion_clip`) to pinned creative personas (`Chat`, `OpenFilm`, `Motion`) and saving ~30k prompt tokens per turn. |
+| F9  | Multi-source ambient audio engine in `generate_ambient_music` | Procedural art pipeline lacked audio or relied only on synthetic droning | Supports explicit user musical genres (e.g. Sitar, Italian Jazz, Celtic Harp), user audio file uploads, local `music_library/` tracks, and offline physical acoustic harmonic synthesis. |
 
 ---
 

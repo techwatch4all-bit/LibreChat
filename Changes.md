@@ -1,3 +1,45 @@
+## 2026-11-21 — Tiered User Storage Quotas, Ephemeral Upload Purge Daemon & Sovereign Studios Dropdown Restoration
+
+- **Automated Tiered User Storage System (`storage/users/<username>/`, `scripts/satchida-storage-sentinel.mjs`)**:
+  - Implemented per-user directory structure: `storage/users/<username>/{uploads, generated, manifest.json}`.
+  - Defined explicit quota allocations:
+    - Standard: 50 MB
+    - Standard Family: 100 MB (Standard × 2)
+    - Pro Member: 100 MB
+    - Pro Family: 200 MB (Standard × 4)
+    - Privacy: 200 MB
+    - Enterprise: Custom / NAS contract (exempt from auto-purge).
+  - Deployed `satchida-storage-sentinel` daemon (PM2 ID 21, cron `*/10 * * * *`) that scans user storage directories, builds `manifest.json`, and enforces LRU auto-purge: oldest ephemeral uploaded files are safely purged first upon quota breach while user-generated deliverables are strictly preserved.
+- **On-Demand Studio Library Recall & Context Flooding Prevention (`skill/satchida-montage-server.py`)**:
+  - Upgraded `_library_manifest()` in `satchida-montage-server.py` to index both generated deliverables and user uploaded assets (`storage/users/<username>/uploads/`).
+  - Solved the multi-turn attachment loss and context flooding issues: instead of bloating conversation prompts on every turn with full asset dumps, models invoke `library_list` on demand to recall and reuse uploaded/generated assets across turns.
+- **Sovereign Tools & Studios Dropdown Restoration (`api/server/routes/config.js`, `librechat.yaml`)**:
+  - Fixed multi-line YAML scalar syntax error (`titlePrompt: >-`) in `librechat.yaml` which prevented `appConfig.modelSpecs` from loading.
+  - Added missing studio modes (`OpenFilm`, `Office-Suite`, `Satchida-3D-Studio`) into `DESIRED_MODES` in `api/server/routes/config.js`.
+  - Replaced simulated tool references (`create_kinetic_motion_clip`) with native tools (`render_motion_to_video`) in `librechat.yaml`.
+  - Verified live via Playwright visual testing that all 11 studios/tools render properly in the "Sovereign Tools & Studios" dropdown.
+
+## 2026-11-21 — Satchida Unified Hub Slimming, High-Fidelity Procedural Art & Multi-Source Ambient Music Engine
+
+- **Elimination of Satchida Unified Hub Tool Bloat (`skill/satchida-unified-hub.py`, `librechat.yaml`)**:
+  - Replaced unbounded wildcard server discovery (`*-server.py`, `*_server.py`) in `satchida-unified-hub.py` with `CORE_HUB_SERVERS`: restricted the default mounted tools strictly to the 4 general productivity and search servers (`satchida-web-search-server.py`, `work-productivity-server.py`, `office-productivity-server.py`, `accessibility-server.py`).
+  - Reduced default `satchida-tools` from **113 tools down to 18 core tools**, permanently preventing oncology databases, Vedic astronomy, and Kubernetes vulnerability scanners from polluting conversational contexts (~25,000–35,000 prompt tokens saved per turn).
+  - Registered `satchida-art` as a dedicated standalone MCP server (`skill/satchida-art-server.py`) in `librechat.yaml` and pinned it only to relevant creative presets (`Chat`, `OpenFilm`, `Motion`).
+
+- **Fine-Art Architectural & Botanical Realism (`skill/satchida-art-server.py`, `librechat.yaml`, `skill/satchida-procedural-art`)**:
+  - Leveraged the full physical rendering classes from foundational repository `cloveric/claude-drawing-skill` (`lib/jiangnan.py` and `lib/watercolor.py`).
+  - Upgraded prompt directives in `librechat.yaml` (`Chat`, `OpenFilm`, `Motion`) to prohibit flat/kindergarten polygon blocks and enforce procedural code generation (`scene_py`):
+    - Multi-tier Shikhara/Mandapa Hindu temple architecture with `stonework()` plinth, `column()` pillared halls, and `roof()` eaves with amalaka, kalasha, and saffron flags.
+    - Botanical realism: `pine()` needle branching, weeping `willow()` tendrils, and multi-tone `foliage()` canopies.
+    - Physical water body: `lake()` base with `reflect(blur=12)` and specular surface `ripples()` for Fresnel water distortion.
+  - Aligned water animation with `alchaincyf/huashu-art-motion` (`scripts/engine/scenes/28_monet.js`): sinusoidal surface current displacement (`Math.sin(y*0.03 - t*3.2)`), lily pad drift, and wind sway on tree branches.
+
+- **Mastered Music Engine: Genre Specificity, Local Libraries & User Audio Uploads (`skill/satchida-art-server.py`)**:
+  - Extended `generate_ambient_music` MCP tool with `genre: str = ""` and `audio_file: str = ""` parameters:
+    - **Priority 0 (User Audio Uploads / Local Library)**: Resolves paths from `music_library/`, `/generated/`, or `uploads/`, normalizes audio, and applies fade-in/out envelopes via FFmpeg into the Studio Library.
+    - **Priority 1 (Royalty-Free Instrumentation Search)**: Uses Pixabay Music with exact prompt + genre queries (e.g. `"Indian classical sitar"`, `"Italian jazz"`, `"Celtic harp"`, `"Bansuri flute"`), fetching real recorded acoustic tracks.
+    - **Priority 2 (Physical Acoustic Synthesis Fallback)**: Multi-harmonic mathematical synthesis with genre-adaptive root frequency tuning (136.1 Hz Vedic Om/Tanpura drone for Indian Classical, 130.81 Hz C3 for Italian Jazz, 146.83 Hz D3 for Zen Shakuhachi), randomized pentatonic melody intervals with breath vibrato, metallic temple bell overtones, and soft rain noise.
+
 ## 2026-11-20 — Multimodal Auto-Routing, Media Attribution/Cost Guard, Per-User Windows-Safe Folders & Multi-Domain Starter Gallery
 
 - **Video/Media Attribution & Cost Guard (`skill/satchida-montage-server.py`, `D:\LAN-AI-Infra\Bifrost\data\logs.db`)**:

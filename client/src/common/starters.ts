@@ -2833,7 +2833,7 @@ export const ALL_CATEGORIES: StarterCategory[] = [
         ],
         deliver:
           'Compose and render a deterministic 1920x1080 watercolor painting using the generate_procedural_art tool with custom procedural washes, atmospheric glazing, and paper grain for [Subject: e.g. misty pine mountain with rustic temple, or autumn lake with red canoe] with palette [Color Palette: e.g. indigo, ochre, burnt umber] and seed [Seed: e.g. 42]. Save to Studio Library and embed inline.',
-        contract: 'generate directly with generate_procedural_art tool and embed the returned image link inline.',
+        contract: 'CALL generate_procedural_art AS A TOOL IMMEDIATELY ON GO. Do not output XML or text placeholders; invoke the native tool call directly and embed the resulting image inline.',
         badge: 'Procedural Art',
         badgeKey: 'starters_badge_motion_generative',
         engineTag: 'NumPy · 1080p Painting',

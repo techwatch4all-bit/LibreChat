@@ -103,6 +103,19 @@ export enum QueryKeys {
   agentQueuedTurns = 'agentQueuedTurns',
   /* Combined Pinned-section display order (favorites + pinned chats) */
   pinnedOrder = 'pinnedOrder',
+  /* OpenCode Vibe Coding Workspace */
+  opencodeStatus = 'opencodeStatus',
+  opencodeSessions = 'opencodeSessions',
+  opencodeMessages = 'opencodeMessages',
+  opencodeDiff = 'opencodeDiff',
+  opencodeProviders = 'opencodeProviders',
+  opencodeAgents = 'opencodeAgents',
+  opencodeTree = 'opencodeTree',
+  opencodeFile = 'opencodeFile',
+  opencodePermissions = 'opencodePermissions',
+  opencodeQuestions = 'opencodeQuestions',
+  opencodeVcs = 'opencodeVcs',
+  opencodePreviewStatus = 'opencodePreviewStatus',
 }
 
 // Dynamic query keys that require parameters
@@ -169,4 +182,16 @@ export enum MutationKeys {
   updateCodeEnvironmentSettings = 'updateCodeEnvironmentSettings',
   deleteCodeEnvironment = 'deleteCodeEnvironment',
   moveConversationCodeEnvironment = 'moveConversationCodeEnvironment',
+  opencodeCreateSession = 'opencodeCreateSession',
+  opencodeSendPrompt = 'opencodeSendPrompt',
+  opencodeAbortSession = 'opencodeAbortSession',
+  opencodeRevertSession = 'opencodeRevertSession',
+  opencodeUnrevertSession = 'opencodeUnrevertSession',
+  opencodeReplyPermission = 'opencodeReplyPermission',
+  opencodeReplyQuestion = 'opencodeReplyQuestion',
+  opencodeRejectQuestion = 'opencodeRejectQuestion',
+  opencodeWriteFile = 'opencodeWriteFile',
+  opencodeCreatePty = 'opencodeCreatePty',
+  opencodeStartPreview = 'opencodeStartPreview',
+  opencodeStopPreview = 'opencodeStopPreview',
 }

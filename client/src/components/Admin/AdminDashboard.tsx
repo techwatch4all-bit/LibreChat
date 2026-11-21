@@ -21,12 +21,14 @@ import AdminOverview from './AdminOverview';
 import AuditLogPanel from './AuditLogPanel';
 import GroupsPanel from './GroupsPanel';
 import VaultsPanel from './VaultsPanel';
+import TenantDashboard from './TenantDashboard';
 import { useLocalize } from '~/hooks';
 import UsersList from './UsersList';
 import RolesList from './RolesList';
 
 type AdminTab =
   | 'overview'
+  | 'tenants'
   | 'users'
   | 'roles'
   | 'groups'
@@ -62,6 +64,12 @@ export default function AdminDashboard(): JSX.Element {
       id: 'overview' as const,
       name: 'Overview',
       icon: LayoutDashboard,
+      badge: undefined,
+    },
+    {
+      id: 'tenants' as const,
+      name: 'Tenant Fleet',
+      icon: Landmark,
       badge: undefined,
     },
     {
@@ -263,6 +271,8 @@ export default function AdminDashboard(): JSX.Element {
               }}
             />
           )}
+
+          {activeTab === 'tenants' && <TenantDashboard />}
 
           {activeTab === 'users' && (
             <UsersList

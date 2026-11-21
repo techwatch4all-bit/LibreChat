@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Exam · High-Stakes Certification Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 50% 20%, #1e0933 0%, #0d0217 55%, #05000a 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .exam-glass {
+        background: rgba(22, 5, 38, 0.75);
+        backdrop-filter: blur(28px) saturate(210%);
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(221, 214, 254, 0.25);
+        border-radius: 20px;
+      }
+      .choice-btn {
+        background: rgba(30, 10, 52, 0.6);
+        border: 1px solid rgba(167, 139, 250, 0.25);
+        border-radius: 14px; padding: 16px 20px;
+        color: #fff; font-size: 14px; text-align: left; cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .choice-btn.selected {
+        background: rgba(52, 211, 153, 0.2);
+        border-color: #34d399; color: #6ee7b7; font-weight: 700;
+        box-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div style="max-width: 900px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 800; color: #a78bfa; text-transform: uppercase; letter-spacing: 1px;">Sovereign AI Architect Certification</div>
+            <h1 style="font-size: 26px; font-weight: 800; margin-top: 6px; color: #fff;">Question 04 of 25</h1>
+          </div>
+          <div class="mono" style="padding: 8px 18px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-weight: 800; font-size: 16px;">
+            ⏱ 14:38 REMAINING
+          </div>
+        </div>
+
+        <div class="exam-glass" style="padding: 32px;">
+          <div style="font-size: 17px; font-weight: 600; line-height: 1.6; color: #f8fafc; margin-bottom: 24px;">
+            When deploying a multi-tenant sovereign inference node behind symmetric CGNAT without VPS relays, which physical transport invariant guarantees zero credential leak to client endpoints?
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="choice-btn">A) Wireguard site-to-site bridge with public static IP forwarding</div>
+            <div class="choice-btn selected">B) Cloudflare Zero Trust Named Tunnel (cloudflared) terminating on a local proxy with runtime JWT bearer injection</div>
+            <div class="choice-btn">C) Client-side direct OpenAI API key configuration in browser localStorage</div>
+            <div class="choice-btn">D) Public Dynamic DNS with UPnP automatic port-mapping</div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px;">
+            <button style="padding: 10px 20px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; font-weight: 600; font-size: 13px;">Previous Question</button>
+            <button style="padding: 10px 24px; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);">Lock Answer & Proceed →</button>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

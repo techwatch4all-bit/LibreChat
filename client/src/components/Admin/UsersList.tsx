@@ -30,6 +30,7 @@ import { useLocalize } from '~/hooks';
 import { useGroupsQuery } from '~/data-provider/admin/groups';
 import { useUserGroupsQuery } from '~/data-provider/admin/users';
 import { useEffectiveCapabilitiesQuery, hasCapability } from '~/data-provider/admin/grants';
+import { adminFetch } from '~/data-provider/admin/client';
 import {
   useUsersQuery,
   useDeleteUserMutation,
@@ -67,16 +68,10 @@ export default function UsersList({
   const [seatEditing, setSeatEditing] = useState<{ userId: string; email: string; accountType: string } | null>(null);
   const [seatFilter, setSeatFilter] = useState<string>('all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Distinct tenant list for the operator's filter dropdown
-  const tenantOptions = useMemo(() => {
-    const set = new Set<string>();
-    users.forEach((u) => set.add(u.tenantId || 'satchida-master'));
-    return Array.from(set).sort();
-  }, [users]);
   const assignSeatMutation = useAssignSeatTokenMutation();
   const revokeSeatMutation = useRevokeSeatTokenMutation();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Bulk Selection States
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -93,6 +88,13 @@ export default function UsersList({
   const users = usersQuery.data?.users ?? [];
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+
+  // Distinct tenant list for the operator's filter dropdown
+  const tenantOptions = useMemo(() => {
+    const set = new Set<string>();
+    users.forEach((u) => set.add(u.tenantId || 'satchida-master'));
+    return Array.from(set).sort();
+  }, [users]);
 
   // Filter application
   const filtered = users.filter((u) => {
@@ -669,11 +671,15 @@ function EditUserModal({
     try {
       // The endpoint binds to the group id; the '__add__' placeholder groupId
       // on the mutation object is unused for these two calls.
-      await fetch(`/api/admin/groups/${groupId}/members`, {
+      const res = await adminFetch(`/api/admin/groups/${groupId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
       userGroupsQuery.refetch();
     } catch (err) {
       setError(`Failed to add user to group: ${(err as Error).message}`);
@@ -683,7 +689,11 @@ function EditUserModal({
   const handleRemoveFromGroup = async (groupId: string) => {
     setError(null);
     try {
-      await fetch(`/api/admin/groups/${groupId}/members/${user.id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/admin/groups/${groupId}/members/${user.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
       userGroupsQuery.refetch();
     } catch (err) {
       setError(`Failed to remove user from group: ${(err as Error).message}`);

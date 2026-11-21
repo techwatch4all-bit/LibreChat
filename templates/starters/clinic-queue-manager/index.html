@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Health · Emergency & Clinical Triage Queue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 20% 20%, #24051a 0%, #10020c 50%, #050004 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .ambient-glow-fuchsia {
+        position: fixed; top: -80px; left: 10%; width: 550px; height: 550px;
+        background: radial-gradient(circle, rgba(236, 72, 153, 0.22) 0%, transparent 70%);
+        filter: blur(90px); pointer-events: none;
+      }
+      .triage-card {
+        background: rgba(26, 6, 20, 0.75);
+        backdrop-filter: blur(28px) saturate(210%);
+        border: 1px solid rgba(244, 114, 182, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(251, 207, 232, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div class="ambient-glow-fuchsia"></div>
+      <div style="max-width: 1280px; margin: 0 auto; position: relative; z-index: 2;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.4); font-size: 11px; font-weight: 700; color: #f472b6;">
+              ● Level-1 Trauma & Super-Speciality Triage Board
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">Patient Flow & Token Dispatch Deck</h1>
+          </div>
+          <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #ec4899, #be185d); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(236, 72, 153, 0.4);">+ Issue Emergency Token</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
+          <!-- Active Token Calling -->
+          <div class="triage-card" style="padding: 32px; text-align: center; border: 2px solid #ec4899;">
+            <div style="font-size: 12px; font-weight: 800; color: #f472b6; letter-spacing: 2px; text-transform: uppercase;">Now In Consultation</div>
+            <div class="mono" style="font-size: 72px; font-weight: 900; color: #fff; text-shadow: 0 0 35px rgba(236, 72, 153, 0.6); margin: 16px 0;">#024</div>
+            <div style="font-size: 18px; font-weight: 700; color: #fbcfe8;">Dr. Rajesh Mehta, MD</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Cabin 3 · Cardiology & Echo Lab</div>
+            <div style="margin-top: 24px; padding: 12px; background: rgba(236, 72, 153, 0.15); border-radius: 12px; font-size: 12px; color: #f472b6; font-weight: 600;">
+              Duration: 12m 45s · Patient Vitals Stable (BP 124/82)
+            </div>
+          </div>
+
+          <!-- Queue Table -->
+          <div class="triage-card" style="padding: 24px;">
+            <div style="font-size: 13px; font-weight: 700; color: #f472b6; text-transform: uppercase; margin-bottom: 16px;">Next In Queue (Walk-in & Scheduled)</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="color: #f472b6; border-bottom: 1px solid rgba(244, 114, 182, 0.2); text-align: left;">
+                  <th style="padding: 10px 0;">Token</th>
+                  <th>Patient Name</th>
+                  <th>Age/Gender</th>
+                  <th>Department</th>
+                  <th style="text-align: right;">Status</th>
+                </tr>
+              </thead>
+              <tbody class="mono" style="color: #e2e8f0;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-weight: 800; color: #38bdf8;">#025</td>
+                  <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Ananya Deshmukh</td>
+                  <td>34 / F</td>
+                  <td style="font-family:'Plus Jakarta Sans';">Cardiology</td>
+                  <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(34, 197, 94, 0.2); color: #4ade80; font-weight: 700;">NEXT CALL</span></td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-weight: 800; color: #f472b6;">#026</td>
+                  <td style="font-family:'Plus Jakarta Sans'; font-weight: 700; color: #fff;">Vikram Malhotra</td>
+                  <td>58 / M</td>
+                  <td style="font-family:'Plus Jakarta Sans';">Neurology</td>
+                  <td style="text-align: right;"><span style="padding: 3px 8px; border-radius: 6px; background: rgba(234, 179, 8, 0.2); color: #facc15; font-weight: 700;">WAITING</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

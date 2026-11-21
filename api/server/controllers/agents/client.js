@@ -1014,7 +1014,12 @@ class AgentClient extends BaseClient {
           conversationId: this.conversationId,
           parentMessageId: this.parentMessageId,
         },
-        db: { getUserKey: db.getUserKey, getUserKeyValues: db.getUserKeyValues },
+        db: {
+          getUserKey: db.getUserKey,
+          getUserKeyValues: db.getUserKeyValues,
+          getPrivacyAssertion: db.getPrivacyAssertion,
+          isPrivacyLocalReady: db.isPrivacyLocalReady,
+        },
       }).catch((error) => {
         /** Never cache a rejection: a transient credential read failure would
          *  otherwise disable labels for the rest of the response. */
@@ -1037,7 +1042,12 @@ class AgentClient extends BaseClient {
           conversationId: this.conversationId,
           parentMessageId: this.parentMessageId,
         },
-        db: { getUserKey: db.getUserKey, getUserKeyValues: db.getUserKeyValues },
+        db: {
+          getUserKey: db.getUserKey,
+          getUserKeyValues: db.getUserKeyValues,
+          getPrivacyAssertion: db.getPrivacyAssertion,
+          isPrivacyLocalReady: db.isPrivacyLocalReady,
+        },
       }).catch((error) => {
         this.activityPhaseLabelLLMPromise = null;
         throw error;
@@ -1058,7 +1068,12 @@ class AgentClient extends BaseClient {
           conversationId: this.conversationId,
           parentMessageId: this.parentMessageId,
         },
-        db: { getUserKey: db.getUserKey, getUserKeyValues: db.getUserKeyValues },
+        db: {
+          getUserKey: db.getUserKey,
+          getUserKeyValues: db.getUserKeyValues,
+          getPrivacyAssertion: db.getPrivacyAssertion,
+          isPrivacyLocalReady: db.isPrivacyLocalReady,
+        },
       }).catch((error) => {
         this.reasoningLabelLLMPromise = null;
         throw error;
@@ -6035,6 +6050,8 @@ class AgentClient extends BaseClient {
       db: {
         getUserKey: db.getUserKey,
         getUserKeyValues: db.getUserKeyValues,
+        getPrivacyAssertion: db.getPrivacyAssertion,
+        isPrivacyLocalReady: db.isPrivacyLocalReady,
       },
     });
 

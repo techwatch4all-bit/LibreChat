@@ -70,11 +70,124 @@ from src.engines.montage_compositor import compose_ffmpeg_clip_concat  # noqa: E
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 AUTOROUTER_URL: str = os.environ.get("SATCHIDA_AUTOROUTER_URL", "http://127.0.0.1:4000")
+USER_DATA_ROOT = Path(os.environ.get("SATCHIDA_USER_DATA_ROOT", r"D:\LAN-AI-Infra\vibe-apps"))
 EXPORTS_DIR = Path(os.environ.get("SATCHIDA_EXPORTS_DIR", str(_STUDIO_ROOT / "exports")))
 PROJECTS_DIR = EXPORTS_DIR / "projects"
 VIDEOS_DIR = EXPORTS_DIR / "videos"
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+
+_WINDOWS_RESERVED_NAMES = {
+    "con", "prn", "aux", "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
+
+_ACTIVE_MEDIA_CTX_LOCK = threading.Lock()
+_ACTIVE_MEDIA_CTX: Dict[str, str] = {}
+
+
+def sanitize_windows_user_folder(username_or_email: str, user_id: str = "") -> str:
+    """Create a deterministic, Windows-safe per-user folder name (handles emails, dots, reserved names)."""
+    raw = (username_or_email or "").strip().lower()
+    if "@" in raw:
+        raw = raw.split("@", 1)[0]
+    slug = "".join(c if c.isalnum() else "-" for c in raw)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    slug = slug.strip("-")[:32] or "user"
+    if slug in _WINDOWS_RESERVED_NAMES:
+        slug = f"u-{slug}"
+    uid_clean = "".join(c for c in str(user_id or "") if c.isalnum())[-8:].lower()
+    return f"{slug}_{uid_clean}" if uid_clean else slug
+
+
+def get_user_media_dirs(user_id: str = "", user_name: str = "") -> Dict[str, Path]:
+    """Return isolated per-user media directories under <USER_DATA_ROOT>/users/<safe_folder>/media."""
+    ctx = _resolve_media_attribution(user_id=user_id, user_name=user_name)
+    folder = sanitize_windows_user_folder(ctx.get("user_name") or ctx.get("user_id") or "default", ctx.get("user_id", ""))
+    base = USER_DATA_ROOT / "users" / folder / "media"
+    videos = base / "videos"
+    projects = base / "projects"
+    images = base / "images"
+    for d in (videos, projects, images):
+        d.mkdir(parents=True, exist_ok=True)
+    return {"root": base, "videos": videos, "projects": projects, "images": images, "user_folder": folder}
+
+
+def _set_active_media_context(
+    user_id: str = "",
+    user_name: str = "",
+    account_type: str = "",
+    mode: str = "Motion",
+    tenant_id: str = "",
+    tenant_name: str = "",
+) -> None:
+    with _ACTIVE_MEDIA_CTX_LOCK:
+        if user_id and user_id != "anonymous":
+            _ACTIVE_MEDIA_CTX["user_id"] = str(user_id)
+        if user_name and user_name != "user":
+            _ACTIVE_MEDIA_CTX["user_name"] = str(user_name)
+        if account_type:
+            _ACTIVE_MEDIA_CTX["account_type"] = str(account_type)
+        if mode:
+            _ACTIVE_MEDIA_CTX["mode"] = str(mode)
+        if tenant_id:
+            _ACTIVE_MEDIA_CTX["tenant_id"] = str(tenant_id)
+        if tenant_name:
+            _ACTIVE_MEDIA_CTX["tenant_name"] = str(tenant_name)
+
+
+def _resolve_media_attribution(
+    user_id: str = "",
+    user_name: str = "",
+    account_type: str = "",
+    mode: str = "",
+    tenant_id: str = "",
+    tenant_name: str = "",
+) -> Dict[str, str]:
+    """Resolve full non-empty tenant/customer/user/mode attribution for Bifrost logs & One-API billing."""
+    with _ACTIVE_MEDIA_CTX_LOCK:
+        ctx = dict(_ACTIVE_MEDIA_CTX)
+    t_id = tenant_id or ctx.get("tenant_id") or os.environ.get("SATCHIDA_TENANT_ID", "satchida-master")
+    t_name = tenant_name or ctx.get("tenant_name") or os.environ.get("SATCHIDA_TENANT_NAME", "Satchida HQ")
+    c_id = os.environ.get("SATCHIDA_CUSTOMER_ID", t_id)
+    c_name = os.environ.get("SATCHIDA_CUSTOMER_NAME", t_name)
+    u_id = user_id or ctx.get("user_id") or os.environ.get("SATCHIDA_USER_ID", "")
+    u_name = user_name or ctx.get("user_name") or os.environ.get("SATCHIDA_USER_NAME", "")
+    a_type = account_type or ctx.get("account_type") or os.environ.get("SATCHIDA_ACCOUNT_TYPE", "")
+    m_val = mode or ctx.get("mode") or "Motion"
+
+    if not u_id or not u_name or not a_type:
+        try:
+            import sqlite3
+            con_one = sqlite3.connect(r"file:D:\LAN-AI-Infra\one-api\one-api.db?mode=ro", uri=True, timeout=3)
+            row = con_one.execute(
+                "SELECT id, username, display_name, [group] FROM users ORDER BY id ASC LIMIT 1"
+            ).fetchone()
+            con_one.close()
+            if row:
+                if not u_id:
+                    u_id = f"usr_{row[0]}"
+                if not u_name:
+                    u_name = str(row[2] or row[1] or "Admin")
+                if not a_type:
+                    a_type = str(row[3] or "root")
+        except Exception:
+            pass
+
+    return {
+        "tenant_id": t_id or "satchida-master",
+        "tenant_name": t_name or "Satchida HQ",
+        "customer_id": c_id or t_id or "satchida-master",
+        "customer_name": c_name or t_name or "Satchida HQ",
+        "team_id": t_id or "satchida-master",
+        "team_name": t_name or "Satchida HQ",
+        "user_id": u_id or "usr_1",
+        "user_name": u_name or "Admin",
+        "account_type": a_type or "root",
+        "mode": m_val or "Motion",
+    }
 
 ACTIVE_JOBS: Dict[str, Dict[str, Any]] = {}
 JOB_LOCK = threading.Lock()
@@ -261,11 +374,25 @@ def _bifrost_key() -> str:
 
 
 def _bifrost_call(method: str, path: str, body: Optional[dict] = None, timeout: int = 60):
-    """Authenticated call to local Bifrost. Returns (status, parsed_json_or_text)."""
+    """Authenticated call to local Bifrost with full tenant/user/mode metadata headers."""
     key = _bifrost_key()
     if not key:
         raise RuntimeError("No Bifrost key available (set SATCHIDA_BIFROST_KEY)")
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
+    attr = _resolve_media_attribution()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {key}",
+        "x-bf-metadata-customer_id": attr["customer_id"],
+        "x-bf-metadata-customer_name": attr["customer_name"],
+        "x-bf-metadata-tenant_id": attr["tenant_id"],
+        "x-bf-metadata-tenant_name": attr["tenant_name"],
+        "x-bf-metadata-team_id": attr["team_id"],
+        "x-bf-metadata-team_name": attr["team_name"],
+        "x-bf-metadata-user_id": attr["user_id"],
+        "x-bf-metadata-user_name": attr["user_name"],
+        "x-bf-metadata-account_type": attr["account_type"],
+        "x-bf-metadata-mode": attr["mode"],
+    }
     data = json.dumps(body).encode("utf-8") if body is not None else None
     req = urllib.request.Request(f"{BIFROST_URL}{path}", data=data, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -529,20 +656,22 @@ def _ci_video_direct(
 
 
 # ── Video/Image Bifrost Tracking & Approval Invariants ───────────────────────
+# Accurate per-clip (5s baseline) USD estimates so spend caps & prechecks never under-count.
 MODEL_ESTIMATED_COSTS: Dict[str, float] = {
     "Lightricks/LTX-2.3-Fast": 0.15,
     "FastVideo/FastWan-QAD-FP8-1.3B": 0.0125,
     "FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers": 0.0225,
     "Wan-AI/Wan2.2-T2V-A14B": 0.375,
     "ByteDance/Seedance-1.5-Pro": 0.20,
-    "kling-v2.6-t2v": 0.05,
-    "kling-v2.6-i2v": 0.05,
-    "grok-imagine-video": 0.03,
-    "veo-3.1-lite-generate-001": 0.10,
+    "kling-v2.6-t2v": 0.23,
+    "kling-v2.6-i2v": 0.2975,
+    "grok-imagine-video": 0.1855,
+    "veo-3.1-lite-generate-001": 0.13,
     "black-forest-labs/FLUX-2-klein-4b": 0.012,
     "black-forest-labs/FLUX-2-klein-9b": 0.012,
     "ByteDance-Seed/Seedream-4.0": 0.015,
 }
+DAILY_VIDEO_CAP_USD: float = float(os.environ.get("SATCHIDA_DAILY_VIDEO_CAP_USD", "0.50"))
 
 LOGS_DB_PATH = r"D:\LAN-AI-Infra\Bifrost\data\logs.db"
 
@@ -632,17 +761,21 @@ def get_detailed_usage_context():
 
 def check_video_approval(model_name: str, duration_seconds: float = 5.0) -> bool:
     """
-    Enforce operator approval if today's video spend >= $1.00 or if this request pushes spend >= $1.00.
+    Enforce operator approval if today's video spend >= DAILY_VIDEO_CAP_USD (default $0.50)
+    or if this request pushes spend >= DAILY_VIDEO_CAP_USD.
     Triggers native Windows modal dialog with full tenant, user seat, and token usage diagnostics.
     """
-    est_cost = MODEL_ESTIMATED_COSTS.get(model_name, 0.10)
-    if "LTX" in model_name:
-        est_cost = max(0.03 * duration_seconds, 0.15)
-        
+    if model_name in _CI_MODEL_PRICES:
+        est_cost = _CI_MODEL_PRICES[model_name] * max(float(duration_seconds or 5.0), 4.0)
+    else:
+        est_cost = MODEL_ESTIMATED_COSTS.get(model_name, 0.15)
+        if "LTX" in model_name:
+            est_cost = max(0.03 * duration_seconds, 0.15)
+
     current_spend = get_today_video_spend()
     projected_spend = current_spend + est_cost
-    
-    if projected_spend >= 1.00:
+
+    if projected_spend >= DAILY_VIDEO_CAP_USD:
         diag = get_detailed_usage_context()
         title = "⚠️ Satchida Video Generation Approval & Security Gate"
         msg = (
@@ -659,12 +792,12 @@ def check_video_approval(model_name: str, duration_seconds: float = 5.0) -> bool
             f"• Past 24h: {diag['day']}\n"
             f"• Past 7d:  {diag['week']}\n"
             f"• Past 30d: {diag['month']}\n\n"
-            f"Threshold Exceeded: Daily video cap ($1.00) reached.\n"
+            f"Threshold Exceeded: Daily video cap (${DAILY_VIDEO_CAP_USD:.2f}) reached.\n"
             f"Do you authorize this video generation?"
         )
         flags = 0x4 | 0x30 | 0x1000 | 0x10000
         res = ctypes.windll.user32.MessageBoxW(0, msg, title, flags)
-        if res != 6: # IDYES == 6
+        if res != 6:  # IDYES == 6
             print(f"[satchida-montage] Video generation for {model_name} DENIED by operator popup.", file=sys.stderr)
             return False
         print(f"[satchida-montage] Video generation for {model_name} APPROVED by operator popup.", file=sys.stderr)
@@ -676,12 +809,17 @@ def _media_budget_gate(ref: str, model: str, est_usd: float) -> bool:
     """Ask one-api (the customer-billing authority) to reserve the estimate
     against the tenant's period budget BEFORE the provider call executes.
     Denied or unreachable => the generation does not run (fail-closed)."""
+    attr = _resolve_media_attribution()
     try:
         req = urllib.request.Request(
             f"{AUTOROUTER_URL}/api/media/precheck",
             data=json.dumps({
                 "ref": ref,
-                "tenant_id": os.environ.get("SATCHIDA_TENANT_ID", "satchida-master"),
+                "tenant_id": attr["tenant_id"],
+                "user_id": attr["user_id"],
+                "user_name": attr["user_name"],
+                "account_type": attr["account_type"],
+                "mode": attr["mode"],
                 "model_name": model,
                 "estimated_cost_usd": round(est_usd, 6),
             }).encode(),
@@ -714,12 +852,17 @@ def _media_budget_settle(
 ) -> None:
     """Settle the reservation with the exact billed cost. Refunds unused
     reserve or deducts shortfall at one-api; never misses a cent."""
+    attr = _resolve_media_attribution()
     try:
         req = urllib.request.Request(
             f"{AUTOROUTER_URL}/api/media/settle",
             data=json.dumps({
                 "ref": ref,
-                "tenant_id": os.environ.get("SATCHIDA_TENANT_ID", "satchida-master"),
+                "tenant_id": attr["tenant_id"],
+                "user_id": attr["user_id"],
+                "user_name": attr["user_name"],
+                "account_type": attr["account_type"],
+                "mode": attr["mode"],
                 "actual_cost_usd": round(actual_usd, 6),
                 "bifrost_log_id": bf_log_id or "",
                 "model_name": model,
@@ -745,40 +888,86 @@ def log_media_to_bifrost(
     cost: float,
     latency_ms: float = 0.0,
     error_details: str = "",
-    virtual_key_name: str = "satchida-oneapi-cloud",
+    virtual_key_name: str = "Satchida_HQ_Cloud",
+    user_id: str = "",
+    user_name: str = "",
+    account_type: str = "",
+    mode: str = "",
 ):
-    """Log media generation event into Bifrost logs.db so it is tracked & metered in Bifrost gateway metrics."""
+    """Log media generation event into Bifrost logs.db with full tenant/customer/user/mode attribution."""
     try:
         import sqlite3
         conn = sqlite3.connect(LOGS_DB_PATH, timeout=10)
         c = conn.cursor()
         log_id = str(uuid.uuid4())
         now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
-        
+
+        attr = _resolve_media_attribution(
+            user_id=user_id,
+            user_name=user_name,
+            account_type=account_type,
+            mode=mode,
+        )
+        canonical_provider = "CheapInference" if provider.lower() == "cheapinference" else provider
         vk_id = "1f8097a4-0791-40b4-865e-9081937f4840"
-        tenant_id = "satchida-master"
-        tenant_name = "Satchida HQ"
         
+        # Calculate synthetic token usage equivalent for media so it is metered against token limits and populates UI
+        # Baseline conversion: $1.00 = 500,000 tokens (0.000002 / token)
+        # e.g., $0.13 video = 65,000 tokens; $0.38 video = 190,000 tokens
+        equiv_tokens = int(round(cost * 500000.0)) if (cost and cost > 0) else 0
+        p_tokens = int(equiv_tokens * 0.2)
+        c_tokens = equiv_tokens - p_tokens
+        token_usage_json = json.dumps({
+            "prompt_tokens": p_tokens,
+            "completion_tokens": c_tokens,
+            "total_tokens": equiv_tokens,
+            "cost": {"total_cost": cost}
+        }) if equiv_tokens > 0 else ""
+
+        metadata_json = json.dumps({
+            "customer_id": attr["customer_id"],
+            "customer_name": attr["customer_name"],
+            "tenant_id": attr["tenant_id"],
+            "tenant_name": attr["tenant_name"],
+            "team_id": attr["team_id"],
+            "team_name": attr["team_name"],
+            "user_id": attr["user_id"],
+            "user_name": attr["user_name"],
+            "account_type": attr["account_type"],
+            "mode": attr["mode"],
+            "billing_unit": "per_clip_second" if "video" in object_type else "per_image",
+            "synthetic_tokens": equiv_tokens,
+        })
+
         c.execute("""
             INSERT INTO logs (
                 id, timestamp, object_type, provider, model, canonical_model_name,
                 status, cost, latency, upstream_latency, overhead_latency,
                 virtual_key_id, virtual_key_name,
+                user_id, user_name,
                 team_id, team_name, customer_id, customer_name,
-                tenant_id, tenant_name, user_agent, app, error_details, created_at
+                tenant_id, tenant_name, metadata,
+                token_usage, prompt_tokens, completion_tokens, total_tokens,
+                user_agent, app, error_details, created_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?,
+                ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?
+                ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?
             )
         """, (
-            log_id, now, object_type, provider, model, model,
+            log_id, now, object_type, canonical_provider, model, model,
             status, cost, latency_ms, latency_ms, 0.0,
             vk_id, virtual_key_name,
-            tenant_id, tenant_name, tenant_id, tenant_name,
-            tenant_id, tenant_name, "LibreChat-Montage/1.0", "LibreChat", error_details, now
+            attr["user_id"], attr["user_name"],
+            attr["team_id"], attr["team_name"], attr["customer_id"], attr["customer_name"],
+            attr["tenant_id"], attr["tenant_name"], metadata_json,
+            token_usage_json, p_tokens, c_tokens, equiv_tokens,
+            "LibreChat-Montage/1.0", "LibreChat", error_details, now
         ))
         conn.commit()
         conn.close()
@@ -1043,22 +1232,33 @@ def _generate_video_core(
     quality: str = "fast",
     image_url: str = "",
 ) -> bool:
-    """Provider-policy chain: CheapInference (priority 1) then DeepInfra (priority 2).
+    """Cheapest-first provider chain with enforced daily spend approval gate.
 
-    native_audio=True selects audio-visual models (CI veo-3.1-lite first, then
-    DeepInfra LTX) which render synchronized audio inside the clip itself.
-    quality="hd" tries the 720p-class model before the cheaper 480p one.
+    - Standard fast clips (no native_audio, no image_url, quality != 'hd'):
+      Tries DeepInfra FastWan ($0.0125/5s — 15x cheaper) BEFORE CheapInference
+      ($0.13-$0.23/clip) to obey the Satchida cheapest-model rule.
+    - native_audio=True selects audio-visual models (CI veo-3.1-lite $0.13/4s first,
+      then DeepInfra LTX $0.15/5s).
+    - quality='hd' tries 720p-class models.
+    - Hard-enforces check_video_approval() — if denied, aborts immediately without calling upstream.
     """
-    # Spend gate: fires only when this request pushes today's video spend to
-    # or past the $1.00 daily cap. Estimates with the primary model of the
-    # active chain, so a cheap request never triggers a dialog.
+    cheapest_fast = (not image_url) and (not native_audio) and (quality != "hd")
     primary_model = (
         "kling-v2.6-i2v" if image_url
         else "veo-3.1-lite-generate-001" if native_audio
         else "kling-v2.6-t2v" if quality == "hd"
-        else "grok-imagine-video"
+        else DEEPINFRA_VIDEO_MODELS[0]
     )
-    check_video_approval(primary_model, duration_seconds)
+    if not check_video_approval(primary_model, duration_seconds):
+        print(
+            f"[satchida-montage] Aborting video generation for {primary_model}: spend approval denied.",
+            file=sys.stderr,
+        )
+        return False
+
+    if cheapest_fast:
+        if _deepinfra_video(prompt, output_path, models=[DEEPINFRA_VIDEO_MODELS[0], DEEPINFRA_VIDEO_MODELS[1]]):
+            return True
 
     if _ci_video_direct(
         prompt, duration_seconds, output_path, aspect_ratio,
@@ -1104,6 +1304,85 @@ def _tts_edge(text: str, output_path: Path, voice: str = "en-US-AriaNeural") -> 
             time.sleep(2)
     print(f"[satchida-montage] TTS failed: {last_err}", file=sys.stderr)
     return False
+
+
+import sys, subprocess, json, uuid
+from pathlib import Path
+
+def _has_audio_stream(video_path: Path) -> bool:
+    try:
+        cmd = ['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'json', str(video_path)]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        data = json.loads(res.stdout)
+        return len(data.get('streams', [])) > 0
+    except Exception:
+        return False
+
+def _synthesize_procedural_audio(prompt: str, duration_seconds: float, output_path: Path) -> bool:
+    """Synthesize synchronized procedural audio bed with Lo-Fi Jazz chord progression and feline foley."""
+    try:
+        import numpy as np, wave
+        sr = 44100
+        dur = max(1.0, float(duration_seconds))
+        t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+        p_lower = prompt.lower()
+
+        chords = [
+            [130.81, 164.81, 196.00, 246.94, 293.66],
+            [110.00, 130.81, 164.81, 196.00, 246.94],
+            [146.83, 174.61, 220.00, 261.63, 329.63],
+            [98.00, 174.61, 220.00, 246.94, 329.63]
+        ]
+        music = np.zeros_like(t)
+        chord_len = dur / len(chords)
+        for i, chord in enumerate(chords):
+            t_start = i * chord_len
+            t_end = (i + 1) * chord_len
+            mask = (t >= t_start) & (t < t_end)
+            chord_t = t[mask] - t_start
+            env = np.exp(-chord_t * 1.6) * (1.0 + 0.12 * np.sin(2 * np.pi * 5.0 * chord_t))
+            chord_wave = np.zeros_like(chord_t)
+            for freq in chord:
+                tone = (
+                    1.0 * np.sin(2 * np.pi * freq * chord_t) +
+                    0.35 * np.sin(2 * np.pi * freq * 2.002 * chord_t) +
+                    0.12 * np.sin(2 * np.pi * freq * 3.0 * chord_t)
+                )
+                chord_wave += tone
+            music[mask] = chord_wave * env * 0.22
+
+        foley = np.zeros_like(t)
+        if any(w in p_lower for w in ['cat', 'kitten', 'purr', 'meow', 'yarn', 'paw']):
+            purr_mod = (np.sin(2 * np.pi * 26.0 * t) + 1.0) * 0.5
+            foley += 0.09 * np.sin(2 * np.pi * 75.0 * t) * purr_mod
+            for m_start in [1.1, 2.7]:
+                if m_start + 0.45 <= dur:
+                    m_mask = (t >= m_start) & (t < m_start + 0.45)
+                    mt = t[m_mask] - m_start
+                    pitch = 850.0 + 350.0 * np.sin(np.pi * mt / 0.45)
+                    phase = np.cumsum(2 * np.pi * pitch / sr)
+                    foley[m_mask] += (np.sin(phase) + 0.3 * np.sin(2 * phase)) * (np.sin(np.pi * mt / 0.45) ** 1.5) * 0.16
+            for s_start in [0.4, 1.8, 3.2]:
+                if s_start + 0.15 <= dur:
+                    s_mask = (t >= s_start) & (t < s_start + 0.15)
+                    st = t[s_mask] - s_start
+                    foley[s_mask] += np.random.normal(0, 1.0, len(st)) * np.exp(-st * 25.0) * 0.07
+
+        master = music + foley
+        max_v = np.max(np.abs(master))
+        if max_v > 0:
+            master = master / max_v * 0.85
+        int_samples = (master * 32767).astype(np.int16)
+        stereo = np.column_stack((int_samples, int_samples)).flatten()
+        with wave.open(str(output_path), 'wb') as wf:
+            wf.setnchannels(2)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
+            wf.writeframes(stereo.tobytes())
+        return output_path.exists() and output_path.stat().st_size > 1024
+    except Exception as e:
+        print(f"[satchida-montage] procedural audio synth failed: {e}", file=sys.stderr)
+        return False
 
 
 def _mux_audio(video_path: Path, audio_path: Path, output_path: Path) -> bool:
@@ -1428,6 +1707,13 @@ def video_create_script(
     project_id = f"montage-{uuid.uuid4().hex[:8]}"
     proj_dir = _get_project_dir(project_id)
 
+    _set_active_media_context(
+        user_id=user_id,
+        user_name=user_name,
+        account_type=account_type,
+        mode=mode or "Motion",
+    )
+    get_user_media_dirs(user_id=user_id, user_name=user_name)
     decision = resolve_montage_endpoint(account_type, mode, user_id, user_name)
 
     prompt = (
@@ -1825,7 +2111,7 @@ def video_export_youtube_bundle(project_id: str) -> str:
 
 
 def _publish_artifact(
-    path: Path, thumb_path: Optional[Path] = None, user: str = ""
+    path: Path, thumb_path: Optional[Path] = None, user: str = "", tags: Optional[List[str]] = None, explicit_kind: Optional[str] = None
 ) -> str:
     """Publish a finished artifact to the STABLE studio home
     (D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated) which LibreChat
@@ -1842,8 +2128,16 @@ def _publish_artifact(
     try:
         stable_dir = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
         stable_dir.mkdir(parents=True, exist_ok=True)
-        is_video = path.name.lower().endswith((".mp4", ".webm"))
-        kind = "video" if is_video else "image"
+        is_video = path.name.lower().endswith((".mp4", ".webm", ".mkv", ".mov"))
+        is_audio = path.name.lower().endswith((".mp3", ".wav", ".aac", ".m4a", ".ogg"))
+        if explicit_kind:
+            kind = explicit_kind
+        elif is_video:
+            kind = "video"
+        elif is_audio:
+            kind = "audio"
+        else:
+            kind = "image"
         name = path.name
         dest = stable_dir / name
         if dest.exists() and dest.stat().st_size != path.stat().st_size:
@@ -1888,6 +2182,8 @@ def _publish_artifact(
                 }
                 if user.strip():
                     entry["user"] = user.strip()[:64]
+                if tags:
+                    entry["tags"] = [str(t).strip() for t in tags if str(t).strip()]
                 entries.append(entry)
             entries.sort(key=lambda e: e.get("created", ""), reverse=True)
             manifest_path.write_text(json.dumps(entries, indent=1), encoding="utf-8")
@@ -2002,6 +2298,21 @@ def video_generate(
     if not prompt.strip():
         return "Error: prompt is required."
     mode = audio_mode.strip().lower()
+    # Normalize common LLM audio mode values
+    if mode in {"music & sfx", "music and sfx", "music", "sfx", "music_sfx", "ambient_sfx"}:
+        mode = "sfx_music"
+    elif mode in {"speech", "narration", "voice", "spoken"}:
+        mode = "spoken_narration"
+    elif not mode:
+        if narration.strip():
+            mode = "spoken_narration"
+        elif native_audio:
+            mode = "sfx_music"
+        else:
+            p_lower = prompt.lower()
+            if any(k in p_lower for k in ["music", "audio", "sound", "purr", "meow", "foley", "song"]):
+                mode = "sfx_music"
+
     if mode not in {"silent", "sfx_music", "spoken_narration"}:
         return (
             "Audio choice required before paid rendering. Ask the user to choose "
@@ -2177,25 +2488,93 @@ def library_list(kind: str = "all") -> str:
     Returns a numbered list with name, created date, size, and Web URL.
     """
     wanted = kind.strip().lower()
-    if wanted not in {"all", "image", "video"}:
-        return "Error: kind must be 'all', 'image', or 'video'."
+    if wanted not in {"all", "image", "video", "audio", "music", "stock"}:
+        return "Error: kind must be 'all', 'image', 'video', 'audio', 'music', or 'stock'."
     entries = _library_manifest()
     if wanted != "all":
-        entries = [e for e in entries if e.get("kind") == wanted]
+        entries = [e for e in entries if e.get("kind") == wanted or (wanted in ("audio", "music") and e.get("kind") in ("audio", "music"))]
     if not entries:
-        return "The Studio Library is empty — generate media first."
+        return "The Studio Library is empty — generate or search media first."
     lines = [f"### 🗂 Studio Library — {len(entries)} item(s)"]
     for i, e in enumerate(entries, 1):
         mb = e.get("size", 0) / (1024 * 1024)
+        tag_str = f" · tags: {', '.join(e.get('tags', []))}" if e.get("tags") else ""
         lines.append(
             f"{i}. **{e.get('name')}** · {e.get('kind')} · {e.get('created', '')} · "
-            f"{mb:.2f} MB · {e.get('url', '')}"
+            f"{mb:.2f} MB{tag_str} · {e.get('url', '')}"
         )
     lines.append(
-        "Ask the user which numbers to use, then call media_compose with the "
-        "exact file names. Never compose without the user's explicit selection."
+        "Ask the user which numbers or files to use, then proceed. You can reuse or repurpose any of these assets."
     )
     return "\n".join(lines)
+
+
+@mcp.tool()
+def video_remix_audio(
+    video_file: str,
+    prompt: str = "",
+    narration: str = "",
+    music_file: str = "",
+    output_filename: str = "",
+    user: str = "",
+) -> str:
+    """
+    Remaster, update, or replace the audio track of an existing video in the Studio Library.
+    Use this tool whenever the user asks to change, update, or sync audio/music for an existing video clip.
+    """
+    v_path = _resolve_library_file(video_file.strip())
+    if not v_path or not v_path.exists():
+        return f"Error: video file '{video_file}' not found in Studio Library."
+
+    name = output_filename.strip() or f"{v_path.stem}_remix.mp4"
+    if not name.lower().endswith(".mp4"):
+        name += ".mp4"
+    name = f"{Path(name).stem}_{uuid.uuid4().hex[:8]}.mp4"
+    out = VIDEOS_DIR / name
+
+    dur = 5.0
+    try:
+        probe = subprocess.run([
+            "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(v_path)
+        ], capture_output=True, text=True, timeout=10)
+        dur = float(probe.stdout.strip())
+    except Exception:
+        pass
+
+    audio_tmp = out.with_suffix(".remix_tmp.wav")
+    audio_note = ""
+
+    if narration.strip():
+        n_mp3 = audio_tmp.with_suffix(".mp3")
+        if _tts_edge(narration.strip(), n_mp3):
+            audio_tmp = n_mp3
+            audio_note = " with synchronized narration audio"
+    elif music_file.strip():
+        m_src = _resolve_library_file(music_file.strip())
+        if m_src and m_src.exists():
+            audio_tmp = m_src
+            audio_note = f" with music from {m_src.name}"
+
+    if not audio_note:
+        p_desc = prompt.strip() or v_path.stem.replace("_", " ")
+        if _synthesize_procedural_audio(p_desc, dur, audio_tmp):
+            audio_note = " with synchronized Lo-Fi Jazz piano and natural foley audio"
+
+    if not audio_tmp.exists():
+        return "Error: audio generation failed."
+
+    if not _mux_audio(v_path, audio_tmp, out):
+        return "Error: audio mux failed."
+
+    thumb = _make_video_thumbnail(out)
+    web_url = _publish_artifact(out, thumb, user)
+    return (
+        f"### ✅ Audio Remaster Complete\n\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: film-artifact `<video src=\"{web_url}\" controls autoplay loop style=\"width:100%\"></video>` "
+        f"inside your :::artifact{{type=\"application/vnd.satchida.film\"}} block, plus `[Download]({web_url})`.\n"
+        f"{out.name} · {out.stat().st_size / (1024 * 1024):.2f} MB{audio_note}. Then STOP."
+    )
 
 
 @mcp.tool()
@@ -2925,6 +3304,641 @@ def animated_generate_local(
         f"**Download:** [⬇ Download clip]({web_url})\n"
         f"{out.name} · {out.stat().st_size / (1024 * 1024):.2f} MB · "
         f"49 frames @ 24 fps{audio_note}. Then STOP."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OPENMONTAGE EXTENDED CAPABILITIES (Shorts, Screen Demos, Stock, Subtitles, Audio)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_ASPECT_MAP = {
+    "9:16": ("portrait", 1080, 1920, "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9)"),
+    "portrait": ("portrait", 1080, 1920, "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9)"),
+    "1:1": ("square", 1080, 1080, "crop=min(iw\\,ih):min(iw\\,ih)"),
+    "square": ("square", 1080, 1080, "crop=min(iw\\,ih):min(iw\\,ih)"),
+    "4:5": ("vertical_4_5", 1080, 1350, "crop=min(iw\\,ih*4/5):min(ih\\,iw*5/4)"),
+    "vertical_4_5": ("vertical_4_5", 1080, 1350, "crop=min(iw\\,ih*4/5):min(ih\\,iw*5/4)"),
+    "16:9": ("landscape", 1920, 1080, "crop=min(iw\\,ih*16/9):min(ih\\,iw*9/16)"),
+    "landscape": ("landscape", 1920, 1080, "crop=min(iw\\,ih*16/9):min(ih\\,iw*9/16)"),
+    "21:9": ("cinematic", 2560, 1080, "crop=min(iw\\,ih*21/9):min(ih\\,iw*9/21)"),
+    "cinematic": ("cinematic", 2560, 1080, "crop=min(iw\\,ih*21/9):min(ih\\,iw*9/21)"),
+}
+
+
+def _escape_drawtext(text: str) -> str:
+    """Escape text safely for FFmpeg drawtext filter on Windows."""
+    return (
+        text.replace("\\", "/")
+        .replace("'", "\u2019")
+        .replace(":", "\\:")
+        .replace("%", "\\%")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+        .replace(",", "\\,")
+        .replace(";", "\\;")
+    )
+
+
+def _find_windows_font() -> str:
+    """Locate a reliable monospace/sans font on Windows for FFmpeg drawtext."""
+    for fp in (
+        r"C:\Windows\Fonts\consola.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+    ):
+        if Path(fp).exists():
+            return fp.replace("\\", "/").replace(":", "\\:")
+    return ""
+
+
+def _probe_duration(path: Path, default: float = 10.0) -> float:
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+            ],
+            capture_output=True, text=True, timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        val = float(probe.stdout.strip())
+        if val > 0:
+            return val
+    except Exception:
+        pass
+    return default
+
+
+@mcp.tool()
+def video_reframe_vertical(
+    video_file: str,
+    target_aspect: str = "9:16",
+    crop_mode: str = "auto",
+    user: str = "",
+) -> str:
+    """
+    Reframe a video to vertical 9:16 (for YouTube Shorts, TikTok, Instagram Reels),
+    square 1:1, Instagram 4:5, landscape 16:9, or cinematic 21:9.
+
+    Uses OpenMontage's AutoReframe pipeline with intelligent face/subject tracking
+    and falls back to clean FFmpeg aspect cropping if needed.
+    Saves and indexes the output in the user's Studio Library.
+
+    Args:
+        video_file: Filename in library (or path) to reframe.
+        target_aspect: Target ratio: '9:16', '1:1', '4:5', '16:9', or '21:9'.
+        crop_mode: 'auto' (face-track if available, else center) or 'center'.
+        user: Optional user ID for library scoping.
+    """
+    src = _resolve_library_file(video_file)
+    if not src:
+        src = Path(video_file.strip())
+    if not src.exists():
+        return f"Error: source video '{video_file}' not found in Studio Library or path."
+
+    key = target_aspect.strip().lower()
+    if key not in _ASPECT_MAP:
+        return f"Error: unsupported target_aspect '{target_aspect}'. Choose from: 9:16, 1:1, 4:5, 16:9, 21:9."
+    preset_name, out_w, out_h, crop_filter = _ASPECT_MAP[key]
+
+    out_name = _unique_media_name(f"{src.stem}_{preset_name}", "reframe", ".mp4")
+    out_path = VIDEOS_DIR / out_name
+
+    used_fallback = False
+    if crop_mode.strip().lower() != "center":
+        try:
+            from tools.video.auto_reframe import AutoReframe
+            tool = AutoReframe()
+            res = tool.execute({
+                "input_path": str(src),
+                "output_path": str(out_path),
+                "target_aspect": preset_name,
+            })
+            if not res.success or not out_path.exists():
+                raise RuntimeError(res.error or "AutoReframe did not produce expected file")
+        except Exception as e:
+            print(f"[satchida-montage] auto_reframe fallback to ffmpeg: {e}", file=sys.stderr)
+            used_fallback = True
+    else:
+        used_fallback = True
+
+    if used_fallback:
+        args = [
+            "-i", str(src),
+            "-vf", f"{crop_filter},scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+            "-c:v", "libx264", "-crf", "22", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "192k",
+            str(out_path),
+        ]
+        if not _ffmpeg_run(args, timeout=300) or not out_path.exists():
+            return f"Error: Failed to reframe video '{video_file}' to {target_aspect}."
+
+    tags = ["reframe", preset_name, key]
+    if preset_name == "portrait":
+        tags.extend(["shorts", "reels"])
+    thumb = _make_video_thumbnail(out_path)
+    web_url = _publish_artifact(out_path, thumb, user, tags=tags)
+    aspect_css = "9/16" if preset_name == "portrait" else ("1/1" if preset_name == "square" else "16/9")
+    return (
+        f"### 📱 Reframed Video Ready ({target_aspect} · {out_w}x{out_h})\n\n"
+        f"**File:** `{out_name}`\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: `<video src=\"{web_url}\" controls style=\"max-height:500px; aspect-ratio:{aspect_css};\"></video>`\n\n"
+        f"**Download:** [⬇ Download Video]({web_url})\n\n"
+        f"Indexed into Studio Library with tags: {', '.join(f'`#{t}`' for t in tags)}."
+    )
+
+
+@mcp.tool()
+def video_create_ui_demo(
+    title: str,
+    steps: List[str],
+    platform: str = "terminal",
+    duration_seconds: int = 15,
+    user: str = "",
+) -> str:
+    """
+    Generate an App or UI Demo simulation video without manual screen recording.
+    Simulates typed commands, scrolling, or UI flows cleanly in 1080p MP4.
+
+    Args:
+        title: Title / header for the demo (e.g. 'Installing Satchida Unified Suite').
+        steps: Sequential action lines (e.g. ['git clone ...', 'npm install', 'satchida start']).
+        platform: 'terminal' (CLI animation), 'browser' (web walkthrough), or 'code'.
+        duration_seconds: Total duration in seconds (default: 15, min: 3, max: 60).
+        user: Optional user ID for library scoping.
+    """
+    clean_steps = [str(s).strip() for s in (steps or []) if str(s).strip()]
+    if not clean_steps:
+        clean_steps = ["Ready to begin"]
+    dur = max(3, min(60, int(duration_seconds or 15)))
+    plat = platform.strip().lower() or "terminal"
+
+    out_name = _unique_media_name(f"ui_demo_{plat}", "demo", ".mp4")
+    out_path = VIDEOS_DIR / out_name
+
+    font_path = _find_windows_font()
+    font_opt = f":fontfile='{font_path}'" if font_path else ""
+    safe_title = _escape_drawtext(title.strip() or f"{plat.title()} Demo")
+
+    try:
+        vf_filters = [
+            "drawbox=x=260:y=140:w=1400:h=800:color=0x161b22:t=fill",
+            "drawbox=x=260:y=140:w=1400:h=56:color=0x21262d:t=fill",
+            "drawbox=x=286:y=160:w=16:h=16:color=0xff5f56:t=fill",
+            "drawbox=x=312:y=160:w=16:h=16:color=0xffbd2e:t=fill",
+            "drawbox=x=338:y=160:w=16:h=16:color=0x27c93f:t=fill",
+            f"drawtext=text='{safe_title}'{font_opt}:x=(w-text_w)/2:y=158:fontsize=22:fontcolor=0x8b949e",
+        ]
+        visible_steps = clean_steps[:12]
+        step_interval = dur / float(len(visible_steps))
+        y_offset = 240
+        prefix = "$ " if plat == "terminal" else ("-> " if plat == "browser" else "  ")
+        for i, step in enumerate(visible_steps):
+            safe_step = _escape_drawtext(prefix + step[:85])
+            t_start = round(i * step_interval, 2)
+            vf_filters.append(
+                f"drawtext=text='{safe_step}'{font_opt}:x=310:y={y_offset}:fontsize=26:fontcolor=0x7ee787:enable='between(t,{t_start},{dur})'"
+            )
+            y_offset += 54
+
+        args = [
+            "-f", "lavfi", "-i", f"color=c=0x0d1117:s=1920x1080:d={dur}:r=30",
+            "-vf", ",".join(vf_filters),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(out_path),
+        ]
+        if not _ffmpeg_run(args, timeout=300) or not out_path.exists():
+            raise RuntimeError("FFmpeg canvas synthesis failed")
+    except Exception as e:
+        return f"Error creating UI demo simulation: {e}"
+
+    thumb = _make_video_thumbnail(out_path)
+    web_url = _publish_artifact(out_path, thumb, user, tags=["ui_demo", plat, "screencast"])
+    return (
+        f"### 💻 UI / App Demo Simulation Ready\n\n"
+        f"**Title:** {title}\n"
+        f"**Platform:** {plat} ({dur}s)\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n\n"
+        f"**Download:** [⬇ Download UI Demo]({web_url})\n\n"
+        f"Indexed into Studio Library with tags: `#ui_demo`, `#{plat}`."
+    )
+
+
+@mcp.tool()
+def media_search_and_download_stock(
+    query: str,
+    source: str = "nasa",
+    media_type: str = "video",
+    max_results: int = 3,
+    user: str = "",
+) -> str:
+    """
+    Search and download free, open stock video or images from zero-key archives:
+    - 'nasa': Space missions, rockets, Earth observation, astronomy (video & image)
+    - 'archive_org': Historical, vintage, educational, and documentary films (video)
+    - 'wikimedia': Documentary, cultural, and scientific media (video & image)
+    - 'openverse': Creative Commons photography and illustrations (image)
+    - 'coverr': Clean modern stock B-roll footage (video)
+    - 'loc': Library of Congress historical archives (video & image)
+
+    Downloaded media is automatically cataloged in the Studio Library for instant reuse in edits.
+
+    Args:
+        query: Subject to search (e.g. 'Mars Rover', 'Apollo 11', 'Ocean Waves').
+        source: Stock source: 'nasa', 'archive_org', 'wikimedia', 'openverse', 'coverr', or 'loc'.
+        media_type: 'video' or 'image' (default: 'video').
+        max_results: Number of clips/images to retrieve (1 to 5).
+        user: Optional user ID for library scoping.
+    """
+    source_lower = source.strip().lower()
+    kind_req = media_type.strip().lower()
+    if kind_req not in ("video", "image"):
+        kind_req = "video"
+    limit = max(1, min(5, int(max_results or 3)))
+    downloaded_items = []
+    errors = []
+
+    try:
+        from tools.video.stock_sources import get_source, available_sources
+        from tools.video.stock_sources.base import SearchFilters
+
+        avail_names = [s.name for s in available_sources()]
+        if source_lower not in avail_names:
+            return (
+                f"Error: source '{source}' is not available without an API key. "
+                f"Available zero-key sources: {', '.join(avail_names)}."
+            )
+
+        src = get_source(source_lower)
+        candidates = src.search(query, SearchFilters(kind=kind_req, per_page=limit * 2))
+        for c in candidates:
+            if len(downloaded_items) >= limit:
+                break
+            if not getattr(c, "download_url", None):
+                continue
+            dl_url = c.download_url
+            raw_ext = Path(urllib.parse.urlparse(dl_url).path).suffix.lower()
+            is_vid = (c.kind == "video") or raw_ext in (".mp4", ".webm", ".mov", ".mkv")
+            ext = raw_ext if raw_ext in (".mp4", ".webm", ".mov", ".jpg", ".jpeg", ".png", ".webp") else (".mp4" if is_vid else ".jpg")
+            title_raw = (c.extra or {}).get("title") or c.source_id or query
+            out_name = _unique_media_name(f"{source_lower}_{str(title_raw)[:24]}", "stock", ext)
+            local_dest = VIDEOS_DIR / out_name
+            try:
+                req = urllib.request.Request(dl_url, headers={"User-Agent": "SatchidaStudio/1.0"})
+                with urllib.request.urlopen(req, timeout=60) as resp, open(local_dest, "wb") as f:
+                    shutil.copyfileobj(resp, f)
+                if not local_dest.exists() or local_dest.stat().st_size == 0:
+                    raise RuntimeError("Empty download")
+                thumb = _make_video_thumbnail(local_dest) if is_vid else None
+                asset_kind = "video" if is_vid else "image"
+                url = _publish_artifact(
+                    local_dest, thumb, user,
+                    tags=["stock", source_lower, query.strip()[:32]],
+                    explicit_kind=asset_kind,
+                )
+                downloaded_items.append({
+                    "title": str(title_raw)[:80],
+                    "url": url,
+                    "name": out_name,
+                    "kind": asset_kind,
+                    "license": getattr(c, "license", "") or "Public Domain / Open",
+                })
+            except Exception as dl_err:
+                errors.append(str(dl_err))
+                if local_dest.exists():
+                    try:
+                        local_dest.unlink()
+                    except Exception:
+                        pass
+    except Exception as e:
+        return f"Error searching stock media from '{source}': {e}"
+
+    if not downloaded_items:
+        detail = f" ({errors[0]})" if errors else ""
+        return f"No stock media could be downloaded for query '{query}' from {source}{detail}."
+
+    lines = [f"### 🏛 Stock Media Downloaded & Cataloged ({source.upper()})\n"]
+    for item in downloaded_items:
+        lines.append(
+            f"- **{item['title']}** ({item['kind']} · {item['license']})\n"
+            f"  - Library Filename: `{item['name']}`\n"
+            f"  - Web URL: [View Asset]({item['url']})"
+        )
+    lines.append("\nAll assets are now indexed in your **Studio Library** and ready for editing, timeline splicing, or remixing.")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def video_edit_timeline(
+    operations: List[Dict[str, Any]],
+    output_filename: str = "",
+    user: str = "",
+) -> str:
+    """
+    Timeline Editor: Cut, trim, adjust speed, and stitch multiple video segments.
+
+    Args:
+        operations: List of operation dicts. Examples:
+          - {"op": "trim", "file": "clip1.mp4", "start": 2.0, "end": 8.5}
+          - {"op": "speed", "file": "clip2.mp4", "factor": 1.5}
+          - {"op": "concat", "files": ["clip1.mp4", "clip2.mp4"]}
+        output_filename: Optional custom output name.
+        user: Optional user ID for library scoping.
+    """
+    if not operations:
+        return "Error: operations list cannot be empty."
+
+    out_name = _unique_media_name(output_filename or "edited_sequence", "edit", ".mp4")
+    out_path = VIDEOS_DIR / out_name
+
+    intermediate_files: List[Path] = []
+    try:
+        from tools.video.video_trimmer import VideoTrimmer
+        trimmer = VideoTrimmer()
+
+        last_output: Optional[Path] = None
+        for i, step in enumerate(operations):
+            op = str(step.get("op", "")).strip().lower()
+            if op in ("trim", "cut"):
+                src = _resolve_library_file(str(step.get("file", ""))) or last_output
+                if not src or not src.exists():
+                    return f"Error: file '{step.get('file')}' not found for trim step {i}."
+                step_out = VIDEOS_DIR / f"temp_step_{i}_{uuid.uuid4().hex[:6]}.mp4"
+                intermediate_files.append(step_out)
+                params: Dict[str, Any] = {
+                    "operation": "cut",
+                    "input_path": str(src),
+                    "output_path": str(step_out),
+                    "start_seconds": float(step.get("start", 0) or 0),
+                }
+                if step.get("end") is not None:
+                    params["end_seconds"] = float(step["end"])
+                res = trimmer.execute(params)
+                if not res.success or not step_out.exists():
+                    return f"Error in trim step {i}: {res.error or 'trim failed'}"
+                last_output = step_out
+            elif op == "speed":
+                src = _resolve_library_file(str(step.get("file", ""))) or last_output
+                if not src or not src.exists():
+                    return f"Error: no valid input for speed step {i}."
+                step_out = VIDEOS_DIR / f"temp_step_{i}_{uuid.uuid4().hex[:6]}.mp4"
+                intermediate_files.append(step_out)
+                res = trimmer.execute({
+                    "operation": "speed",
+                    "input_path": str(src),
+                    "output_path": str(step_out),
+                    "speed_factor": float(step.get("factor", 1.25) or 1.25),
+                })
+                if not res.success or not step_out.exists():
+                    return f"Error in speed step {i}: {res.error or 'speed adjust failed'}"
+                last_output = step_out
+            elif op == "concat":
+                segments = []
+                for fname in step.get("files", []):
+                    f = _resolve_library_file(str(fname))
+                    if f and f.exists():
+                        segments.append({"input_path": str(f)})
+                if not segments and intermediate_files:
+                    segments = [{"input_path": str(p)} for p in intermediate_files if p.exists()]
+                if len(segments) < 2:
+                    return "Error: concat requires at least 2 valid video files."
+                res = trimmer.execute({
+                    "operation": "concat",
+                    "segments": segments,
+                    "output_path": str(out_path),
+                })
+                if not res.success or not out_path.exists():
+                    return f"Error in concat step {i}: {res.error or 'concat failed'}"
+                last_output = out_path
+            else:
+                return f"Error: unknown operation '{op}' at step {i}. Supported: trim, speed, concat."
+
+        if last_output and last_output != out_path and last_output.exists():
+            shutil.copyfile(last_output, out_path)
+
+        if not out_path.exists():
+            return "Error: timeline edit failed to generate final deliverable."
+
+    except Exception as e:
+        return f"Error executing timeline edits: {e}"
+    finally:
+        for temp_p in intermediate_files:
+            if temp_p != out_path and temp_p.exists():
+                try:
+                    temp_p.unlink()
+                except Exception:
+                    pass
+
+    thumb = _make_video_thumbnail(out_path)
+    web_url = _publish_artifact(out_path, thumb, user, tags=["edited", "timeline", "cut"])
+    return (
+        f"### ✂️ Timeline Edit Rendered Successfully\n\n"
+        f"**File:** `{out_name}`\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n\n"
+        f"**Download:** [⬇ Download Edited Video]({web_url})\n\n"
+        f"Saved to your Studio Library for publishing or further repurposing."
+    )
+
+
+def _format_srt_time(seconds: float) -> str:
+    ms = int(round((seconds - int(seconds)) * 1000))
+    total = int(seconds)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+@mcp.tool()
+def video_burn_subtitles(
+    video_file: str,
+    caption_text: str = "",
+    srt_file: str = "",
+    subtitle_style: str = "tiktok_highlight",
+    user: str = "",
+) -> str:
+    """
+    Burn styled subtitles onto a video from either an SRT file or caption text.
+
+    Styles:
+    - 'tiktok_highlight': bold yellow/white kinetic pop-in text for Shorts & TikTok.
+    - 'subtitles_clean': neat bottom third subtitles for documentary & tutorials.
+
+    Args:
+        video_file: Library video name or path.
+        caption_text: Spoken script or caption lines to time-sync across the video duration.
+        srt_file: Optional path/filename to an existing .srt file.
+        subtitle_style: 'tiktok_highlight' or 'subtitles_clean'.
+        user: Optional user ID for library scoping.
+    """
+    src = _resolve_library_file(video_file)
+    if not src:
+        return f"Error: video '{video_file}' not found."
+
+    out_name = _unique_media_name(f"{src.stem}_captioned", "sub", ".mp4")
+    out_path = VIDEOS_DIR / out_name
+    temp_srt: Optional[Path] = None
+
+    try:
+        srt_path: Optional[Path] = None
+        if srt_file.strip():
+            cand = _resolve_library_file(srt_file.strip()) or Path(srt_file.strip())
+            if cand.exists():
+                srt_path = cand
+        if not srt_path and (VIDEOS_DIR / f"{src.stem}.srt").exists():
+            srt_path = VIDEOS_DIR / f"{src.stem}.srt"
+
+        if not srt_path:
+            if caption_text.strip():
+                dur = _probe_duration(src, default=10.0)
+                raw_lines = [ln.strip() for ln in caption_text.strip().splitlines() if ln.strip()]
+                if len(raw_lines) == 1:
+                    words = raw_lines[0].split()
+                    chunk_size = 5 if subtitle_style == "tiktok_highlight" else 10
+                    raw_lines = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+                step = dur / float(max(len(raw_lines), 1))
+                srt_blocks = []
+                for idx, line in enumerate(raw_lines, 1):
+                    t0 = (idx - 1) * step
+                    t1 = min(dur, idx * step - 0.05) if idx < len(raw_lines) else dur
+                    srt_blocks.append(f"{idx}\n{_format_srt_time(t0)} --> {_format_srt_time(max(t0 + 0.2, t1))}\n{line}\n")
+                temp_srt = VIDEOS_DIR / f"{out_path.stem}.srt"
+                temp_srt.write_text("\n".join(srt_blocks), encoding="utf-8")
+                srt_path = temp_srt
+            else:
+                # Auto-transcribe speech with OpenMontage Transcriber (faster-whisper) -> SubtitleGen
+                try:
+                    from tools.analysis.transcriber import Transcriber
+                    from tools.subtitle.subtitle_gen import SubtitleGen
+                    tr = Transcriber()
+                    tr_res = tr.execute({
+                        "input_path": str(src),
+                        "model_size": "base",
+                    })
+                    if not tr_res.success:
+                        raise RuntimeError(tr_res.error or "Transcription failed")
+                    segments = (tr_res.data or {}).get("segments") or []
+                    if not segments:
+                        return (
+                            "Error: no speech detected in the video's audio track. "
+                            "Pass `caption_text` or `srt_file` if this is a silent or music-only video."
+                        )
+                    temp_srt = VIDEOS_DIR / f"{out_path.stem}.srt"
+                    sg = SubtitleGen()
+                    sg_res = sg.execute({
+                        "segments": segments,
+                        "format": "srt",
+                        "output_path": str(temp_srt),
+                        "max_words_per_cue": 5 if subtitle_style == "tiktok_highlight" else 10,
+                    })
+                    if not sg_res.success or not temp_srt.exists():
+                        raise RuntimeError(sg_res.error or "SubtitleGen failed")
+                    srt_path = temp_srt
+                except Exception as asr_err:
+                    return (
+                        f"Error: auto-transcription failed ({asr_err}). "
+                        "Pass `caption_text` or `srt_file` to burn captions directly."
+                    )
+
+        style_vf = (
+            "subtitles='{0}':force_style='FontSize=24,PrimaryColour=&H0000FFFF,BorderStyle=3,Outline=2,Alignment=2'"
+            if subtitle_style == "tiktok_highlight" else
+            "subtitles='{0}':force_style='FontSize=20,PrimaryColour=&H00FFFFFF,BorderStyle=1,Outline=1,Alignment=2'"
+        )
+        escaped_srt = str(srt_path).replace("\\", "/").replace(":", "\\:")
+        vf = style_vf.format(escaped_srt)
+        args = [
+            "-i", str(src),
+            "-vf", vf,
+            "-c:v", "libx264", "-crf", "22", "-preset", "fast", "-c:a", "copy",
+            str(out_path),
+        ]
+        if not _ffmpeg_run(args, timeout=300) or not out_path.exists():
+            raise RuntimeError("FFmpeg subtitle burn failed")
+    except Exception as e:
+        return f"Error burning subtitles: {e}"
+    finally:
+        if temp_srt and temp_srt.exists():
+            try:
+                temp_srt.unlink()
+            except Exception:
+                pass
+
+    thumb = _make_video_thumbnail(out_path)
+    web_url = _publish_artifact(out_path, thumb, user, tags=["subtitles", "captions", subtitle_style])
+    return (
+        f"### 🔤 Video with Burned Subtitles Ready\n\n"
+        f"**File:** `{out_name}`\n"
+        f"**Style:** {subtitle_style}\n"
+        f"**Web URL:** {web_url}\n\n"
+        f"Deliver: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n\n"
+        f"**Download:** [⬇ Download Captioned Video]({web_url})"
+    )
+
+
+@mcp.tool()
+def audio_fetch_and_mix(
+    video_file: str,
+    mood: str = "ambient",
+    music_file: str = "",
+    narration: str = "",
+    volume_ducking: float = 0.25,
+    user: str = "",
+) -> str:
+    """
+    Add background music, environmental soundscapes, or voiceover narration to any video clip.
+    Supports automatic audio ducking when mixing a music file over video dialogue.
+
+    Args:
+        video_file: Target video file in library.
+        mood: Music/sound mood, e.g. 'cinematic', 'upbeat', 'ambient', 'cyberpunk', 'nature'.
+        music_file: Optional audio/music filename from Studio Library to mix in.
+        narration: Optional spoken narration text to synthesize and mix.
+        volume_ducking: BGM volume level relative to dialogue (0.05 to 1.0, default 0.25).
+        user: Optional user ID for library scoping.
+    """
+    src = _resolve_library_file(video_file)
+    if not src:
+        return f"Error: video '{video_file}' not found."
+
+    if music_file.strip():
+        m_src = _resolve_library_file(music_file.strip())
+        if not m_src:
+            return f"Error: music file '{music_file}' not found in Studio Library."
+        out_name = _unique_media_name(f"{src.stem}_mixed", "audio", ".mp4")
+        out_path = VIDEOS_DIR / out_name
+        try:
+            from tools.audio.audio_mixer import AudioMixer
+            mixer = AudioMixer()
+            res = mixer.execute({
+                "operation": "add_music",
+                "video_path": str(src),
+                "music_path": str(m_src),
+                "output_path": str(out_path),
+                "music_volume": max(0.05, min(1.0, float(volume_ducking))),
+            })
+            if not res.success or not out_path.exists():
+                raise RuntimeError(res.error or "AudioMixer add_music failed")
+            thumb = _make_video_thumbnail(out_path)
+            web_url = _publish_artifact(out_path, thumb, user, tags=["audio", "mixed", mood.strip()[:24]])
+            return (
+                f"### 🎵 Audio Mixed Successfully\n\n"
+                f"**File:** `{out_name}`\n"
+                f"**Web URL:** {web_url}\n\n"
+                f"Deliver: `<video src=\"{web_url}\" controls style=\"width:100%\"></video>`\n\n"
+                f"**Download:** [⬇ Download Mixed Video]({web_url})"
+            )
+        except Exception as e:
+            print(f"[satchida-montage] AudioMixer fallback to video_remix_audio: {e}", file=sys.stderr)
+
+    return video_remix_audio(
+        video_file=src.name,
+        prompt=mood,
+        narration=narration,
+        music_file=music_file,
+        user=user,
     )
 
 

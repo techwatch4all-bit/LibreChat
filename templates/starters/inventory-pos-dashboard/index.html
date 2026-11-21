@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Retail · Industrial Barcode POS & SKU Cash Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 75% 25%, #291503 0%, #120901 55%, #050300 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .orange-glass {
+        background: rgba(28, 14, 3, 0.75);
+        backdrop-filter: blur(28px) saturate(200%);
+        border: 1px solid rgba(249, 115, 22, 0.35);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(254, 215, 170, 0.25);
+        border-radius: 20px;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div style="max-width: 1280px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; background: rgba(249, 115, 22, 0.15); border: 1px solid rgba(249, 115, 22, 0.4); font-size: 11px; font-weight: 700; color: #fb923c;">
+              Terminal #04 · Flagship Hardware Checkout
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #fff;">High-Throughput Inventory & Barcode POS</h1>
+          </div>
+          <div class="mono" style="font-size: 13px; color: #fdba74;">BARCODE SCANNER READY [HID USB]</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+          <!-- SKU Table -->
+          <div class="orange-glass" style="padding: 24px;">
+            <div style="font-size: 13px; font-weight: 700; color: #fb923c; text-transform: uppercase; margin-bottom: 16px;">Active In-Store SKU Catalog</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+              <div style="padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(249, 115, 22, 0.2); border-radius: 12px;">
+                <div style="font-size: 14px; font-weight: 700; color: #fff;">USB-C 100W GaN Charging Dock</div>
+                <div class="mono" style="font-size: 12px; color: #94a3b8; margin: 4px 0 10px;">SKU: CHG-100-PRO · Stock: 84 units</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span class="mono" style="font-size: 18px; font-weight: 800; color: #fb923c;">$49.99</span>
+                  <button style="padding: 6px 14px; border-radius: 8px; background: #ea580c; color: #fff; font-weight: 700; font-size: 12px; border: none;">+ Add</button>
+                </div>
+              </div>
+              <div style="padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(249, 115, 22, 0.2); border-radius: 12px;">
+                <div style="font-size: 14px; font-weight: 700; color: #fff;">Gasket Mechanical Studio Keyboard</div>
+                <div class="mono" style="font-size: 12px; color: #94a3b8; margin: 4px 0 10px;">SKU: KEY-MECH-98 · Stock: 16 units</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span class="mono" style="font-size: 18px; font-weight: 800; color: #fb923c;">$129.00</span>
+                  <button style="padding: 6px 14px; border-radius: 8px; background: #ea580c; color: #fff; font-weight: 700; font-size: 12px; border: none;">+ Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checkout Cart -->
+          <div class="orange-glass" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #fb923c; text-transform: uppercase; margin-bottom: 16px;">Current Register Order (2 Items)</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+                <span>1x GaN 100W Dock</span>
+                <span class="mono" style="font-weight: 700;">$49.99</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 13px;">
+                <span>1x Gasket Studio Keyboard</span>
+                <span class="mono" style="font-weight: 700;">$129.00</span>
+              </div>
+              <div style="border-top: 1px solid rgba(249, 115, 22, 0.3); padding-top: 16px;">
+                <span style="font-size: 11px; text-transform: uppercase; color: #fb923c; font-weight: 800;">Total Payable (incl. Sales Tax)</span>
+                <div class="mono" style="font-size: 34px; font-weight: 800; color: #fff; margin-top: 4px;">$178.99</div>
+              </div>
+            </div>
+            <button style="width: 100%; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; font-weight: 800; font-size: 14px; border: none; box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4); margin-top: 24px;">Charge Customer via UPI / Card</button>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

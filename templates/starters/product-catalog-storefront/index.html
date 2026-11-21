@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Atelier · High-Craft Architectural Studio Storefront</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: #080808;
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .carbon-card {
+        background: #111111;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div style="max-width: 1280px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+          <div>
+            <span class="mono" style="font-size: 11px; color: #a1a1aa; letter-spacing: 2px;">EDITION 2026 // ATELIER HARDWARE</span>
+            <h1 class="serif" style="font-size: 38px; color: #fff; margin-top: 6px;">Precision Acoustic & Display Engineering</h1>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button style="padding: 8px 18px; border-radius: 999px; background: #fff; color: #000; font-weight: 700; font-size: 12px; border: none;">Curated Releases</button>
+            <button style="padding: 8px 18px; border-radius: 999px; background: transparent; color: #a1a1aa; font-weight: 600; font-size: 12px; border: 1px solid rgba(255,255,255,0.15);">Technical Specs</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+          <div class="carbon-card" style="padding: 24px;">
+            <div style="height: 180px; background: linear-gradient(135deg, #1c1917, #292524); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 48px;">🖥️</div>
+            <div style="margin-top: 18px;">
+              <h3 style="font-size: 18px; font-weight: 700; color: #fff;">27" 5K Retina Reference Monitor</h3>
+              <p style="font-size: 12px; color: #a1a1aa; margin: 6px 0 16px;">True 10-bit IPS panel, 99% DCI-P3 color calibration for digital colorists.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="mono" style="font-size: 20px; font-weight: 800; color: #fff;">$1,299.00</span>
+                <button style="padding: 8px 16px; border-radius: 8px; background: #fff; color: #000; font-weight: 700; font-size: 12px; border: none;">Order</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="carbon-card" style="padding: 24px;">
+            <div style="height: 180px; background: linear-gradient(135deg, #1c1917, #292524); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 48px;">🎧</div>
+            <div style="margin-top: 18px;">
+              <h3 style="font-size: 18px; font-weight: 700; color: #fff;">Planar Magnetic Studio Cans</h3>
+              <p style="font-size: 12px; color: #a1a1aa; margin: 6px 0 16px;">Open-back precision diaphragms tuned for spatial audio mixing.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="mono" style="font-size: 20px; font-weight: 800; color: #fff;">$549.00</span>
+                <button style="padding: 8px 16px; border-radius: 8px; background: #fff; color: #000; font-weight: 700; font-size: 12px; border: none;">Order</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="carbon-card" style="padding: 24px;">
+            <div style="height: 180px; background: linear-gradient(135deg, #1c1917, #292524); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 48px;">⌨️</div>
+            <div style="margin-top: 18px;">
+              <h3 style="font-size: 18px; font-weight: 700; color: #fff;">Solid Brass Split Macro Deck</h3>
+              <p style="font-size: 12px; color: #a1a1aa; margin: 6px 0 16px;">CNC milled from solid billet C360 brass with haptic rotary dials.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="mono" style="font-size: 20px; font-weight: 800; color: #fff;">$380.00</span>
+                <button style="padding: 8px 16px; border-radius: 8px; background: #fff; color: #000; font-weight: 700; font-size: 12px; border: none;">Order</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

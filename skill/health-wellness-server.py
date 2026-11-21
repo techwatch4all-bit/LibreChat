@@ -516,5 +516,158 @@ def yoga_asana_and_pranayama_guide(
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
 
+@mcp.tool()
+def fetch_medical_visuals(topic: str, media_type: str = "diagram") -> str:
+    """
+    Finds and downloads a verified medical illustration, anatomical cross-section diagram, or clinical chart
+    from Wikimedia Commons/Wikipedia and saves it locally in the public media directory.
+    Returns the ready-to-render Markdown image tag (e.g. ![Topic](/assets/health/media/topic.jpg)).
+    topic: The anatomical structure, organ, or medical issue (e.g. 'burn depth cross section', 'appendix anatomy', 'kidney anatomy', 'hand bones').
+    media_type: 'diagram', 'anatomy', 'plant', or 'organ'
+    """
+    import os
+    import urllib.request
+    import urllib.parse
+    import re
+    
+    try:
+        clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', topic.lower()).strip('_')
+        out_dir = r"d:\LAN-AI-Infra\LibreChat\client\public\assets\health\media"
+        os.makedirs(out_dir, exist_ok=True)
+
+        # Curated anatomical & cross-sectional mappings for acute medical conditions
+        curated_mappings = {
+            "burn": "burn_degree_depth_cross_section.jpg",
+            "burns": "burn_degree_depth_cross_section.jpg",
+            "hand_burn": "hand_burn_degrees_clinical_comparison.jpg",
+            "burnt_hand": "hand_burn_degrees_clinical_comparison.jpg",
+            "burn_degrees": "hand_burn_degrees_clinical_comparison.jpg",
+            "burn_comparison": "hand_burn_degrees_clinical_comparison.jpg",
+            "skin_burn": "burn_degree_depth_cross_section.jpg",
+            "burn_depth": "burn_degree_depth_cross_section.jpg",
+            "hand": "hand_anatomy.jpg",
+            "hand_anatomy": "hand_anatomy.jpg",
+            "fracture": "bone_fracture.jpg",
+            "choking": "choking.jpg",
+            "cpr": "cardiopulmonary_resuscitation.jpg",
+            "bleeding": "bleeding.jpg",
+            "snake_bite": "snakebite.jpg",
+            "snakebite": "snakebite.jpg",
+            "dog_bite": "rabies.jpg",
+            "rabies": "rabies.jpg",
+            "kidney_stones": "nephrolithiasis.jpg",
+            "gallstones": "gallstone.jpg",
+            "gerd": "gastroesophageal_reflux_disease.jpg",
+            "tonsillitis": "tonsillitis.jpg",
+            "mouth_ulcers": "aphthous_stomatitis.jpg",
+            "plantar_fasciitis": "plantar_fasciitis.jpg",
+            "foot_pain": "plantar_fasciitis.jpg",
+        }
+
+        # Check curated mapping in order of specificity (longest key match first)
+        mapped_file = None
+        for key in sorted(curated_mappings.keys(), key=len, reverse=True):
+            if key in clean_name:
+                mapped_file = curated_mappings[key]
+                break
+        if not mapped_file:
+            for key in sorted(curated_mappings.keys(), key=len, reverse=True):
+                if clean_name in key:
+                    mapped_file = curated_mappings[key]
+                    break
+
+        if mapped_file:
+            local_mapped_path = os.path.join(out_dir, mapped_file)
+            if os.path.exists(local_mapped_path) and os.path.getsize(local_mapped_path) > 5000:
+                public_mapped_url = f"/assets/health/media/{mapped_file}"
+                return json.dumps({
+                    "status": "success",
+                    "cached": True,
+                    "curated": True,
+                    "markdown_embed": f"![{topic.title()} Cross-Section Diagram]({public_mapped_url})",
+                    "image_url": public_mapped_url,
+                    "topic": topic
+                })
+
+        out_filename = f"{clean_name}.jpg"
+        local_path = os.path.join(out_dir, out_filename)
+        public_url = f"/assets/health/media/{out_filename}"
+        
+        # If file already downloaded, return immediate cached embed tag
+        if os.path.exists(local_path) and os.path.getsize(local_path) > 5000:
+            return json.dumps({
+                "status": "success",
+                "cached": True,
+                "markdown_embed": f"![{topic.title()} Diagram]({public_url})",
+                "image_url": public_url,
+                "topic": topic
+            })
+            
+        headers = {'User-Agent': 'SatchidaHealthBot/1.0 (info@satchida.com)'}
+        
+        # Search Wikipedia articles with cross-section / diagram emphasis
+        candidates = [topic]
+        topic_clean = topic.replace("human", "").replace("anatomy", "").replace("diagram", "").strip()
+        if topic_clean and topic_clean.lower() != topic.lower():
+            candidates.append(f"{topic_clean} diagram")
+            candidates.append(f"{topic_clean} cross section")
+        if "anatomy" not in topic.lower():
+            candidates.append(f"{topic_clean} anatomy")
+            
+        titles = []
+        for cand in candidates:
+            srch_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(cand)}&limit=3&namespace=0&format=json"
+            req = urllib.request.Request(srch_url, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    if len(data) > 1:
+                        for t in data[1]:
+                            if t not in titles:
+                                titles.append(t)
+            except Exception:
+                pass
+            if len(titles) >= 3:
+                break
+                
+        img_source_url = None
+        for title in titles:
+            p_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&redirects=1&prop=pageimages&format=json&pithumbsize=800"
+            req_p = urllib.request.Request(p_url, headers=headers)
+            with urllib.request.urlopen(req_p, timeout=8) as p_resp:
+                p_data = json.loads(p_resp.read().decode('utf-8'))
+                pages = p_data.get('query', {}).get('pages', {})
+                for _, p in pages.items():
+                    if 'thumbnail' in p and p['thumbnail'].get('source'):
+                        img_source_url = p['thumbnail']['source']
+                        break
+            if img_source_url:
+                break
+                
+        if not img_source_url:
+            return json.dumps({
+                "status": "not_found",
+                "message": f"No high-resolution illustration found on Wikimedia for '{topic}'. Use ASCII or Mermaid anatomical diagrams instead.",
+                "topic": topic
+            })
+            
+        # Download and save locally
+        dl_req = urllib.request.Request(img_source_url, headers=headers)
+        with urllib.request.urlopen(dl_req, timeout=12) as dl_resp:
+            content = dl_resp.read()
+            with open(local_path, "wb") as f:
+                f.write(content)
+                
+        return json.dumps({
+            "status": "success",
+            "cached": False,
+            "markdown_embed": f"![{topic.title()} Diagram]({public_url})",
+            "image_url": public_url,
+            "topic": topic,
+            "file_size_bytes": len(content)
+        })
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e), "topic": topic})
+
 if __name__ == "__main__":
     mcp.run()

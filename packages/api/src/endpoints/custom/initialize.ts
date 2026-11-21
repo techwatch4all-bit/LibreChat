@@ -347,6 +347,12 @@ export async function initializeCustom(
     apiKey = privacyAssertion;
   } else if (userProvidesKey || userProvidesURL) {
     apiKey = userValues?.apiKey;
+  } else if (
+    process.env.SATCHIDA_TENANT_MODE === 'true' &&
+    isSatchidaEndpoint &&
+    !user?.seatToken
+  ) {
+    throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
   } else {
     apiKey = user?.seatToken ?? CUSTOM_API_KEY;
   }

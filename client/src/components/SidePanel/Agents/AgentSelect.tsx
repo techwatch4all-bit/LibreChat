@@ -111,6 +111,7 @@ function AgentSelect({
         avatar_preview: fullAgent.avatar?.filepath ?? '',
         avatar_action: null,
         stateful_code_environment: fullAgent.stateful_code_environment ?? 'user',
+        conversation_starters: fullAgent.conversation_starters ?? [],
         code_environment_id: fullAgent.code_environment_id,
         repositoryInstructions: fullAgent.repositoryInstructions,
         code_workspace_id: fullAgent.code_workspace_id,

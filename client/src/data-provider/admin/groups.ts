@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import type { TenantAccountType, TenantSeatCapability } from 'librechat-data-provider';
+import { adminFetch } from './client';
 
 /**
  * Admin group management.
@@ -86,7 +87,7 @@ export async function fetchGroups(params: GroupListParams = {}, signal?: AbortSi
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  const response = await fetch(`/api/admin/groups${suffix}`, { signal });
+  const response = await adminFetch(`/api/admin/groups${suffix}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as GroupsResponse;
 }
@@ -100,7 +101,7 @@ export async function fetchGroupMembers(
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  const response = await fetch(`/api/admin/groups/${groupId}/members${suffix}`, { signal });
+  const response = await adminFetch(`/api/admin/groups/${groupId}/members${suffix}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as GroupMembersResponse;
 }
@@ -136,7 +137,7 @@ export const GROUP_ACCOUNT_TYPES: TenantAccountType[] = [
 ];
 
 export async function createGroup(payload: CreateGroupPayload) {
-  const response = await fetch('/api/admin/groups', {
+  const response = await adminFetch('/api/admin/groups', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -146,7 +147,7 @@ export async function createGroup(payload: CreateGroupPayload) {
 }
 
 export async function updateGroup(groupId: string, payload: UpdateGroupPayload) {
-  const response = await fetch(`/api/admin/groups/${groupId}`, {
+  const response = await adminFetch(`/api/admin/groups/${groupId}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -156,13 +157,13 @@ export async function updateGroup(groupId: string, payload: UpdateGroupPayload) 
 }
 
 export async function deleteGroup(groupId: string) {
-  const response = await fetch(`/api/admin/groups/${groupId}`, { method: 'DELETE' });
+  const response = await adminFetch(`/api/admin/groups/${groupId}`, { method: 'DELETE' });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { success: boolean; id: string };
 }
 
 export async function addGroupMember(groupId: string, userId: string) {
-  const response = await fetch(`/api/admin/groups/${groupId}/members`, {
+  const response = await adminFetch(`/api/admin/groups/${groupId}/members`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId }),
@@ -172,7 +173,7 @@ export async function addGroupMember(groupId: string, userId: string) {
 }
 
 export async function removeGroupMember(groupId: string, userId: string) {
-  const response = await fetch(`/api/admin/groups/${groupId}/members/${userId}`, {
+  const response = await adminFetch(`/api/admin/groups/${groupId}/members/${userId}`, {
     method: 'DELETE',
   });
   if (!response.ok) throw await readError(response);

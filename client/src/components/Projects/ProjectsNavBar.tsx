@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react';
+/* eslint-disable i18next/no-literal-string */
+import { Plus, LayoutGrid } from 'lucide-react';
 import { Button, useMediaQuery } from '@librechat/client';
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import { useLocalize } from '~/hooks';
@@ -6,9 +7,14 @@ import { useLocalize } from '~/hooks';
 type ProjectsNavBarProps = {
   onCreate: () => void;
   onOpenFolder?: () => void;
+  onOpenTemplates?: () => void;
 };
 
-export default function ProjectsNavBar({ onCreate, onOpenFolder }: ProjectsNavBarProps) {
+export default function ProjectsNavBar({
+  onCreate,
+  onOpenFolder,
+  onOpenTemplates,
+}: ProjectsNavBarProps) {
   const localize = useLocalize();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
@@ -22,6 +28,18 @@ export default function ProjectsNavBar({ onCreate, onOpenFolder }: ProjectsNavBa
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenTemplates ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onOpenTemplates}
+              className="shrink-0 gap-1.5"
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+              1-Click Templates
+            </Button>
+          ) : null}
           {onOpenFolder ? (
             <Button
               type="button"
@@ -34,7 +52,13 @@ export default function ProjectsNavBar({ onCreate, onOpenFolder }: ProjectsNavBa
               Open Existing Project
             </Button>
           ) : null}
-          <Button type="button" variant="default" size="sm" onClick={onCreate} className="shrink-0 gap-1.5">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={onCreate}
+            className="shrink-0 gap-1.5"
+          >
             <Plus className="h-4 w-4" aria-hidden="true" />
             {localize('com_ui_new_project')}
           </Button>

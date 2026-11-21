@@ -62,6 +62,7 @@ const {
   waitForKeyvRedisClient,
   warnOnUnreachableDeliveryPaths,
   createCodeApiUploadRegistry,
+  createOpenCodePtyUpgradeHandler,
   deadManLeaseGuard,
   createStaticPreviewRelayMiddleware,
 } = require('@librechat/api');
@@ -431,6 +432,83 @@ const startServer = async () => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     next();
   });
+  // OpenFilm Studio static assets (CanvasView, index chunks, CSS)
+  const openfilmStudioUiAssets =
+    'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\assets';
+  if (fs.existsSync(openfilmStudioUiAssets)) {
+    app.use(
+      '/assets',
+      (req, res, next) => {
+        res.removeHeader('X-Frame-Options');
+        res.removeHeader('Cross-Origin-Opener-Policy');
+        res.removeHeader('Cross-Origin-Embedder-Policy');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        next();
+      },
+      express.static(openfilmStudioUiAssets, { maxAge: '1y', immutable: true }),
+    );
+  }
+  // Invalidate 304 cache on OpenFilm Studio assets
+  app.use('/assets/index-hCOubUll.js', (req, res, next) => {
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
+  // OpenFilm Studio projects route handler (serve Studio HTML directly with session cookie),
+  // excluding LibreChat's own /projects and /projects/<24-hex ObjectId> SPA routes unless explicitly from Studio.
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && (req.path === '/projects' || req.path.startsWith('/projects/'))) {
+      const referer = req.headers['referer'] || '';
+      const runInfo = routes.openfilm?.getStudioRunInfo?.();
+      const expectedKey = runInfo?.key;
+      const isStudioReq =
+        referer.includes('/api/openfilm/') ||
+        Boolean(req.query?.key || req.headers['x-studio-key']) ||
+        Boolean(expectedKey && referer.includes(`key=${expectedKey}`));
+      const isLibreChatProjectSpaRoute =
+        req.path === '/projects' ||
+        req.path === '/projects/' ||
+        /^\/projects\/[0-9a-f]{24}\/?$/i.test(req.path);
+      if (isLibreChatProjectSpaRoute && !isStudioReq) {
+        return next();
+      }
+      const studioKey = req.query?.key || expectedKey;
+      if (studioKey) {
+        res.cookie('openfilm_studio_4747', studioKey, {
+          path: '/',
+          httpOnly: false,
+          sameSite: 'lax',
+          secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+        });
+        res.cookie('openfilm_studio_4747_framed', studioKey, {
+          path: '/',
+          httpOnly: false,
+          sameSite: 'none',
+          secure: true,
+        });
+      }
+      res.removeHeader('X-Frame-Options');
+      res.removeHeader('Cross-Origin-Opener-Policy');
+      res.removeHeader('Cross-Origin-Embedder-Policy');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+      if (
+        fs.existsSync(
+          'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\index.html',
+        )
+      ) {
+        return res.sendFile(
+          'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\index.html',
+        );
+      }
+    }
+    next();
+  });
   app.use(staticCache(appConfig.paths.dist));
   app.use(staticCache(appConfig.paths.fonts));
   app.use('/assets', staticCache(appConfig.paths.assets));
@@ -486,6 +564,7 @@ const startServer = async () => {
   app.use('/api/admin/reconciliation', routes.adminReconciliation);
   app.use('/api/admin/entitlements', routes.adminEntitlements);
   app.use('/api/admin/vaults', routes.adminVaults);
+  app.use('/api/admin/tenants', routes.adminTenants);
   app.use('/api/actions', routes.actions);
   app.use('/api/keys', routes.keys);
   app.use('/api/api-keys', routes.apiKeys);
@@ -495,9 +574,95 @@ const startServer = async () => {
   app.use('/api/convos', routes.convos);
   app.use('/api/traces', routes.traces);
   app.use('/api/presets', routes.presets);
+  // Intercept OpenFilm Studio calls to /api/projects/:id before LibreChat's project router
+  app.use((req, res, next) => {
+    const p = req.originalUrl || req.url;
+    const referer = req.headers['referer'] || '';
+    const runInfo = routes.openfilm?.getStudioRunInfo?.();
+    const studioKey = runInfo?.key;
+
+    if (p.startsWith('/api/openfilm/project-sync')) {
+      return next();
+    }
+
+    // LibreChat's own Chat Projects use 24-hex MongoDB ObjectIds; OpenFilm Studio uses short alphanumeric IDs
+    // (e.g. PQhJ7O71SYVE) and may strip ?key= from the iframe URL after initial load.
+    const isOpenFilmRefererPath =
+      /\/projects\/(?!([0-9a-f]{24})(\/|\?|$))[A-Za-z0-9_-]{6,20}(\/|\?|$)/i.test(referer);
+    const isStudioReferer =
+      referer.includes('/api/openfilm/') ||
+      isOpenFilmRefererPath ||
+      Boolean(studioKey && referer.includes(`key=${studioKey}`));
+    const isOpenFilmProjectIdPath =
+      /^\/api\/projects\/(?!([0-9a-f]{24})(\/|$))[A-Za-z0-9_-]{6,20}(\/|$)/i.test(p);
+    const isDirectOpenfilmApi = p.startsWith('/api/openfilm/');
+    const isOpenfilmSpecificApi =
+      p.startsWith('/api/version') ||
+      p.startsWith('/api/prefs') ||
+      p.startsWith('/api/examples') ||
+      p.startsWith('/api/events') ||
+      p.startsWith('/api/health') ||
+      p.startsWith('/api/library') ||
+      p.startsWith('/api/fonts') ||
+      p.startsWith('/api/providers') ||
+      p.startsWith('/api/local-models') ||
+      p.startsWith('/api/desktop') ||
+      p.startsWith('/api/saved/') ||
+      p.startsWith('/api/pick-');
+
+    const hasStudioKey = Boolean(
+      studioKey && (req.query?.key === studioKey || req.headers['x-studio-key'] === studioKey),
+    );
+
+    // Route /api/projects to OpenFilm if it targets an OpenFilm short project ID, originated from OpenFilm Studio, or carries studio key
+    const isOpenFilmProjectCall =
+      p.startsWith('/api/projects') &&
+      (isOpenFilmProjectIdPath || isStudioReferer || hasStudioKey);
+
+    if (isDirectOpenfilmApi || isOpenfilmSpecificApi || isOpenFilmProjectCall) {
+      return routes.openfilm.openfilmProxy(req, res, next);
+    }
+    next();
+  });
+
   app.use('/api/projects', routes.projects);
   app.use('/api/opencode', routes.opencode);
   app.use('/api/ide', routes.ide.router);
+  app.use('/api/openfilm', routes.openfilm.router);
+
+  // Forward OpenFilm Studio /projects/* asset/API paths to OpenFilm proxy,
+  // while letting LibreChat SPA routes (/projects and /projects/<24-hex ObjectId>)
+  // fall through to index.html so browser reloads work cleanly.
+  app.use('/projects', (req, res, next) => {
+    const referer = req.headers['referer'] || '';
+    const runInfo = routes.openfilm?.getStudioRunInfo?.();
+    const studioKey = runInfo?.key;
+    const isStudioReq =
+      referer.includes('/api/openfilm/') ||
+      Boolean(
+        studioKey &&
+          (req.query?.key === studioKey ||
+            req.headers['x-studio-key'] === studioKey ||
+            referer.includes(`key=${studioKey}`)),
+      );
+    const isLibreChatProjectSpaRoute =
+      req.method === 'GET' && (req.path === '/' || /^\/[0-9a-f]{24}\/?$/i.test(req.path));
+    if (isLibreChatProjectSpaRoute && !isStudioReq) {
+      return next();
+    }
+    return routes.openfilm.openfilmProxy(req, res, next);
+  });
+
+  // Forward OpenFilm media server /p/* paths to openfilmMediaProxy (port 4748)
+  app.use('/p', (req, res, next) => {
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return routes.openfilm.openfilmMediaProxy(req, res, next);
+  });
+
   app.use('/api/prompts', routes.prompts);
   app.use('/api/skills', routes.skills);
   app.use('/api/categories', routes.categories);
@@ -553,15 +718,38 @@ const startServer = async () => {
     }),
   );
 
+  // ComfyUI Studio reverse proxy (:8188)
+  const { createProxyMiddleware } = require('http-proxy-middleware');
+  const comfyProxy = createProxyMiddleware({
+    target: 'http://127.0.0.1:8188',
+    changeOrigin: true,
+    // Upgraded explicitly in server.on('upgrade') below; ws:true would auto-hook globally.
+    ws: false,
+    pathRewrite: { '^/comfyui': '' },
+    logLevel: 'silent',
+    onError: (err, req, res) => {
+      logger.error('[COMFY-PROXY-ERR]', err.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'ComfyUI studio offline' });
+      }
+    },
+  });
+  app.use('/comfyui', comfyProxy);
+
   // Studio Library page — the per-user gallery of every generated image and
   // video. Serve it from client/public ahead of the SPA fallback, which would
   // otherwise swallow this path and render the chat shell instead of the
   // library. The source of truth stays in client/public so client rebuilds
   // keep shipping it.
-  app.get(
-    '/studio-library.html',
-    express.static(appConfig.paths.publicPath),
-  );
+  app.get('/studio-library.html', (req, res, next) => {
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' *;");
+    const p = path.join(appConfig.paths.publicPath, 'studio-library.html');
+    if (fs.existsSync(p)) {
+      return res.sendFile(p);
+    }
+    next();
+  });
 
   // Studio artifact home — stable directory OUTSIDE client/dist so client
   // rebuilds can never 404 a delivered creation. The montage server publishes
@@ -608,10 +796,10 @@ const startServer = async () => {
       }
       const owner = (req.user && (req.user.name || req.user.username)) || '';
       const scoped = entries.filter(
-        (e) => !e.user || e.user === owner || e.user === 'shared',
+        (e) => !e.user || e.user === owner || e.user === 'shared' || e.user === 'template',
       );
       return res.json({ items: scoped, owner, total: entries.length });
-    } catch (err) {
+    } catch (_err) {
       return res.status(500).json({ error: 'Library manifest unavailable' });
     }
   });
@@ -839,7 +1027,27 @@ RULES FOR YOUR SPOKEN EXPLANATION:
     requestTimeout: server.requestTimeout,
   });
 
-  const ptyWss = new WebSocket.Server({ noServer: true });
+  const ptyWss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
+  const handleOpenCodePtyUpgrade = createOpenCodePtyUpgradeHandler({
+    wss: ptyWss,
+    registry: routes.opencode.ptyRegistry,
+    getAppConfig,
+    getChatProject: (userId, projectId) =>
+      runAsSystem(() => agentEventMethods.getChatProject(userId, projectId)),
+    verifyJwt: (token) => {
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        return null;
+      }
+      const decoded = jwt.verify(token, secret);
+      if (!decoded || typeof decoded !== 'object' || typeof decoded.id !== 'string') {
+        return null;
+      }
+      return { id: decoded.id, tenantId: decoded.tenantId };
+    },
+    createUpstreamWebSocket: (wsUrl, opts) =>
+      new WebSocket(wsUrl, { ...opts, perMessageDeflate: false }),
+  });
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/ide')) {
@@ -890,46 +1098,35 @@ RULES FOR YOUR SPOKEN EXPLANATION:
       }
       return;
     }
-    const match = url.pathname.match(/\/api\/opencode\/pty\/(pty_[^/]+)\/connect/);
-    if (match) {
-      const ptyId = match[1];
-      ptyWss.handleUpgrade(req, socket, head, (clientWs) => {
-        const opencodePort = process.env.OPENCODE_PORT || 4096;
-        const targetWs = new WebSocket(`ws://127.0.0.1:${opencodePort}/pty/${ptyId}/connect`);
-
-        targetWs.on('open', () => {
-          clientWs.on('message', (msg) => {
-            if (targetWs.readyState === WebSocket.OPEN) {
-              targetWs.send(msg);
-            }
-          });
-        });
-
-        targetWs.on('message', (data) => {
-          if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(data);
-          }
-        });
-
-        const closeBoth = () => {
-          try {
-            clientWs.close();
-          } catch {
-            /* socket already closed */
-          }
-          try {
-            targetWs.close();
-          } catch {
-            /* socket already closed */
-          }
-        };
-
-        clientWs.on('close', closeBoth);
-        clientWs.on('error', closeBoth);
-        targetWs.on('close', closeBoth);
-        targetWs.on('error', closeBoth);
-      });
+    if (url.pathname.startsWith('/comfyui/ws')) {
+      req.headers['origin'] = 'http://127.0.0.1:8188';
+      req.headers['host'] = '127.0.0.1:8188';
+      if (typeof comfyProxy?.upgrade === 'function') {
+        comfyProxy.upgrade(req, socket, head);
+        return;
+      }
     }
+    if (
+      url.pathname.startsWith('/api/openfilm') ||
+      url.pathname.startsWith('/ws') ||
+      url.pathname === '/api/events' ||
+      url.pathname.includes('/events')
+    ) {
+      if (routes.openfilm?.openfilmProxy?.upgrade) {
+        const runInfo = routes.openfilm.getStudioRunInfo();
+        const targetHost = (runInfo?.origin || routes.openfilm.OPENFILM_TARGET).replace(
+          /^https?:\/\//,
+          '',
+        );
+        req.headers['origin'] = `http://${targetHost}`;
+        req.headers['host'] = targetHost;
+        routes.openfilm.openfilmProxy.upgrade(req, socket, head);
+      } else {
+        socket.destroy();
+      }
+      return;
+    }
+    void handleOpenCodePtyUpgrade(req, socket, head);
   });
 
   setupGracefulShutdown(server);

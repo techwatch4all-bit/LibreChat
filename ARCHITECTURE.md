@@ -3170,3 +3170,128 @@ Both the Operator Central PC and all Tenant Edge Nodes operate behind residentia
   - Upstream **One-API (`gateway.satchida.com`) is the authoritative policy enforcement plane** for tenant-level seat capacity, token pool balances, and model rate limits.
   - LibreChat groups (`Basic`, `Standard`, `Pro`, `Family`, `Privacy`, etc.) exist on the edge node to configure interface capabilities, allowed modes, and pass the appropriate seat token/headers upstream.
   - Upstream One-API validates token balances and seat allocations in-flight per tenant policy; local edge seat limits act purely as a protective local default and must never artificially obstruct provisioning or desynchronize from One-API governance.
+
+---
+
+## 32. Sovereign Multi-Tenant RAG & Statutory Knowledge Architecture
+
+To guarantee that all end users across every distributed tenant deployment have immediate, zero-latency access to the complete legal and statutory knowledge corpus (161+ Bare Acts) while preserving physical tenant isolation and preventing data leakage between clients, the system enforces a Three-Pillar Architecture.
+
+### 32.1 Functional Separation: LibreChat Native RAG vs. AnythingLLM Sovereign Vault
+
+| Feature | LibreChat Native RAG (`rag-service` :8000) | AnythingLLM Knowledge Vault (`anythingllm` :3012) |
+|---|---|---|
+| **Scope** | Session-local, transient chat attachments | Institutional, multi-document statutory knowledge base |
+| **Ingestion Trigger** | User drops a PDF/file directly into a chat window | Automated batch embedding & operator fleet sync |
+| **Storage Backend** | Node.js native SQLite (`./data/rag.sqlite`) | LanceDB vector database (`storage/lancedb`) |
+| **Agent Access** | Restricted to conversation context window | Exposed as MCP tools (`satchida-knowledge-vault`) |
+| **Isolation Model** | Strictly isolated by LibreChat `user_id` | Dual-Tier: Isolated private vaults + Global shared corpus |
+
+### 32.2 The Three Architectural Pillars for Universal Tenant Legal Access
+
+```mermaid
+flowchart TD
+    User["End User (Any Tenant / Seat)"] -->|Interacts with Agent| LC["LibreChat UI (:3080)"]
+    LC -->|Invokes MCP Tools| Hub["Satchida Unified Hub (:stdio)"]
+    Hub -->|query_vault_rag / search_vault| VaultServer["anythingllm_mcp_server.py"]
+    
+    subgraph DualTier["Pillar 1: Dual-Tier Vector Routing"]
+        VaultServer -->|"1. User Identifier Vault"| Priv["Private Tenant Vault (vault-{userId})"]
+        VaultServer -->|"2. Automatic Dual-Search / Fallback"| Stat["Global Statutes Vault (indian-acts-and-statutes)"]
+    end
+    
+    subgraph Storage["Pillar 2: Pre-Packaged Golden Vector Assets"]
+        Priv --> LancePriv["LanceDB Table (Tenant Local)"]
+        Stat --> LanceStat["LanceDB Table (161+ Embedded Bare Acts)"]
+    end
+    
+    subgraph FleetSync["Pillar 3: Fleet Delta Synchronization"]
+        Operator["Operator Central HQ"] -->|New Gazettes / Amendments| SyncEngine["satchida-fleet-sync (:8444)"]
+        SyncEngine -->|Replicates Vector Chunks via Named Tunnel| LanceStat
+    end
+```
+
+#### Pillar 1: Dual-Tier Workspace Routing in `anythingllm_mcp_server.py`
+1. **Private Tenant Vault (`vault-{userId}` / `vault-{tenantId}`)**:
+   - Holds tenant-specific documents (school rules, employee handbooks, commercial contracts).
+   - Dynamically provisioned when a user uploads private material.
+2. **Sovereign Statutes Vault (`indian-acts-and-statutes`)**:
+   - Houses the pre-indexed legal corpus (161+ Central Bare Acts, POCSO, BNS, BNSS, DPDP Act 2023, IT Act, etc.).
+   - Tool calls (`search_vault_documents` and `query_vault_rag_with_citations`) automatically sanitize input workspace parameters (treating `"none"`, `"null"`, or empty values as default) and execute a dual-search: querying the user's private vault for organizational context while simultaneously querying `indian-acts-and-statutes` for statutory law.
+
+#### Pillar 2: Pre-Packaged LanceDB Vector Assets in Golden Deployment
+- Vectorized tables reside on disk at `D:\LAN-AI-Infra\AnythingLLM\server\storage\lancedb\indian-acts-and-statutes.lance`.
+- During edge node provisioning, the pre-indexed LanceDB vector directory is included in the tenant base image.
+- **Zero Cold-Start Overhead**: Newly deployed tenant instances boot with all 161+ Bare Acts pre-indexed, consuming zero tenant compute cycles for initial vectorization.
+
+#### Pillar 3: Automated Fleet Delta Sync via `satchida-fleet-sync` (:8444)
+- When statutory amendments, state circulars, or new gazette notifications are published:
+  1. The central operator ingests and vectorizes the document once at Satchida Central HQ.
+  2. The `satchida-fleet-sync` service pushes the new LanceDB table chunks across the Cloudflare Named Tunnel network to all tenant edge nodes.
+  3. Tenant nodes hot-reload the updated vectors without downtime or service restart.
+
+### 32.3 Single Source of Truth & Zero-Bypass Routing Architecture
+
+To prevent unauthorized bypass of LibreChat's session management, tier entitlements, and LLM governance, AnythingLLM operates strictly as a **Headless Internal Document Engine**. 
+
+```mermaid
+flowchart TD
+    subgraph ClientPerimeter ["Perimeter & UI Layer (Single Point of Entry)"]
+        EndUser["End Users (Web / Android / Remote)"]
+        TenantAdmin["Tenant On-Prem Admin (Localhost)"]
+        LC["LibreChat Gateway & UI (:3080)<br/>• ai.satchida.com<br/>• Sole User Interface of Truth<br/>• Enforces Tier Entitlements"]
+        
+        EndUser -->|Public HTTPS / Tunnel| LC
+        TenantAdmin -->|"1. Normal AI Work"| LC
+        TenantAdmin -->|"2. Diagnostic / Maintenance (127.0.0.1:3012)"| DirectAL["AnythingLLM UI (:3012)<br/>(Localhost / Tenant Host Only)"]
+    end
+
+    subgraph GovernanceRouting ["LibreChat Intent & Seat Engine"]
+        LC -->|"Standard Chat Prompt"| TierCheck{"Check User Seat"}
+        LC -->|"Knowledge Vault (@Vault)"| Entitlement{"Entitlement Gate"}
+        
+        TierCheck -->|Privacy Tier| LocalGPU["Local Llama Fleet (:8080)<br/>CUDA0 • Ternary-Bonsai"]
+        TierCheck -->|Basic / Standard / Pro| AutoRouter["Local AutoRouter (:4000)"]
+        AutoRouter -->|Bearer Injection| CentralHQ["Satchida Gateway (control.satchida.com)"]
+        CentralHQ --> CloudModel["Cloud LLM Providers (Claude / OpenAI / Gemini)"]
+    end
+
+    subgraph InternalVaultPipeline ["Headless Sovereign Vault (Internal Execution)"]
+        Entitlement -->|Basic / Standard| UpsellModal["Show SatchiUpgradeModal<br/>(Upgrade to Pro for Global Vaults)"]
+        Entitlement -->|Pro / Privacy / Operator| MCPTool["anythingllm_mcp_server.py<br/>• Isolated Query Sessions (UUID)<br/>• Audit Logger for Tenant Managers"]
+        
+        MCPTool -->|"mode: query (Similarity >= 0.55)"| ALHeadless["AnythingLLM Engine (127.0.0.1:3012)"]
+        ALHeadless --> LanceIndex[("LanceDB Vector Storage<br/>161+ Pre-Indexed Bare Acts")]
+        
+        LanceIndex -->|"Score >= 0.55 (Context Present)"| LocalGPU
+        LanceIndex -->|"Score < 0.55 (No Relevant Law)"| Refusal["Early Refusal<br/>Zero Local GPU Cycles"]
+    end
+
+    subgraph MultiUserRBAC ["Audit & Governance"]
+        DirectAL --> AuthCheck{"RBAC Login"}
+        AuthCheck -->|admin@satchida.com| OpAudit["Central Operator Admin<br/>(Exempt from Audit Logging)"]
+        AuthCheck -->|manager@tenant.satchida.com| MgrAudit["Tenant Manager<br/>(Access Logged to tenant_manager_vault_audit.jsonl)"]
+    end
+
+    classDef primary fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#fff;
+    classDef secure fill:#059669,stroke:#047857,stroke-width:2px,color:#fff;
+    classDef warning fill:#d97706,stroke:#b45309,stroke-width:2px,color:#fff;
+    classDef local fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff;
+
+    class LC,MCPTool primary;
+    class LanceIndex,ALHeadless secure;
+    class UpsellModal,Refusal warning;
+    class LocalGPU local;
+```
+
+#### Key Perimeter & Injection-Proof Invariants:
+1. **Localhost Maintenance Access for Tenant Administrators**:
+   - `http://127.0.0.1:3012` is bound locally on the tenant host machine. While external users are strictly blocked (Cloudflare Tunnel forwards only `:3080`), an administrator physically on the tenant PC (or via local console) can log in with `manager@tenant.satchida.com` or `admin@satchida.com` for maintenance, troubleshooting, and manual backups.
+2. **Anti-Injection Isolated Sessions**:
+   - Every RAG tool invocation through `anythingllm_mcp_server.py` supplies an isolated session ID (`sessionId = f"rag-{uuid[:12]}"`), preventing conversational context backfilling from prior chat turns.
+3. **Strict Cosine Threshold (0.55)**:
+   - Queries with insufficient semantic proximity exit before invoking `llama-server.exe`, ensuring the local LLM cannot be repurposed as a free general-purpose chat engine via vault injection attacks.
+4. **Operator Audit Exemption**:
+   - All diagnostic and inspection actions performed by `admin@satchida.com` remain completely unlogged, while actions by `manager@tenant.satchida.com` write immutable records to `logs/tenant_manager_vault_audit.jsonl`.
+
+

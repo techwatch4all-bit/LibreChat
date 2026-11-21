@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Satchida Tax · Enterprise GST Portal & e-Way Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Animated Ambient Mesh Glow */
+    @keyframes meshFloat {
+      0% { transform: translate(0px, 0px) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-25px, 25px) scale(0.95); }
+      100% { transform: translate(0px, 0px) scale(1); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; filter: drop-shadow(0 0 16px currentColor); }
+    }
+    @keyframes shimmerBar {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    
+      body {
+        background: radial-gradient(circle at 85% 15%, #062e1b 0%, #03140c 50%, #010805 100%);
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .ambient-glow {
+        position: fixed; top: -80px; left: -80px; width: 600px; height: 600px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%);
+        filter: blur(90px); pointer-events: none;
+      }
+      .emerald-glass {
+        background: rgba(6, 28, 18, 0.75);
+        backdrop-filter: blur(24px) saturate(200%);
+        border: 1px solid rgba(52, 211, 153, 0.28);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(110, 231, 183, 0.2);
+        border-radius: 20px;
+      }
+      .lime-badge {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(163, 230, 53, 0.15));
+        border: 1px solid rgba(163, 230, 53, 0.4);
+        color: #bef264;
+      }
+    
+  </style>
+</head>
+<body>
+  
+      <div class="ambient-glow"></div>
+      <div style="max-width: 1280px; margin: 0 auto; position: relative; z-index: 2;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+          <div>
+            <div class="lime-badge" style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+              ✓ NIC e-Invoice Portal Synchronized · 256-Bit Signed IRN
+            </div>
+            <h1 style="font-size: 32px; font-weight: 800; margin-top: 10px; color: #ecfdf5;">Corporate Tax & GST B2B Bill Desk</h1>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button style="padding: 10px 20px; border-radius: 12px; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); color: #6ee7b7; font-weight: 700; font-size: 13px;">Verify NIC Portal</button>
+            <button style="padding: 10px 22px; border-radius: 12px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; font-size: 13px; border: none; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);">⚡ Generate QR & Sign IRN</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+          <div class="emerald-glass" style="padding: 28px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(52, 211, 153, 0.15); padding-bottom: 18px; margin-bottom: 20px;">
+              <div>
+                <span style="font-size: 11px; color: #6ee7b7; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Recipient Entity</span>
+                <div style="font-size: 18px; font-weight: 800; color: #fff; margin-top: 4px;">SunTech Aerospace Engineering Ltd</div>
+                <div class="mono" style="font-size: 12px; color: #a7f3d0; margin-top: 2px;">GSTIN: 27AABCS1429B1Z8 · State: Maharashtra (27)</div>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-size: 11px; color: #6ee7b7; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Invoice Series</span>
+                <div class="mono" style="font-size: 20px; font-weight: 800; color: #a3e635;">INV-2026-X901</div>
+                <div style="font-size: 12px; color: #94a3b8;">Issued: 20-Nov-2026</div>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr style="color: #6ee7b7; border-bottom: 1px solid rgba(52, 211, 153, 0.2); font-weight: 700;">
+                  <th style="padding: 10px 0;">Item & Specification</th>
+                  <th style="padding: 10px 0;">HSN/SAC</th>
+                  <th style="padding: 10px 0;">Qty</th>
+                  <th style="padding: 10px 0;">Rate (₹)</th>
+                  <th style="padding: 10px 0; text-align: right;">Taxable (₹)</th>
+                </tr>
+              </thead>
+              <tbody class="mono" style="color: #e2e8f0;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 600; color: #fff;">Quantum Sovereign GPU Blade Tier-4</td>
+                  <td style="color: #94a3b8;">8471</td>
+                  <td>2</td>
+                  <td>₹45,00,000</td>
+                  <td style="text-align: right; color: #6ee7b7; font-weight: 700;">₹90,00,000</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 600; color: #fff;">Mission-Critical SLA Maintenance</td>
+                  <td style="color: #94a3b8;">9983</td>
+                  <td>1</td>
+                  <td>₹12,50,000</td>
+                  <td style="text-align: right; color: #6ee7b7; font-weight: 700;">₹12,50,000</td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 0; font-family:'Plus Jakarta Sans'; font-weight: 600; color: #fff;">Zero-Trust Encryption Controller</td>
+                  <td style="color: #94a3b8;">8517</td>
+                  <td>4</td>
+                  <td>₹6,25,000</td>
+                  <td style="text-align: right; color: #6ee7b7; font-weight: 700;">₹25,00,000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Tax Calculation Summary -->
+          <div class="emerald-glass" style="padding: 28px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #a3e635; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px;">Tax Split Breakdown</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                <span style="color: #94a3b8;">Taxable Base Total</span>
+                <span class="mono" style="font-weight: 700; color: #fff;">₹1,27,50,000.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                <span style="color: #94a3b8;">CGST (9.0%)</span>
+                <span class="mono" style="font-weight: 600; color: #6ee7b7;">₹11,47,500.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 13px;">
+                <span style="color: #94a3b8;">SGST (9.0%)</span>
+                <span class="mono" style="font-weight: 600; color: #6ee7b7;">₹11,47,500.00</span>
+              </div>
+              <div style="border-top: 1px solid rgba(52, 211, 153, 0.25); padding-top: 16px;">
+                <span style="font-size: 11px; text-transform: uppercase; color: #a3e635; font-weight: 800; letter-spacing: 1px;">Gross Invoice Value</span>
+                <div class="mono" style="font-size: 32px; font-weight: 800; color: #ecfdf5; margin-top: 4px;">₹1,50,45,000</div>
+              </div>
+            </div>
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1px dashed rgba(52, 211, 153, 0.35); border-radius: 12px; padding: 12px; text-align: center; margin-top: 20px;">
+              <span class="mono" style="font-size: 11px; color: #a7f3d0; word-break: break-all;">IRN: e7a92c45f891b0cde2419087abcdf145781a... [DIGITALLY SIGNED]</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+</body>
+</html>

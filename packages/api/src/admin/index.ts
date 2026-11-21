@@ -9,6 +9,7 @@ export { createAdminAuditLogHandlers } from './auditLog';
 export { createAdminCodeEnvironmentHandlers } from './code';
 export { createAdminReconciliationHandlers } from './reconciliation';
 export { createAdminEntitlementsHandlers } from './entitlements';
+export { createApplyTenantContractHandler, parseContractPayload } from './tenantContract';
 export { buildAuditContext } from './context';
 export { resolveConfigSecret, redactConfigSecretMaps } from './secrets';
 export type { AdminConfigDeps } from './config';

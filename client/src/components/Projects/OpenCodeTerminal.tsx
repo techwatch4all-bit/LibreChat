@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { Play, Square, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { Button } from '@librechat/client';
+import { dataService } from 'librechat-data-provider';
+import { useLocalize } from '~/hooks';
 
 interface OpenCodeTerminalProps {
   projectId: string;
@@ -16,79 +18,108 @@ export default function OpenCodeTerminal({
   projectPath,
   className = '',
 }: OpenCodeTerminalProps) {
+  const localize = useLocalize();
+  const localizeRef = useRef(localize);
+  localizeRef.current = localize;
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const termInstance = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const ptyIdRef = useRef<string | null>(null);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mode, setMode] = useState<'opencode' | 'shell'>('opencode');
   const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>(
     'disconnected',
   );
-  const [ptyInfo, setPtyInfo] = useState<{ id: string; command: string } | null>(null);
 
-  const connectTerminal = async () => {
-    if (!projectId) return;
-    setStatus('connecting');
-
-    try {
-      // 1. Create a PTY session via /api/opencode/:projectId/pty
-      const res = await fetch(`/api/opencode/${encodeURIComponent(projectId)}/pty`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to create PTY: ${res.statusText}`);
+  const syncPtySize = useCallback(
+    (cols: number, rows: number) => {
+      const activePtyId = ptyIdRef.current;
+      if (!activePtyId || !projectId || cols < 20 || rows < 5) {
+        return;
       }
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current);
+      }
+      resizeTimerRef.current = setTimeout(() => {
+        void dataService.resizeOpenCodePty(projectId, activePtyId, { cols, rows }).catch(() => {
+          /* ignore transient resize failure */
+        });
+      }, 80);
+    },
+    [projectId],
+  );
 
-      const pty = await res.json();
-      setPtyInfo({ id: pty.id, command: pty.command });
+  const connectTerminal = useCallback(
+    async (targetMode: 'opencode' | 'shell' = mode) => {
+      if (!projectId) {
+        return;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      ptyIdRef.current = null;
+      termInstance.current?.reset();
+      setStatus('connecting');
 
-      // 2. Open WebSocket to /api/opencode/pty/:ptyId/connect
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/opencode/pty/${pty.id}/connect`;
-      const ws = new WebSocket(wsUrl);
-      socketRef.current = ws;
+      try {
+        const pty = await dataService.createOpenCodePty(projectId, { mode: targetMode });
+        ptyIdRef.current = pty.id;
 
-      ws.onopen = () => {
-        setStatus('connected');
-        termInstance.current?.focus();
-      };
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/api/opencode/pty/${encodeURIComponent(
+          pty.id,
+        )}/connect?ticket=${encodeURIComponent(pty.connectTicket)}`;
 
-      ws.onmessage = (event) => {
-        if (typeof event.data === 'string') {
-          termInstance.current?.write(event.data);
-        }
-      };
+        const ws = new WebSocket(wsUrl);
+        socketRef.current = ws;
 
-      ws.onerror = (err) => {
-        console.error('PTY WebSocket error:', err);
+        ws.onopen = () => {
+          setStatus('connected');
+          try {
+            fitAddonRef.current?.fit();
+            if (termInstance.current) {
+              syncPtySize(termInstance.current.cols, termInstance.current.rows);
+            }
+          } catch {
+            /* ignore */
+          }
+          termInstance.current?.focus();
+        };
+
+        ws.onmessage = (event) => {
+          if (typeof event.data === 'string') {
+            termInstance.current?.write(event.data);
+          }
+        };
+
+        ws.onerror = () => {
+          setStatus('error');
+        };
+
+        ws.onclose = () => {
+          setStatus('disconnected');
+        };
+      } catch {
         setStatus('error');
-      };
-
-      ws.onclose = () => {
-        setStatus('disconnected');
-      };
-    } catch (err: any) {
-      console.error('Terminal init error:', err);
-      setStatus('error');
-      termInstance.current?.writeln(`\r\n\x1b[31m[Error starting terminal: ${err.message}]\x1b[0m\r\n`);
-    }
-  };
+        termInstance.current?.writeln(
+          `\r\n[${localizeRef.current('com_opencode_terminal_init_error')}]\r\n`,
+        );
+      }
+    },
+    [mode, projectId, syncPtySize],
+  );
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    if (!terminalRef.current) {
+      return;
+    }
 
     const term = new Terminal({
       cursorBlink: true,
       fontFamily: 'Consolas, "Fira Code", monospace, "Segoe UI"',
       fontSize: 13,
-      theme: {
-        background: '#141416',
-        foreground: '#e4e4e7',
-        cursor: '#38bdf8',
-        selectionBackground: 'rgba(56, 189, 248, 0.3)',
-      },
     });
 
     const fitAddon = new FitAddon();
@@ -105,82 +136,103 @@ export default function OpenCodeTerminal({
       }
     });
 
+    const resizeDisp = term.onResize(({ cols, rows }) => {
+      syncPtySize(cols, rows);
+    });
+
     const handleResize = () => {
       try {
         fitAddon.fit();
-      } catch (e) {}
+      } catch {
+        /* ignore resize error when hidden */
+      }
     };
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(handleResize) : null;
+    if (resizeObserver && terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
     window.addEventListener('resize', handleResize);
-
-    // Initial connection
-    connectTerminal();
+    void connectTerminal(mode);
 
     return () => {
+      resizeDisp.dispose();
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', handleResize);
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current);
+      }
       if (socketRef.current) {
         socketRef.current.close();
       }
       term.dispose();
     };
-  }, [projectId]);
+  }, [connectTerminal, mode, syncPtySize]);
 
-  const sendCommand = (cmd: string) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(`${cmd}\r\n`);
-    }
-  };
+  const statusKeyMap = {
+    connected: 'com_opencode_status_connected',
+    connecting: 'com_opencode_status_connecting',
+    error: 'com_opencode_status_error',
+    disconnected: 'com_opencode_status_disconnected',
+  } as const;
+  const statusText = localize(statusKeyMap[status]);
 
   return (
-    <div className={`flex flex-col h-full bg-[#141416] text-white rounded-xl border border-border-light overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border-light bg-surface-secondary text-xs">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              status === 'connected'
-                ? 'bg-green-500'
-                : status === 'connecting'
-                ? 'bg-yellow-500 animate-pulse'
-                : 'bg-red-500'
-            }`}
-          />
-          <span className="font-mono font-medium text-text-primary">
-            OpenCode CLI Terminal
-          </span>
-          {projectPath && (
-            <span className="text-text-secondary truncate max-w-xs font-mono">
-              ({projectPath})
+    <div
+      className={`flex flex-col overflow-hidden rounded-lg border border-border-light bg-surface-primary ${className}`}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-border-light bg-surface-secondary px-3 py-1.5 text-xs">
+        <div className="flex items-center gap-2 truncate">
+          <div className="flex items-center rounded border border-border-light bg-surface-primary p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode('opencode')}
+              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                mode === 'opencode'
+                  ? 'bg-surface-active text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {localize('com_opencode_terminal_mode_tui')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('shell')}
+              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                mode === 'shell'
+                  ? 'bg-surface-active text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {localize('com_opencode_terminal_mode_shell')}
+            </button>
+          </div>
+          {projectPath ? (
+            <span className="truncate font-mono text-[11px] text-text-secondary">
+              {projectPath}
             </span>
-          )}
+          ) : null}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] text-text-secondary">
+            {statusText}
+          </span>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => sendCommand('opencode run')}
-            className="h-7 text-xs px-2 gap-1 text-text-secondary hover:text-text-primary"
-            title="Launch interactive OpenCode session"
+            onClick={() => void connectTerminal(mode)}
+            className="h-6 px-2 text-xs"
+            aria-label={localize('com_opencode_terminal_reconnect')}
           >
-            <Play className="size-3" />
-            opencode run
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (socketRef.current) socketRef.current.close();
-              connectTerminal();
-            }}
-            className="h-7 text-xs px-2 gap-1 text-text-secondary hover:text-text-primary"
-            title="Restart terminal"
-          >
-            <RotateCw className="size-3" />
-            Reset
+            <RotateCw className="mr-1 size-3" aria-hidden="true" />
+            {localize('com_opencode_terminal_reconnect')}
           </Button>
         </div>
       </div>
-      <div className="flex-1 p-2 min-h-[160px]" ref={terminalRef} />
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-black p-1.5">
+        <div ref={terminalRef} className="h-full w-full overflow-hidden" />
+      </div>
     </div>
   );
 }

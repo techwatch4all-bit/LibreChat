@@ -8,6 +8,7 @@ import type {
 } from './types/traces';
 import type { TInsightsAccessResponse, TInsightsParams, TInsightsResponse } from './types/insights';
 import type { TFileConfig } from './file-config';
+import type * as oc from './types/opencode';
 import type * as tl from './types/tools';
 import type * as t from './types';
 import * as permissions from './accessPermissions';
@@ -1706,3 +1707,140 @@ export interface ActiveJobsResponse {
 export const getActiveJobs = (): Promise<ActiveJobsResponse> => {
   return request.get(endpoints.activeJobs());
 };
+
+/* OpenCode Vibe Coding Workspace */
+export const getOpenCodeStatus = (): Promise<oc.OpenCodeStatusResponse> =>
+  request.get(endpoints.opencodeStatus());
+
+export const provisionOpenCodeWorkspace = (
+  projectId: string,
+): Promise<{ localPath: string; created: boolean }> =>
+  request.post(endpoints.opencodeWorkspace(projectId), {});
+
+export const getOpenCodeTree = (projectId: string): Promise<oc.OpenCodeTreeResponse> =>
+  request.get(endpoints.opencodeTree(projectId));
+
+export const readOpenCodeFile = (
+  projectId: string,
+  filePath: string,
+): Promise<oc.OpenCodeFileReadResponse> => request.get(endpoints.opencodeFile(projectId, filePath));
+
+export const writeOpenCodeFile = (
+  projectId: string,
+  payload: { path: string; content: string },
+): Promise<oc.OpenCodeFileWriteResponse> =>
+  request.post(endpoints.opencodeFile(projectId), payload);
+
+export const createOpenCodePty = (
+  projectId: string,
+  payload: { command?: string; args?: string[]; title?: string; mode?: 'opencode' | 'shell' } = {},
+): Promise<oc.OpenCodePtyResponse> => request.post(endpoints.opencodePty(projectId), payload);
+
+export const resizeOpenCodePty = (
+  projectId: string,
+  ptyId: string,
+  size: { cols: number; rows: number },
+): Promise<{ ok: boolean; cols: number; rows: number }> =>
+  request.put(endpoints.opencodePtyResize(projectId, ptyId), size);
+
+export const listOpenCodeSessions = (projectId: string): Promise<oc.OpenCodeSessionDto[]> =>
+  request.get(endpoints.opencodeSessions(projectId));
+
+export const createOpenCodeSession = (
+  projectId: string,
+  payload: { title?: string; agent?: string } = {},
+): Promise<oc.OpenCodeSessionDto> => request.post(endpoints.opencodeSessions(projectId), payload);
+
+export const sendOpenCodePrompt = (
+  projectId: string,
+  sessionId: string,
+  payload: {
+    text: string;
+    agent?: string;
+    model?: { providerID: string; modelID: string };
+    images?: oc.OpenCodePromptImageAttachment[];
+  },
+): Promise<{ accepted: boolean }> =>
+  request.post(endpoints.opencodeSessionPrompt(projectId, sessionId), payload);
+
+export const abortOpenCodeSession = (
+  projectId: string,
+  sessionId: string,
+): Promise<{ aborted: boolean }> =>
+  request.post(endpoints.opencodeSessionAbort(projectId, sessionId), {});
+
+export const getOpenCodeSessionMessages = (
+  projectId: string,
+  sessionId: string,
+): Promise<oc.OpenCodeMessageEnvelope[]> =>
+  request.get(endpoints.opencodeSessionMessages(projectId, sessionId));
+
+export const getOpenCodeSessionDiff = (
+  projectId: string,
+  sessionId: string,
+): Promise<oc.OpenCodeDiffDto[]> =>
+  request.get(endpoints.opencodeSessionDiff(projectId, sessionId));
+
+export const revertOpenCodeSession = (
+  projectId: string,
+  sessionId: string,
+  payload: { messageID: string; partID?: string },
+): Promise<oc.OpenCodeSessionDto> =>
+  request.post(endpoints.opencodeSessionRevert(projectId, sessionId), payload);
+
+export const unrevertOpenCodeSession = (
+  projectId: string,
+  sessionId: string,
+): Promise<oc.OpenCodeSessionDto> =>
+  request.post(endpoints.opencodeSessionUnrevert(projectId, sessionId), {});
+
+export const getOpenCodeProviders = (projectId: string): Promise<oc.OpenCodeProvidersResponse> =>
+  request.get(endpoints.opencodeProviders(projectId));
+
+export const getOpenCodeAgents = (projectId: string): Promise<oc.OpenCodeAgentDto[]> =>
+  request.get(endpoints.opencodeAgents(projectId));
+
+export const getOpenCodePermissions = (
+  projectId: string,
+): Promise<oc.OpenCodePermissionRequestDto[]> =>
+  request.get(endpoints.opencodePermissions(projectId));
+
+export const replyOpenCodePermission = (
+  projectId: string,
+  requestId: string,
+  payload: { reply: 'once' | 'always' | 'reject'; message?: string },
+): Promise<{ ok: boolean }> =>
+  request.post(endpoints.opencodePermissionReply(projectId, requestId), payload);
+
+export const getOpenCodeQuestions = (projectId: string): Promise<oc.OpenCodeQuestionRequestDto[]> =>
+  request.get(endpoints.opencodeQuestions(projectId));
+
+export const replyOpenCodeQuestion = (
+  projectId: string,
+  requestId: string,
+  payload: { answers: string[][] },
+): Promise<{ ok: boolean }> =>
+  request.post(endpoints.opencodeQuestionReply(projectId, requestId), payload);
+
+export const rejectOpenCodeQuestion = (
+  projectId: string,
+  requestId: string,
+): Promise<{ ok: boolean }> =>
+  request.post(endpoints.opencodeQuestionReject(projectId, requestId), {});
+
+export const getOpenCodeVcs = (projectId: string): Promise<oc.OpenCodeVcsResponse> =>
+  request.get(endpoints.opencodeVcs(projectId));
+
+export const getOpenCodePreviewStatus = (
+  projectId: string,
+): Promise<oc.OpenCodePreviewStatusResponse> =>
+  request.get(endpoints.opencodePreviewStatus(projectId));
+
+export const startOpenCodePreview = (
+  projectId: string,
+  payload: { command?: string; args?: string[] } = {},
+): Promise<oc.OpenCodePreviewStatusResponse> =>
+  request.post(endpoints.opencodePreviewStart(projectId), payload);
+
+export const stopOpenCodePreview = (projectId: string): Promise<{ stopped: boolean }> =>
+  request.post(endpoints.opencodePreviewStop(projectId), {});

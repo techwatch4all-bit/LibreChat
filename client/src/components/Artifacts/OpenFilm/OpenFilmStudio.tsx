@@ -18,18 +18,18 @@ import {
   Film,
   FastForward,
   Rewind,
+  Sliders,
+  Layers,
+  Wand2,
+  Send,
+  Check,
 } from 'lucide-react';
+import { useToastContext } from '@librechat/client';
+import { mainTextareaId } from '~/common';
 import type { Artifact } from '~/common';
 import { renderFilmVideo, saveVideoToDisk, type ExportProgress } from './exportEngine';
-import {
-  ART_STYLE_PRESETS,
-  MOTION_RECIPE_PRESETS,
-  GRAMMAR_PRESETS,
-  artPreviewUrl,
-  artStylePresetToFilm,
-  motionPresetToFilm,
-} from './stylePresets';
 import { useCodeState } from '~/Providers/EditorContext';
+import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 
 export const SATCHIDA_FILM_MIME = 'application/vnd.satchida.film' as const;
@@ -67,8 +67,21 @@ type FPS = 24 | 30 | 60;
 
 export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStudioProps) {
   const _localize = useLocalize();
-  const { currentCode, setCurrentCode } = useCodeState();
+  let currentCode: string | undefined;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const codeCtx = useCodeState();
+    currentCode = codeCtx.currentCode;
+  } catch {
+    currentCode = undefined;
+  }
+  const { token } = useAuthContext();
 
+  const [activeTab, setActiveTab] = useState<'workbench' | 'preview'>('workbench');
+  const [studioUrl, setStudioUrl] = useState<string>(
+    `/projects/PQhJ7O71SYVE?key=8708e7f0687fe2db0e26f9681d67f57307b1beeee7d50921${token ? `&token=${encodeURIComponent(token)}` : ''}`
+  );
+  const [isStudioLoading, setIsStudioLoading] = useState<boolean>(true);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [fps, setFps] = useState<FPS>(30);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -85,9 +98,57 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
     if (typeof navigator === 'undefined') return false;
     return navigator.userAgent.toLowerCase().includes('firefox');
   });
-  const [showPresets, setShowPresets] = useState<boolean>(false);
-  const [presetTab, setPresetTab] = useState<'art' | 'motion' | 'grammar'>('motion');
-  const [presetQuery, setPresetQuery] = useState<string>('');
+  const { showToast } = useToastContext();
+  const [suggestedPrompt, setSuggestedPrompt] = useState<{ effectName: string; prompt: string } | null>(null);
+
+  // Sync OpenFilm project with the backend proxy based on the artifact
+  useEffect(() => {
+    let isMounted = true;
+    const syncProject = async () => {
+      try {
+        setIsStudioLoading(true);
+        // Derive project name and media from artifact title / content / id
+        const rawContent = (currentCode || artifact.content || '').trim();
+        const baseTitle = (artifact.title || 'FilmProject')
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .slice(0, 24) || 'FilmProject';
+        const idSuffix = (artifact.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(-8);
+        const cleanTitle = idSuffix ? `${baseTitle}_${idSuffix}` : baseTitle;
+        
+        let mediaParam = '';
+        const matchMedia = rawContent.match(/src=["']([^"']+\.(?:mp4|webm))["']/i) ||
+          rawContent.match(/(?:https?:\/\/[^\s"'<>]+|\/[^\s"'<>]+)(?:\.(?:mp4|webm))/i) ||
+          rawContent.match(/([a-zA-Z0-9_\-]+\.(?:mp4|webm))/i);
+        if (matchMedia && matchMedia[1]) {
+          mediaParam = `&media=${encodeURIComponent(matchMedia[1])}`;
+        } else if (matchMedia && matchMedia[0]) {
+          mediaParam = `&media=${encodeURIComponent(matchMedia[0])}`;
+        }
+        
+        const url = `/api/openfilm/project-sync?name=${encodeURIComponent(cleanTitle)}${mediaParam}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (isMounted && data.studioUrl) {
+          const fullStudioUrl = `${data.studioUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+          setStudioUrl(fullStudioUrl);
+        }
+      } catch (err) {
+        // Fallback to default DawnValley project if sync fails
+        if (isMounted) {
+          setStudioUrl(`/projects/PQhJ7O71SYVE?key=8708e7f0687fe2db0e26f9681d67f57307b1beeee7d50921${token ? `&token=${encodeURIComponent(token)}` : ''}`);
+        }
+      } finally {
+        if (isMounted) {
+          setIsStudioLoading(false);
+        }
+      }
+    };
+    syncProject();
+    return () => {
+      isMounted = false;
+    };
+  }, [artifact.id, artifact.title, artifact.content, currentCode, token]);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -99,9 +160,83 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   // Source film HTML: from current editor state, or artifact content, or fallback demo
   const rawFilmContent = useMemo(() => {
     const raw = (currentCode || artifact.content || '').trim();
-    if (raw.length > 0 && (raw.includes('</script>') || raw.includes('</html>')) && (raw.includes('window.film') || raw.includes('requestAnimationFrame') || raw.includes('renderer.render'))) {
+    if (
+      raw.length > 0 &&
+      (raw.includes('</script>') || raw.includes('</html>')) &&
+      (raw.includes('window.film') ||
+        raw.includes('requestAnimationFrame') ||
+        raw.includes('renderer.render'))
+    ) {
       return raw;
     }
+
+    // Direct video element playback if the artifact points to an mp4/webm URL
+    const videoMatch = raw.match(/src=["']([^"']+\.(?:mp4|webm))["']/i);
+    const videoUrl =
+      (videoMatch && videoMatch[1]) ||
+      raw.match(/https?:\/\/[^\s"'<>]+(?:\.(?:mp4|webm))/i)?.[0] ||
+      raw.match(/\/[^\s"'<>]+\.(?:mp4|webm)/i)?.[0] ||
+      raw.match(/[a-zA-Z0-9_\-]+\.(?:mp4|webm)/i)?.[0];
+
+    if (videoUrl) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video id="studio-video" src="${videoUrl}" preload="auto" playsinline></video>
+  <script>
+    (function() {
+      var v = document.getElementById('studio-video');
+      window.film = {
+        duration: 10,
+        width: 1920,
+        height: 1080,
+        frame: function(t) {
+          if (v && !isNaN(v.duration) && v.duration > 0) {
+            v.currentTime = Math.min(v.duration, Math.max(0, t));
+          }
+        },
+        setMuted: function(m) {
+          if (v) v.muted = m;
+        }
+      };
+      v.addEventListener('loadedmetadata', function() {
+        if (v.duration && !isNaN(v.duration)) {
+          window.film.duration = v.duration;
+          window.parent.postMessage({
+            type: 'FILM_METADATA',
+            duration: v.duration,
+            width: v.videoWidth || 1920,
+            height: v.videoHeight || 1080
+          }, '*');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+    }
+
     // High-yield fallback Satchida Motion Studio template
     return `<!DOCTYPE html>
 <html>
@@ -498,6 +633,39 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
     }
   }, []);
 
+  const applyPromptToChatTextarea = useCallback((prompt: string, shouldFocus = false) => {
+    const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
+    if (!textarea) {
+      return;
+    }
+    const currentVal = (textarea.value || '').trim();
+    let nextVal = currentVal;
+    if (!currentVal) {
+      nextVal = prompt;
+    } else if (!currentVal.toLowerCase().includes(prompt.toLowerCase())) {
+      const lowered = `${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}`;
+      nextVal = currentVal.endsWith('.')
+        ? `${currentVal} Also, ${lowered}`
+        : `${currentVal}. In addition, ${lowered}`;
+    }
+    if (nextVal !== textarea.value) {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        'value',
+      )?.set;
+      if (nativeSetter) {
+        nativeSetter.call(textarea, nextVal);
+      } else {
+        textarea.value = nextVal;
+      }
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (shouldFocus) {
+      textarea.focus();
+    }
+  }, []);
+
   // Handle incoming metadata messages from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
@@ -505,11 +673,23 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
         if (typeof e.data.duration === 'number' && e.data.duration > 0) {
           setDuration(e.data.duration);
         }
+      } else if (e.data && e.data.type === 'OPENFILM_STUDIO_SUGGEST_PROMPT') {
+        const { effectName, prompt } = e.data;
+        if (prompt) {
+          setSuggestedPrompt({ effectName: effectName || 'Effect', prompt });
+          applyPromptToChatTextarea(prompt, false);
+          if (showToast) {
+            showToast({
+              message: `Layered ${effectName || 'effect'} into chat prompt!`,
+              status: 'info',
+            });
+          }
+        }
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [applyPromptToChatTextarea, showToast]);
 
   // Animation Playhead Loop
   useEffect(() => {
@@ -736,15 +916,45 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
     <div className="relative flex h-full w-full select-none flex-col overflow-hidden bg-[#0a0f1d] text-slate-100">
       {/* Top Header & Toolbar */}
       <div className="flex h-11 items-center justify-between border-b border-slate-800 bg-[#0d1326] px-3 text-xs">
-        {/* Left: Studio Branding & Title */}
+        {/* Left: Studio Branding, Title & Mode Tabs */}
         <div className="flex items-center space-x-2.5">
           <div className="flex items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-600/20 px-2 py-1 font-semibold text-purple-400">
             <Film className="h-3.5 w-3.5" />
-            <span>Satchida Studio</span>
+            <span>OpenFilm Studio</span>
           </div>
-          <span className="max-w-[180px] truncate font-medium text-slate-300 sm:max-w-xs">
+          <span className="hidden max-w-[140px] truncate font-medium text-slate-300 md:inline sm:max-w-xs">
             {artifact.title || 'Motion Project'}
           </span>
+
+          {/* Mode Switcher: 4-Editor Workbench vs Live Motion Viewport */}
+          <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900/90 p-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('workbench')}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                activeTab === 'workbench'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="OpenFilm 4-Editor Suite: Screening (Frame edits), Timeline Edit, Canvas planning, Color grading & Library"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Studio Workbench</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                activeTab === 'preview'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Omni-Studio Real-Time Interactive Scene & Video Player"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+              <span>Omni-Motion View</span>
+            </button>
+          </div>
         </div>
 
         {/* Center: Aspect Ratio & FPS Selectors */}
@@ -792,20 +1002,6 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
         {/* Right: FPS & Save / Export */}
         <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => setShowPresets((v) => !v)}
-            className={`flex items-center space-x-1 rounded border px-2 py-1 font-medium transition-colors ${
-              showPresets
-                ? 'border-purple-500/50 bg-purple-600/30 text-purple-200'
-                : 'border-slate-700/60 bg-slate-800 text-slate-200 hover:bg-slate-700'
-            }`}
-            title="One-click style presets: 82 fine-art styles, 36 motion recipes, 9 explainer grammars"
-          >
-            <Sparkles className="h-3 w-3" />
-            <span className="hidden sm:inline">Presets</span>
-          </button>
-
           <div className="flex items-center rounded border border-slate-800 bg-slate-900/80 font-mono text-[10px] text-slate-300">
             <button
               type="button"
@@ -873,125 +1069,87 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
         </div>
       )}
 
-      {/* Style Presets Panel (82 art styles / 36 motion recipes / 9 grammars) */}
-      {showPresets && (
-        <div className="absolute inset-x-0 top-11 z-30 flex max-h-[55%] flex-col border-b border-purple-500/30 bg-[#0d1326]/98 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5">
-            <div className="flex items-center space-x-1">
-              {(
-                [
-                  { key: 'motion', label: `Motion Recipes (${MOTION_RECIPE_PRESETS.length})` },
-                  { key: 'art', label: `Fine Art Styles (${ART_STYLE_PRESETS.length})` },
-                  { key: 'grammar', label: `Grammars (${GRAMMAR_PRESETS.length})` },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setPresetTab(tab.key)}
-                  className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                    presetTab === tab.key
-                      ? 'bg-purple-600 text-white'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+      {/* Full 4-Editor OpenFilm Studio Workbench (Screening, Edit, Canvas, Color & Library) */}
+      {activeTab === 'workbench' && (
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-[#0a0f1d]">
+          {isStudioLoading && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#070b16]/90 backdrop-blur-xs">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+              <span className="mt-3 text-xs font-semibold text-slate-300">
+                Initializing OpenFilm Studio Workbench...
+              </span>
             </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={presetQuery}
-                onChange={(e) => setPresetQuery(e.target.value)}
-                placeholder="Filter presets..."
-                className="w-40 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] text-slate-200 placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPresets(false)}
-                className="text-slate-400 hover:text-slate-100"
-                aria-label="Close presets"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto p-3 sm:grid-cols-3 lg:grid-cols-5">
-            {(() => {
-              const q = presetQuery.trim().toLowerCase();
-              const match = (...fields: string[]) =>
-                !q || fields.some((f) => f.toLowerCase().includes(q));
-              if (presetTab === 'art') {
-                return ART_STYLE_PRESETS.filter((s) => match(s.id, s.label, s.look)).map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setCurrentCode(artStylePresetToFilm(s));
-                      setShowPresets(false);
-                    }}
-                    className="group overflow-hidden rounded-lg border border-slate-800 bg-slate-900 text-left transition-colors hover:border-purple-500/60"
-                    title={`${s.label} — ${s.look}`}
-                  >
-                    <div
-                      className="h-16 w-full bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${s.preview ?? artPreviewUrl(s.id)}), linear-gradient(135deg, ${s.palette.join(', ')})`,
-                      }}
-                    />
-                    <div className="p-1.5">
-                      <div className="truncate text-[11px] font-semibold text-slate-100">
-                        {s.label}
-                      </div>
-                      <div className="truncate text-[10px] text-slate-400">{s.look}</div>
-                    </div>
-                  </button>
-                ));
-              }
-              const list =
-                presetTab === 'motion'
-                  ? MOTION_RECIPE_PRESETS.filter((s) => match(s.id, s.label, s.look))
-                  : GRAMMAR_PRESETS.filter((s) => match(s.id, s.label, s.look));
-              return list.map((s) => (
+          )}
+          {/* Student Prompt Suggestions Floating Card */}
+          {suggestedPrompt && (
+            <div className="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between gap-3 rounded-xl border border-violet-500/50 bg-[#0f172a]/95 p-3 shadow-2xl backdrop-blur-md">
+              <div className="flex items-start gap-2.5 overflow-hidden">
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-600/30 text-violet-300">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-violet-400">
+                      Suggested Edit Prompt · {suggestedPrompt.effectName}
+                    </span>
+                    <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] text-violet-300">
+                      Click to Apply in Chat
+                    </span>
+                  </div>
+                  <p className="truncate text-xs font-medium text-slate-200">
+                    "{suggestedPrompt.prompt}"
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
-                  key={s.id}
                   type="button"
                   onClick={() => {
-                    setCurrentCode(motionPresetToFilm(s));
-                    setShowPresets(false);
+                    applyPromptToChatTextarea(suggestedPrompt.prompt, true);
+                    if (showToast) {
+                      showToast({
+                        message: 'Layered effect prompt into message box!',
+                        status: 'success',
+                      });
+                    }
                   }}
-                  className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-left transition-colors hover:border-purple-500/60"
-                  title={`${s.label} — ${s.look}`}
+                  className="flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-violet-500 transition-colors"
                 >
-                  <div className="mb-1 flex h-8 items-center space-x-1">
-                    {s.palette.map((c, i) => (
-                      <span
-                        key={i}
-                        className="h-4 w-4 rounded-full border border-slate-700"
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                  <div className="truncate text-[11px] font-semibold text-slate-100">
-                    {s.label}
-                  </div>
-                  <div className="truncate text-[10px] text-slate-400">{s.look}</div>
+                  <Send className="h-3 w-3" />
+                  <span>Use in Chat</span>
                 </button>
-              ));
-            })()}
-          </div>
-          <div className="border-t border-slate-800 px-3 py-1 text-[10px] text-slate-500">
-            One click loads a deterministic film into the Studio (Play / Pause / Scrubber / Mute /
-            MP4 export all live). Fine-art presets also document their
-            <span className="mx-1 font-mono text-purple-300">generate_procedural_art</span>
-            MCP call for full procedural renders in chat.
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setSuggestedPrompt(null)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  title="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {studioUrl ? (
+            <iframe
+              src={studioUrl}
+              title="OpenFilm Studio 4-Editor Suite"
+              allow="autoplay; fullscreen; clipboard-read; clipboard-write"
+              className="h-full w-full border-0"
+              onLoad={() => setIsStudioLoading(false)}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-xs text-slate-400">
+              Connecting to OpenFilm Studio service...
+            </div>
+          )}
         </div>
       )}
 
-      {/* Center Viewport Stage */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[#070b16] p-3">
+      {/* Omni-Motion Preview & Timeline View (Option A Diffusion / Option B 3D) */}
+      <div className={`flex flex-1 flex-col overflow-hidden ${activeTab === 'preview' ? 'flex' : 'hidden'}`}>
+        {/* Center Viewport Stage */}
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[#070b16] p-3">
         <div
           className={`relative flex items-center justify-center overflow-hidden rounded-lg border border-slate-800/80 bg-black shadow-2xl transition-all ${aspectClass}`}
           style={{ width: aspectRatio === '16:9' ? '100%' : undefined }}
@@ -1154,6 +1312,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
             <div className="rounded-xs absolute -left-1.5 -top-1 h-3 w-3 rotate-45 bg-red-500" />
           </div>
         </div>
+      </div>
       </div>
 
       {/* Hidden in-DOM OpenFilm Side-Chat Container (Zero duplicate UI, 100% prompt contract preservation) */}

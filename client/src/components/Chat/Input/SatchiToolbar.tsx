@@ -83,7 +83,7 @@ function SatchiToolbar({ getText, setText, disabled = false }: SatchiToolbarProp
 
   const [upgradeModal, setUpgradeModal] = useState<{
     open: boolean;
-    feature: 'vibecoding' | 'research';
+    feature: 'vibecoding' | 'research' | 'vault';
   }>({ open: false, feature: 'vibecoding' });
 
   // Plan entitlement check
@@ -464,7 +464,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
       setCurrentArtifactId(artifactId);
       setArtifactsVisible(true);
       showToast({
-        message: 'Opened Satchida Studio (OpenFilm)!',
+        message: 'Opened OpenFilm Studio!',
         status: 'success',
       });
     },
@@ -845,13 +845,13 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
               </div>
             </DropdownMenuItem>
 
-            {/* 🎬 Satchida Studio (OpenFilm) */}
+            {/* 🎬 OpenFilm Studio */}
             <DropdownMenuItem
               onClick={() => {
                 handleOpenFilmStudio('blank');
                 handleApplyPersonaPrompt(
-                  'Act as Satchida Motion Studio (OpenFilm). Choreograph a cinema-grade photorealistic video using Wan 2.1 (14B) & Kling 2.5 with native audio. Produce both Option A (Neural Video Diffusion) and Option B (Satchida Omni-Studio 3D simulation).',
-                  'Satchida Studio (OpenFilm)',
+                  'Act as Satchida OpenFilm Studio 🎬. Choreograph a cinema-grade photorealistic video using Wan 2.1 (14B) & Kling 2.5 with native audio. Produce both Option A (Neural Video Diffusion) and Option B (Satchida Omni-Studio 3D simulation).',
+                  'OpenFilm Studio',
                 );
               }}
               className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
@@ -859,7 +859,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
               <Film className="h-4 w-4 shrink-0 text-violet-400" />
               <div>
                 <div className="font-semibold text-text-primary">
-                  Satchida Studio (OpenFilm) 🎬
+                  OpenFilm Studio 🎬
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
                   Launch visual timeline, canvas stage & MP4 video exporter
@@ -913,6 +913,41 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                 </div>
                 <div className="text-[11px] leading-tight text-text-secondary">
                   {localize('com_satchida_vault_search_desc')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+
+            {/* ➕ Create Custom Vault (Pro & Privacy) */}
+            <DropdownMenuItem
+              onClick={() => {
+                if (!isPro) {
+                  setUpgradeModal({ open: true, feature: 'vault' });
+                } else {
+                  if (getText && setText) {
+                    setText(
+                      'Please initialize and configure a new private knowledge vault partition for my organization/project with custom vector settings.',
+                    );
+                    showToast({
+                      message: 'Configured New Knowledge Vault prompt!',
+                      status: 'info',
+                    });
+                  }
+                }
+              }}
+              className="outline-hidden flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs hover:bg-surface-hover"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <div className="flex items-center gap-1.5 font-semibold text-text-primary">
+                  <span>Create Additional Vault</span>
+                  {!isPro && (
+                    <span className="rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-400">
+                      PRO
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] leading-tight text-text-secondary">
+                  Create isolated knowledge vaults for projects & teams
                 </div>
               </div>
             </DropdownMenuItem>
@@ -1238,7 +1273,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                   <DropdownMenuSeparator className="my-1 bg-border-light/60" />
 
                   <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-                    Satchida Studio (OpenFilm)
+                    OpenFilm Studio
                   </div>
 
                   {/* OpenFilm Studio Canvas */}

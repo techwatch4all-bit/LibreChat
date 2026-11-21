@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { adminFetch } from './client';
 
 /**
  * Effective capabilities for the logged-in admin user. The backend resolves
@@ -14,7 +15,7 @@ export type EffectiveCapabilities = {
 };
 
 export async function fetchEffectiveCapabilities(signal?: AbortSignal): Promise<EffectiveCapabilities> {
-  const response = await fetch('/api/admin/grants/effective', { signal });
+  const response = await adminFetch('/api/admin/grants/effective', { signal });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     throw new Error(data?.error || `HTTP ${response.status}`);

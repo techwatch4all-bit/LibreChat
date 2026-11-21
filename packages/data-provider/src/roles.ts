@@ -14,6 +14,7 @@ import {
   multiConvoPermissionsSchema,
   mcpServersPermissionsSchema,
   schedulesPermissionsSchema,
+  opencodePermissionsSchema,
   sharedLinksPermissionsSchema,
   peoplePickerPermissionsSchema,
   remoteAgentsPermissionsSchema,
@@ -122,6 +123,9 @@ const defaultRolesSchema = z.object({
         [Permissions.USE]: z.boolean().default(true),
         [Permissions.CREATE]: z.boolean().default(true),
       }),
+      [PermissionTypes.OPENCODE]: opencodePermissionsSchema.extend({
+        [Permissions.USE]: z.boolean().default(true),
+      }),
     }),
   }),
   [SystemRoles.USER]: roleSchema.extend({
@@ -220,6 +224,9 @@ export const roleDefaults = defaultRolesSchema.parse({
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
       },
+      [PermissionTypes.OPENCODE]: {
+        [Permissions.USE]: true,
+      },
     },
   },
   [SystemRoles.USER]: {
@@ -280,6 +287,9 @@ export const roleDefaults = defaultRolesSchema.parse({
       [PermissionTypes.SCHEDULES]: {
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
+      },
+      [PermissionTypes.OPENCODE]: {
+        [Permissions.USE]: false,
       },
     },
   },

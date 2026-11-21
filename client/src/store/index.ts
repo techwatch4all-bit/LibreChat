@@ -1,4 +1,5 @@
 import * as artifacts from './artifacts';
+import * as studioLibrary from './studioLibrary';
 import submission from './submission';
 import isTemporary from './temporary';
 import endpoints from './endpoints';
@@ -22,6 +23,7 @@ export * from './steer';
 
 export default {
   ...artifacts,
+  ...studioLibrary,
   ...families,
   ...endpoints,
   ...user,

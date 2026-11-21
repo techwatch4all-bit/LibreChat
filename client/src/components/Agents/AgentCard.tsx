@@ -1,10 +1,29 @@
 import React, { useMemo, useState } from 'react';
-import { Label, OGDialog, OGDialogTrigger } from '@librechat/client';
+import { Play, Info } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Label,
+  OGDialog,
+  OGDialogTrigger,
+  Button,
+  TooltipAnchor,
+} from '@librechat/client';
+import {
+  Constants,
+  QueryKeys,
+  EModelEndpoint,
+  LocalStorageKeys,
+  PermissionBits,
+} from 'librechat-data-provider';
 import type t from 'librechat-data-provider';
+import type { AgentListResponse } from 'librechat-data-provider';
 import Description, { getPlainDescription } from '~/components/ui/Description';
 import { useLocalize, TranslationKeys, useAgentCategories } from '~/hooks';
+import useGetConversation from '~/hooks/Conversations/useGetConversation';
+import useDefaultConvo from '~/hooks/Conversations/useDefaultConvo';
+import { clearMessagesCache, specDisplayFieldReset, cn, renderAgentAvatar } from '~/utils';
+import useNewConvo from '~/hooks/useNewConvo';
 import AgentDetailContent from './AgentDetailContent';
-import { cn, renderAgentAvatar } from '~/utils';
 import AgentContact from './AgentContact';
 
 interface AgentCardProps {
@@ -18,7 +37,12 @@ interface AgentCardProps {
  */
 const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }) => {
   const localize = useLocalize();
+  const queryClient = useQueryClient();
   const { categories } = useAgentCategories();
+  const getDefaultConversation = useDefaultConvo();
+  const { newConversation } = useNewConvo();
+  const getConversation = useGetConversation(0);
+
   const [isOpen, setIsOpen] = useState(false);
   const description = useMemo(() => getPlainDescription(agent.description), [agent.description]);
 
@@ -40,6 +64,47 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
     setIsOpen(open);
     if (open && onSelect) {
       onSelect(agent);
+    }
+  };
+
+  const handleLaunchAgent = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const conversation = await getConversation();
+    if (agent) {
+      const keys = [QueryKeys.agents, { requiredPermission: PermissionBits.EDIT }];
+      const listResp = queryClient.getQueryData<AgentListResponse>(keys);
+      if (listResp != null) {
+        if (!listResp.data.some((a) => a.id === agent.id)) {
+          const currentAgents = [agent, ...JSON.parse(JSON.stringify(listResp.data))];
+          queryClient.setQueryData<AgentListResponse>(keys, { ...listResp, data: currentAgents });
+        }
+      }
+
+      localStorage.setItem(`${LocalStorageKeys.AGENT_ID_PREFIX}0`, agent.id);
+
+      clearMessagesCache(queryClient, conversation?.conversationId);
+      queryClient.invalidateQueries([QueryKeys.messages]);
+
+      /** Template with agent configuration */
+      const template = {
+        conversationId: Constants.NEW_CONVO as string,
+        endpoint: EModelEndpoint.agents,
+        agent_id: agent.id,
+        title: localize('com_agents_chat_with', { name: agent.name || localize('com_ui_agent') }),
+        ...specDisplayFieldReset,
+      };
+
+      const currentConvo = getDefaultConversation({
+        conversation: { ...(conversation ?? {}), ...template },
+        preset: template,
+      });
+
+      newConversation({
+        template: currentConvo,
+        preset: template,
+      });
     }
   };
 
@@ -69,12 +134,28 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
             }
           }}
         >
-          {/* Category badge - top right */}
-          {categoryLabel && (
-            <span className="absolute right-4 top-3 rounded-md bg-surface-hover px-2 py-0.5 text-xs text-text-secondary">
-              {categoryLabel}
-            </span>
-          )}
+          {/* Category badge & quick actions - top right */}
+          <div className="absolute right-3 top-3 flex items-center gap-1.5">
+            {categoryLabel && (
+              <span className="rounded-md bg-surface-hover px-2 py-0.5 text-xs text-text-secondary">
+                {categoryLabel}
+              </span>
+            )}
+            <TooltipAnchor
+              description={localize('com_agents_start_chat')}
+              render={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleLaunchAgent}
+                  aria-label={localize('com_agents_start_chat')}
+                  className="size-7 rounded-lg bg-surface-primary/70 text-text-secondary shadow-sm hover:bg-surface-submit hover:text-white"
+                >
+                  <Play className="size-3.5 fill-current" />
+                </Button>
+              }
+            />
+          </div>
 
           {/* Avatar */}
           <div className="flex-shrink-0 self-center">

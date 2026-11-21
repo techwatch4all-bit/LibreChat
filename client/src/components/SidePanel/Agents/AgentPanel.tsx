@@ -97,6 +97,7 @@ export function composeAgentUpdatePayload(
     recursion_limit,
     category,
     support_contact,
+    conversation_starters,
     tool_options,
     skills,
     skills_enabled,
@@ -169,6 +170,9 @@ export function composeAgentUpdatePayload(
       recursion_limit,
       category,
       support_contact,
+      conversation_starters: Array.isArray(conversation_starters)
+        ? conversation_starters.filter((s) => typeof s === 'string' && s.trim() !== '')
+        : undefined,
       tool_options: normalizedToolOptions,
       skills,
       skills_enabled,

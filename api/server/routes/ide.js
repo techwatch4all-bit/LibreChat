@@ -12,7 +12,9 @@ const VSCODER_TARGET = `http://127.0.0.1:${VSCODER_PORT}`;
 const vscoderProxy = createProxyMiddleware({
   target: VSCODER_TARGET,
   changeOrigin: true,
-  ws: true,
+  // Upgraded explicitly in api/server/index.js; ws:true would auto-hook server.on('upgrade')
+  // globally without a pathFilter and hijack unrelated WebSockets.
+  ws: false,
   xfwd: true,
   on: {
     proxyReq: (proxyReq, req, _res) => {
@@ -44,9 +46,7 @@ const vscoderProxy = createProxyMiddleware({
               const additions = tokens.filter(
                 (t) => !sources.toLowerCase().includes(t.toLowerCase()),
               );
-              return additions.length
-                ? `${directive} ${sources} ${additions.join(' ')}`
-                : _m;
+              return additions.length ? `${directive} ${sources} ${additions.join(' ')}` : _m;
             });
           } else {
             csp += ` ${directive} ${tokens.join(' ')};`;

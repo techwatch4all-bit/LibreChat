@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import { GROUPS_QUERY_KEY } from './groups';
+import { adminFetch } from './client';
 
 export const USERS_QUERY_KEY = ['admin', 'users'] as const;
 
@@ -84,26 +85,26 @@ export async function fetchUsers(
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  const response = await fetch(`/api/admin/users${suffix}`, { signal });
+  const response = await adminFetch(`/api/admin/users${suffix}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as UsersResponse;
 }
 
 export async function searchUsers(query: string, signal?: AbortSignal): Promise<{ users: AdminUserSearchResult[] }> {
   const qs = new URLSearchParams({ q: query });
-  const response = await fetch(`/api/admin/users/search?${qs.toString()}`, { signal });
+  const response = await adminFetch(`/api/admin/users/search?${qs.toString()}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { users: AdminUserSearchResult[] };
 }
 
 export async function fetchUserGroups(userId: string, signal?: AbortSignal): Promise<{ groups: AdminUserGroup[] }> {
-  const response = await fetch(`/api/admin/users/${userId}/groups`, { signal });
+  const response = await adminFetch(`/api/admin/users/${userId}/groups`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { groups: AdminUserGroup[] };
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<{ ok: boolean; temporaryPassword?: string; user: AdminUserListItem }> {
-  const response = await fetch('/api/admin/users', {
+  const response = await adminFetch('/api/admin/users', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -113,7 +114,7 @@ export async function createUser(payload: CreateUserPayload): Promise<{ ok: bool
 }
 
 export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<{ user: AdminUserListItem }> {
-  const response = await fetch(`/api/admin/users/${userId}`, {
+  const response = await adminFetch(`/api/admin/users/${userId}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -123,7 +124,7 @@ export async function updateUser(userId: string, payload: UpdateUserPayload): Pr
 }
 
 export async function resetPassword(userId: string): Promise<{ ok: boolean; temporaryPassword: string }> {
-  const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+  const response = await adminFetch(`/api/admin/users/${userId}/reset-password`, {
     method: 'POST',
   });
   if (!response.ok) throw await readError(response);
@@ -131,7 +132,7 @@ export async function resetPassword(userId: string): Promise<{ ok: boolean; temp
 }
 
 export async function fetchCsvTemplate(): Promise<string> {
-  const response = await fetch('/api/admin/users/csv-template');
+  const response = await adminFetch('/api/admin/users/csv-template');
   if (!response.ok) throw await readError(response);
   return await response.text();
 }
@@ -143,7 +144,7 @@ export async function bulkCreateUsers(payload: { csvData?: string; users?: any[]
   skipped: Array<{ email: string; reason: string }>;
   slips: Array<{ id: string | null; name: string; email: string; role: string; accountType: string | null; group: string; tempPassword: string }>;
 }> {
-  const response = await fetch('/api/admin/users/bulk', {
+  const response = await adminFetch('/api/admin/users/bulk', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -237,7 +238,7 @@ export function useResetPasswordMutation(): UseMutationResult<
 }
 
 export async function deleteUser(userId: string): Promise<{ message: string }> {
-  const response = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+  const response = await adminFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { message: string };
 }
@@ -266,7 +267,7 @@ export async function assignSeatToken(
   userId: string,
   payload: AssignSeatPayload,
 ): Promise<{ accountType: string; seatAlias: string; oneapiTenant?: string; seatTokenHint: string }> {
-  const response = await fetch(`/api/admin/users/${userId}/seat-token`, {
+  const response = await adminFetch(`/api/admin/users/${userId}/seat-token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -279,7 +280,7 @@ export async function assignSeatToken(
 }
 
 export async function revokeSeatToken(userId: string): Promise<{ revoked: boolean }> {
-  const response = await fetch(`/api/admin/users/${userId}/seat-token`, { method: 'DELETE' });
+  const response = await adminFetch(`/api/admin/users/${userId}/seat-token`, { method: 'DELETE' });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     throw new Error(data?.error || `HTTP ${response.status}`);

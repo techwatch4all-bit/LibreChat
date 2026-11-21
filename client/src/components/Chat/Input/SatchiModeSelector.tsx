@@ -1,16 +1,28 @@
+/* eslint-disable i18next/no-literal-string */
 import React, { memo } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
+import { useNavigate } from 'react-router-dom';
+import { accountTypeModes, resolveTenantAccountType } from 'librechat-data-provider';
+import {
+  MessageSquare,
+  Briefcase,
+  GraduationCap,
+  ShieldCheck,
+  ChevronDown,
+  Code2,
+  Lock,
+  ArrowUpRight,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   TooltipAnchor,
 } from '@librechat/client';
-import { MessageSquare, Briefcase, GraduationCap, ShieldCheck, ChevronDown, Code2, Lock } from 'lucide-react';
 import type { EModelEndpoint, TConversation } from 'librechat-data-provider';
-import { accountTypeModes, resolveTenantAccountType } from 'librechat-data-provider';
 import type { SetterOrUpdater } from 'recoil';
 import type { TranslationKeys } from '~/hooks/useLocalize';
 import {
@@ -19,10 +31,10 @@ import {
   satchiThinkAtom,
   type SatchiMode,
 } from '~/store/satchiStore';
+import { useGetStartupConfig, useProjectsInfiniteQuery } from '~/data-provider';
 import { useLocalize, useAuthContext } from '~/hooks';
-import { cn, getModelSpec } from '~/utils';
-import { useGetStartupConfig } from '~/data-provider';
 import SatchiUpgradeModal from './SatchiUpgradeModal';
+import { cn, getModelSpec } from '~/utils';
 
 interface SatchiModeSelectorProps {
   conversation?: TConversation | null;
@@ -93,6 +105,7 @@ function SatchiModeSelector({
   setConversation,
   disabled = false,
 }: SatchiModeSelectorProps) {
+  const navigate = useNavigate();
   const [currentMode, setMode] = useAtom(satchiModeAtom);
   const localize = useLocalize();
   const { user } = useAuthContext();
@@ -142,8 +155,12 @@ function SatchiModeSelector({
   const allowStudy = isAdmin || allowedModes.includes('Study');
   const canUseWorkTools =
     isAdmin ||
-    ((isPro || isPrivacySeat) && !isFamily && !isChild && (user?.tenantSeatCapabilities?.length ?? 0) > 0);
-  const canUsePrivacy = allowedModes.includes('Privacy') && !(isFamily && user?.privacyEntitled !== true);
+    ((isPro || isPrivacySeat) &&
+      !isFamily &&
+      !isChild &&
+      (user?.tenantSeatCapabilities?.length ?? 0) > 0);
+  const canUsePrivacy =
+    allowedModes.includes('Privacy') && !(isFamily && user?.privacyEntitled !== true);
 
   // If conversation has a spec, keep currentMode in sync if matching
   const activeMode = (conversation?.spec as SatchiMode) || currentMode;
@@ -154,6 +171,10 @@ function SatchiModeSelector({
   const setStyle = useSetAtom(satchiStyleAtom);
   const setThink = useSetAtom(satchiThinkAtom);
   const { data: startupConfig } = useGetStartupConfig();
+  const { data: projectsData } = useProjectsInfiniteQuery(
+    { sortBy: 'updatedAt', sortDirection: 'desc', limit: 10 },
+    { enabled: canUseWorkTools },
+  );
 
   const handleSelectMode = (mode: SatchiMode) => {
     if (disabled) return;
@@ -191,7 +212,9 @@ function SatchiModeSelector({
     if (setConversation) {
       setConversation((prev) => {
         if (!prev) return prev;
-        const targetEndpoint = (mode === 'Privacy' ? 'Satchida' : 'Satchida-Gateway') as EModelEndpoint;
+        const targetEndpoint = (
+          mode === 'Privacy' ? 'Satchida' : 'Satchida-Gateway'
+        ) as EModelEndpoint;
         const spec = getModelSpec({ specName: mode, startupConfig });
         const fallbackModelByMode: Record<SatchiMode, string> = {
           Chat: 'deepseek-ai/DeepSeek-V4-Flash-0731',
@@ -209,6 +232,20 @@ function SatchiModeSelector({
         };
       });
     }
+
+    if (mode === 'VibeCoder') {
+      const activeProjId = conversation?.chatProjectId;
+      if (activeProjId) {
+        navigate(`/projects/${activeProjId}`);
+      } else {
+        const availableProjects = projectsData?.pages?.[0]?.projects || [];
+        if (availableProjects.length > 0) {
+          navigate(`/projects/${availableProjects[0]._id}`);
+        } else {
+          navigate('/projects');
+        }
+      }
+    }
   };
 
   return (
@@ -224,12 +261,14 @@ function SatchiModeSelector({
                 disabled={disabled}
                 aria-label={`AI Mode: ${activeLabel}`}
                 className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary shadow-xs transition-all',
-                  'hover:border-border-medium hover:bg-surface-tertiary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+                  'shadow-xs inline-flex h-8 items-center gap-1.5 rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary transition-all',
+                  'focus-visible:outline-hidden focus-visible:ring-ring hover:border-border-medium hover:bg-surface-tertiary focus-visible:ring-1',
                   disabled && 'pointer-events-none opacity-50',
                 )}
               >
-                <ActiveIcon className={cn('h-3.5 w-3.5', activeDef.accentColor ?? 'text-text-secondary')} />
+                <ActiveIcon
+                  className={cn('h-3.5 w-3.5', activeDef.accentColor ?? 'text-text-secondary')}
+                />
                 <span>{activeLabel}</span>
                 <ChevronDown className="h-3 w-3 text-text-tertiary" />
               </button>
@@ -264,18 +303,23 @@ function SatchiModeSelector({
                   key={mode.id}
                   value={mode.id}
                   className={cn(
-                    'group flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs outline-hidden transition-colors',
+                    'outline-hidden group flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs transition-colors',
                     'hover:bg-surface-hover focus:bg-surface-hover',
                     isSelected && 'bg-surface-active-alt font-medium text-text-primary',
                     isLocked && 'opacity-85',
                   )}
                 >
-                  <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', mode.accentColor ?? 'text-text-secondary')} />
+                  <Icon
+                    className={cn(
+                      'mt-0.5 h-4 w-4 shrink-0',
+                      mode.accentColor ?? 'text-text-secondary',
+                    )}
+                  />
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-text-primary">{label}</span>
                       {mode.id === 'Privacy' && (
-                        <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-medium text-emerald-500">
+                        <span className="py-0.2 rounded-full bg-emerald-500/10 px-1.5 text-[10px] font-medium text-emerald-500">
                           100% Local
                         </span>
                       )}
@@ -286,12 +330,31 @@ function SatchiModeSelector({
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-text-secondary leading-tight mt-0.5">{desc}</div>
+                    <div className="mt-0.5 text-[11px] leading-tight text-text-secondary">
+                      {desc}
+                    </div>
                   </div>
                 </DropdownMenuRadioItem>
               );
             })}
           </DropdownMenuRadioGroup>
+
+          {activeMode === 'VibeCoder' && (
+            <>
+              <DropdownMenuSeparator className="my-1 border-t border-border-light/70" />
+              <button
+                type="button"
+                onClick={() => navigate('/projects')}
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-hover hover:text-text-primary"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Code2 className="size-3.5 text-text-secondary" />
+                  <span>Launch Satchida Code Workspace</span>
+                </div>
+                <ArrowUpRight className="size-3.5 text-text-tertiary" />
+              </button>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

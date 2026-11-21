@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 import type { TenantEntitlementSummary, TenantEntitlementUpdate } from 'librechat-data-provider';
+import { adminFetch } from './client';
 
 export const ADMIN_ENTITLEMENTS_QUERY_KEY = ['admin', 'entitlements'] as const;
 
@@ -16,7 +17,7 @@ async function readError(response: Response): Promise<Error> {
 export async function fetchEntitlements(signal?: AbortSignal): Promise<{
   entitlements: TenantEntitlementSummary[];
 }> {
-  const response = await fetch('/api/admin/entitlements', { signal });
+  const response = await adminFetch('/api/admin/entitlements', { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as { entitlements: TenantEntitlementSummary[] };
 }
@@ -25,7 +26,7 @@ export async function fetchEntitlement(
   tenantId: string,
   signal?: AbortSignal,
 ): Promise<{ entitlement: TenantEntitlementSummary }> {
-  const response = await fetch(
+  const response = await adminFetch(
     `/api/admin/entitlements/${encodeURIComponent(tenantId)}`,
     { signal },
   );
@@ -37,7 +38,7 @@ export async function putEntitlement(
   tenantId: string,
   update: TenantEntitlementUpdate,
 ): Promise<{ entitlement: TenantEntitlementSummary }> {
-  const response = await fetch(`/api/admin/entitlements/${encodeURIComponent(tenantId)}`, {
+  const response = await adminFetch(`/api/admin/entitlements/${encodeURIComponent(tenantId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(update),

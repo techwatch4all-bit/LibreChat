@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { adminFetch } from './client';
 
 export const AUDIT_LOG_QUERY_KEY = ['admin', 'audit-log'] as const;
 
@@ -64,7 +65,7 @@ export async function fetchAuditLog(
   if (params.offset != null) query.set('offset', String(params.offset));
   if (params.search) query.set('search', params.search);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  const response = await fetch(`/api/admin/audit-log${suffix}`, { signal });
+  const response = await adminFetch(`/api/admin/audit-log${suffix}`, { signal });
   if (!response.ok) throw await readError(response);
   return (await response.json()) as AuditLogResponse;
 }
@@ -82,7 +83,7 @@ export function useAuditLogQuery(
 }
 
 export async function verifyAuditChain(): Promise<AuditVerificationResult> {
-  const response = await fetch('/api/admin/audit-log/verify');
+  const response = await adminFetch('/api/admin/audit-log/verify');
   if (!response.ok) throw await readError(response);
   return (await response.json()) as AuditVerificationResult;
 }

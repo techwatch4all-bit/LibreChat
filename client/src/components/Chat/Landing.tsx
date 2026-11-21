@@ -112,17 +112,17 @@ export default function Landing({
     : (resolvedWelcome ?? scheduledGreeting);
 
   return (
-    <div className="mb-2 flex w-full shrink-0 flex-col items-center justify-center text-center transition-all duration-200">
-      <div className="mb-2 flex shrink-0 items-center justify-center">
+    <div className="satchida-landing-container mb-2 flex w-full shrink-0 flex-col items-center justify-center text-center transition-all duration-200">
+      <div className="satchida-mandala-wrapper mb-2 flex shrink-0 items-center justify-center">
         <img
           src="/assets/satchida/satchida-splash-mandala-dark.png?v=clean6"
           alt="Satchida AI Mandala"
-          className="pointer-events-none h-auto max-h-[270px] w-auto max-w-[340px] select-none object-contain drop-shadow-md sm:max-h-[290px] sm:max-w-[360px]"
+          className="satchida-mandala-img pointer-events-none h-auto select-none object-contain drop-shadow-md"
         />
       </div>
       <div
         ref={contentRef}
-        className="flex w-full max-w-2xl flex-col items-center justify-center gap-0 px-2 py-0.5 text-center"
+        className="flex w-full max-w-3xl flex-col items-center justify-center gap-0 px-2 py-0.5 text-center sm:max-w-4xl lg:max-w-5xl"
       >
         <div
           className={`flex ${textHasMultipleLines ? 'flex-col' : 'flex-col md:flex-row'} items-center justify-center gap-2`}

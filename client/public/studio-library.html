@@ -116,14 +116,28 @@ document.getElementById('copySel').onclick = async () => {
 
 async function load() {
   const grid = document.getElementById('grid');
+  // The per-user endpoint needs the in-memory access token, which a standalone
+  // page does not have (silentRefresh architecture), so fall back to the public
+  // static manifest of the same generated directory.
+  const sources = [
+    () => fetch('/api/studio/library', { credentials: 'include' }),
+    () => fetch('/generated/manifest.json', { credentials: 'include' }),
+  ];
   try {
-    const r = await fetch('/api/studio/library', { credentials: 'include' });
-    if (r.status === 401) {
+    let entries = null;
+    for (const src of sources) {
+      const r = await src();
+      if (!r.ok) continue;
+      const data = await r.json();
+      entries = Array.isArray(data) ? data : (data.items || data.entries || null);
+      if (Array.isArray(entries) && entries.length) break;
+      if (!Array.isArray(entries)) entries = null;
+    }
+    if (!entries) {
       grid.innerHTML = '<div class="empty">Sign in to LibreChat, then open your Studio Library again.</div>';
       return;
     }
-    const data = await r.json();
-    items = data.items || [];
+    items = entries;
     items.forEach(it => { it.kind = it.kind || ((it.url || '').match(/\.(mp4|webm)$/i) ? 'video' : 'image'); });
     if (!items.length) {
       grid.innerHTML = '<div class="empty">No creations yet — generate one from any Satchida Studio chat.</div>';

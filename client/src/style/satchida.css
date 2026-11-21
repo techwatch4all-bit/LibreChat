@@ -774,5 +774,57 @@ html[data-theme='satchida'] .satchida-chat-surface {
   backdrop-filter: blur(12px);
 }
 
+/**
+ * ============================================================================
+ * Responsive Canvas & Mandala Auto-Scaling / Zoom Clamping
+ * ============================================================================
+ */
+.satchida-landing-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Mandala dynamic responsive sizing across device resolutions */
+.satchida-mandala-img {
+  width: auto;
+  height: clamp(160px, 28vh, 360px);
+  max-width: min(90vw, 440px);
+  transition: height 0.25s ease, max-width 0.25s ease;
+}
+
+/* Phone Portrait: compact mandala so content fits comfortably */
+@media (max-width: 640px) {
+  .satchida-mandala-img {
+    height: clamp(130px, 22vh, 220px);
+    max-width: min(85vw, 260px);
+  }
+}
+
+/* Landscape Mode on Phones/Small Screens: shrink mandala to prevent vertical overflow */
+@media (orientation: landscape) and (max-height: 560px) {
+  .satchida-mandala-img {
+    height: clamp(90px, 20vh, 140px);
+    max-width: 180px;
+  }
+  .satchida-mandala-wrapper {
+    margin-bottom: 0.25rem !important;
+  }
+}
+
+/* Large Tablet / Desktop: expansive mandala filling available room */
+@media (min-width: 1024px) and (min-height: 800px) {
+  .satchida-mandala-img {
+    height: clamp(240px, 32vh, 400px);
+    max-width: 480px;
+  }
+}
+
+/* Prevent accidental horizontal canvas shift when zoomed */
+body {
+  overflow-x: hidden;
+}
+
+
+
 
 

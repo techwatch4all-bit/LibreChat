@@ -681,7 +681,11 @@ const ChatForm = memo(function ChatForm({
            asked for less motion gets the new position outright — this one is a
            slide across the page rather than decoration. */
         'mx-auto flex w-full flex-row gap-3 transition-[max-width,margin-bottom] duration-300 motion-reduce:transition-none sm:px-2',
-        maximizeChatSpace ? 'max-w-full' : 'md:max-w-3xl xl:max-w-4xl',
+        maximizeChatSpace
+          ? 'max-w-full'
+          : isLandingPage
+            ? 'max-w-3xl sm:max-w-4xl lg:max-w-5xl'
+            : 'md:max-w-3xl xl:max-w-4xl',
         bottomClearance,
       )}
     >
@@ -872,7 +876,7 @@ const ChatForm = memo(function ChatForm({
               )}
               <div
                 className={cn(
-                  '@container flex flex-wrap items-center gap-2 px-2 pb-2',
+                  'flex items-center gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar flex-nowrap',
                   isRTL ? 'flex-row-reverse' : 'flex-row',
                 )}
               >

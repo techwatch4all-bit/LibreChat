@@ -1,0 +1,17 @@
+{
+  "grammar": "y3_whiteboard",
+  "duration": 10,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "theme": "chalk",
+  "cues": [
+    { "at": 0.0, "kind": "draw", "text": "25 minutes", "data": { "icon": "clock" } },
+    { "at": 1.5, "kind": "point", "text": "only one thing in this time" },
+    { "at": 2.8, "kind": "draw", "text": "no switching", "data": { "icon": "target" } },
+    { "at": 4.1, "kind": "point", "text": "when the bell rings, rest 5 minutes" },
+    { "at": 5.4, "kind": "draw", "text": "a breath of change", "data": { "icon": "bulb" } },
+    { "at": 6.8, "kind": "point", "text": "a long break after four rounds" },
+    { "at": 8.2, "kind": "highlight", "data": { "target": "draw", "index": 0 } }
+  ]
+}

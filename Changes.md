@@ -3021,3 +3021,121 @@ offending custom node. CheapInference media unlocks with one dashboard action (B
 - `librechat.yaml`: Deduplicated repeated `satchida-tools` listings across all model specs.
 - Rebuilt `@librechat/api` (`npm run build:api`), passed full TypeScript typecheck (`npx tsc --noEmit`), and safely restarted LibreChat PM2 service (`librechat` #10).
 
+
+## 2026-11-20 — Satchida Procedural Art & Motion Art: rebrand, English-only, loader fix, MCP bridge, Studio presets
+
+**Context:** Operator directive (2026-11-20): all skill/repo content must be English-only, MIT/Apache
+skills rebranded to Satchida. Mission: audit loader compatibility, audit Python env, build the
+Satchida Art MCP bridge, deepen Studio UI integration, verify end-to-end on :3080.
+
+**Audit findings (pre-fix):**
+- `skill/claude-drawing-skill` would have crashed the ENTIRE deployment-skill registry on next
+  restart: frontmatter name `claude绘图` failed `SKILL_NAME_PATTERN` (kebab-case), description ~31k
+  chars > 1024 limit, body 743k chars > 100k limit. `loadDeploymentSkillsFromDirectory` uses
+  `Promise.all` — one throw aborts all skills.
+- `skill/huashu-art-motion`: 116 non-ASCII filenames failed `validateRelativePath`
+  (`/^[a-zA-Z0-9._\-/]+$/`) → same registry-wide abort.
+- PM2 log confirmed the last successful load was 22 skills at 17:37 — the new trees had never been
+  loaded; the next restart was a live grenade.
+- Python env (Python 3.11.9, the interpreter LibreChat spawns): mcp 2.x, Pillow 12.1.1, numpy
+  1.26.4, playwright, fontTools 4.62.1 all present in user site-packages (`python -I` hides them —
+  relevant to scene subprocesses).
+
+**Delivered:**
+- Deterministic ASCII rename of all 116 huashu paths + in-content path rewriting (43 files renamed,
+  84 text files updated). Directories rebranded: `skill/satchida-procedural-art`,
+  `skill/satchida-motion-art` (+ mirrored `repos/` renames).
+- New English `SKILL.md` for satchida-procedural-art (name/desc/body all within loader limits).
+- Translations dispatched and verified with the real loader offline: 24/24 skills load.
+- `skill/satchida-art-server.py`: `generate_procedural_art` (renders scene.py or matching example,
+  seed override, publishes to `/generated` + Studio Library manifest, never overwrites),
+  `create_kinetic_motion_clip` (deterministic film HTML honoring the OpenFilmStudio bridge:
+  `window.film.frame(t)/setMuted`, WebAudio foley cues, optional 60fps MP4 via the motion-server
+  Playwright+FFmpeg pipeline), `list_procedural_art_styles` (84), `list_motion_grammars` (9).
+- Hub auto-mount verified offline AND live after restart: 21 servers, 104 tools.
+- Functional probes: watercolor render (61.6s → `/generated/probe_watercolor.png`), motion clip
+  compile (28ms → `/generated/probe_motion.html`), 60fps MP4 export (240 frames, 137.7KB, 16s →
+  `/generated/probe_export60.mp4`).
+- Studio presets: `client/src/components/Artifacts/OpenFilm/stylePresets.ts` (82 art-style entries,
+  36 motion recipes, 9 grammars, deterministic film builder honoring the Studio bridge) +
+  OpenFilmStudio Presets panel (filterable, 3 tabs). 83 vendored 640px previews under
+  `client/public/assets/art-presets/` mirrored to dist. Client rebuilt twice (preview-URL fix).
+- Browser E2E on :3080 (Admin session): film artifact opens OpenFilmStudio; Presets panel live;
+  Ghibli recipe and Synthwave art preset load and PLAY (screenshots); Pause/Step/Loop/Mute verified
+  (mute toggles to Unmute); 60fps selector + Export present; Deterministic 60fps badge shown.
+- Fixed pre-existing Studio Library page 401: `client/public/studio-library.html` now falls back to
+  the public `/generated/manifest.json` (with an Array.prototype.entries parsing trap fixed);
+  page renders 17 artifacts including the MCP-published probe.
+- `pm2 restart librechat`: live log `Loaded 24 deployment skill(s)`, hub `Mounted 4 tools from
+  satchida-art-server.py`, app/preview/generated endpoints all 200.
+
+## 2026-11-20 (later) — In-chat art workflow verified live + prompt routing wired + bug fixes
+
+**Operator directive:** art must be created via LibreChat prompts until delivered; the prompts must
+use the two rebranded skills (upstream: alchaincyf/huashu-art-motion, cloveric/claude-drawing-skill)
+with their tools and functions.
+
+**Live workflow proof (real chat turn, zero stubs):** prompt "Paint a tiny watercolor mountain with
+seed 42 using generate_procedural_art" in the Chat lane → agent ran the Studio action (satchida-tools
+MCP) → watercolor rendered (~73.5s) → reply delivered the picture INLINE as a markdown image
+(`/generated/tiny_watercolor_mountain_seed42.png`, complete, 1920×1080) with seed/canvas/composition
+details. No external windows, no silent no-answer.
+
+**Prompt wiring (librechat.yaml, 18 model specs validated):**
+- Chat + Work: new "SATCHIDA PROCEDURAL ART & KINETIC MOTION" routing block — art requests →
+  `generate_procedural_art` (embed returned `/generated/...` URL as markdown image); kinetic clips →
+  `create_kinetic_motion_clip` (copy returned `embed_artifact` verbatim); full films → the
+  deployment skills `satchida-procedural-art` (82 styles) / `satchida-motion-art` (36 recipes + 9
+  grammars).
+- Study: added "Procedural Teaching Art & Animated Explainers" bullet inside Local STEM & Study Tools.
+- OpenFilm + Motion specs: replaced the stale `claude-drawing-skill` reference with the rebranded
+  skill names and both MCP tools.
+
+**Bugs fixed this pass:**
+1. Studio Library page 401 (pre-existing): `studio-library.html` now falls back to the public
+   `/generated/manifest.json` when the per-user endpoint is unauthorized; fixed the
+   `Array.prototype.entries` parsing trap; page renders 17 artifacts incl. MCP-published ones.
+2. Fine-art preset cards showed gradients instead of vendored previews (preview URL never set) —
+   now derived from `/assets/art-presets/<id>.jpg` layered over the palette gradient; pixel.jpg
+   generated; dist mirrored.
+3. `create_kinetic_motion_clip` MP4 publish missed the file (motion server returns `filename`, not
+   `file`) — fixed; 60fps export probe: 240 frames / 137.7KB in 16s → `/generated/probe_export60.mp4`.
+4. Motion-clip delivery contract hardened: tool now returns a small `embed_artifact` (iframe wrapper
+   streaming the saved film) that the model can emit reliably, with full HTML as fallback; embed
+   delivery verified in-app (iframe-streamed clip playing in the Studio panel with timeline).
+5. Scene subprocess isolation: `python -I` hid user-site Pillow — scenes now run un-isolated from a
+   neutral temp dir; seed-patched examples run as temp siblings inside examples/ so their `../lib`
+   sys.path resolution works.
+
+**Restart:** `pm2 restart librechat` — 24 deployment skills loaded, hub mounted 4 art tools (21
+servers / 104 tools), app 200.
+
+## 2026-11-20 (final pass) — quality gates, prompt routing live, lint/template alignment, upstream review
+
+**Quality validation against upstream:** fetched both upstream repos (cloveric/claude-drawing-skill:
+83 styles, per-style defect checklists, examples+gallery quality bar; alchaincyf/huashu-art-motion:
+36 styles + 9 grammars, qa/film_gate/deliver pipeline). Our in-repo trees match (82 style modules +
+toolkits, 57 recipe cards, 9 grammars, full qa/lint/deliver scripts). Rendered outputs visually
+verified benchmark-grade: watercolor (glazes/mist/paper texture), synthwave (chrome lettering,
+scanline sun, neon grid), ink wash (zen minimal composition, seal stamp) — bauhaus std 69.3,
+synthwave 43.7, ink 25.3.
+
+**Added:**
+- Post-render quality gate in `generate_procedural_art` (`_validate_render`): decode check, size
+  report, blank/solid-frame detection (pixel std < 4.0 warns the model before delivery).
+- Style→example alias map (`STYLE_EXAMPLE_ALIASES`) so toolkit styles without name-prefixed
+  examples (inkpaint→moon_river/bawansiqian, oilpaint→oil_wheatfield) still render.
+- Shot-list template ↔ storyboard_lint alignment: template headers now `Time | Subject | Action |
+  Camera | On-screen text | Method` and pre-table line `Character:` — parser regex (LOCK, column
+  map) passes; lint smoke test on the template's own example table: **Verdict: green**.
+- librechat.yaml prompt routing (Chat, Work, Study, OpenFilm, Motion specs) → both MCP tools +
+  skill names; stale `claude-drawing-skill` references replaced with rebranded names.
+
+**Restored per operator decision:** the full upstream showcase (clawd/mario demo assets) — repo is
+MIT under alchaincyf; files restored from the repos/ mirror.
+
+**Agent translation results:** procedural-art COMPLETE (35 lib + 90 examples + docs/defect-checklists
+(83 style tables, 1393 lines) + docs/style-api.md + README/PROVENANCE; 172 .py compile clean;
+benchmark render verified; zero Chinese). Motion-art docs COMPLETE (SKILL.md + 26 refs + 9 grammar
+docs + READMEs + PROVENANCE; zero Chinese). Engine scripts corpus in progress (parallelized:
+reference_films / scenes / demos agents + scripts agent on top-level files).

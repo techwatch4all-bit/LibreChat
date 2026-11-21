@@ -200,7 +200,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                             'relative z-10 w-full bg-presentation [view-transition-name:chat-form]',
                             !isLandingPage && 'scrollbar-gutter-spacer',
                             isLandingPage &&
-                              'mx-auto w-full max-w-2xl transition-all duration-200 sm:max-w-3xl',
+                              'mx-auto w-full max-w-3xl transition-all duration-200 sm:max-w-4xl lg:max-w-5xl',
                           )}
                         >
                           {isLandingPage && <ConversationStarters />}

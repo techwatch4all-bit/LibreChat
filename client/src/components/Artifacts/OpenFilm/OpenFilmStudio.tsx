@@ -21,6 +21,14 @@ import {
 } from 'lucide-react';
 import type { Artifact } from '~/common';
 import { renderFilmVideo, saveVideoToDisk, type ExportProgress } from './exportEngine';
+import {
+  ART_STYLE_PRESETS,
+  MOTION_RECIPE_PRESETS,
+  GRAMMAR_PRESETS,
+  artPreviewUrl,
+  artStylePresetToFilm,
+  motionPresetToFilm,
+} from './stylePresets';
 import { useCodeState } from '~/Providers/EditorContext';
 import { useLocalize } from '~/hooks';
 
@@ -59,7 +67,7 @@ type FPS = 24 | 30 | 60;
 
 export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStudioProps) {
   const _localize = useLocalize();
-  const { currentCode } = useCodeState();
+  const { currentCode, setCurrentCode } = useCodeState();
 
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [fps, setFps] = useState<FPS>(30);
@@ -77,6 +85,9 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
     if (typeof navigator === 'undefined') return false;
     return navigator.userAgent.toLowerCase().includes('firefox');
   });
+  const [showPresets, setShowPresets] = useState<boolean>(false);
+  const [presetTab, setPresetTab] = useState<'art' | 'motion' | 'grammar'>('motion');
+  const [presetQuery, setPresetQuery] = useState<string>('');
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -781,6 +792,20 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
 
         {/* Right: FPS & Save / Export */}
         <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setShowPresets((v) => !v)}
+            className={`flex items-center space-x-1 rounded border px-2 py-1 font-medium transition-colors ${
+              showPresets
+                ? 'border-purple-500/50 bg-purple-600/30 text-purple-200'
+                : 'border-slate-700/60 bg-slate-800 text-slate-200 hover:bg-slate-700'
+            }`}
+            title="One-click style presets: 82 fine-art styles, 36 motion recipes, 9 explainer grammars"
+          >
+            <Sparkles className="h-3 w-3" />
+            <span className="hidden sm:inline">Presets</span>
+          </button>
+
           <div className="flex items-center rounded border border-slate-800 bg-slate-900/80 font-mono text-[10px] text-slate-300">
             <button
               type="button"
@@ -845,6 +870,123 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
           >
             <X className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* Style Presets Panel (82 art styles / 36 motion recipes / 9 grammars) */}
+      {showPresets && (
+        <div className="absolute inset-x-0 top-11 z-30 flex max-h-[55%] flex-col border-b border-purple-500/30 bg-[#0d1326]/98 shadow-2xl backdrop-blur">
+          <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5">
+            <div className="flex items-center space-x-1">
+              {(
+                [
+                  { key: 'motion', label: `Motion Recipes (${MOTION_RECIPE_PRESETS.length})` },
+                  { key: 'art', label: `Fine Art Styles (${ART_STYLE_PRESETS.length})` },
+                  { key: 'grammar', label: `Grammars (${GRAMMAR_PRESETS.length})` },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setPresetTab(tab.key)}
+                  className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                    presetTab === tab.key
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={presetQuery}
+                onChange={(e) => setPresetQuery(e.target.value)}
+                placeholder="Filter presets..."
+                className="w-40 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] text-slate-200 placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPresets(false)}
+                className="text-slate-400 hover:text-slate-100"
+                aria-label="Close presets"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto p-3 sm:grid-cols-3 lg:grid-cols-5">
+            {(() => {
+              const q = presetQuery.trim().toLowerCase();
+              const match = (...fields: string[]) =>
+                !q || fields.some((f) => f.toLowerCase().includes(q));
+              if (presetTab === 'art') {
+                return ART_STYLE_PRESETS.filter((s) => match(s.id, s.label, s.look)).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setCurrentCode(artStylePresetToFilm(s));
+                      setShowPresets(false);
+                    }}
+                    className="group overflow-hidden rounded-lg border border-slate-800 bg-slate-900 text-left transition-colors hover:border-purple-500/60"
+                    title={`${s.label} — ${s.look}`}
+                  >
+                    <div
+                      className="h-16 w-full bg-cover bg-center"
+                      style={{
+                        backgroundImage: `url(${s.preview ?? artPreviewUrl(s.id)}), linear-gradient(135deg, ${s.palette.join(', ')})`,
+                      }}
+                    />
+                    <div className="p-1.5">
+                      <div className="truncate text-[11px] font-semibold text-slate-100">
+                        {s.label}
+                      </div>
+                      <div className="truncate text-[10px] text-slate-400">{s.look}</div>
+                    </div>
+                  </button>
+                ));
+              }
+              const list =
+                presetTab === 'motion'
+                  ? MOTION_RECIPE_PRESETS.filter((s) => match(s.id, s.label, s.look))
+                  : GRAMMAR_PRESETS.filter((s) => match(s.id, s.label, s.look));
+              return list.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setCurrentCode(motionPresetToFilm(s));
+                    setShowPresets(false);
+                  }}
+                  className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-left transition-colors hover:border-purple-500/60"
+                  title={`${s.label} — ${s.look}`}
+                >
+                  <div className="mb-1 flex h-8 items-center space-x-1">
+                    {s.palette.map((c, i) => (
+                      <span
+                        key={i}
+                        className="h-4 w-4 rounded-full border border-slate-700"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                  <div className="truncate text-[11px] font-semibold text-slate-100">
+                    {s.label}
+                  </div>
+                  <div className="truncate text-[10px] text-slate-400">{s.look}</div>
+                </button>
+              ));
+            })()}
+          </div>
+          <div className="border-t border-slate-800 px-3 py-1 text-[10px] text-slate-500">
+            One click loads a deterministic film into the Studio (Play / Pause / Scrubber / Mute /
+            MP4 export all live). Fine-art presets also document their
+            <span className="mx-1 font-mono text-purple-300">generate_procedural_art</span>
+            MCP call for full procedural renders in chat.
+          </div>
         </div>
       )}
 

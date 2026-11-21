@@ -1,0 +1,14 @@
+{
+  "grammar": "y5_kinetic_type",
+  "duration": 7.5,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "theme": "poster",
+  "cues": [
+    { "at": 0.7, "kind": "number", "text": "code bought with one sentence", "data": { "value": 3000, "suffix": " lines" } },
+    { "at": 2.6, "kind": "point", "text": "completion", "sub": "it used to finish a line", "data": { "label": "before", "key": "a line" } },
+    { "at": 4.3, "kind": "point", "text": "agent", "sub": "now it does the whole task", "data": { "label": "now", "key": "the whole task" } },
+    { "at": 5.6, "kind": "highlight", "data": { "word": "agent" } }
+  ]
+}

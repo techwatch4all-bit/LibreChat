@@ -769,3 +769,56 @@ Not upstream. Three pieces:
 4. **Configuration Cleanup (`librechat.yaml`)**:
    - Deduplicated repeated `satchida-tools` listings across model specs (`Chat`, `Work`, `Study`, `Vibecoding`, `Privacy`, `Panchang-Vedic`, `Architect-Studio`).
 
+## C36 — 2026-11-20: In-Repo Self-Containment & UI Confinement Law
+
+**Problem:** Dependent skills and repositories were located outside the repository (e.g. `~/.gemini/config/skills`), creating breakages upon tenant copying/cloning, and previous verification steps suggested opening raw `localhost` URLs outside the LibreChat interface.
+
+**Fixes & Invariants:**
+1. **In-Repo Directory Structure**:
+   - Dependent repositories cloned into `repos/` (`repos/claude-drawing-skill`, `repos/huashu-art-motion`).
+   - Deployment skills loaded via LibreChat native skill loader in `skill/` (`skill/claude-drawing-skill`, `skill/huashu-art-motion`).
+   - Core runtime never relies on external system directories.
+2. **Strict UI Confinement**:
+   - Never redirect users or provide links to raw external localhost URLs.
+   - All visual, motion, art, CAD, audio, and studio deliverables must render inside the native LibreChat UI via Artifacts (`:::artifact{type="application/vnd.librechat.film"}`) or the integrated Satchida Studio side panel.
+
+
+
+## C37 — 2026-11-20: Satchida Procedural Art & Motion Art skills — rebrand, English-only, loader-compatible, MCP bridge, Studio presets
+
+**Problem:** Two MIT upstream skills were cloned into the repo as `skill/claude-drawing-skill` and
+`skill/huashu-art-motion` with untranslated Chinese content. Three hard defects followed: (1) the
+deployment skill loader would have THROWN on next restart — `claude绘画` failed the kebab-case
+`SKILL_NAME_PATTERN`, the 31k-char description exceeded `SKILL_DESCRIPTION_MAX_LENGTH` (1024), the
+743KB body exceeded `SKILL_BODY_MAX_LENGTH` (100000), and huashu's 116 non-ASCII filenames failed
+`validateRelativePath` — and because `loadDeploymentSkillsFromDirectory` uses `Promise.all`, one bad
+skill aborts the whole registry, killing all 22 existing deployment skills; (2) operator directive
+2026-11-20 requires English-only content everywhere; (3) MIT skills must be rebranded to Satchida.
+
+**Fixes:**
+1. **Rebrand + restructure**: directories renamed to `skill/satchida-procedural-art` and
+   `skill/satchida-motion-art` (mirrored in `repos/`); PROVENANCE.md added to both (upstream credit:
+   cloveric/claude-drawing-skill, alchaincyf/huashu-art-motion, both MIT; original LICENSE files
+   retained). Operator English-only directive applied: deterministic ASCII rename of all 116
+   non-ASCII paths (style recipes, grammar docs, shot-list template, assets) plus full translation
+   of SKILL.md, references, style recipes (57 files), scripts, engine docs, READMEs, schemas.
+2. **Loader compliance**: new English SKILL.md for satchida-procedural-art (name kebab-case, desc
+   1003 chars, body 9.8k chars, 82-style table + workflow contract); satchida-motion-art SKILL.md
+   rewritten by translation agent (desc 405, body 30.5k). Verified with the REAL loader
+   (`loadDeploymentSkillsFromDirectory` via tsx): 24/24 skills load, no errors.
+3. **Satchida Art MCP bridge** (`skill/satchida-art-server.py`, auto-mounted by the Unified Hub as
+   server #21): `generate_procedural_art(style, prompt, palette, seed, scene_py, ...)` renders with
+   the procedural-art library and publishes to the stable Studio home `/generated/...` with a Studio
+   Library manifest entry (never overwrites, montage-compatible); `create_kinetic_motion_clip(grammar,
+   spec_json, audio_cues, render_mp4, ...)` compiles a deterministic OpenFilmStudio-compatible film
+   (window.film = {frame,duration,width,height,setMuted}, SEEK_FRAME/AUDIO_MUTE bridge, WebAudio
+   foley cues) and returns artifact-wrapped HTML plus a permalink; optional MP4 through the existing
+   satchida-motion-server Playwright+FFmpeg pipeline; discovery tools `list_procedural_art_styles`
+   (84 entries) and `list_motion_grammars` (9). Hub mount verified offline: 21 servers, 104 tools.
+4. **Studio presets UI** (`client/src/components/Artifacts/OpenFilm/stylePresets.ts` +
+   OpenFilmStudio integration): one-click Presets panel in the Studio toolbar with three tabs — 36
+   implemented motion recipes, 82 fine-art styles, 9 explainer grammars; each preset injects a
+   deterministic film honoring the studio bridge (Play/Pause/Scrubber/Mute/MP4 export live
+   immediately); fine-art presets carry vendored 640px benchmark previews from
+   `/assets/art-presets/<id>.jpg` (83 files, 4.4MB, mirrored to client/dist) and document the exact
+   MCP regeneration call. Client rebuilt; presets present in the production bundle.

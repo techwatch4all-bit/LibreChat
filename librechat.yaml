@@ -135,8 +135,11 @@ User message:
     maxToolResultChars: 50000
     headers:
       X-Bifrost-Mode: chat
-      X-Seat-Alias: '{{LIBRECHAT_USER_ID}}'
-      X-User-Id: '{{LIBRECHAT_USER_ID}}'
+      # Seat identity is resolved server-side (signed assertion via the
+      # privacy router, or the gateway's own resolution). Sending the raw
+      # LibreChat user id here used to key reservations and seat rows on
+      # Mongo ObjectIds; the gateway now rejects such aliases outright, and
+      # the headers below carry display data only.
       X-User-Name: '{{LIBRECHAT_USER_USERNAME}}'
     dropParams:
     - user
@@ -860,6 +863,8 @@ modelSpecs:
         EXECUTIVE REPORTS (.pdf & .docx): - Include Executive Summary, Markdown comparison tables (`| Col1 | Col2 |`), callouts (`> Strategic Directive: ...`), and phased implementation milestones.
         Always invoke `create_formatted_document` as soon as the brief is approved — never state you cannot create files, can only output text outlines, or cannot embed images. Always output the direct download link from the tool output so the user can download the file in 1 click: `[Download <filename>](/generated/<filename>)`.
 
+        SATCHIDA PROCEDURAL ART & KINETIC MOTION (in-repo skills + Satchida tools): When the user asks to "paint with code", "draw it yourself without an image model", or names a fine-art style (watercolor, ink wash, ukiyo-e, pixel art, synthwave, stained glass, Bauhaus, comic, and 74 more), call the `generate_procedural_art` tool (style + prompt + seed — deterministic, numpy+Pillow, no image model) and embed the returned `/generated/...` URL as a markdown image in your reply. When the user asks for a kinetic or animated clip (kinetic typography, explainer animation, animated chart, storybook motion), call the `create_kinetic_motion_clip` tool (grammar + spec JSON + audio cues) and copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel. For full multi-shot art films, consult the deployment skills `satchida-procedural-art` (82 styles, examples + defect checklists) and `satchida-motion-art` (36 style recipes + 9 explainer grammars, shot-list workflow).
+
         SATCHIDA ACCURACY & ZERO-HALLUCINATION CONTRACT — ALWAYS IN FORCE:
 
 
@@ -1158,6 +1163,8 @@ modelSpecs:
 
         Always invoke `create_formatted_document` as soon as the brief is approved — never state you cannot create files, can only output text outlines, or cannot embed images. Always present the direct download link from the tool output to the user so they can download the file with one click: `[Download <filename>](/generated/<filename>)`.
 
+        SATCHIDA PROCEDURAL ART & KINETIC MOTION (in-repo skills + Satchida tools): for "paint with code"/no-image-model art requests or any named fine-art style, call the `generate_procedural_art` tool (style + prompt + seed) and embed the returned `/generated/...` URL as a markdown image; for kinetic clips and animated explainers, call the `create_kinetic_motion_clip` tool (grammar + spec JSON + audio cues) and copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel. The deployment skills `satchida-procedural-art` (82 styles) and `satchida-motion-art` (36 recipes + 9 grammars) document the catalogs and workflows.
+
         SATCHIDA ACCURACY & ZERO-HALLUCINATION CONTRACT — ALWAYS IN FORCE:
 
 
@@ -1400,6 +1407,7 @@ modelSpecs:
            - You have access to the local Satchida STEM & Study Engine (satchida-stem-study) for exact symbolic mathematics (SymPy), pedagogical step-by-step algebra (`solve_pedagogical_algebra`), offline interactive PhET simulations (`get_interactive_stem_simulation`), offline Kiwix ZIM lookup (`query_local_zim_library`), calculus differentiation/integration, matrix linear algebra, function plotting (Matplotlib), chemistry equation balancing, CODATA physical constants, educational visual download (`fetch_learning_visuals`), and video search (`search_curated_learning_videos`).
            - Always invoke these tools for exact calculations rather than estimating or hallucinating arithmetic.
            - You also have access to the Satchida Knowledge Vault (satchida-knowledge-vault) for generating study notes, PDF lesson plans, PowerPoint review decks, and semantic searching across textbooks.
+           - **Procedural Teaching Art & Animated Explainers**: when a student asks you to draw/paint a diagram or illustration yourself ("paint it with code", "draw it without an image model"), call the `generate_procedural_art` tool (style + prompt + seed) and embed the returned `/generated/...` URL as a markdown image; when a concept needs a short animated explainer (kinetic typography, animated chart, whiteboard sketch), call the `create_kinetic_motion_clip` tool (grammar + spec JSON) and copy the returned `embed_artifact` block verbatim. The deployment skills `satchida-procedural-art` (82 styles) and `satchida-motion-art` (36 recipes + 9 grammars) document the full style catalogs.
 
         5. **Hands-On & Socratic Guidance**:
            - For complex problems, break solutions into numbered milestones with progressive hints.
@@ -2118,7 +2126,7 @@ modelSpecs:
            - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: Three.js + GSAP deterministic timeline (window.__TIMELINE__ and window.__SEEK_FRAME__).
            - Kinetic Typography / Brand Openers / Motion Promos: BangMotion & Remotion kinetic typography with GSAP easing.
            - Cinematic Narratives / Historical / Story-to-Animation: Cinematic-Film camera choreography synced to narration beats.
-           - Procedural Art / Storybook / Non-3D Aesthetics: Procedural illustration styles (watercolor, ink wash, sketch, anime via claude-drawing-skill).
+           - Procedural Art / Storybook / Non-3D Aesthetics: still art via the `generate_procedural_art` MCP tool (Satchida Procedural Art skill `satchida-procedural-art` — 82 styles: watercolor, ink wash, sketch, anime, synthwave, ...); kinetic clips and animated explainers via the `create_kinetic_motion_clip` MCP tool (Satchida Motion Art skill `satchida-motion-art` — 36 style recipes + 9 explainer grammars). IMPORTANT FOR ART LEARNERS & PROMPT RECREATION: When the user specifies particular scene objects or elements (e.g. mountain, river, boat, person, temple, tree, animals, or specific color schemes), DO NOT rely on static preset scenes; synthesize custom `scene_py` code utilizing the style classes in `lib/` and pass it to `generate_procedural_art` so the exact user concept is painted deterministically. Explain the procedural glaze and geometry steps to the learner. Copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel with Play/Pause/Scrubber/Mute and MP4 export.
            - Foley & Audio Design: Map frame-accurate sound effects with real-sfx and balance acoustic loudness with earshot.
            - Multi-Scene Long Video / YouTube Production: Formulate a GLM 5.3 Flash / MiniMax-H3 beat grid combining visual scenes, synchronized voiceover narration, and ambient/foley tracks.
 
@@ -2249,7 +2257,7 @@ modelSpecs:
            - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: Three.js + GSAP deterministic timeline (window.__TIMELINE__ and window.__SEEK_FRAME__).
            - Kinetic Typography / Brand Openers / Motion Promos: BangMotion & Remotion kinetic typography with GSAP easing.
            - Cinematic Narratives / Historical / Story-to-Animation: Cinematic-Film camera choreography synced to narration beats.
-           - Procedural Art / Storybook / Non-3D Aesthetics: Procedural illustration styles (watercolor, ink wash, sketch, anime via claude-drawing-skill).
+           - Procedural Art / Storybook / Non-3D Aesthetics: still art via the `generate_procedural_art` MCP tool (Satchida Procedural Art skill `satchida-procedural-art` — 82 styles: watercolor, ink wash, sketch, anime, synthwave, ...); kinetic clips and animated explainers via the `create_kinetic_motion_clip` MCP tool (Satchida Motion Art skill `satchida-motion-art` — 36 style recipes + 9 explainer grammars). IMPORTANT FOR ART LEARNERS & PROMPT RECREATION: When the user specifies particular scene objects or elements (e.g. mountain, river, boat, person, temple, tree, animals, or specific color schemes), DO NOT rely on static preset scenes; synthesize custom `scene_py` code utilizing the style classes in `lib/` and pass it to `generate_procedural_art` so the exact user concept is painted deterministically. Explain the procedural glaze and geometry steps to the learner. Copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel with Play/Pause/Scrubber/Mute and MP4 export.
            - Foley & Audio Design: Map frame-accurate sound effects with real-sfx and balance acoustic loudness with earshot.
            - Multi-Scene Long Video / YouTube Production: Formulate a GLM 5.3 Flash / MiniMax-H3 beat grid combining visual scenes, synchronized voiceover narration, and ambient/foley tracks.
 

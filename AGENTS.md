@@ -340,3 +340,18 @@ model-selection dropdown once (2026-11-10); it must never happen again.
   alone. Reference: `skill/llama-fleet-troubleshoot/SKILL.md` (triage order: server →
   model → autostart → resources; stop at the first red layer; never restart or switch
   models without user confirmation).
+
+### 7. In-Repo Self-Containment & UI Confinement Law (NON-NEGOTIABLE)
+
+1. **Zero External Skill / Repository Leaks**:
+   - Every skill, submodule, script, and external dependency required by LibreChat or Satchida must live **inside** the `LibreChat` repository directory:
+     - Dependent repositories belong under `d:\LAN-AI-Infra\LibreChat\repos\<repo-name>`.
+     - Deployment skills belong under `d:\LAN-AI-Infra\LibreChat\skill\<skill-name>\SKILL.md`.
+   - Never reference paths outside `d:\LAN-AI-Infra\LibreChat` (such as `~/.gemini/config/skills` or external system folders) for core runtime tasks, so cloning or copying the repo to tenant edge nodes works out-of-the-box.
+
+2. **Never Jump Out of the LibreChat UI**:
+   - The user must **never** be directed to external raw URLs, new browser windows, or localhost server ports (e.g. `http://localhost:3080/assets/...`).
+   - All visual, motion, art, CAD, audio, and studio deliverables **MUST** render natively within the LibreChat interface:
+     - Render through **Artifacts** (`:::artifact{identifier="..." type="application/vnd.librechat.film" ...}`) or the **Satchida Studio Side Panel** (`OpenFilmStudio.tsx` / `ArtifactTabs.tsx`).
+     - Procedural artwork, images, and documents must display as in-chat media previews or within the embedded **Studio Library** panel.
+   - Any animation, motion graphics, or video preview must run with its timeline scrubber, foley audio controls, and MP4 export buttons contained entirely within LibreChat's embedded side-panel sandbox.

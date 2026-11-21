@@ -1,6 +1,41 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import type { ComponentType } from 'react';
 import { useAtom } from 'jotai';
-import { Search, X } from 'lucide-react';
+import {
+  Search,
+  X,
+  Coins,
+  Bot,
+  Scale,
+  AlertTriangle,
+  TrendingUp,
+  HeartPulse,
+  Train,
+  FileSearch,
+  ShieldCheck,
+  Lightbulb,
+  GraduationCap,
+  BookOpen,
+  Code2,
+  Database,
+  Cpu,
+  Layers,
+  ShieldAlert,
+  Home,
+  Sun,
+  Flame,
+  FileSpreadsheet,
+  FileText,
+  ShoppingCart,
+  Wrench,
+  Compass,
+  Boxes,
+  Sparkles,
+  PenTool,
+  Pill,
+  Radio,
+  Atom,
+} from 'lucide-react';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import type { MotionStudioGroupId, StarterItem } from '~/common/starters';
 import {
@@ -27,6 +62,140 @@ import { useLocalize } from '~/hooks';
  * staging a new starter detaches the previous one.
  */
 let stagedTabHandler: ((ev: KeyboardEvent) => void) | null = null;
+
+/**
+ * Helper to resolve high-definition SVG/Lucide icons with gold-standard
+ * visual presentation for each persona, reflecting its exact domain subject.
+ */
+interface PersonaVisual {
+  Icon: ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+}
+
+const getPersonaVisual = (title: string, badge?: string): PersonaVisual => {
+  const text = `${title} ${badge ?? ''}`.toLowerCase();
+
+  // 1. Precious Metals, Bullion & Fuel
+  if (text.includes('gold') || text.includes('silver') || text.includes('bullion') || text.includes('jeweller')) {
+    return { Icon: Coins, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
+  }
+  if (text.includes('fuel') || text.includes('petrol') || text.includes('diesel') || text.includes('lpg')) {
+    return { Icon: Flame, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' };
+  }
+
+  // 2. AI Model Releases, LLM, Neural & Architecture
+  if (text.includes('ai model') || text.includes('model release') || text.includes('llm') || text.includes('benchmark')) {
+    return { Icon: Bot, color: 'text-indigo-400', bg: 'bg-indigo-500/10 border-indigo-500/20' };
+  }
+  if (text.includes('dijkstra') || text.includes('backprop') || text.includes('neural') || text.includes('quantum')) {
+    return { Icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' };
+  }
+
+  // 3. Governance, Law, Gazette, Court & Compliance
+  if (
+    text.includes('court') ||
+    text.includes('govt') ||
+    text.includes('gazette') ||
+    text.includes('judgment') ||
+    text.includes('legal') ||
+    text.includes('rbi') ||
+    text.includes('circular')
+  ) {
+    return { Icon: Scale, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
+  }
+
+  // 4. Disaster, Weather, IMD & SOS Alerts
+  if (text.includes('disaster') || text.includes('weather') || text.includes('cyclone') || text.includes('flood') || text.includes('alert') || text.includes('imd')) {
+    return { Icon: AlertTriangle, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' };
+  }
+
+  // 5. Financial Markets, Equities, Crypto & Trading
+  if (text.includes('market wrap') || text.includes('indices') || text.includes('stock') || text.includes('crypto') || text.includes('equity') || text.includes('dcf')) {
+    return { Icon: TrendingUp, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' };
+  }
+
+  // 6. Public Health, Medicine, Clinic & AQI
+  if (text.includes('aqi') || text.includes('health') || text.includes('outbreak') || text.includes('cpcb') || text.includes('clinic')) {
+    return { Icon: HeartPulse, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' };
+  }
+  if (text.includes('medicine') || text.includes('drug') || text.includes('ddx') || text.includes('pharma')) {
+    return { Icon: Pill, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
+  }
+
+  // 7. Transit, Rail, Flight & Road Highways
+  if (text.includes('rail') || text.includes('flight') || text.includes('road') || text.includes('transit') || text.includes('highway') || text.includes('traffic')) {
+    return { Icon: Train, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
+  }
+
+  // 8. Policy Research & Audit
+  if (text.includes('policy') || text.includes('audit') || text.includes('research') || text.includes('scheme') || text.includes('scholar')) {
+    return { Icon: FileSearch, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' };
+  }
+
+  // 9. Document Vault, Vector Search, Knowledge & RAG
+  if (text.includes('vault') || text.includes('lancedb') || text.includes('rag') || text.includes('indexed') || text.includes('private strategy') || text.includes('offline document')) {
+    return { Icon: ShieldCheck, color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' };
+  }
+  if (text.includes('security') || text.includes('threat') || text.includes('cve') || text.includes('iso 27001') || text.includes('soc 2')) {
+    return { Icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' };
+  }
+
+  // 10. First-Principles Explainer & Deep Concepts
+  if (text.includes('first-principles') || text.includes('explainer') || text.includes('scratch') || text.includes('trade-off')) {
+    return { Icon: Lightbulb, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' };
+  }
+
+  // 11. Academic, Curriculum & Chapter Tutoring
+  if (text.includes('cbse') || text.includes('igcse') || text.includes('tutor') || text.includes('curriculum') || text.includes('study book') || text.includes('grade')) {
+    return { Icon: GraduationCap, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' };
+  }
+  if (text.includes('textbook') || text.includes('exercise') || text.includes('chapter') || text.includes('notes') || text.includes('study')) {
+    return { Icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
+  }
+
+  // 12. Coding, Python & Software Architecture
+  if (text.includes('python') || text.includes('code review') || text.includes('api architecture') || text.includes('async task') || text.includes('binary search')) {
+    return { Icon: Code2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
+  }
+  if (text.includes('sql') || text.includes('query') || text.includes('database') || text.includes('indexing')) {
+    return { Icon: Database, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
+  }
+
+  // 13. Science, Physics, Math & Formulas
+  if (text.includes('physics') || text.includes('emi problem') || text.includes('wave-particle') || text.includes('thermodynamics') || text.includes('quadratic') || text.includes('kirchhoff') || text.includes('newton')) {
+    return { Icon: Atom, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' };
+  }
+
+  // 14. Architecture, 3D, Floor Plans & Home Building
+  if (text.includes('3bhk') || text.includes('duplex') || text.includes('villa') || text.includes('vastu') || text.includes('floor plan') || text.includes('room reconstruction')) {
+    return { Icon: Home, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' };
+  }
+
+  // 15. Vedic, Panchang, Astrology & Solar
+  if (text.includes('panchang') || text.includes('muhurat') || text.includes('festival') || text.includes('solar') || text.includes('daylighting') || text.includes('sun-path')) {
+    return { Icon: Sun, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
+  }
+
+  // 16. Office, Spreadsheets, Budget & Documents
+  if (text.includes('budget') || text.includes('spreadsheet') || text.includes('inventory') || text.includes('sales & expense') || text.includes('kpi dashboard')) {
+    return { Icon: FileSpreadsheet, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
+  }
+  if (text.includes('formal letter') || text.includes('bill') || text.includes('agreement') || text.includes('statement') || text.includes('prd') || text.includes('deck')) {
+    return { Icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
+  }
+  if (text.includes('grocery') || text.includes('cart') || text.includes('restock')) {
+    return { Icon: ShoppingCart, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' };
+  }
+
+  // 17. Hardware, DIY & Makers
+  if (text.includes('arduino') || text.includes('esp32') || text.includes('appliance') || text.includes('diy') || text.includes('repair')) {
+    return { Icon: Wrench, color: 'text-zinc-300', bg: 'bg-zinc-500/10 border-zinc-500/20' };
+  }
+
+  // Default Sovereign Insight Icon
+  return { Icon: Sparkles, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
+};
 
 const ConversationStarters = () => {
   const { conversation } = useChatContext();
@@ -444,8 +613,8 @@ const ConversationStarters = () => {
       ) : (
         <div
           className={cn(
-            'grid w-full grid-cols-1 gap-2 sm:grid-cols-2',
-            isScrollableGrid && 'max-h-[290px] overflow-y-auto pr-0.5',
+            'grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3',
+            isScrollableGrid && 'max-h-[320px] overflow-y-auto pr-0.5',
           )}
         >
           {displayedStarters.map((item: StarterItem, index: number) => {
@@ -471,116 +640,66 @@ const ConversationStarters = () => {
               }
             }
 
-            // Extract leading emoji from title if icon wasn't explicitly provided
-            if (title && !icon) {
-              const emojiMatch = title.match(
-                /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/u,
-              );
-              if (emojiMatch) {
-                icon = emojiMatch[1];
-                title = title.slice(emojiMatch[0].length).trim();
-              }
+            // Strip leading emoji from title if any exists
+            let cleanTitle = title ?? '';
+            const emojiMatch = cleanTitle.match(
+              /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/u,
+            );
+            if (emojiMatch) {
+              cleanTitle = cleanTitle.slice(emojiMatch[0].length).trim();
             }
 
-            if (!icon) {
-              // Assign distinct contextual icon based on badge or title keywords
-              const lower = `${title} ${item.badge ?? ''}`.toLowerCase();
-              if (lower.includes('gold') || lower.includes('bullion') || lower.includes('rates')) {
-                icon = '🌟';
-              } else if (
-                lower.includes('model') ||
-                lower.includes('ai') ||
-                lower.includes('tech') ||
-                lower.includes('code')
-              ) {
-                icon = '🤖';
-              } else if (
-                lower.includes('law') ||
-                lower.includes('court') ||
-                lower.includes('govt') ||
-                lower.includes('precedent')
-              ) {
-                icon = '⚖️';
-              } else if (
-                lower.includes('alert') ||
-                lower.includes('disaster') ||
-                lower.includes('sos') ||
-                lower.includes('emergency')
-              ) {
-                icon = '🚨';
-              } else if (
-                lower.includes('stock') ||
-                lower.includes('market') ||
-                lower.includes('crypto') ||
-                lower.includes('equity')
-              ) {
-                icon = '📈';
-              } else if (
-                lower.includes('health') ||
-                lower.includes('pharma') ||
-                lower.includes('clinic') ||
-                lower.includes('medicine')
-              ) {
-                icon = '🩺';
-              } else if (
-                lower.includes('rail') ||
-                lower.includes('transit') ||
-                lower.includes('flight') ||
-                lower.includes('traffic')
-              ) {
-                icon = '🚆';
-              } else if (
-                lower.includes('research') ||
-                lower.includes('policy') ||
-                lower.includes('audit') ||
-                lower.includes('scholar')
-              ) {
-                icon = '🔬';
-              } else if (
-                lower.includes('vault') ||
-                lower.includes('rag') ||
-                lower.includes('security') ||
-                lower.includes('privacy')
-              ) {
-                icon = '🛡️';
-              } else if (lower.includes('panchang') || lower.includes('vedic')) {
-                icon = '🕉️';
-              } else if (lower.includes('ayurv')) {
-                icon = '🌿';
-              } else {
-                icon = '💡';
-              }
-            }
+            // Resolve modern gold-standard domain visual for this persona
+            const visual = getPersonaVisual(cleanTitle, item.badge);
+            const PersonaIcon = visual.Icon;
 
             return (
               <button
-                key={`${item.badgeKey ?? item.badge ?? index}-${title ?? index}`}
+                key={`${item.badgeKey ?? item.badge ?? index}-${cleanTitle ?? index}`}
                 type="button"
-                aria-label={title && description ? `${title}. ${description}` : item.prompt}
+                aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
                 onClick={() => handleStarterClick(item)}
                 style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
-                className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3 py-2 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
+                className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3.5 py-2.5 sm:py-3 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
               >
                 <div className="flex w-full items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 overflow-hidden">
-                    <span className="shrink-0 text-sm leading-none" aria-hidden="true">
-                      {icon}
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <span
+                      className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-lg border transition-transform duration-150 group-hover:scale-105',
+                        visual.bg,
+                        visual.color,
+                      )}
+                      aria-hidden="true"
+                    >
+                      <PersonaIcon className="size-3.5" />
                     </span>
-                    <span className="truncate text-xs font-semibold text-text-primary group-hover:text-text-primary">
-                      {title}
+                    <span className="truncate text-[13px] font-semibold text-text-primary group-hover:text-text-primary">
+                      {cleanTitle}
                     </span>
                   </div>
                   {item.badge && (
-                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[9px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted">
+                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted">
                       {item.badgeKey
                         ? localize(item.badgeKey, { defaultValue: item.badge })
                         : item.badge}
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-normal text-text-secondary group-hover:text-text-primary/90">
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-secondary group-hover:text-text-primary/90">
                   {description}
                 </p>
+                {item.engineTag && (
+                  <div className="mt-2.5 flex w-full items-center justify-between border-t border-border-light/50 pt-1.5 text-[10px] text-text-tertiary">
+                    <span className="flex items-center gap-1 font-mono font-medium tracking-tight text-text-secondary group-hover:text-text-primary">
+                      <span className="inline-block size-1.5 rounded-full bg-emerald-500/80"></span>
+                      {item.engineTag}
+                    </span>
+                    <span className="text-[9px] uppercase tracking-wider text-text-tertiary group-hover:text-text-secondary">
+                      Click to stage
+                    </span>
+                  </div>
+                )}
               </button>
             );
           })}

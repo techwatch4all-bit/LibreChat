@@ -913,4 +913,167 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
       expect(fs.existsSync(path.join(userRoot, 'media', 'projects'))).toBe(true);
     });
   });
+
+  describe('Privacy tier & mode local llama :8080 routing', () => {
+    it('routes privacy-tier user in privacy mode to local llama :8080 with loaded model, and other modes/tiers to Satchida Gateway', async () => {
+      const prevVk = process.env.SATCHIDA_GATEWAY_VK;
+      const prevAutoRouter = process.env.SATCHIDA_AUTOROUTER_BASE_URL;
+      const prevLlama = process.env.SATCHIDA_LLAMA_BASE_URL;
+      process.env.SATCHIDA_GATEWAY_VK = 'test-vk-secret';
+      process.env.SATCHIDA_AUTOROUTER_BASE_URL = 'http://127.0.0.1:4000/v1';
+      process.env.SATCHIDA_LLAMA_BASE_URL = 'http://127.0.0.1:8080/v1';
+
+      const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+      const mockFetch = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        fetchCalls.push({ url, init });
+        if (url.includes('/prompt_async')) {
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/session')) {
+          return new Response(
+            JSON.stringify({
+              id: 'ses-1',
+              title: 'T',
+              directory: projectRoot,
+              time: { created: 1, updated: 1 },
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          );
+        }
+        if (url === 'http://127.0.0.1:8080/v1/models') {
+          return new Response(
+            JSON.stringify({
+              data: [
+                { id: 'unloaded-model', status: { value: 'unloaded' } },
+                { id: 'Ternary-Bonsai-2-9B-PQ2_0-MTP-Q8_0', status: { value: 'loaded' } },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(JSON.stringify({ id: 'chatcmpl-1', choices: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }) as unknown as typeof fetch;
+
+      try {
+        const handlers = createOpenCodeHttpHandlers({
+          getAppConfig: async () =>
+            ({
+              opencode: {
+                enabled: true,
+                serverUrl: 'http://127.0.0.1:4096',
+                allowedRoots: [allowedRoot],
+                maxFileBytes: 4096,
+                requestTimeoutMs: 5000,
+              },
+            }) as never,
+          getChatProject: async (uid, pid) => {
+            if (pid === 'proj-priv' && uid === 'user-priv') {
+              return { id: 'proj-priv', name: 'Priv', localPath: projectRoot };
+            }
+            if (pid === 'proj-pro' && uid === 'user-pro') {
+              return { id: 'proj-pro', name: 'Pro', localPath: projectRoot };
+            }
+            return null;
+          },
+          getServerPassword: () => 'pw',
+          getUserSeatCredential: async (uid) =>
+            uid === 'user-priv'
+              ? { seatToken: 'seat-priv-1', accountType: 'privacy', tenantId: 'tenant-a' }
+              : { seatToken: 'seat-pro-1', accountType: 'pro', tenantId: 'tenant-b' },
+          fetchImpl: mockFetch,
+        });
+
+        // 1. Record privacy-tier caller in privacy mode via createSessionPrompt
+        const recRes1 = makeRes();
+        await handlers.createSessionPrompt(
+          {
+            user: { id: 'user-priv', accountType: 'privacy' },
+            params: { projectId: 'proj-priv' },
+            headers: { 'x-satchida-mode': 'privacy' },
+            body: { prompt: 'hello privacy' },
+          } as unknown as Request,
+          recRes1.res,
+        );
+        expect(recRes1.state.statusCode).toBe(202);
+
+        fetchCalls.length = 0;
+        const proxyRes1 = makeRes();
+        await handlers.proxyLlmToGateway(
+          {
+            method: 'POST',
+            path: '/chat/completions',
+            headers: { authorization: 'Bearer test-vk-secret' },
+            body: {
+              model: 'satchida-pro',
+              messages: [
+                {
+                  role: 'system',
+                  content: '[Satchida-Context: projectId=proj-priv userId=user-priv]',
+                },
+              ],
+            },
+          } as unknown as Request,
+          proxyRes1.res,
+        );
+
+        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:8080/v1/models');
+        expect(fetchCalls[1]?.url).toBe('http://127.0.0.1:8080/v1/chat/completions');
+        const sentBody1 = JSON.parse(String(fetchCalls[1]?.init?.body ?? '{}'));
+        expect(sentBody1.model).toBe('Ternary-Bonsai-2-9B-PQ2_0-MTP-Q8_0');
+
+        // 2. Pro-tier user routes to Satchida Gateway on :4000 with their seatToken
+        const recRes2 = makeRes();
+        await handlers.createSessionPrompt(
+          {
+            user: { id: 'user-pro', accountType: 'pro' },
+            params: { projectId: 'proj-pro' },
+            headers: { 'x-satchida-mode': 'vibecoding' },
+            body: { prompt: 'hello pro' },
+          } as unknown as Request,
+          recRes2.res,
+        );
+        expect(recRes2.state.statusCode).toBe(202);
+
+        fetchCalls.length = 0;
+        const proxyRes2 = makeRes();
+        await handlers.proxyLlmToGateway(
+          {
+            method: 'POST',
+            path: '/chat/completions',
+            headers: { authorization: 'Bearer test-vk-secret' },
+            body: {
+              model: 'satchida-pro',
+              messages: [
+                {
+                  role: 'system',
+                  content: '[Satchida-Context: projectId=proj-pro userId=user-pro]',
+                },
+              ],
+            },
+          } as unknown as Request,
+          proxyRes2.res,
+        );
+
+        expect(fetchCalls.length).toBe(1);
+        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:4000/v1/chat/completions');
+        const sentHeaders2 = fetchCalls[0]?.init?.headers as Record<string, string>;
+        expect(sentHeaders2.Authorization).toBe('Bearer seat-pro-1');
+        expect(sentHeaders2['X-Tenant-Id']).toBe('tenant-b');
+      } finally {
+        if (prevVk === undefined) delete process.env.SATCHIDA_GATEWAY_VK;
+        else process.env.SATCHIDA_GATEWAY_VK = prevVk;
+        if (prevAutoRouter === undefined) delete process.env.SATCHIDA_AUTOROUTER_BASE_URL;
+        else process.env.SATCHIDA_AUTOROUTER_BASE_URL = prevAutoRouter;
+        if (prevLlama === undefined) delete process.env.SATCHIDA_LLAMA_BASE_URL;
+        else process.env.SATCHIDA_LLAMA_BASE_URL = prevLlama;
+      }
+    });
+  });
 });

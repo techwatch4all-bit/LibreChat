@@ -438,12 +438,13 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
   const previewManager = deps.previewManager ?? createOpenCodePreviewManager();
   interface SeatCallerRecord {
     userId: string;
-    tenantId?: string | null;
     projectId?: string;
     projectRoot?: string;
     isPlatformAdmin: boolean;
     seatToken?: string | null;
     accountType?: string | null;
+    tenantId?: string | null;
+    mode?: string | null;
     updatedAt: number;
   }
 
@@ -463,7 +464,17 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
     if (!PLATFORM_OPERATOR_TENANTS.has(tenantId)) {
       return false;
     }
-    return (req.user?.role ?? '').toUpperCase() === 'ADMIN';
+    if ((req.user?.role ?? '').toUpperCase() === 'ADMIN') {
+      return true;
+    }
+    if (deps.isUserInPlatformAdminGroup) {
+      try {
+        return await deps.isUserInPlatformAdminGroup(userId);
+      } catch {
+        return false;
+      }
+    }
+    return false;
   }
 
   async function recordActiveLlmCaller(
@@ -477,12 +488,14 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
     const isPlatformAdmin = await isPlatformAdminUser(req);
     let seatToken: string | null | undefined = req.user?.seatToken;
     let accountType: string | null | undefined = req.user?.accountType;
+    let tenantId: string | null | undefined = req.user?.tenantId;
 
     if (deps.getUserSeatCredential) {
       const cred = await deps.getUserSeatCredential(userId);
       if (cred) {
         seatToken = cred.seatToken ?? seatToken;
         accountType = cred.accountType ?? accountType;
+        tenantId = cred.tenantId ?? tenantId;
         if (cred.familyRole === 'minor' || cred.familyRole === 'child') {
           return { ok: false, error: { code: 'OPENCODE_UNAUTHORIZED', status: 403 } };
         }
@@ -497,6 +510,17 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
       return { ok: false, error: { code: 'OPENCODE_UNAUTHORIZED', status: 403 } };
     }
 
+    const headerMode =
+      typeof req.headers?.['x-satchida-mode'] === 'string'
+        ? req.headers['x-satchida-mode'].trim()
+        : undefined;
+    const bodyMode =
+      req.body && typeof (req.body as { mode?: unknown }).mode === 'string'
+        ? ((req.body as { mode: string }).mode || '').trim()
+        : undefined;
+    const existingCaller = callersByUserId.get(userId);
+    const mode = headerMode || bodyMode || existingCaller?.mode || undefined;
+
     const record: SeatCallerRecord = {
       userId,
       projectId: context?.projectId,
@@ -504,6 +528,8 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
       isPlatformAdmin,
       seatToken,
       accountType,
+      tenantId,
+      mode,
       updatedAt: Date.now(),
     };
     activeLlmCaller = record;
@@ -2106,19 +2132,36 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         }
 
         // Privacy Mode & Tier Enforcement:
-        // When user is on privacy tier OR privacy mode is requested, route STRICTLY
-        // to the local llama.cpp fleet on 127.0.0.1:8080 (zero cloud/gateway routing).
+        // When a Privacy-tier user selects 'privacy' mode, route STRICTLY to the
+        // local llama.cpp fleet on 127.0.0.1:8080 using the currently loaded model
+        // (zero cloud/gateway routing). For all other modes and entitled tiers,
+        // route through Satchida Gateway using the user's seatToken.
         const isPrivacyTier = caller?.accountType?.toLowerCase() === 'privacy';
-        const isPrivacyMode =
-          req.headers['x-satchida-mode']?.toString().toLowerCase() === 'privacy' || isPrivacyTier;
+        const requestedMode = (
+          (typeof req.headers['x-satchida-mode'] === 'string'
+            ? req.headers['x-satchida-mode']
+            : undefined) ||
+          caller?.mode ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+        const isPrivacyMode = isPrivacyTier && requestedMode === 'privacy';
+
+        const fetchFn = deps.fetchImpl ?? fetch;
+        const isGetOrHead = req.method === 'GET' || req.method === 'HEAD';
 
         let upstreamTargetUrl = targetUrl;
         let upstreamHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${caller?.seatToken || expectedVk}`,
-          'X-Satchida-Mode': isPrivacyMode ? 'Privacy' : 'Vibecoding',
+          'X-Satchida-Mode': 'Vibecoding',
           'X-Tenant-Id': caller?.tenantId || 'satchida-master',
         };
+        let forwardBody: Record<string, unknown> | undefined =
+          !isGetOrHead && req.body && typeof req.body === 'object'
+            ? { ...(req.body as Record<string, unknown>) }
+            : undefined;
 
         if (isPrivacyMode) {
           const llamaBase = (
@@ -2131,14 +2174,40 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
             'X-Satchida-Privacy-Local': 'true',
             'X-Satchida-Mode': 'Privacy',
           };
+
+          if (forwardBody) {
+            try {
+              const modelsRes = await fetchFn(`${llamaBase}/models`, { method: 'GET' });
+              if (modelsRes.ok) {
+                const modelsJson = (await modelsRes.json()) as {
+                  data?: Array<{
+                    id?: string;
+                    status?: { value?: string };
+                    loaded?: boolean;
+                  }>;
+                };
+                const modelsList = Array.isArray(modelsJson?.data) ? modelsJson.data : [];
+                const loadedModel =
+                  modelsList.find(
+                    (m) => m.status?.value === 'loaded' || m.loaded === true,
+                  ) ?? modelsList[0];
+                if (loadedModel?.id) {
+                  forwardBody.model = loadedModel.id;
+                }
+              }
+            } catch (modelLookupErr) {
+              logger.warn(
+                '[OpenCodeHttp] Failed to resolve loaded local llama model on :8080',
+                getSafeErrorMetadata(modelLookupErr),
+              );
+            }
+          }
         }
 
-        const fetchFn = deps.fetchImpl ?? fetch;
-        const isGetOrHead = req.method === 'GET' || req.method === 'HEAD';
         const upstreamRes = await fetchFn(upstreamTargetUrl, {
           method: req.method,
           headers: upstreamHeaders,
-          ...(!isGetOrHead && req.body ? { body: JSON.stringify(req.body) } : {}),
+          ...(forwardBody ? { body: JSON.stringify(forwardBody) } : {}),
         });
 
         res.status(upstreamRes.status);

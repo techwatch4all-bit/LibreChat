@@ -1042,10 +1042,67 @@ RULES FOR YOUR SPOKEN EXPLANATION:
   /** SPA fallback - serve index.html for all unmatched routes */
   app.use(createSpaFallback(sendIndexHtml));
 
+  /** Branded 404 fallback for any unmatched non-SPA browser request */
+  app.use((req, res) => {
+    const acceptsHtml =
+      !req.path.startsWith('/api/') &&
+      typeof req.headers.accept === 'string' &&
+      req.headers.accept.includes('text/html');
+    if (acceptsHtml) {
+      const { renderBrandedNoticeHtml } = require('@librechat/api');
+      return res
+        .status(404)
+        .setHeader('Content-Type', 'text/html; charset=utf-8')
+        .send(
+          renderBrandedNoticeHtml({
+            badgeText: '404 • Page Not Found',
+            badgeTone: 'warning',
+            headline: 'Page Not Found',
+            detail:
+              'The page or resource you requested could not be found in this workspace. It may have been moved or removed.',
+            actionHint:
+              'Return to the main workspace or contact your <strong>Organization / Tenant Administrator</strong> if you need access.',
+            showHomeButton: true,
+          }),
+        );
+    }
+    return res.status(404).json({
+      error: 'The requested resource was not found.',
+      message: 'Please check the address or contact your Organization / Tenant Administrator.',
+    });
+  });
+
   /** Record trace errors before the final error controller. */
   if (telemetry.enabled) {
     app.use(telemetry.telemetryErrorMiddleware);
   }
+  /** Branded HTML 500 error notice for browser requests (API routes continue to ErrorController) */
+  app.use((err, req, res, next) => {
+    const acceptsHtml =
+      !req.path.startsWith('/api/') &&
+      typeof req.headers.accept === 'string' &&
+      req.headers.accept.includes('text/html');
+    if (acceptsHtml && !res.headersSent) {
+      logger.error('[Satchida] Unhandled HTML route error:', err);
+      const { renderBrandedNoticeHtml } = require('@librechat/api');
+      return res
+        .status(err?.status || err?.statusCode || 500)
+        .setHeader('Content-Type', 'text/html; charset=utf-8')
+        .send(
+          renderBrandedNoticeHtml({
+            badgeText: 'Service Notice',
+            badgeTone: 'error',
+            headline: 'Something Went Wrong',
+            detail:
+              'An unexpected error occurred while loading this page. Your projects and data remain safe.',
+            actionHint:
+              'Please refresh or contact your <strong>Organization / Tenant Administrator</strong> if this issue persists.',
+            showHomeButton: true,
+          }),
+        );
+    }
+    return next(err);
+  });
   /** Error handler (must be last - Express identifies error middleware by its 4-arg signature) */
   app.use(ErrorController);
 

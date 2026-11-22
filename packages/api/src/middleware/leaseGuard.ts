@@ -172,22 +172,33 @@ export function verifyDeadManLease(): {
   }
 }
 
-function renderServiceNoticeHtml(reason?: string): string {
-  const isPaused = reason === 'TENANT_LOCKED_BY_OPERATOR';
-  const badgeText = isPaused ? 'Service Paused' : 'Renewal Pending';
-  const headline = isPaused
-    ? 'Workspace Temporarily Paused'
-    : 'Workspace Access Temporarily Unavailable';
-  const detail = isPaused
-    ? 'AI Workspace access for your organization has been temporarily paused by your administrator. Your existing projects, files, and conversations remain safely preserved.'
-    : 'The subscription lease for this organization workspace requires renewal. Your existing projects, files, and conversations remain safely preserved.';
+export interface BrandedNoticeOptions {
+  badgeText: string;
+  badgeTone?: 'warning' | 'error';
+  headline: string;
+  detail: string;
+  actionHint?: string;
+  showHomeButton?: boolean;
+}
+
+export function renderBrandedNoticeHtml(opts: BrandedNoticeOptions): string {
+  const isError = opts.badgeTone === 'error';
+  const badgeBg = isError ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+  const badgeColor = isError ? '#f87171' : '#fbbf24';
+  const badgeBorder = isError ? 'rgba(239, 68, 68, 0.28)' : 'rgba(245, 158, 11, 0.28)';
+  const actionHint =
+    opts.actionHint ||
+    'Please contact your <strong>Organization / Tenant Administrator</strong> if this issue persists.';
+  const buttonHtml = opts.showHomeButton
+    ? '<a class="btn" href="/">Return to Workspace</a>'
+    : '<button class="btn" type="button" onclick="window.location.reload()">Check Access Again</button>';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Satchida AI — Service Notice</title>
+  <title>Satchida AI — ${opts.headline}</title>
   <link rel="icon" type="image/png" href="/assets/satchida/favicon-32.png" />
   <style>
     :root { color-scheme: dark; }
@@ -235,16 +246,16 @@ function renderServiceNoticeHtml(reason?: string): string {
       font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.03em;
-      background: rgba(245, 158, 11, 0.12);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.28);
+      background: ${badgeBg};
+      color: ${badgeColor};
+      border: 1px solid ${badgeBorder};
       margin-bottom: 18px;
     }
     .dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #fbbf24;
+      background: ${badgeColor};
     }
     h1 {
       font-size: 22px;
@@ -281,6 +292,7 @@ function renderServiceNoticeHtml(reason?: string): string {
       color: #f9fafb;
       font-size: 13.5px;
       font-weight: 500;
+      text-decoration: none;
       cursor: pointer;
       transition: background 0.15s ease;
     }
@@ -296,17 +308,32 @@ function renderServiceNoticeHtml(reason?: string): string {
   <main class="card">
     <img class="logo" src="/assets/satchida/satchida-splash-mandala-dark.png" alt="Satchida AI" />
     <img class="wordmark" src="/assets/satchida/satchida-splash-wordmark-dark.png" alt="Satchida" />
-    <div class="badge"><span class="dot"></span>${badgeText}</div>
-    <h1>${headline}</h1>
-    <p>${detail}</p>
-    <div class="notice-box">
-      Please contact your <strong>Organization / Tenant Administrator</strong> for assistance or to restore workspace access.
-    </div>
-    <button class="btn" type="button" onclick="window.location.reload()">Check Access Again</button>
+    <div class="badge"><span class="dot"></span>${opts.badgeText}</div>
+    <h1>${opts.headline}</h1>
+    <p>${opts.detail}</p>
+    <div class="notice-box">${actionHint}</div>
+    ${buttonHtml}
     <div class="footer">Satchida AI Workspace &bull; Managed Organization Node</div>
   </main>
 </body>
 </html>`;
+}
+
+function renderServiceNoticeHtml(reason?: string): string {
+  const isPaused = reason === 'TENANT_LOCKED_BY_OPERATOR';
+  return renderBrandedNoticeHtml({
+    badgeText: isPaused ? 'Service Paused' : 'Renewal Pending',
+    badgeTone: 'warning',
+    headline: isPaused
+      ? 'Workspace Temporarily Paused'
+      : 'Workspace Access Temporarily Unavailable',
+    detail: isPaused
+      ? 'AI Workspace access for your organization has been temporarily paused by your administrator. Your existing projects, files, and conversations remain safely preserved.'
+      : 'The subscription lease for this organization workspace requires renewal. Your existing projects, files, and conversations remain safely preserved.',
+    actionHint:
+      'Please contact your <strong>Organization / Tenant Administrator</strong> for assistance or to restore workspace access.',
+    showHomeButton: false,
+  });
 }
 
 /**

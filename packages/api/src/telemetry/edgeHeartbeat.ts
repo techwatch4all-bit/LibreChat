@@ -463,7 +463,16 @@ async function measureNetworkThroughput(): Promise<{ rxKbps: number; txKbps: num
  */
 function probeDiskVolumes(): DiskVolumeInfo[] {
   const volumes: DiskVolumeInfo[] = [];
-  const drives = process.platform === 'win32' ? ['C:\\', 'D:\\'] : ['/'];
+  const customDrives = process.env.SATCHIDA_TELEMETRY_DRIVES
+    ?.split(',')
+    .map((d) => d.trim())
+    .filter(Boolean);
+  const drives =
+    customDrives && customDrives.length > 0
+      ? customDrives
+      : process.platform === 'win32'
+        ? ['C:\\', 'D:\\', 'E:\\', 'F:\\']
+        : ['/'];
 
   for (const drive of drives) {
     try {
@@ -547,12 +556,13 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
   };
 
   const start = Date.now();
+  const anythingPort = parseInt(process.env.ANYTHINGLLM_PORT || '3012', 10) || 3012;
   try {
     const pingPromise = new Promise<{ ok: boolean; pingMs: number }>((resolve) => {
       const req = http.request(
         {
           hostname: '127.0.0.1',
-          port: 3012,
+          port: anythingPort,
           path: '/api/ping',
           method: 'GET',
           timeout: 1000,
@@ -577,11 +587,22 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
     }
 
     // Inspect AnythingLLM SQLite database directly without locking
-    const dbPath = process.platform === 'win32'
-      ? 'D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\anythingllm.db'
-      : '/opt/AnythingLLM/server/storage/anythingllm.db';
+    const candidateDbPaths =
+      process.platform === 'win32'
+        ? [
+            process.env.ANYTHINGLLM_DB_PATH,
+            'D:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\anythingllm.db',
+            'C:\\LAN-AI-Infra\\AnythingLLM\\server\\storage\\anythingllm.db',
+            path.resolve(process.cwd(), '..', 'AnythingLLM', 'server', 'storage', 'anythingllm.db'),
+          ].filter((p): p is string => Boolean(p))
+        : [
+            process.env.ANYTHINGLLM_DB_PATH,
+            '/opt/AnythingLLM/server/storage/anythingllm.db',
+          ].filter((p): p is string => Boolean(p));
 
-    if (fs.existsSync(dbPath)) {
+    const dbPath = candidateDbPaths.find((p) => fs.existsSync(p)) || candidateDbPaths[0];
+
+    if (dbPath && fs.existsSync(dbPath)) {
       try {
         let scriptPath = path.join(__dirname, 'probe_anythingllm.py');
         if (!fs.existsSync(scriptPath)) {
@@ -591,8 +612,11 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
           scriptPath = 'd:\\LAN-AI-Infra\\LibreChat\\probe_anythingllm.py';
         }
 
+        const pythonBin =
+          process.env.PYTHON_PATH || (process.platform === 'win32' ? 'python.exe' : 'python3');
+
         const { stdout } = await execFileAsync(
-          'python.exe',
+          pythonBin,
           [scriptPath, dbPath],
           { windowsHide: true, timeout: 2500 }
         );
@@ -796,6 +820,9 @@ export function startEdgeHeartbeatEmitter(intervalMs = 1000): void {
     clearInterval(heartbeatTimer);
   }
 
+  const envInterval = parseInt(process.env.SATCHIDA_TELEMETRY_INTERVAL_MS || '', 10);
+  const effectiveInterval = Number.isFinite(envInterval) && envInterval >= 1000 ? envInterval : intervalMs;
+
   // Pre-seed CPU sample
   getRealtimeCpuPercent();
 
@@ -804,12 +831,12 @@ export function startEdgeHeartbeatEmitter(intervalMs = 1000): void {
     emitEdgeHeartbeat();
   }, 300);
 
-  // Recurring pulse every 1 second
+  // Recurring pulse
   heartbeatTimer = setInterval(() => {
     emitEdgeHeartbeat();
-  }, intervalMs);
+  }, effectiveInterval);
 
-  logger.info('[EdgeHeartbeat] Realtime tenant telemetry emitter started (every 1s).');
+  logger.info(`[EdgeHeartbeat] Realtime tenant telemetry emitter started (every ${effectiveInterval}ms).`);
 }
 
 export function stopEdgeHeartbeatEmitter(): void {

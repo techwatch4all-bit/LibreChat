@@ -16,7 +16,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import mongoose from 'mongoose';
 import { logger } from '@librechat/data-schemas';
-import { verifyDeadManLease } from '../middleware/leaseGuard';
+import { verifyDeadManLease, updateNodeLicense } from '../middleware/leaseGuard';
 
 const execFileAsync = promisify(execFile);
 
@@ -642,7 +642,29 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
 }
 
 /**
- * Send heartbeat to central gateway over HTTPS/HTTP.
+ * Sync shared node lockdown state to disk so AnythingLLM and LibreChat enforce
+ * operator pause / contract breach lockdowns simultaneously.
+ */
+function syncSharedLockdownState(locked: boolean, reason: string, expiresAt = 0): void {
+  try {
+    const lockdownPath =
+      process.env.SATCHIDA_LOCKDOWN_FILE ||
+      path.resolve(process.cwd(), '..', '.satchida-lockdown.json');
+    const state = {
+      locked,
+      reason: locked ? reason || 'TENANT_LOCKED_BY_OPERATOR' : '',
+      expiresAt,
+      updatedAt: Date.now(),
+    };
+    fs.writeFileSync(lockdownPath, JSON.stringify(state, null, 2), 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.debug(`[EdgeHeartbeat] Failed to sync shared lockdown file: ${msg}`);
+  }
+}
+
+/**
+ * Send heartbeat to central gateway over HTTPS/HTTP and apply returned lockdown/lease directives.
  */
 function sendHeartbeatRequest(gatewayUrl: string, virtualKey: string, payload: EdgeTelemetryPayload): Promise<void> {
   return new Promise((resolve) => {
@@ -666,8 +688,35 @@ function sendHeartbeatRequest(gatewayUrl: string, virtualKey: string, payload: E
           timeout: 4000,
         },
         (res) => {
-          res.resume();
-          resolve();
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => {
+            if (body.length < 16384) body += chunk;
+          });
+          res.on('end', () => {
+            try {
+              if (res.statusCode === 200 && body.trim().startsWith('{')) {
+                const parsed = JSON.parse(body) as {
+                  locked?: boolean;
+                  reason?: string;
+                  license_token?: string;
+                };
+                if (typeof parsed.locked === 'boolean') {
+                  syncSharedLockdownState(
+                    parsed.locked,
+                    parsed.reason || '',
+                    payload.lease_expires_at || 0,
+                  );
+                }
+                if (typeof parsed.license_token === 'string' && parsed.license_token.length > 0) {
+                  updateNodeLicense(parsed.license_token);
+                }
+              }
+            } catch {
+              // Ignore malformed response bodies
+            }
+            resolve();
+          });
         },
       );
 

@@ -29,6 +29,14 @@ import { buildAuditContext } from './context';
 type GroupListFilter = Pick<GroupFilterOptions, 'source' | 'search' | 'accountType'>;
 
 const VALID_GROUP_SOURCES: ReadonlySet<string> = new Set(['local', 'entra']);
+const FORBIDDEN_GROUP_NAMES: ReadonlySet<string> = new Set([
+  'admin',
+  'administrator',
+  'root',
+  'superadmin',
+  'operator',
+  'system',
+]);
 const MAX_CREATE_MEMBER_IDS = 500;
 const MAX_SEARCH_LENGTH = 200;
 const MAX_NAME_LENGTH = 500;
@@ -291,6 +299,12 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
       if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
         return res.status(400).json({ error: 'name is required' });
       }
+      const normalizedName = body.name.trim().toLowerCase();
+      if (FORBIDDEN_GROUP_NAMES.has(normalizedName)) {
+        return res
+          .status(400)
+          .json({ error: `Group name "${body.name.trim()}" is reserved and permanently prohibited.` });
+      }
       if (body.name.trim().length > MAX_NAME_LENGTH) {
         return res
           .status(400)
@@ -399,6 +413,14 @@ export function createAdminGroupsHandlers(deps: AdminGroupsDeps): {
         return res
           .status(400)
           .json({ error: `name must not exceed ${MAX_NAME_LENGTH} characters` });
+      }
+      if (body.name !== undefined) {
+        const normalizedUpdateName = body.name.trim().toLowerCase();
+        if (FORBIDDEN_GROUP_NAMES.has(normalizedUpdateName)) {
+          return res.status(400).json({
+            error: `Group name "${body.name.trim()}" is reserved and permanently prohibited.`,
+          });
+        }
       }
       if (body.description !== undefined && body.description.length > MAX_DESCRIPTION_LENGTH) {
         return res

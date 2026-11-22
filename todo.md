@@ -5,6 +5,7 @@ Last updated: 2026-10-04
 
 ## A. Deferred by decision
 
+- [ ] **Fleet Operations Consolidation into Satchida Gateway (one-api on :4000)** — Consolidate tenant fleet tracking, heartbeat telemetry, lease validation, and credential key-exchange into the one-api gateway engine (`gateway.satchida.com`), replacing the standalone `:8443` script.
 - [ ] **Cloudflare Worker gateway** — token check, provider-key injection (keys as Worker secrets), per-client monthly spend cap, kill switch, usage counters (KV/D1). See ARCHITECTURE.md §III (III.1, III.3, III.6: 100k req/day free limit).
 - [ ] **Mid-turn recovery** (multi-bot) for dropped streams — INFERENCE.md §6.
 - [ ] **openai-zdr provider** — enable in `satchida/router/registry.json` only after ZDR data-processing agreement approved. Currently `enabled: false`.

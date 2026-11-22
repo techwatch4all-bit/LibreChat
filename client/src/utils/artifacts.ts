@@ -762,6 +762,18 @@ const ARTIFACT_ROW_KINDS: Record<string, ArtifactRowKind> = {
     rendersPreview: true,
     fallbackGlyph: 'project',
   },
+  [SATCHIDA_FILM_ARTIFACT_TYPE]: {
+    lang: 'film',
+    label: { key: 'com_ui_artifact_format_film' },
+    rendersPreview: true,
+    fallbackGlyph: 'film',
+  },
+  'application/vnd.librechat.film': {
+    lang: 'film',
+    label: { key: 'com_ui_artifact_format_film' },
+    rendersPreview: true,
+    fallbackGlyph: 'film',
+  },
 };
 
 /**

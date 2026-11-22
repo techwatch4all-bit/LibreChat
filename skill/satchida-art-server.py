@@ -54,13 +54,15 @@ MOTION_SKILL_ROOT = os.path.join(WORKSPACE_ROOT, "skill", "satchida-motion-art")
 
 # Stable studio artifact home, served by LibreChat at /generated (see
 # api/server/index.js). Outside client/dist so client rebuilds never 404 it.
-STABLE_GENERATED_DIR = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
+_IN_REPO_GEN = Path(WORKSPACE_ROOT) / "storage" / "exports" / "generated"
+STABLE_GENERATED_DIR = _IN_REPO_GEN if _IN_REPO_GEN.exists() else Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
 
 PYTHON_BIN = sys.executable or "python"
 
 GRAMMARS = [
     "3b1b", "keynote_ui", "finance_chart", "kurzgesagt", "vox",
     "whiteboard", "storytime", "kinetic_type", "presenter_explainer",
+    "living_landscape", "atmospheric_art",
 ]
 
 # ---------------------------------------------------------------------------
@@ -420,10 +422,113 @@ FILM_TEMPLATE = r"""<!DOCTYPE html>
     ctx.fillStyle=BG;ctx.font='800 '+Math.round(H*0.05)+'px sans-serif';ctx.textAlign='center';
     ctx.fillText('Satchida',W*0.81,H*0.5);
   }
+  // ---- Living Landscape / Procedural Art Animator Grammar -----------------
+  var bgImg = null;
+  if (SPEC.image_url) {
+    bgImg = new Image();
+    bgImg.onload = function() {
+      if (typeof window.film === 'object' && typeof window.film.frame === 'function') {
+        window.film.frame(window.__CURRENT_T__ || 0);
+      }
+    };
+    bgImg.src = SPEC.image_url;
+  }
+  function gLivingLandscape(c, s, u) {
+    if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+      ctx.drawImage(bgImg, 0, 0, W, H);
+    } else if (SPEC.image_url) {
+      ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+      if (!bgImg) { bgImg = new Image(); bgImg.src = SPEC.image_url; }
+    } else {
+      ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+    }
+
+    var globalT = (window.__CURRENT_T__ != null) ? window.__CURRENT_T__ : (u * DURATION);
+
+    // 1. Drifting Atmospheric Mountain Mist (Multi-layered translucent bands)
+    for (var m = 0; m < 4; m++) {
+      var speed = 18 + m * 14;
+      var mistX = ((globalT * speed + m * 480) % (W + 600)) - 300;
+      var mistY = H * 0.32 + m * (H * 0.08) + Math.sin(globalT * 0.5 + m) * 15;
+      var mistGrad = ctx.createRadialGradient(mistX, mistY, 40, mistX, mistY, W * 0.45);
+      mistGrad.addColorStop(0, 'rgba(235, 240, 248, 0.22)');
+      mistGrad.addColorStop(0.5, 'rgba(225, 235, 245, 0.12)');
+      mistGrad.addColorStop(1, 'rgba(220, 230, 240, 0)');
+      ctx.fillStyle = mistGrad;
+      ctx.beginPath();
+      ctx.ellipse(mistX, mistY, W * 0.45, H * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Realistic Mountain Rain Droplets & Splash Ripples
+    var rainCount = 140;
+    ctx.strokeStyle = 'rgba(215, 228, 242, 0.42)';
+    ctx.lineWidth = 1.2;
+    for (var r = 0; r < rainCount; r++) {
+      var seedR = (r * 997.3) % 1;
+      var speedR = 680 + seedR * 420;
+      var rx = ((seedR * W + globalT * 120) % (W + 200)) - 100;
+      var ry = ((globalT * speedR + seedR * H * 1.8) % (H * 1.15)) - 20;
+      var rLen = 16 + seedR * 22;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx - 4, ry + rLen);
+      ctx.stroke();
+
+      // Splashes on lake surface
+      if (ry > H * 0.58 && ry < H * 0.96 && (r % 3 === 0)) {
+        var splashU = (globalT * 3 + seedR * 10) % 1;
+        var sR = splashU * 14;
+        ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.35 * (1 - splashU)) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, sR, sR * 0.35, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // 3. Gliding Himalayan Birds (Dynamic flapping & gliding across ridge)
+    for (var b = 0; b < 4; b++) {
+      var bSeed = b * 137.5;
+      var bSpeed = 48 + b * 16;
+      var bx = ((globalT * bSpeed + bSeed * 3.5) % (W + 300)) - 150;
+      var by = H * 0.24 + b * 28 + Math.sin(globalT * 0.8 + b) * 12;
+      var flap = Math.sin(globalT * 6.5 + b * 2);
+      var bSpan = 14 + b * 2;
+
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.85)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(bx - bSpan, by - flap * 6);
+      ctx.quadraticCurveTo(bx - bSpan * 0.4, by + flap * 2, bx, by);
+      ctx.quadraticCurveTo(bx + bSpan * 0.4, by + flap * 2, bx + bSpan, by - flap * 6);
+      ctx.stroke();
+    }
+
+    // 4. Subtle Ambient Water Shimmer & Floating Vignette
+    var waterGrad = ctx.createLinearGradient(0, H * 0.58, 0, H);
+    waterGrad.addColorStop(0, 'rgba(255, 255, 255, 0.04)');
+    waterGrad.addColorStop(0.5, 'rgba(200, 220, 240, 0.08)');
+    waterGrad.addColorStop(1, 'rgba(15, 23, 42, 0.15)');
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(0, H * 0.58, W, H * 0.42);
+
+    if (s.caption) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = '600 ' + Math.round(H * 0.038) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 8;
+      ctx.fillText(s.caption, W / 2, H * 0.92);
+      ctx.shadowBlur = 0;
+    }
+  }
+
   var GRAMMAR_FN={
     kinetic_type:gKineticType, finance_chart:gFinanceChart, keynote_ui:gKeynoteUI,
     '3b1b':g3b1b, kurzgesagt:gKurzgesagt, vox:gVox, whiteboard:gWhiteboard,
-    storytime:gStorytime, presenter_explainer:gPresenter
+    storytime:gStorytime, presenter_explainer:gPresenter,
+    living_landscape:gLivingLandscape, atmospheric_art:gLivingLandscape
   };
 
   function roundRect(x,y,w,h,r){
@@ -445,6 +550,7 @@ FILM_TEMPLATE = r"""<!DOCTYPE html>
 
   function frame(t){
     t=Math.max(0,Math.min(t,DURATION));
+    window.__CURRENT_T__ = t;
     ctx.fillStyle=BG;ctx.fillRect(0,0,W,H);
     var at=sceneAt(t);
     var u=at.dur>0?at.local/at.dur:1;
@@ -489,7 +595,24 @@ FILM_TEMPLATE = r"""<!DOCTYPE html>
     else{ /* success */ o.type='triangle';o.frequency.setValueAtTime(660,t0);
       o.frequency.setValueAtTime(880,t0+0.09);env(0.3,0.35);o.start(t0);o.stop(t0+0.4);}
   }
-  function setMuted(v){ muted=!!v; if(master)master.gain.value=muted?0:0.8; }
+  var bgAudio = null;
+  if (SPEC.audio_url) {
+    try {
+      bgAudio = document.createElement('audio');
+      bgAudio.id = 'bgm';
+      bgAudio.src = SPEC.audio_url;
+      bgAudio.loop = true;
+      bgAudio.preload = 'auto';
+      bgAudio.volume = muted ? 0 : 0.85;
+      document.body.appendChild(bgAudio);
+    } catch(e) {}
+  }
+
+  function setMuted(v){
+    muted=!!v;
+    if(master)master.gain.value=muted?0:0.8;
+    if(bgAudio)bgAudio.muted=muted;
+  }
 
   // Schedule cues relative to playhead; reschedule on seek.
   var scheduled=[], playT0=null, playBase=0;
@@ -504,9 +627,40 @@ FILM_TEMPLATE = r"""<!DOCTYPE html>
     });
   }
   window.addEventListener('message',function(e){
-    if(e.data&&e.data.type==='FILM_PLAY'){playBase=e.data.time||0;playT0=performance.now();scheduleFrom(playBase);}
-    else if(e.data&&e.data.type==='FILM_PAUSE'){scheduled.forEach(function(id){clearTimeout(id);});scheduled=[];}
-    else if(e.data&&e.data.type==='SEEK_FRAME'){playT0=null;scheduled.forEach(function(id){clearTimeout(id);});scheduled=[];}
+    if(e.data&&e.data.type==='FILM_PLAY'){
+      playBase=e.data.time||0;
+      playT0=performance.now();
+      scheduleFrom(playBase);
+      if(bgAudio){
+        try{
+          if(typeof e.data.time==='number'){ bgAudio.currentTime=e.data.time; }
+          bgAudio.play().catch(function(err){});
+        }catch(err){}
+      }
+    }
+    else if(e.data&&e.data.type==='FILM_PAUSE'){
+      scheduled.forEach(function(id){clearTimeout(id);});scheduled=[];
+      if(bgAudio){ try{ bgAudio.pause(); }catch(err){} }
+    }
+    else if(e.data&&e.data.type==='SEEK_FRAME'){
+      playT0=null;
+      scheduled.forEach(function(id){clearTimeout(id);});scheduled=[];
+      if(typeof e.data.time==='number'){
+        frame(e.data.time);
+      }
+      if(bgAudio){
+        if(typeof e.data.time==='number'){
+          try{ bgAudio.currentTime=e.data.time; }catch(err){}
+        }
+        if(bgAudio.paused){
+          bgAudio.play().then(function(){
+            console.log('[bgAudio] Auto-resumed on seek!');
+          }).catch(function(err){
+            console.warn('[bgAudio] Auto-resume blocked:', err);
+          });
+        }
+      }
+    }
     else if(e.data&&e.data.type==='AUDIO_MUTE'){setMuted(e.data.muted);}
   });
 
@@ -514,6 +668,14 @@ FILM_TEMPLATE = r"""<!DOCTYPE html>
   window.__TIMELINE__={pause:function(t){if(t!=null)frame(t);},seek:function(t){frame(t);}};
   window.__SEEK_FRAME__=frame;
   frame(0);
+  try {
+    window.parent.postMessage({
+      type: 'FILM_METADATA',
+      duration: DURATION,
+      width: W,
+      height: H
+    }, '*');
+  } catch(e) {}
 })();
 </script>
 </body>
@@ -530,8 +692,14 @@ def _build_film_html(spec: dict, cues: list, duration: float, width: int, height
     if not isinstance(scenes, list) or not scenes:
         scenes = [{"t": 0, "dur": duration, "grammar": grammar,
                    "words": [str(title).split()[:3] or ["Satchida"]]}]
-    safe_spec = {"title": title, "grammar": grammar,
-                 "theme": spec.get("theme") or {}, "scenes": scenes}
+    safe_spec = {
+        "title": title,
+        "grammar": grammar,
+        "theme": spec.get("theme") or {},
+        "scenes": scenes,
+        "image_url": spec.get("image_url") or "",
+        "audio_url": spec.get("audio_url") or "",
+    }
     html = (FILM_TEMPLATE
             .replace("__TITLE__", title)
             .replace("__GRAMMAR__", grammar)
@@ -588,9 +756,11 @@ def list_motion_grammars() -> str:
         "storytime": "Storybook hill scene with a bouncy round character and caption",
         "kinetic_type": "Stacked kinetic typography, word-by-word reveal with underline sweep",
         "presenter_explainer": "Presenter card + caption typewriter + branded side panel",
+        "living_landscape": "Living artwork animator: brings procedural painting/image alive with rain drizzle, mist drift, splashes, birds, and ambient audio",
+        "atmospheric_art": "Living artwork animator: brings procedural painting/image alive with rain drizzle, mist drift, splashes, birds, and ambient audio",
     }
     return json.dumps({"status": "ok", "grammars": [
-        {"id": g, "description": descriptions[g]} for g in GRAMMARS]})
+        {"id": g, "description": descriptions.get(g, "Kinetic motion grammar")} for g in GRAMMARS]})
 
 
 @mcp.tool()
@@ -807,9 +977,9 @@ def create_kinetic_motion_clip(
     html_url = _publish_artifact(html_path, user=user)
 
     # Small, robust in-chat embed: the model emits this 2-line artifact wrapper
-    # (far more reliable than copying a 15KB escaped HTML string out of JSON).
+    # using application/vnd.satchida.film so OpenFilmStudio mounts it directly.
     embed_html = (
-        f':::artifact{{identifier="motion-{slug}" type="text/html" '
+        f':::artifact{{identifier="motion-{slug}" type="application/vnd.satchida.film" '
         f'title="{spec.get("title", "Satchida Motion Clip")}"}}\n'
         f'````html\n<!DOCTYPE html>\n<html><head><meta charset="utf-8">\n'
         f'<style>html,body{{margin:0;height:100%;background:#000}}\n'
@@ -860,3 +1030,172 @@ def create_kinetic_motion_clip(
                 result["mp4"] = {"status": "error", "code": "render_failed",
                                  "message": str(e)[:500]}
     return json.dumps(result)
+
+@mcp.tool()
+def generate_ambient_music(
+    prompt: str = 'calm ambient soundscape',
+    genre: str = '',
+    audio_file: str = '',
+    duration_seconds: float = 30.0,
+    mood: str = 'meditative',
+    filename: str = '',
+    user: str = '',
+) -> str:
+    '''Generate high-fidelity acoustic background music or ambient soundscapes (MP3 file).'''
+    import numpy as np, wave
+
+    started = time.time()
+    dur = max(5.0, min(float(duration_seconds), 180.0))
+    sr = 44100
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    p_lower = (prompt + ' ' + genre + ' ' + mood).lower()
+
+    if audio_file and str(audio_file).strip():
+        candidate_paths = [
+            Path(audio_file),
+            Path(r'd:\LAN-AI-Infra\LibreChat\music_library') / Path(audio_file).name,
+            STABLE_GENERATED_DIR / Path(audio_file).name,
+            Path(r'd:\LAN-AI-Infra\LibreChat\uploads') / Path(audio_file).name,
+        ]
+        resolved_file = None
+        for cp in candidate_paths:
+            if cp.exists() and cp.is_file() and cp.stat().st_size > 1000:
+                resolved_file = cp
+                break
+        if not resolved_file and str(audio_file).startswith('/generated/'):
+            gen_p = STABLE_GENERATED_DIR / str(audio_file).replace('/generated/', '')
+            if gen_p.exists() and gen_p.is_file():
+                resolved_file = gen_p
+
+        if resolved_file:
+            try:
+                base_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', filename.strip()) if filename.strip() else f'user_audio_{int(time.time())}'
+                final_mp3 = Path(tempfile.gettempdir()) / f'{base_name}.mp3'
+                fade_start = max(0.0, dur - 2.5)
+                subprocess.run([
+                    'ffmpeg', '-y', '-i', str(resolved_file),
+                    '-t', str(dur), '-af', f'afade=t=out:st={fade_start}:d=2.5',
+                    '-b:a', '192k', str(final_mp3)
+                ], capture_output=True, timeout=30)
+                if final_mp3.exists() and final_mp3.stat().st_size > 1000:
+                    url = _publish_artifact(final_mp3, user=user)
+                    try:
+                        final_mp3.unlink()
+                    except OSError:
+                        pass
+                    return json.dumps({
+                        'status': 'ok',
+                        'url': url,
+                        'duration_seconds': dur,
+                        'source': 'user_uploaded_file',
+                        'original_file': resolved_file.name,
+                        'elapsed_ms': round((time.time() - started) * 1000),
+                        'message': f'User-selected audio track mastered and published to Studio Library at {url}.'
+                    })
+            except Exception as ue:
+                print(f'[satchida-art] User audio processing failed: {ue}', file=sys.stderr)
+
+    f_root = 136.1
+    if any(k in p_lower for k in ['jazz', 'piano', 'lofi']):
+        f_root = 130.81
+    elif any(k in p_lower for k in ['zen', 'japanese', 'bamboo']):
+        f_root = 146.83
+    elif any(k in p_lower for k in ['sitar', 'indian', 'classical', 'himalayan', 'temple', 'shivalik']):
+        f_root = 138.59
+
+    drone = (
+        0.26 * np.sin(2 * np.pi * f_root * t) +
+        0.18 * np.sin(2 * np.pi * (f_root * 1.5) * t) +
+        0.12 * np.sin(2 * np.pi * (f_root * 2.0) * t) +
+        0.20 * np.sin(2 * np.pi * (f_root * 0.5) * t)
+    )
+    drone += 0.08 * np.sin(2 * np.pi * (f_root * 3.0) * t)
+    drone *= (1.0 + 0.08 * np.sin(2 * np.pi * 0.2 * t))
+
+    pentatonic = [f_root * 2.0, f_root * 2.25, f_root * 2.5, f_root * 3.0, f_root * 3.375, f_root * 4.0]
+    melody = np.zeros_like(t)
+    curr_t = 1.0
+    rng = np.random.RandomState(42)
+    while curr_t < dur - 2.0:
+        note_dur = float(rng.uniform(1.8, 3.2))
+        freq = float(rng.choice(pentatonic))
+        mask = (t >= curr_t) & (t < curr_t + note_dur)
+        if np.any(mask):
+            nt = t[mask] - curr_t
+            env = np.sin(np.pi * (nt / note_dur)) ** 1.3
+            vib = 1.0 + 0.012 * np.sin(2 * np.pi * 5.4 * nt)
+            tone = (
+                np.sin(2 * np.pi * freq * vib * nt) +
+                0.35 * np.sin(2 * np.pi * freq * 2.0 * vib * nt) +
+                0.12 * np.sin(2 * np.pi * freq * 3.0 * vib * nt) +
+                0.03 * rng.normal(0, 0.1, len(nt))
+            )
+            melody[mask] += tone * env * 0.28
+        curr_t += note_dur + float(rng.uniform(0.4, 1.2))
+
+    nature = np.zeros_like(t)
+    if any(k in p_lower for k in ['rain', 'water', 'lake', 'mist', 'river', 'stream', 'ocean']):
+        noise = rng.normal(0, 0.05, len(t))
+        w = 12
+        nature += np.convolve(noise, np.ones(w)/w, mode='same') * 0.25
+
+    bells = np.zeros_like(t)
+    if any(k in p_lower for k in ['bell', 'chime', 'temple', 'bowl', 'shikara', 'himalayan', 'morning']):
+        bell_times = np.arange(2.0, dur - 1.0, float(rng.uniform(4.5, 7.5)))
+        for bt in bell_times:
+            bf = float(rng.choice([587.33, 880.0, 1174.66, 659.25]))
+            mask = (t >= bt) & (t < bt + 4.0)
+            if np.any(mask):
+                b_nt = t[mask] - bt
+                b_env = np.exp(-b_nt * 0.9)
+                b_tone = (
+                    np.sin(2 * np.pi * bf * b_nt) +
+                    0.45 * np.sin(2 * np.pi * (bf * 2.76) * b_nt) +
+                    0.20 * np.sin(2 * np.pi * (bf * 5.4) * b_nt)
+                )
+                bells[mask] += b_tone * b_env * 0.16
+
+    master = drone + melody + nature + bells
+    max_val = np.max(np.abs(master)) + 1e-6
+    master = (master / max_val * 0.9)
+    master_i16 = (master * 32767).astype(np.int16)
+
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as wf_tmp:
+        wav_path = wf_tmp.name
+    with wave.open(wav_path, 'w') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(master_i16.tobytes())
+
+    base_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', filename.strip()) if filename.strip() else f'soundscape_{int(time.time())}'
+    out_mp3 = Path(tempfile.gettempdir()) / f'{base_name}.mp3'
+    fade_start = max(0.0, dur - 2.5)
+    subprocess.run([
+        'ffmpeg', '-y', '-i', wav_path,
+        '-af', f'afade=t=out:st={fade_start}:d=2.5',
+        '-b:a', '192k', str(out_mp3)
+    ], capture_output=True, timeout=30)
+    try:
+        os.remove(wav_path)
+    except OSError:
+        pass
+
+    url = _publish_artifact(out_mp3, user=user)
+    try:
+        out_mp3.unlink()
+    except OSError:
+        pass
+
+    return json.dumps({
+        'status': 'ok',
+        'url': url,
+        'duration_seconds': dur,
+        'mood': mood,
+        'provider': 'acoustic_physical_synthesis',
+        'elapsed_ms': round((time.time() - started) * 1000),
+        'message': f'Synthesized mastered acoustic soundscape published to Studio Library at {url}.'
+    })
+
+if __name__ == '__main__':
+    mcp.run()

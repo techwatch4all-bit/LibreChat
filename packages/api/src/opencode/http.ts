@@ -438,6 +438,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
   const previewManager = deps.previewManager ?? createOpenCodePreviewManager();
   interface SeatCallerRecord {
     userId: string;
+    tenantId?: string | null;
     projectId?: string;
     projectRoot?: string;
     isPlatformAdmin: boolean;
@@ -462,17 +463,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
     if (!PLATFORM_OPERATOR_TENANTS.has(tenantId)) {
       return false;
     }
-    if ((req.user?.role ?? '').toUpperCase() === 'ADMIN') {
-      return true;
-    }
-    if (deps.isUserInPlatformAdminGroup) {
-      try {
-        return await deps.isUserInPlatformAdminGroup(userId);
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    return (req.user?.role ?? '').toUpperCase() === 'ADMIN';
   }
 
   async function recordActiveLlmCaller(
@@ -2113,18 +2104,40 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           sendError(res, { code: 'OPENCODE_UNAUTHORIZED', status: 403 });
           return;
         }
-        const effectiveToken = caller?.seatToken || expectedVk;
+
+        // Privacy Mode & Tier Enforcement:
+        // When user is on privacy tier OR privacy mode is requested, route STRICTLY
+        // to the local llama.cpp fleet on 127.0.0.1:8080 (zero cloud/gateway routing).
+        const isPrivacyTier = caller?.accountType?.toLowerCase() === 'privacy';
+        const isPrivacyMode =
+          req.headers['x-satchida-mode']?.toString().toLowerCase() === 'privacy' || isPrivacyTier;
+
+        let upstreamTargetUrl = targetUrl;
+        let upstreamHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${caller?.seatToken || expectedVk}`,
+          'X-Satchida-Mode': isPrivacyMode ? 'Privacy' : 'Vibecoding',
+          'X-Tenant-Id': caller?.tenantId || 'satchida-master',
+        };
+
+        if (isPrivacyMode) {
+          const llamaBase = (
+            process.env.SATCHIDA_LLAMA_BASE_URL || 'http://127.0.0.1:8080/v1'
+          ).replace(/\/+$/, '');
+          upstreamTargetUrl = `${llamaBase}/${subPath}`;
+          upstreamHeaders = {
+            'Content-Type': 'application/json',
+            ...(caller?.seatToken ? { Authorization: `Bearer ${caller.seatToken}` } : {}),
+            'X-Satchida-Privacy-Local': 'true',
+            'X-Satchida-Mode': 'Privacy',
+          };
+        }
 
         const fetchFn = deps.fetchImpl ?? fetch;
         const isGetOrHead = req.method === 'GET' || req.method === 'HEAD';
-        const upstreamRes = await fetchFn(targetUrl, {
+        const upstreamRes = await fetchFn(upstreamTargetUrl, {
           method: req.method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${effectiveToken}`,
-            'X-Satchida-Mode': 'Vibecoding',
-            'X-Tenant-Id': caller?.tenantId || 'satchida-master',
-          },
+          headers: upstreamHeaders,
           ...(!isGetOrHead && req.body ? { body: JSON.stringify(req.body) } : {}),
         });
 

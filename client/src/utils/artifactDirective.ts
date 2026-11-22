@@ -8,10 +8,12 @@ const ARTIFACT_MIME_TYPES = new Set([
   'application/vnd.ant.react',
   'application/vnd.mermaid',
   'application/vnd.librechat.project',
+  'application/vnd.satchida.film',
+  'application/vnd.librechat.film',
 ]);
 
 const ARTIFACT_MIME_REGEX =
-  /type\s*=\s*["'](text\/html|text\/md|text\/plain|text\/markdown|image\/svg\+xml|application\/vnd\.react|application\/vnd\.ant\.react|application\/vnd\.mermaid|application\/vnd\.librechat\.project)["']/i;
+  /type\s*=\s*["'](text\/html|text\/md|text\/plain|text\/markdown|image\/svg\+xml|application\/vnd\.react|application\/vnd\.ant\.react|application\/vnd\.mermaid|application\/vnd\.librechat\.project|application\/vnd\.satchida\.film|application\/vnd\.librechat\.film)["']/i;
 
 const ARTIFACT_HTML_TYPE_REGEX = /type\s*=\s*["'](?:text\/html|application\/vnd\.code-html)["']/i;
 const MALFORMED_DIRECTIVE_REGEX = /^\s*:::(?!artifact(?:\b|\{))([a-zA-Z][a-zA-Z0-9_-]*)\s*(.+)$/;

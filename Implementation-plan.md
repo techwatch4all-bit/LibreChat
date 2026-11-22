@@ -600,6 +600,36 @@ Alpha term is mandatory. Always regenerate from `C:\Users\WinDiesel\Pictures\Sat
 
 ---
 
+## Phase 9 — One-API Operator Master Security Vault & Remote Tenant Licensing
+
+**Goal**: Non-technical operator manages master keys, tenant contract renewals, and 1-click lock/unlock directly from One-API Web UI (`control.satchida.com`), pushing signed directives through Cloudflare Tunnels to tenant nodes.
+
+### 9a. One-API Master Security Key Vault (Central HQ)
+- [ ] Add **Security Vault** module in One-API UI:
+  - 1-click **Generate Master Key** (Ed25519 256-bit asymmetric keypair).
+  - Store private key encrypted in One-API database vault (AES-256-GCM); never export or share.
+  - Display Master Public Key for embedding in tenant edge builds.
+  - 1-click **Rotate Master Key** with 14-day transition grace window.
+
+### 9b. One-API Remote Directive & Lease Dispatcher
+- [ ] Under **Tenants** in One-API, track `contract_end_date`, `grace_period_days`, and `lockdown_status`.
+- [ ] 1-click **Renew / Unlock Tenant**:
+  - One-API signs a time-bounded, tenant-scoped Ed25519 directive (`UNLOCK_LEASE`).
+  - Pushes token through Cloudflare Tunnel to `https://<tenant>.satchida.com/api/admin/license/update` (or serves via 15s heartbeat).
+
+### 9c. Tenant LibreChat & MongoDB Dual-Lockdown Engine
+- [ ] In `packages/api/src/middleware/leaseGuard.ts`:
+  - When contract + grace period expires:
+    - Return `HTTP 402 Payment Required` on all `/api/*` endpoints.
+    - Render full-screen, non-dismissible lockout curtain in LibreChat UI.
+    - Lock MongoDB mutation streams (read-only mode) and reject local GPU completions.
+  - Verification:
+    - Receive signed directive from One-API.
+    - Verify Ed25519 signature against embedded `SATCHIDA_MASTER_PUBLIC_KEY`.
+    - Automatically update `satchida.lic`, reset monotonic clock ledger, and lift lockdown immediately.
+
+---
+
 ## Open decisions (must answer before scoping work)
 
 | # | Decision | Affects |

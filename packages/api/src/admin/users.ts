@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import { ACCOUNT_TYPES, logger, isValidObjectIdString, runAsSystem } from '@librechat/data-schemas';
+import { calculatePasswordSignature } from '../auth/password';
 import type {
   AuditAction,
   AuditMetadata,
@@ -743,6 +744,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           ? body.password
           : generateTempPassword();
       const password = await hashPassword(plainPassword);
+      const passwordSig = calculatePasswordSignature(password);
       const name =
         typeof body.name === 'string' && body.name.trim() ? body.name.trim() : email.split('@')[0];
       const username =
@@ -762,6 +764,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         username,
         uniqueIdentifier,
         password,
+        passwordSig,
         emailVerified: true,
         provider: 'local',
         role,
@@ -1337,7 +1340,8 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       }
 
       const hash = await hashPassword(newPassword);
-      const user = await updateUserRecord(id, { password: hash });
+      const passwordSig = calculatePasswordSignature(hash);
+      const user = await updateUserRecord(id, { password: hash, passwordSig });
       if (!user) {
         return res.status(404).json({ error: 'User not found', error_code: 'USER_NOT_FOUND' });
       }

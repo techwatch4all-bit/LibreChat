@@ -289,7 +289,7 @@ mcpServers:
     title: Satchida 3D Montage Studio
     description: Full production sequence automation for true 3D animated YouTube videos via OpenMontage, FastWan/LTX AI clips (approved provider chain), FLUX-2 images, and Remotion.
     chatMenu: true
-    startup: true
+    startup: false
   satchida-web-search:
     type: stdio
     command: python
@@ -363,7 +363,7 @@ mcpServers:
     description: '89 parametric BIM tools for building shells, levels, roofs, stairs,
       and structural inspections; runs fully offline from local node_modules.'
     chatMenu: true
-    startup: true
+    startup: false
   satchida-architect:
     type: stdio
     command: python
@@ -795,6 +795,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-art
     - satchida-tools
     - devops-security
     - git-librechat
@@ -1071,13 +1072,8 @@ modelSpecs:
     webSearch: true
     mcpServers:
     - satchida-art
-    - satchida-motion
     - satchida-tools
     - time-server
-    - web-fetch
-    - accessibility-tools
-    - openfda-drugs
-    - devops-security
     conversation_starters:
     - |-
       Gold, Silver & Fuel — Live rates with an as-of stamp on every figure.
@@ -1380,8 +1376,6 @@ modelSpecs:
     - git-librechat
     - devops-security
     - legal-research
-    - deeptutor-integration
-    - arxiv-search
     - academic-search
     conversation_starters:
     - |-
@@ -1640,6 +1634,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-stem-study
     - satchida-tools
     - time-server
     - web-fetch
@@ -1874,6 +1869,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-stem-study
     - satchida-tools
     - deeptutor-integration
     conversation_starters:
@@ -2102,7 +2098,6 @@ modelSpecs:
     mcpServers:
     - satchida-tools
     - time-server
-    - devops-security
     - accessibility-tools
     conversation_starters:
     - |-
@@ -2604,6 +2599,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-health-wellness
     - satchida-tools
     - openfda-drugs
     - clinical-research
@@ -2646,6 +2642,7 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-panchang-vedic
     - satchida-tools
     - time-server
     conversation_starters:
@@ -2750,6 +2747,8 @@ modelSpecs:
     fileSearch: true
     webSearch: true
     mcpServers:
+    - satchida-maker-engineering
+    - satchida-stem-study
     - satchida-tools
     - time-server
     conversation_starters:

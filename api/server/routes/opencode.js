@@ -44,19 +44,6 @@ function getHandlers() {
         return null;
       },
       enforcePlatformAdminForPty: true,
-      isUserInPlatformAdminGroup: (userId) =>
-        runAsSystem(async () => {
-          const Group = mongoose.models.Group;
-          if (!Group) {
-            return false;
-          }
-          const found = await Group.findOne({
-            name: /^admin$/i,
-            $or: [{ tenantId: 'satchida-master' }, { tenantId: { $exists: false } }],
-            memberIds: userId,
-          }).lean();
-          return Boolean(found);
-        }),
       getUserSeatCredential: (userId) =>
         runAsSystem(async () => {
           const User = mongoose.models.User;

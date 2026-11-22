@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const { calculatePasswordSignature } = require('@librechat/api');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { createAdminUsersHandlers, revokeUserCodeEnvironmentWorkers } = require('@librechat/api');

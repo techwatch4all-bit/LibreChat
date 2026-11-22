@@ -3580,5 +3580,6 @@
   "com_opencode_browse_folder": "Browse...",
   "com_ui_smart_agent_templates": "1-Click Smart Agent Templates",
   "com_ui_smart_memory_starters": "1-Click Smart Memory Starters",
-  "com_ui_smart_memory_desc": "Auto-memory is active for your chats. Click any starter below to seed your personal memory profile immediately:"
+  "com_ui_smart_memory_desc": "Auto-memory is active for your chats. Click any starter below to seed your personal memory profile immediately:",
+  "com_ui_artifact_format_film": "Film / Animation"
 }

@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Code2,
+  Columns,
   Download,
   FileCode,
   FileDiff,
@@ -22,9 +23,12 @@ import {
   PanelBottomOpen,
   PanelLeft,
   RotateCw,
+  Rows,
   Save,
+  Search,
   Sparkles,
   Terminal as TerminalIcon,
+  X,
 } from 'lucide-react';
 import type { OpenCodeDirTreeEntry } from 'librechat-data-provider';
 import {
@@ -87,7 +91,12 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const setPendingAutoPrompt = useSetAtom(openCodePendingAutoPromptAtom);
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [dirtyFiles, setDirtyFiles] = useState<Record<string, boolean>>({});
   const [editorContent, setEditorContent] = useState<string>('');
+  const [fileSearchQuery, setFileSearchQuery] = useState<string>('');
+  const [sidebarView, setSidebarView] = useState<'files' | 'search'>('files');
+  const [terminalSplit, setTerminalSplit] = useState<'horizontal' | 'vertical'>('horizontal');
   const [expandedDirs, setExpandedDirs] = useState<Record<string, boolean>>({});
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null);
   const autoProvisionedRef = useRef<string | null>(null);
@@ -150,8 +159,32 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     },
   );
 
+  const handleOpenFile = (filePath: string) => {
+    setSelectedFile(filePath);
+    setOpenFiles((prev) => (prev.includes(filePath) ? prev : [...prev, filePath]));
+    setWorkbenchTab('editor');
+  };
+
+  const handleCloseFile = (filePath: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenFiles((prev) => {
+      const filtered = prev.filter((f) => f !== filePath);
+      if (selectedFile === filePath) {
+        setSelectedFile(filtered.length > 0 ? filtered[filtered.length - 1] : null);
+      }
+      return filtered;
+    });
+    setDirtyFiles((prev) => {
+      const next = { ...prev };
+      delete next[filePath];
+      return next;
+    });
+  };
+
   useEffect(() => {
     setSelectedFile(null);
+    setOpenFiles([]);
+    setDirtyFiles({});
     setEditorContent('');
     setExpandedDirs({});
     setProvisionedPath(null);
@@ -171,7 +204,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
           .map((pref) => topFiles.find((f) => f.name.toLowerCase() === pref.toLowerCase()))
           .find(Boolean) ?? topFiles[0];
       if (match) {
-        setSelectedFile(match.path);
+        handleOpenFile(match.path);
       }
     }
   }, [selectedFile, treeQuery.data?.tree]);
@@ -222,7 +255,12 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     {
       enabled: isEnabled && Boolean(projectId) && Boolean(selectedFile),
       refetchOnWindowFocus: false,
-      onSuccess: (data) => setEditorContent(data.content),
+      onSuccess: (data) => {
+        setEditorContent(data.content);
+        if (selectedFile) {
+          setDirtyFiles((prev) => ({ ...prev, [selectedFile]: false }));
+        }
+      },
     },
   );
 
@@ -235,6 +273,9 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
       }),
     {
       onSuccess: () => {
+        if (selectedFile) {
+          setDirtyFiles((prev) => ({ ...prev, [selectedFile]: false }));
+        }
         queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
         queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
       },
@@ -278,10 +319,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
         <button
           key={node.path}
           type="button"
-          onClick={() => {
-            setSelectedFile(node.path);
-            setWorkbenchTab('editor');
-          }}
+          onClick={() => handleOpenFile(node.path)}
           className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs ${
             isSelected
               ? 'bg-surface-active font-medium text-text-primary'
@@ -291,9 +329,34 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
         >
           <FileCode className="size-3.5 shrink-0 opacity-75" aria-hidden="true" />
           <span className="truncate">{node.name}</span>
+          {dirtyFiles[node.path] ? (
+            <span className="ml-auto size-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
+          ) : null}
         </button>
       );
     });
+
+  // Flatten tree for fast workspace-wide file search
+  const flattenFiles = (nodes: OpenCodeDirTreeEntry[]): OpenCodeDirTreeEntry[] => {
+    const list: OpenCodeDirTreeEntry[] = [];
+    for (const node of nodes) {
+      if (node.type === 'file') {
+        list.push(node);
+      } else if (node.children) {
+        list.push(...flattenFiles(node.children));
+      }
+    }
+    return list;
+  };
+
+  const allFiles = flattenFiles(treeQuery.data?.tree ?? []);
+  const matchingFiles = fileSearchQuery.trim()
+    ? allFiles.filter(
+        (f) =>
+          f.name.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+          f.path.toLowerCase().includes(fileSearchQuery.toLowerCase()),
+      )
+    : [];
 
   if (statusQuery.isLoading) {
     return (
@@ -489,16 +552,35 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Left File Explorer Sidebar */}
+          {/* Left File Explorer & Search Sidebar */}
           {showFiles ? (
-            <aside className="flex w-56 shrink-0 flex-col border-r border-border-light bg-surface-secondary">
-              <div className="flex h-8 shrink-0 items-center justify-between border-b border-border-light px-2.5 text-xs">
-                <span
-                  className="truncate font-mono text-[11px] font-medium text-text-secondary"
-                  title={rootPath}
-                >
-                  {rootPath || projectName}
-                </span>
+            <aside className="flex w-60 shrink-0 flex-col border-r border-border-light bg-surface-secondary">
+              <div className="flex h-8 shrink-0 items-center justify-between border-b border-border-light px-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarView('files')}
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                      sidebarView === 'files'
+                        ? 'bg-surface-active text-text-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {localize('com_opencode_files_label') || 'Files'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarView('search')}
+                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                      sidebarView === 'search'
+                        ? 'bg-surface-active text-text-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    <Search className="size-3" aria-hidden="true" />
+                    <span>{localize('com_ui_search') || 'Search'}</span>
+                  </button>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -510,38 +592,106 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                   <RotateCw className="size-3" aria-hidden="true" />
                 </Button>
               </div>
-              <div className="flex-1 overflow-y-auto p-1.5">
-                {treeQuery.isLoading ? (
-                  <div className="flex items-center justify-center p-4 text-xs text-text-secondary">
-                    <Spinner className="mr-1.5 size-3.5" />
-                    {localize('com_opencode_loading_tree')}
+
+              {sidebarView === 'search' ? (
+                <div className="flex flex-1 flex-col overflow-hidden p-2">
+                  <div className="relative mb-2">
+                    <Search className="pointer-events-none absolute left-2 top-2 size-3.5 text-text-secondary" />
+                    <input
+                      type="text"
+                      value={fileSearchQuery}
+                      onChange={(e) => setFileSearchQuery(e.target.value)}
+                      placeholder={localize('com_ui_search') || 'Find files in project...'}
+                      className="w-full rounded border border-border-light bg-surface-primary py-1 pl-7 pr-2 text-xs text-text-primary placeholder:text-text-secondary focus:border-border-medium focus:outline-none"
+                    />
                   </div>
-                ) : null}
-                {!treeQuery.isLoading && treeQuery.isError ? (
-                  <div className="p-3 text-xs text-text-destructive">
-                    {localize('com_opencode_error_generic')}
+                  <div className="flex-1 overflow-y-auto">
+                    {(() => {
+                      if (fileSearchQuery.trim() === '') {
+                        return (
+                          <p className="p-2 text-center text-xs text-text-secondary">
+                            {localize('com_ui_search') || 'Type to search files...'}
+                          </p>
+                        );
+                      }
+                      if (matchingFiles.length === 0) {
+                        return (
+                          <p className="p-2 text-center text-xs text-text-secondary">
+                            {localize('com_ui_no_results') || 'No files match'}
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="space-y-0.5">
+                          {matchingFiles.map((file) => (
+                            <button
+                              key={file.path}
+                              type="button"
+                              onClick={() => handleOpenFile(file.path)}
+                              className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs ${
+                                selectedFile === file.path
+                                  ? 'bg-surface-active font-medium text-text-primary'
+                                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                              }`}
+                            >
+                              <FileCode className="size-3.5 shrink-0 opacity-75" />
+                              <div className="truncate">
+                                <span className="font-medium text-text-primary">{file.name}</span>
+                                <span className="ml-1 text-[10px] text-text-secondary">
+                                  {file.path}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
-                ) : null}
-                {!treeQuery.isLoading &&
-                !treeQuery.isError &&
-                (treeQuery.data?.tree ?? []).length === 0 ? (
-                  <div className="p-3 text-xs text-text-secondary">
-                    {localize('com_opencode_empty_tree')}
-                  </div>
-                ) : null}
-                {!treeQuery.isLoading &&
-                !treeQuery.isError &&
-                (treeQuery.data?.tree ?? []).length > 0
-                  ? renderTree(treeQuery.data?.tree ?? [])
-                  : null}
-              </div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto p-1.5">
+                  {treeQuery.isLoading ? (
+                    <div className="flex items-center justify-center p-4 text-xs text-text-secondary">
+                      <Spinner className="mr-1.5 size-3.5" />
+                      {localize('com_opencode_loading_tree')}
+                    </div>
+                  ) : null}
+                  {!treeQuery.isLoading && treeQuery.isError ? (
+                    <div className="p-3 text-xs text-text-destructive">
+                      {localize('com_opencode_error_generic')}
+                    </div>
+                  ) : null}
+                  {!treeQuery.isLoading &&
+                  !treeQuery.isError &&
+                  (treeQuery.data?.tree ?? []).length === 0 ? (
+                    <div className="p-3 text-xs text-text-secondary">
+                      {localize('com_opencode_empty_tree')}
+                    </div>
+                  ) : null}
+                  {!treeQuery.isLoading &&
+                  !treeQuery.isError &&
+                  (treeQuery.data?.tree ?? []).length > 0
+                    ? renderTree(treeQuery.data?.tree ?? [])
+                    : null}
+                </div>
+              )}
             </aside>
           ) : null}
 
           {/* Center Workbench Stage */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div
+            className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${
+              showTerminal && !isFullTerminal && terminalSplit === 'vertical'
+                ? 'flex-row'
+                : 'flex-col'
+            }`}
+          >
             {!isFullTerminal ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div
+                className={`flex min-h-0 flex-1 overflow-hidden ${
+                  showTerminal && terminalSplit === 'vertical' ? 'w-1/2 flex-row' : 'flex-col'
+                }`}
+              >
                 {workbenchTab === 'changes' ? (
                   <div className="flex-1 overflow-hidden">
                     <OpenCodeChangesPanel projectId={projectId} />
@@ -559,10 +709,56 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                 ) : null}
                 {workbenchTab === 'editor' ? (
                   <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                    <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border-light bg-surface-secondary px-3 text-xs">
-                      <span className="truncate font-mono text-text-primary">
-                        {selectedFile || localize('com_opencode_select_file_prompt')}
-                      </span>
+                    {/* Multi-Tab File Buffer Header */}
+                    <div className="flex h-8 shrink-0 items-center justify-between border-b border-border-light bg-surface-secondary px-2 text-xs">
+                      {/* Open File Tabs */}
+                      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                        {openFiles.length === 0 && selectedFile ? (
+                          <div className="border-primary flex items-center gap-1.5 rounded-t border-b-2 bg-surface-primary px-2.5 py-1 text-text-primary">
+                            <span className="font-mono text-xs">
+                              {selectedFile.split('/').pop()}
+                            </span>
+                          </div>
+                        ) : null}
+                        {openFiles.map((file) => {
+                          const fileName = file.split('/').pop() || file;
+                          const isActive = selectedFile === file;
+                          const isDirty = dirtyFiles[file];
+                          return (
+                            <div
+                              key={file}
+                              onClick={() => {
+                                setSelectedFile(file);
+                                setWorkbenchTab('editor');
+                              }}
+                              className={`group flex cursor-pointer items-center gap-1.5 rounded-t px-2.5 py-1 text-xs transition-colors ${
+                                isActive
+                                  ? 'border-primary border-b-2 bg-surface-primary font-medium text-text-primary'
+                                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                              }`}
+                              title={file}
+                            >
+                              <FileCode className="size-3 opacity-70" />
+                              <span className="max-w-[120px] truncate font-mono">{fileName}</span>
+                              {isDirty ? (
+                                <span
+                                  className="size-1.5 rounded-full bg-amber-400"
+                                  title="Unsaved changes"
+                                />
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={(e) => handleCloseFile(file, e)}
+                                className="ml-1 rounded p-0.5 opacity-0 hover:bg-surface-active group-hover:opacity-100"
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Editor Controls & Diagnostic Actions */}
                       <div className="flex shrink-0 items-center gap-1.5">
                         {selectedFile && diagnostics.length > 0 ? (
                           <Button
@@ -587,6 +783,33 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                           >
                             <MapIcon className="size-3" aria-hidden="true" />
                             {localize('com_opencode_minimap')}
+                          </Button>
+                        ) : null}
+                        {isPlatformAdmin && showTerminal && !isFullTerminal ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setTerminalSplit((prev) =>
+                                prev === 'horizontal' ? 'vertical' : 'horizontal',
+                              )
+                            }
+                            className="h-6 gap-1 px-2 text-[11px]"
+                            title={
+                              terminalSplit === 'horizontal'
+                                ? 'Split Side-by-Side'
+                                : 'Split Stacked'
+                            }
+                          >
+                            {terminalSplit === 'horizontal' ? (
+                              <Columns className="size-3" />
+                            ) : (
+                              <Rows className="size-3" />
+                            )}
+                            <span className="hidden sm:inline">
+                              {terminalSplit === 'horizontal' ? 'Split Vertical' : 'Split Stacked'}
+                            </span>
                           </Button>
                         ) : null}
                         {selectedFile ? (
@@ -641,7 +864,12 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                           theme={isDarkTheme ? 'vs-dark' : 'light'}
                           language={getLanguageFromPath(selectedFile)}
                           value={editorContent}
-                          onChange={(value) => setEditorContent(value ?? '')}
+                          onChange={(value) => {
+                            setEditorContent(value ?? '');
+                            if (selectedFile) {
+                              setDirtyFiles((prev) => ({ ...prev, [selectedFile]: true }));
+                            }
+                          }}
                           onValidate={(markers) =>
                             setDiagnostics(
                               markers.map((m) => ({
@@ -720,21 +948,28 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
             ) : null}
 
             {/* Persistent Live Satchida Code TUI / Terminal (restricted to Platform Admin / platform admin group) */}
-            {isPlatformAdmin && (isFullTerminal || showTerminal) ? (
-              <div
-                className={
-                  isFullTerminal
-                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                    : 'flex h-[48%] min-h-[260px] shrink-0 flex-col overflow-hidden border-t border-border-medium'
-                }
-              >
-                <OpenCodeTerminal
-                  projectId={projectId}
-                  projectPath={rootPath}
-                  className="h-full rounded-none border-0"
-                />
-              </div>
-            ) : null}
+            {(() => {
+              if (!isPlatformAdmin || (!isFullTerminal && !showTerminal)) {
+                return null;
+              }
+              let terminalContainerClass =
+                'flex h-[48%] min-h-[260px] shrink-0 flex-col overflow-hidden border-t border-border-medium';
+              if (isFullTerminal) {
+                terminalContainerClass = 'flex min-h-0 flex-1 flex-col overflow-hidden';
+              } else if (terminalSplit === 'vertical') {
+                terminalContainerClass =
+                  'flex min-h-0 w-1/2 flex-1 flex-col overflow-hidden border-l border-border-medium';
+              }
+              return (
+                <div className={terminalContainerClass}>
+                  <OpenCodeTerminal
+                    projectId={projectId}
+                    projectPath={rootPath}
+                    className="h-full rounded-none border-0"
+                  />
+                </div>
+              );
+            })()}
           </div>
 
           {/* Right AI Agent Chat Panel (Cursor-style, collapsible) */}

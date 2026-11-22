@@ -102,6 +102,41 @@ function capNormalizedProvenance(
   };
 }
 
+/**
+ * Strips raw DeepSeek / DSML tool calling markup from assistant message text
+ * so XML tags and parameter blocks never leak into user chat bubbles.
+ */
+function sanitizeDsmlFromText(val: string): string {
+  if (typeof val !== 'string' || !val) {
+    return val;
+  }
+  return val
+    .replace(/<[|｜]DSML[|｜]tool_calls>[\s\S]*?(<\/[|｜]DSML[|｜]tool_calls>|$)/gi, '')
+    .replace(/<[|｜]DSML[|｜][\s\S]*?(<\/[|｜]DSML[|｜][^>]*>|$)/gi, '')
+    .replace(/<[|｜]DSML[|｜][\s\S]*$/gi, '')
+    .trim();
+}
+
+function sanitizeDsmlFromMessage<T extends Record<string, unknown>>(msg: T): T {
+  if (!msg) return msg;
+  const anyMsg = msg as any;
+  if (typeof anyMsg.text === 'string') {
+    anyMsg.text = sanitizeDsmlFromText(anyMsg.text);
+  }
+  if (Array.isArray(anyMsg.content)) {
+    for (const part of anyMsg.content) {
+      if (part && typeof part === 'object' && part.type === 'text') {
+        if (typeof part.text === 'string') {
+          part.text = sanitizeDsmlFromText(part.text);
+        } else if (part.text && typeof part.text === 'object' && typeof (part.text as any).value === 'string') {
+          (part.text as any).value = sanitizeDsmlFromText((part.text as any).value);
+        }
+      }
+    }
+  }
+  return msg;
+}
+
 type StoredSubagentControlReceipt = NonNullable<
   NonNullable<IMessage['subagentTask']>['controlReceipts']
 >[number];
@@ -939,8 +974,9 @@ export function createMessageMethods(mongoose: typeof import('mongoose')): Messa
 
     try {
       const Message = mongoose.models.Message as Model<IMessage>;
+      const sanitizedParams = sanitizeDsmlFromMessage({ ...params });
       const update: Record<string, unknown> = {
-        ...params,
+        ...sanitizedParams,
         user: userId,
         messageId: params.newMessageId || params.messageId,
       };
@@ -1232,7 +1268,7 @@ export function createMessageMethods(mongoose: typeof import('mongoose')): Messa
   ) {
     try {
       const Message = mongoose.models.Message as Model<IMessage>;
-      await Message.updateOne({ messageId, user: userId }, { text });
+      await Message.updateOne({ messageId, user: userId }, { text: sanitizeDsmlFromText(text) });
     } catch (err) {
       logger.error('Error updating message text:', err);
       throw err;
@@ -2533,7 +2569,13 @@ export function createMessageMethods(mongoose: typeof import('mongoose')): Messa
         query.limit(options.limit);
       }
 
-      return await query.lean<IMessage[]>();
+      const results = await query.lean<IMessage[]>();
+      if (Array.isArray(results)) {
+        for (const msg of results) {
+          sanitizeDsmlFromMessage(msg as unknown as Record<string, unknown>);
+        }
+      }
+      return results;
     } catch (err) {
       logger.error('Error getting messages:', err);
       throw err;

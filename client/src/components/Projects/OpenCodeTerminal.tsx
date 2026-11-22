@@ -136,6 +136,17 @@ export default function OpenCodeTerminal({
       }
     });
 
+    // Native clipboard paste support (Ctrl+V / Shift+Insert / right-click paste)
+    const handlePaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text');
+      if (text && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        e.preventDefault();
+        socketRef.current.send(text);
+      }
+    };
+    const terminalEl = terminalRef.current;
+    terminalEl.addEventListener('paste', handlePaste);
+
     const resizeDisp = term.onResize(({ cols, rows }) => {
       syncPtySize(cols, rows);
     });
@@ -156,6 +167,7 @@ export default function OpenCodeTerminal({
     void connectTerminal(mode);
 
     return () => {
+      terminalEl?.removeEventListener('paste', handlePaste);
       resizeDisp.dispose();
       resizeObserver?.disconnect();
       window.removeEventListener('resize', handleResize);

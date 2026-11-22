@@ -50,7 +50,12 @@ export function isFilmArtifact(type?: string, content?: string): boolean {
     content &&
     (content.includes('window.film') ||
       content.includes('<section data-track=') ||
-      content.includes('data-openfilm'))
+      content.includes('data-openfilm') ||
+      content.includes('motion_') ||
+      content.includes('living-art') ||
+      content.includes('motion-') ||
+      content.includes('atmosphere.html') ||
+      (content.includes('<iframe') && content.includes('/generated/') && content.includes('.html')))
   ) {
     return true;
   }
@@ -77,10 +82,8 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   }
   const { token } = useAuthContext();
 
-  const [activeTab, setActiveTab] = useState<'workbench' | 'preview'>('workbench');
-  const [studioUrl, setStudioUrl] = useState<string>(
-    `/projects/PQhJ7O71SYVE?key=8708e7f0687fe2db0e26f9681d67f57307b1beeee7d50921${token ? `&token=${encodeURIComponent(token)}` : ''}`
-  );
+  const [activeTab, setActiveTab] = useState<'workbench' | 'preview'>('preview');
+  const [studioUrl, setStudioUrl] = useState<string>('');
   const [isStudioLoading, setIsStudioLoading] = useState<boolean>(true);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [fps, setFps] = useState<FPS>(30);
@@ -157,9 +160,28 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   const isScrubbingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Detect direct film URL if the artifact links or embeds a /generated/*.html or /motion/*.html
+  const directFilmUrl = useMemo(() => {
+    let raw = (currentCode || artifact.content || '').trim();
+    if (raw.startsWith('```')) {
+      raw = raw.replace(/^```[a-zA-Z0-9_-]*\s*/, '').replace(/```\s*$/, '').trim();
+    }
+    const match =
+      raw.match(/<iframe[^>]+src=["']([^"']+\.html)["']/i) ||
+      raw.match(/src=["']([^"']+\.html)["']/i) ||
+      raw.match(/(\/(?:generated|motion)\/[^"'\s<>]+\.html)/i);
+    return match ? (match[1] || match[0]) : null;
+  }, [currentCode, artifact.content]);
+
   // Source film HTML: from current editor state, or artifact content, or fallback demo
   const rawFilmContent = useMemo(() => {
-    const raw = (currentCode || artifact.content || '').trim();
+    let raw = (currentCode || artifact.content || '').trim();
+
+    // Strip wrapping markdown code blocks if the agent wrapped the film HTML
+    if (raw.startsWith('```')) {
+      raw = raw.replace(/^```[a-zA-Z0-9_-]*\s*/, '').replace(/```\s*$/, '').trim();
+    }
+
     if (
       raw.length > 0 &&
       (raw.includes('</script>') || raw.includes('</html>')) &&
@@ -170,13 +192,65 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       return raw;
     }
 
-    // Direct video element playback if the artifact points to an mp4/webm URL
+    // Direct iframe source embedding if the artifact wraps an iframe with a /generated/*.html URL
+    const iframeMatch =
+      raw.match(/<iframe[^>]+src=["']([^"']+\.html)["']/i) ||
+      raw.match(/src=["']([^"']+\.html)["']/i) ||
+      raw.match(/(\/(?:generated|motion)\/[^"'\s<>]+\.html)/i);
+    if (iframeMatch && (iframeMatch[1] || iframeMatch[0])) {
+      const filmHtmlUrl = iframeMatch[1] || iframeMatch[0];
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
+    }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+<body>
+  <iframe id="sub-film" src="${filmHtmlUrl}" allow="autoplay"></iframe>
+  <script>
+    (function() {
+      var sub = document.getElementById('sub-film');
+      window.film = {
+        duration: 12,
+        width: 1920,
+        height: 1080,
+        frame: function(t) {
+          if (sub && sub.contentWindow) {
+            sub.contentWindow.postMessage({ type: 'SEEK_FRAME', time: t }, '*');
+          }
+        },
+        setMuted: function(m) {
+          if (sub && sub.contentWindow) {
+            sub.contentWindow.postMessage({ type: 'AUDIO_MUTE', muted: m }, '*');
+          }
+        }
+      };
+      window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'FILM_METADATA') {
+          if (window.film) window.film.duration = e.data.duration;
+          window.parent.postMessage(e.data, '*');
+        } else if (e.data && (e.data.type === 'FILM_PLAY' || e.data.type === 'FILM_PAUSE')) {
+          if (sub && sub.contentWindow) {
+            sub.contentWindow.postMessage(e.data, '*');
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+    }
+
+    // Direct video element playback ONLY if explicitly an mp4/webm src tag or bare video
     const videoMatch = raw.match(/src=["']([^"']+\.(?:mp4|webm))["']/i);
     const videoUrl =
       (videoMatch && videoMatch[1]) ||
-      raw.match(/https?:\/\/[^\s"'<>]+(?:\.(?:mp4|webm))/i)?.[0] ||
-      raw.match(/\/[^\s"'<>]+\.(?:mp4|webm)/i)?.[0] ||
-      raw.match(/[a-zA-Z0-9_\-]+\.(?:mp4|webm)/i)?.[0];
+      (raw.startsWith('/') || raw.startsWith('http') ? raw.match(/https?:\/\/[^\s"'<>]+(?:\.(?:mp4|webm))/i)?.[0] || raw.match(/\/(?:generated|motion)\/[^\s"'<>]+\.(?:mp4|webm)/i)?.[0] : null);
 
     if (videoUrl) {
       return `<!DOCTYPE html>
@@ -580,6 +654,18 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
                   console.warn('Audio mute error:', err);
                 }
               }
+            } else if (e.data && (e.data.type === 'FILM_PLAY' || e.data.type === 'FILM_PAUSE')) {
+              var bgm = document.getElementById('bgm');
+              if (bgm) {
+                if (e.data.type === 'FILM_PLAY') {
+                  if (typeof e.data.time === 'number') {
+                    try { bgm.currentTime = e.data.time; } catch(err){}
+                  }
+                  bgm.play().catch(function(err){});
+                } else {
+                  bgm.pause();
+                }
+              }
             }
           });
 
@@ -775,9 +861,20 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   const togglePlay = useCallback(() => {
     setIsPlaying((prev) => {
       const next = !prev;
+      let targetTime = currentTime;
       if (next && currentTime >= duration) {
+        targetTime = 0;
         setCurrentTime(0);
         postSeek(0);
+      }
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: next ? 'FILM_PLAY' : 'FILM_PAUSE',
+            time: targetTime,
+          },
+          '*',
+        );
       }
       return next;
     });
@@ -1156,9 +1253,11 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
         >
           <iframe
             ref={iframeRef}
-            srcDoc={srcDoc}
+            src={directFilmUrl || undefined}
+            srcDoc={!directFilmUrl ? srcDoc : undefined}
             title={artifact.title || 'Satchida Studio Film'}
             sandbox="allow-scripts allow-same-origin"
+            allow="autoplay"
             className="h-full w-full border-0 bg-black"
           />
         </div>

@@ -355,3 +355,9 @@ model-selection dropdown once (2026-11-10); it must never happen again.
      - Render through **Artifacts** (`:::artifact{identifier="..." type="application/vnd.librechat.film" ...}`) or the **Satchida Studio Side Panel** (`OpenFilmStudio.tsx` / `ArtifactTabs.tsx`).
      - Procedural artwork, images, and documents must display as in-chat media previews or within the embedded **Studio Library** panel.
    - Any animation, motion graphics, or video preview must run with its timeline scrubber, foley audio controls, and MP4 export buttons contained entirely within LibreChat's embedded side-panel sandbox.
+
+### 8. Strict Credential & Password Immutability Directive (NON-NEGOTIABLE)
+- **Zero Automated Password Overwrites**: No script, subagent, automated test, or AI assistant is ever authorized to change, reset, or overwrite passwords or credentials (especially for `admin@satchida.com`, `root`, or local accounts) without explicit, real-time user confirmation.
+- **Mandatory Root Passphrase Authorization**: Modification of the root/superadmin password requires explicit verification of the designated cryptographic root authorization passphrase. Any request, script, or automated tool lacking this passphrase must be strictly rejected at both the API and database levels.
+- **No Ad-Hoc Password Reset Scripts**: Never create or leave standalone ad-hoc scripts (e.g. `set_admin_pwd.js`, `reset-admin-pwd.js`, `reset_root.py`) in `scripts/`, `scratch/`, or `satchida/ops/` containing hardcoded password hashes or direct database mutations.
+- **Tenant Node Protection**: On client/tenant edge installations, local database access must be guarded against unauthorized administrative escalation. Any credential modification must require authenticated master authorization or secondary approval.

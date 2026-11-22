@@ -50,6 +50,7 @@ export interface IUser extends Document {
   email: string;
   emailVerified: boolean;
   password?: string;
+  passwordSig?: string | null;
   avatar?: string;
   provider: string;
   role?: string;

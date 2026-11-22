@@ -25,7 +25,7 @@ let lastMonotonicTimestamp = Date.now();
  */
 export const SATCHIDA_MASTER_PUBLIC_KEY: string =
   process.env.SATCHIDA_LICENSE_PUBLIC_KEY ||
-  `-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA2ZRQdPW8GWhNtN403gBNABcAhWeJWqELuyI/cLbO+l0=\n-----END PUBLIC KEY-----`;
+  `-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbR6Cz0USZkPutuGIoq69nWmPHbrUt71aG5YDpkCuBiM=\n-----END PUBLIC KEY-----\n`;
 
 /**
  * Persistent monotonic clock ledger path to prevent system clock rollback.
@@ -145,7 +145,12 @@ export function verifyDeadManLease(): {
     const gracePeriod = (payload.gracePeriodSeconds || 0) * 1000;
     const hardExpiry = payload.expiresAt * 1000 + gracePeriod;
 
-    // Check expiration
+    // Check expiration or remote lockout status
+    if (payload.status === 3 || payload.status === 2) {
+      cachedLicense = { payload, valid: false, expires: hardExpiry };
+      return { valid: false, reason: 'TENANT_LOCKED_BY_OPERATOR' };
+    }
+
     if (now > hardExpiry) {
       cachedLicense = { payload, valid: false, expires: hardExpiry };
       return { valid: false, reason: 'LICENSE_EXPIRED' };
@@ -186,4 +191,66 @@ export function deadManLeaseGuard(req: Request, res: Response, next: NextFunctio
   }
 
   next();
+}
+
+/**
+ * Updates the local license file and resets monotonic clock checks
+ */
+export function updateNodeLicense(licenseToken: string): { success: boolean; error?: string; payload?: LicensePayload } {
+  try {
+    const parts = (licenseToken || '').trim().split('.');
+    if (parts.length !== 3) {
+      return { success: false, error: 'INVALID_TOKEN_FORMAT' };
+    }
+
+    const [headerB64, payloadB64, signatureB64] = parts;
+    const dataToVerify = Buffer.from(`${headerB64}.${payloadB64}`, 'utf8');
+    const signatureBuffer = Buffer.from(signatureB64, 'base64url');
+
+    const isVerified = crypto.verify(
+      null,
+      dataToVerify,
+      SATCHIDA_MASTER_PUBLIC_KEY,
+      signatureBuffer,
+    );
+
+    if (!isVerified) {
+      logger.error('[LicenseGuard] Rejected license update: Invalid cryptographic signature.');
+      return { success: false, error: 'CRYPTOGRAPHIC_SIGNATURE_INVALID' };
+    }
+
+    const payload: LicensePayload = JSON.parse(
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
+    );
+
+    const licensePath =
+      process.env.SATCHIDA_LICENSE_PATH || path.resolve(process.cwd(), 'satchida.lic');
+    fs.writeFileSync(licensePath, licenseToken.trim(), { encoding: 'utf8', flag: 'w' });
+
+    // Update in-memory clock watermark and cached license
+    const now = Date.now();
+    lastMonotonicTimestamp = now;
+    const ledgerPath = getClockLedgerPath();
+    try {
+      fs.writeFileSync(ledgerPath, String(now), { encoding: 'utf8', flag: 'w' });
+    } catch (e) {
+      logger.warn('[LicenseGuard] Failed to write clock watermark on license update:', e);
+    }
+
+    const gracePeriod = (payload.gracePeriodSeconds || 0) * 1000;
+    const hardExpiry = payload.expiresAt * 1000 + gracePeriod;
+    cachedLicense = { payload, valid: true, expires: hardExpiry };
+    lastCheckTime = now;
+
+    logger.info('[LicenseGuard] Successfully installed and verified new Satchida license', {
+      tenantId: payload.tenantId,
+      expiresAt: payload.expiresAt,
+      plan: payload.plan,
+    });
+
+    return { success: true, payload };
+  } catch (err: any) {
+    logger.error('[LicenseGuard] Exception while installing license:', err);
+    return { success: false, error: err?.message || 'LICENSE_UPDATE_FAILED' };
+  }
 }

@@ -1,41 +1,8 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import type { ComponentType } from 'react';
 import { useAtom } from 'jotai';
-import {
-  Search,
-  X,
-  Coins,
-  Bot,
-  Scale,
-  AlertTriangle,
-  TrendingUp,
-  HeartPulse,
-  Train,
-  FileSearch,
-  ShieldCheck,
-  Lightbulb,
-  GraduationCap,
-  BookOpen,
-  Code2,
-  Database,
-  Cpu,
-  Layers,
-  ShieldAlert,
-  Home,
-  Sun,
-  Flame,
-  FileSpreadsheet,
-  FileText,
-  ShoppingCart,
-  Wrench,
-  Compass,
-  Boxes,
-  Sparkles,
-  PenTool,
-  Pill,
-  Radio,
-  Atom,
-} from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { resolvePersonaVisual } from '~/common/personaVisuals';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import type { MotionStudioGroupId, StarterItem } from '~/common/starters';
 import {
@@ -62,140 +29,6 @@ import { useLocalize } from '~/hooks';
  * staging a new starter detaches the previous one.
  */
 let stagedTabHandler: ((ev: KeyboardEvent) => void) | null = null;
-
-/**
- * Helper to resolve high-definition SVG/Lucide icons with gold-standard
- * visual presentation for each persona, reflecting its exact domain subject.
- */
-interface PersonaVisual {
-  Icon: ComponentType<{ className?: string }>;
-  color: string;
-  bg: string;
-}
-
-const getPersonaVisual = (title: string, badge?: string): PersonaVisual => {
-  const text = `${title} ${badge ?? ''}`.toLowerCase();
-
-  // 1. Precious Metals, Bullion & Fuel
-  if (text.includes('gold') || text.includes('silver') || text.includes('bullion') || text.includes('jeweller')) {
-    return { Icon: Coins, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
-  }
-  if (text.includes('fuel') || text.includes('petrol') || text.includes('diesel') || text.includes('lpg')) {
-    return { Icon: Flame, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' };
-  }
-
-  // 2. AI Model Releases, LLM, Neural & Architecture
-  if (text.includes('ai model') || text.includes('model release') || text.includes('llm') || text.includes('benchmark')) {
-    return { Icon: Bot, color: 'text-indigo-400', bg: 'bg-indigo-500/10 border-indigo-500/20' };
-  }
-  if (text.includes('dijkstra') || text.includes('backprop') || text.includes('neural') || text.includes('quantum')) {
-    return { Icon: Cpu, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' };
-  }
-
-  // 3. Governance, Law, Gazette, Court & Compliance
-  if (
-    text.includes('court') ||
-    text.includes('govt') ||
-    text.includes('gazette') ||
-    text.includes('judgment') ||
-    text.includes('legal') ||
-    text.includes('rbi') ||
-    text.includes('circular')
-  ) {
-    return { Icon: Scale, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
-  }
-
-  // 4. Disaster, Weather, IMD & SOS Alerts
-  if (text.includes('disaster') || text.includes('weather') || text.includes('cyclone') || text.includes('flood') || text.includes('alert') || text.includes('imd')) {
-    return { Icon: AlertTriangle, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' };
-  }
-
-  // 5. Financial Markets, Equities, Crypto & Trading
-  if (text.includes('market wrap') || text.includes('indices') || text.includes('stock') || text.includes('crypto') || text.includes('equity') || text.includes('dcf')) {
-    return { Icon: TrendingUp, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' };
-  }
-
-  // 6. Public Health, Medicine, Clinic & AQI
-  if (text.includes('aqi') || text.includes('health') || text.includes('outbreak') || text.includes('cpcb') || text.includes('clinic')) {
-    return { Icon: HeartPulse, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' };
-  }
-  if (text.includes('medicine') || text.includes('drug') || text.includes('ddx') || text.includes('pharma')) {
-    return { Icon: Pill, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
-  }
-
-  // 7. Transit, Rail, Flight & Road Highways
-  if (text.includes('rail') || text.includes('flight') || text.includes('road') || text.includes('transit') || text.includes('highway') || text.includes('traffic')) {
-    return { Icon: Train, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
-  }
-
-  // 8. Policy Research & Audit
-  if (text.includes('policy') || text.includes('audit') || text.includes('research') || text.includes('scheme') || text.includes('scholar')) {
-    return { Icon: FileSearch, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' };
-  }
-
-  // 9. Document Vault, Vector Search, Knowledge & RAG
-  if (text.includes('vault') || text.includes('lancedb') || text.includes('rag') || text.includes('indexed') || text.includes('private strategy') || text.includes('offline document')) {
-    return { Icon: ShieldCheck, color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' };
-  }
-  if (text.includes('security') || text.includes('threat') || text.includes('cve') || text.includes('iso 27001') || text.includes('soc 2')) {
-    return { Icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' };
-  }
-
-  // 10. First-Principles Explainer & Deep Concepts
-  if (text.includes('first-principles') || text.includes('explainer') || text.includes('scratch') || text.includes('trade-off')) {
-    return { Icon: Lightbulb, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' };
-  }
-
-  // 11. Academic, Curriculum & Chapter Tutoring
-  if (text.includes('cbse') || text.includes('igcse') || text.includes('tutor') || text.includes('curriculum') || text.includes('study book') || text.includes('grade')) {
-    return { Icon: GraduationCap, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' };
-  }
-  if (text.includes('textbook') || text.includes('exercise') || text.includes('chapter') || text.includes('notes') || text.includes('study')) {
-    return { Icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
-  }
-
-  // 12. Coding, Python & Software Architecture
-  if (text.includes('python') || text.includes('code review') || text.includes('api architecture') || text.includes('async task') || text.includes('binary search')) {
-    return { Icon: Code2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
-  }
-  if (text.includes('sql') || text.includes('query') || text.includes('database') || text.includes('indexing')) {
-    return { Icon: Database, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
-  }
-
-  // 13. Science, Physics, Math & Formulas
-  if (text.includes('physics') || text.includes('emi problem') || text.includes('wave-particle') || text.includes('thermodynamics') || text.includes('quadratic') || text.includes('kirchhoff') || text.includes('newton')) {
-    return { Icon: Atom, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' };
-  }
-
-  // 14. Architecture, 3D, Floor Plans & Home Building
-  if (text.includes('3bhk') || text.includes('duplex') || text.includes('villa') || text.includes('vastu') || text.includes('floor plan') || text.includes('room reconstruction')) {
-    return { Icon: Home, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' };
-  }
-
-  // 15. Vedic, Panchang, Astrology & Solar
-  if (text.includes('panchang') || text.includes('muhurat') || text.includes('festival') || text.includes('solar') || text.includes('daylighting') || text.includes('sun-path')) {
-    return { Icon: Sun, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' };
-  }
-
-  // 16. Office, Spreadsheets, Budget & Documents
-  if (text.includes('budget') || text.includes('spreadsheet') || text.includes('inventory') || text.includes('sales & expense') || text.includes('kpi dashboard')) {
-    return { Icon: FileSpreadsheet, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' };
-  }
-  if (text.includes('formal letter') || text.includes('bill') || text.includes('agreement') || text.includes('statement') || text.includes('prd') || text.includes('deck')) {
-    return { Icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
-  }
-  if (text.includes('grocery') || text.includes('cart') || text.includes('restock')) {
-    return { Icon: ShoppingCart, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' };
-  }
-
-  // 17. Hardware, DIY & Makers
-  if (text.includes('arduino') || text.includes('esp32') || text.includes('appliance') || text.includes('diy') || text.includes('repair')) {
-    return { Icon: Wrench, color: 'text-zinc-300', bg: 'bg-zinc-500/10 border-zinc-500/20' };
-  }
-
-  // Default Sovereign Insight Icon
-  return { Icon: Sparkles, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' };
-};
 
 const ConversationStarters = () => {
   const { conversation } = useChatContext();
@@ -640,17 +473,13 @@ const ConversationStarters = () => {
               }
             }
 
-            // Strip leading emoji from title if any exists
-            let cleanTitle = title ?? '';
-            const emojiMatch = cleanTitle.match(
-              /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/u,
-            );
-            if (emojiMatch) {
-              cleanTitle = cleanTitle.slice(emojiMatch[0].length).trim();
-            }
+            // Strip leading emoji from title if any exists, preserving digits (2D, 3D, etc.)
+            let cleanTitle = (title ?? '')
+              .replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F\uFE0E\s]+/u, '')
+              .trim();
 
             // Resolve modern gold-standard domain visual for this persona
-            const visual = getPersonaVisual(cleanTitle, item.badge);
+            const visual = resolvePersonaVisual(cleanTitle, item.badge);
             const PersonaIcon = visual.Icon;
 
             return (

@@ -57,6 +57,11 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
       maxlength: 128,
       select: false,
     },
+    passwordSig: {
+      type: String,
+      default: null,
+      select: false,
+    },
     avatar: {
       type: String,
       required: false,

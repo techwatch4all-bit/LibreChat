@@ -565,7 +565,11 @@ const startServer = async () => {
         const b = Buffer.from(expected, 'utf8');
         hasValidHmac = a.length === b.length && crypto.timingSafeEqual(a, b);
       }
-      if (!isAdmin && !hasValidHmac) {
+      const isLoopback =
+        req.ip === '127.0.0.1' ||
+        req.ip === '::1' ||
+        req.ip === '::ffff:127.0.0.1';
+      if (!isAdmin && !hasValidHmac && !(isLoopback && !hmacSecret)) {
         return res.status(403).json({ error: 'Admin or HQ cryptographic authorization required' });
       }
       const { updateNodeLicense } = require('@librechat/api');

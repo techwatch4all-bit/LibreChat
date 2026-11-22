@@ -95,7 +95,15 @@ export function verifyDeadManLease(): {
 
   // Return cached result if checked within 30 seconds
   if (cachedLicense && now - lastCheckTime < 30000) {
-    if (!cachedLicense.valid || now > cachedLicense.expires) {
+    if (!cachedLicense.valid) {
+      const isLocked =
+        cachedLicense.payload?.status === 2 || cachedLicense.payload?.status === 3;
+      return {
+        valid: false,
+        reason: isLocked ? 'TENANT_LOCKED_BY_OPERATOR' : 'LICENSE_EXPIRED',
+      };
+    }
+    if (now > cachedLicense.expires) {
       return { valid: false, reason: 'LICENSE_EXPIRED' };
     }
     return { valid: true, payload: cachedLicense.payload };
@@ -251,7 +259,8 @@ export function updateNodeLicense(licenseToken: string): { success: boolean; err
 
     const gracePeriod = (payload.gracePeriodSeconds || 0) * 1000;
     const hardExpiry = payload.expiresAt * 1000 + gracePeriod;
-    cachedLicense = { payload, valid: true, expires: hardExpiry };
+    const isLocked = payload.status === 2 || payload.status === 3;
+    cachedLicense = { payload, valid: !isLocked, expires: hardExpiry };
     lastCheckTime = now;
 
     logger.info('[LicenseGuard] Successfully installed and verified new Satchida license', {

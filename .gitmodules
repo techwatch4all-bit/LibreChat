@@ -1,0 +1,9 @@
+[submodule "repos/satchida-motion-art"]
+	path = repos/satchida-motion-art
+	url = ./repos/satchida-motion-art
+[submodule "repos/satchida-procedural-art"]
+	path = repos/satchida-procedural-art
+	url = ./repos/satchida-procedural-art
+[submodule "repos/Satchida-Studio"]
+	path = repos/Satchida-Studio
+	url = ./repos/Satchida-Studio

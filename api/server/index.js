@@ -547,6 +547,28 @@ const startServer = async () => {
   /* Dead-man cryptographic lease & anti-clock-tampering guard */
   app.use(deadManLeaseGuard);
 
+  /* Remote Cryptographic License & Lease Update Directives (from One-API HQ) */
+  app.post('/api/admin/license/update', (req, res) => {
+    try {
+      const { license } = req.body || {};
+      if (!license || typeof license !== 'string') {
+        return res.status(400).json({ error: 'License token is required' });
+      }
+      const { updateNodeLicense } = require('@librechat/api');
+      const result = updateNodeLicense(license);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || 'Failed to update license' });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Cryptographic license lease verified, activated and un-locked.',
+        data: result.payload,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   /* API Endpoints */
   app.use('/api/auth', preAuthTenantMiddleware, routes.auth);
   app.use('/api/insights', routes.insights);
@@ -718,6 +740,49 @@ const startServer = async () => {
     }),
   );
 
+  // Authenticated and Privacy-Isolated /storage Static Route (tenant & user isolation)
+  const storageRootDir = path.resolve('storage');
+  if (!fs.existsSync(storageRootDir)) {
+    fs.mkdirSync(storageRootDir, { recursive: true });
+  }
+  app.use('/storage', optionalJwtAuth, (req, res, next) => {
+    // 1. Guard user privacy for /storage/users/:username/...
+    const userMatch = req.path.match(/^\/users\/([^\/]+)/);
+    if (userMatch) {
+      const targetUser = decodeURIComponent(userMatch[1]);
+      const currentUserName = (req.user && (req.user.name || req.user.username)) || '';
+      const isOwner = currentUserName && (currentUserName === targetUser);
+      const isAdmin = req.user && (req.user.role === 'ADMIN' || req.user.role === 'admin');
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: 'Access denied to private user storage' });
+      }
+    }
+
+    // 2. Serve static file with full byte-range streaming & proper MIME headers
+    express.static(storageRootDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.mp4')) {
+          res.setHeader('Content-Type', 'video/mp4');
+        } else if (filePath.endsWith('.webm')) {
+          res.setHeader('Content-Type', 'video/webm');
+        } else if (filePath.endsWith('.mp3')) {
+          res.setHeader('Content-Type', 'audio/mpeg');
+        } else if (filePath.endsWith('.png')) {
+          res.setHeader('Content-Type', 'image/png');
+        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+          res.setHeader('Content-Type', 'image/jpeg');
+        } else if (filePath.endsWith('.pdf')) {
+          res.setHeader('Content-Type', 'application/pdf');
+        } else if (filePath.endsWith('.json')) {
+          res.setHeader('Content-Type', 'application/json');
+        }
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      },
+    })(req, res, next);
+  });
+
   // ComfyUI Studio reverse proxy (:8188)
   const { createProxyMiddleware } = require('http-proxy-middleware');
   const comfyProxy = createProxyMiddleware({
@@ -760,7 +825,9 @@ const startServer = async () => {
   // Studio artifact home — stable directory OUTSIDE client/dist so client
   // rebuilds can never 404 a delivered creation. The montage server publishes
   // here and the Studio Library manifest lives alongside the artifacts.
-  const studioGeneratedDir = path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated');
+  const inRepoGeneratedDir = path.resolve('storage', 'exports', 'generated');
+  const externalGeneratedDir = path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated');
+  const studioGeneratedDir = fs.existsSync(inRepoGeneratedDir) ? inRepoGeneratedDir : externalGeneratedDir;
   if (!fs.existsSync(studioGeneratedDir)) {
     fs.mkdirSync(studioGeneratedDir, { recursive: true });
   }
@@ -793,9 +860,9 @@ const startServer = async () => {
       return res.status(401).json({ error: 'Sign in to view your Studio Library' });
     }
     try {
-      const manifestPath = path.resolve(
-        'D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated\\manifest.json',
-      );
+      const manifestPath = fs.existsSync(path.resolve('storage', 'exports', 'generated', 'manifest.json'))
+        ? path.resolve('storage', 'exports', 'generated', 'manifest.json')
+        : path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated\\manifest.json');
       let entries = [];
       if (fs.existsSync(manifestPath)) {
         entries = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
@@ -1018,6 +1085,13 @@ RULES FOR YOUR SPOKEN EXPLANATION:
       }
       serverReady = true;
       logger.info('Server readiness checks passing.');
+
+      try {
+        const { startEdgeHeartbeatEmitter } = require('@librechat/api/telemetry');
+        startEdgeHeartbeatEmitter(1000);
+      } catch (hbErr) {
+        logger.warn('[EdgeHeartbeat] Could not start telemetry emitter: ' + hbErr.message);
+      }
     } catch (initErr) {
       serverReady = false;
       logger.error('Post-listen initialization failed:', initErr);

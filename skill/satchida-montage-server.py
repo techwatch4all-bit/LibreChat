@@ -44,7 +44,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 # ── Path bootstrap ────────────────────────────────────────────────────────────
-_STUDIO_ROOT = Path(r"D:\LAN-AI-Infra\Satchida-Studio")
+_LIBRECHAT_ROOT = Path(__file__).resolve().parent.parent
+_STUDIO_ROOT = (_LIBRECHAT_ROOT / "repos" / "Satchida-Studio") if (_LIBRECHAT_ROOT / "repos" / "Satchida-Studio").exists() else Path(r"D:\LAN-AI-Infra\Satchida-Studio")
 _OPEN_MONTAGE = Path(os.environ.get(
     "OPEN_MONTAGE_ROOT",
     r"D:\LAN-AI-Infra\Satchida-Studio\external\OpenMontage"
@@ -2126,7 +2127,7 @@ def _publish_artifact(
     thumbnail next to the media so the library and chat embeds can show one.
     """
     try:
-        stable_dir = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
+        stable_dir = _STABLE_GENERATED_DIR
         stable_dir.mkdir(parents=True, exist_ok=True)
         is_video = path.name.lower().endswith((".mp4", ".webm", ".mkv", ".mov"))
         is_audio = path.name.lower().endswith((".mp3", ".wav", ".aac", ".m4a", ".ogg"))
@@ -2449,7 +2450,7 @@ def image_generate(
 
 
 # ── Studio Library + multi-image composition (operator request, 2026-11-17) ──
-_STABLE_GENERATED_DIR = Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
+_STABLE_GENERATED_DIR = (_LIBRECHAT_ROOT / "storage" / "exports" / "generated") if (_LIBRECHAT_ROOT / "storage" / "exports" / "generated").exists() else Path(r"D:\LAN-AI-Infra\Satchida-Studio\exports\generated")
 _COMPOSABLE_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -3971,3 +3972,5 @@ def audio_fetch_and_mix(
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     mcp.run()
+
+

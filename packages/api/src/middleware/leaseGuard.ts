@@ -13,6 +13,7 @@ export interface LicensePayload {
   gracePeriodSeconds?: number;
   plan?: string;
   features?: string[];
+  status?: number;
 }
 
 let cachedLicense: { payload: LicensePayload; valid: boolean; expires: number } | null = null;
@@ -21,11 +22,10 @@ let lastMonotonicTimestamp = Date.now();
 
 /**
  * Hardcoded Satchida Master Authority Ed25519 Public Key.
- * Embedded directly in compiled bytecode so tenant IT cannot modify it by editing .env.
+ * Embedded directly in compiled bytecode so tenant IT or local agents cannot
+ * substitute a rogue public key by editing .env.
  */
-export const SATCHIDA_MASTER_PUBLIC_KEY: string =
-  process.env.SATCHIDA_LICENSE_PUBLIC_KEY ||
-  `-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbR6Cz0USZkPutuGIoq69nWmPHbrUt71aG5YDpkCuBiM=\n-----END PUBLIC KEY-----\n`;
+export const SATCHIDA_MASTER_PUBLIC_KEY: string = `-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbR6Cz0USZkPutuGIoq69nWmPHbrUt71aG5YDpkCuBiM=\n-----END PUBLIC KEY-----\n`;
 
 /**
  * Persistent monotonic clock ledger path to prevent system clock rollback.
@@ -222,6 +222,18 @@ export function updateNodeLicense(licenseToken: string): { success: boolean; err
     const payload: LicensePayload = JSON.parse(
       Buffer.from(payloadB64, 'base64url').toString('utf8'),
     );
+
+    if (
+      cachedLicense?.payload?.issuedAt &&
+      typeof payload.issuedAt === 'number' &&
+      payload.issuedAt < cachedLicense.payload.issuedAt
+    ) {
+      logger.warn('[LicenseGuard] Rejected replayed/older license token.', {
+        incomingIssuedAt: payload.issuedAt,
+        currentIssuedAt: cachedLicense.payload.issuedAt,
+      });
+      return { success: false, error: 'LICENSE_REPLAY_REJECTED' };
+    }
 
     const licensePath =
       process.env.SATCHIDA_LICENSE_PATH || path.resolve(process.cwd(), 'satchida.lic');

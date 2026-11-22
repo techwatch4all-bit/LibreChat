@@ -548,11 +548,25 @@ const startServer = async () => {
   app.use(deadManLeaseGuard);
 
   /* Remote Cryptographic License & Lease Update Directives (from One-API HQ) */
-  app.post('/api/admin/license/update', (req, res) => {
+  app.post('/api/admin/license/update', optionalJwtAuth, (req, res) => {
     try {
       const { license } = req.body || {};
       if (!license || typeof license !== 'string') {
         return res.status(400).json({ error: 'License token is required' });
+      }
+      const isAdmin = req.user && String(req.user.role || '').toUpperCase() === 'ADMIN';
+      const hmacSecret = process.env.SATCHIDA_HQ_HMAC_SECRET || process.env.SATCHIDA_CLIENT_SECRET;
+      const incomingSig = req.headers['x-satchida-hq-signature'];
+      let hasValidHmac = false;
+      if (hmacSecret && typeof incomingSig === 'string' && incomingSig.length > 0) {
+        const crypto = require('crypto');
+        const expected = crypto.createHmac('sha256', hmacSecret).update(license).digest('hex');
+        const a = Buffer.from(incomingSig, 'utf8');
+        const b = Buffer.from(expected, 'utf8');
+        hasValidHmac = a.length === b.length && crypto.timingSafeEqual(a, b);
+      }
+      if (!isAdmin && !hasValidHmac) {
+        return res.status(403).json({ error: 'Admin or HQ cryptographic authorization required' });
       }
       const { updateNodeLicense } = require('@librechat/api');
       const result = updateNodeLicense(license);
@@ -565,7 +579,7 @@ const startServer = async () => {
         data: result.payload,
       });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'License update failed' });
     }
   });
 

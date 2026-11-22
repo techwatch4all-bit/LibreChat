@@ -587,6 +587,49 @@ const startServer = async () => {
     }
   });
 
+  /* Remote Signed Delta Release Push & Verification (triggered from One-API HQ) */
+  app.post('/api/admin/release/apply', optionalJwtAuth, (req, res) => {
+    try {
+      const isAdmin = req.user && String(req.user.role || '').toUpperCase() === 'ADMIN';
+      const hmacSecret = process.env.SATCHIDA_HQ_HMAC_SECRET || process.env.SATCHIDA_CLIENT_SECRET;
+      const isLoopback =
+        req.ip === '127.0.0.1' ||
+        req.ip === '::1' ||
+        req.ip === '::ffff:127.0.0.1';
+      if (!isAdmin && !(isLoopback && !hmacSecret)) {
+        return res.status(403).json({ error: 'Admin or HQ authorization required' });
+      }
+      const { execFileSync } = require('child_process');
+      const updaterPath = path.resolve(__dirname, '..', '..', 'scripts', 'satchida-updater.mjs');
+      const gatewayOverride =
+        typeof req.body?.gatewayUrl === 'string' && req.body.gatewayUrl.trim().length > 0
+          ? req.body.gatewayUrl.trim()
+          : process.env.SATCHIDA_GATEWAY_URL || 'http://127.0.0.1:4000';
+      const rawOut = execFileSync(process.execPath, [updaterPath, '--json'], {
+        cwd: path.resolve(__dirname, '..', '..'),
+        encoding: 'utf8',
+        timeout: 60000,
+        windowsHide: true,
+        env: { ...process.env, SATCHIDA_GATEWAY_URL: gatewayOverride },
+      }).trim();
+      const parsed = JSON.parse(rawOut);
+      return res.status(200).json({
+        success: true,
+        verified: Boolean(parsed.verified),
+        version: parsed.version,
+        appliedFiles: parsed.appliedFiles ?? 0,
+        message: parsed.message || 'Release update applied and verified.',
+      });
+    } catch (err) {
+      logger.error('[ReleaseApply] Failed to apply pushed release:', err);
+      return res.status(500).json({
+        success: false,
+        verified: false,
+        error: 'Release update failed on tenant node',
+      });
+    }
+  });
+
   /* API Endpoints */
   app.use('/api/auth', preAuthTenantMiddleware, routes.auth);
   app.use('/api/insights', routes.insights);

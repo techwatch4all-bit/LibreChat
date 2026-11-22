@@ -19,6 +19,7 @@ const SATCHIDA_MASTER_PUBLIC_KEY =
 
 const REPO_ROOT = process.cwd();
 const dryRun = process.argv.includes('--dry-run');
+const jsonOut = process.argv.includes('--json');
 const gatewayBase = (
   process.env.SATCHIDA_GATEWAY_URL || 'https://gateway.satchida.com'
 ).replace(/\/+$/, '');
@@ -50,7 +51,9 @@ async function main() {
   const vk = process.env.SATCHIDA_GATEWAY_VK || '';
   const headers = vk ? { Authorization: `Bearer ${vk}` } : {};
 
-  console.log(`[SatchidaUpdater] Checking ${gatewayBase}/api/releases/latest ...`);
+  if (!jsonOut) {
+    console.log(`[SatchidaUpdater] Checking ${gatewayBase}/api/releases/latest ...`);
+  }
   const res = await fetch(`${gatewayBase}/api/releases/latest`, { headers });
   if (!res.ok) {
     throw new Error(`Release check failed with HTTP ${res.status}`);
@@ -82,15 +85,42 @@ async function main() {
   }
 
   if (changedFiles.length === 0) {
-    console.log(`[SatchidaUpdater] Node is already up to date (${manifest.version}).`);
+    if (jsonOut) {
+      console.log(
+        JSON.stringify({
+          success: true,
+          version: manifest.version,
+          appliedFiles: 0,
+          verified: true,
+          message: `Already up to date (${manifest.version})`,
+        }),
+      );
+    } else {
+      console.log(`[SatchidaUpdater] Node is already up to date (${manifest.version}).`);
+    }
     return;
   }
 
-  console.log(
-    `[SatchidaUpdater] Found ${changedFiles.length} delta file(s) for ${manifest.version}.`,
-  );
+  if (!jsonOut) {
+    console.log(
+      `[SatchidaUpdater] Found ${changedFiles.length} delta file(s) for ${manifest.version}.`,
+    );
+  }
   if (dryRun) {
-    console.log('[SatchidaUpdater] Dry-run mode; no files modified.');
+    if (jsonOut) {
+      console.log(
+        JSON.stringify({
+          success: true,
+          version: manifest.version,
+          appliedFiles: 0,
+          pendingFiles: changedFiles.length,
+          verified: true,
+          dryRun: true,
+        }),
+      );
+    } else {
+      console.log('[SatchidaUpdater] Dry-run mode; no files modified.');
+    }
     return;
   }
 
@@ -111,9 +141,28 @@ async function main() {
     fs.renameSync(tmpPath, item.localPath);
   }
 
-  console.log(
-    `[SatchidaUpdater] Applied ${changedFiles.length} verified delta file(s) for ${manifest.version}. Restart LibreChat to activate.`,
-  );
+  // Post-apply verification: confirm every updated file on disk matches expected SHA-256
+  for (const item of changedFiles) {
+    if (sha256File(item.localPath) !== item.expectedHash) {
+      throw new Error(`Post-apply verification failed on ${item.relPath}`);
+    }
+  }
+
+  if (jsonOut) {
+    console.log(
+      JSON.stringify({
+        success: true,
+        version: manifest.version,
+        appliedFiles: changedFiles.length,
+        verified: true,
+        message: `Applied and verified ${changedFiles.length} file(s) for ${manifest.version}`,
+      }),
+    );
+  } else {
+    console.log(
+      `[SatchidaUpdater] Applied & verified ${changedFiles.length} delta file(s) for ${manifest.version}.`,
+    );
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {

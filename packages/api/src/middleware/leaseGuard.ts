@@ -359,6 +359,7 @@ export function deadManLeaseGuard(req: Request, res: Response, next: NextFunctio
     req.path === '/readyz' ||
     req.path === '/api/health' ||
     req.path === '/api/admin/license/update' ||
+    req.path === '/api/admin/release/apply' ||
     req.path === '/favicon.ico' ||
     req.path.startsWith('/assets/satchida/')
   ) {

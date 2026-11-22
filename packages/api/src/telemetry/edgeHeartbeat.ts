@@ -17,6 +17,11 @@ import { promisify } from 'util';
 import mongoose from 'mongoose';
 import { logger } from '@librechat/data-schemas';
 import { verifyDeadManLease, updateNodeLicense } from '../middleware/leaseGuard';
+import {
+  getLocalHardwareFingerprint,
+  getDeploymentId,
+  getAppVersion,
+} from '../middleware/hardwareId';
 
 const execFileAsync = promisify(execFile);
 
@@ -134,6 +139,8 @@ export interface EdgeTelemetryPayload {
   lease_expires_at: number;
   librechat_uptime: number;
   version: string;
+  hardware_fingerprint: string;
+  deployment_id: string;
 }
 
 /**
@@ -851,7 +858,9 @@ export async function emitEdgeHeartbeat(): Promise<void> {
       lease_valid: leaseCheck.valid,
       lease_expires_at: leaseCheck.payload?.expiresAt || 0,
       librechat_uptime: Math.round((Date.now() - startTime) / 1000),
-      version: 'v0.8.8',
+      version: `v${getAppVersion().replace(/^v/i, '')}`,
+      hardware_fingerprint: getLocalHardwareFingerprint(),
+      deployment_id: getDeploymentId(),
     };
 
     await sendHeartbeatRequest(gatewayUrl, virtualKey, payload);

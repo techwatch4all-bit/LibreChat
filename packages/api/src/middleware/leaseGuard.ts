@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { logger } from '@librechat/data-schemas';
 import type { Request, Response, NextFunction } from 'express';
+import { getLocalHardwareFingerprint } from './hardwareId';
 
 export interface LicensePayload {
   tenantId: string;
@@ -152,6 +153,17 @@ export function verifyDeadManLease(): {
     );
     const gracePeriod = (payload.gracePeriodSeconds || 0) * 1000;
     const hardExpiry = payload.expiresAt * 1000 + gracePeriod;
+
+    // Hardware fingerprint binding check (prevents folder copying to another PC)
+    if (
+      payload.hardwareFingerprint &&
+      payload.hardwareFingerprint.trim().length > 0 &&
+      payload.hardwareFingerprint.trim() !== getLocalHardwareFingerprint()
+    ) {
+      logger.error('[LicenseGuard] Hardware fingerprint mismatch! License bound to another machine.');
+      cachedLicense = { payload, valid: false, expires: hardExpiry };
+      return { valid: false, reason: 'HARDWARE_MISMATCH' };
+    }
 
     // Check expiration or remote lockout status
     if (payload.status === 3 || payload.status === 2) {
@@ -420,6 +432,15 @@ export function updateNodeLicense(licenseToken: string): { success: boolean; err
         currentIssuedAt: cachedLicense.payload.issuedAt,
       });
       return { success: false, error: 'LICENSE_REPLAY_REJECTED' };
+    }
+
+    if (
+      payload.hardwareFingerprint &&
+      payload.hardwareFingerprint.trim().length > 0 &&
+      payload.hardwareFingerprint.trim() !== getLocalHardwareFingerprint()
+    ) {
+      logger.error('[LicenseGuard] Rejected license update: Hardware fingerprint mismatch.');
+      return { success: false, error: 'HARDWARE_MISMATCH' };
     }
 
     const licensePath =

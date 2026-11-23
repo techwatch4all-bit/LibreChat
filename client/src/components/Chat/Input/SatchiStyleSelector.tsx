@@ -67,7 +67,7 @@ function SatchiStyleSelector({ disabled = false }: SatchiStyleSelectorProps) {
               disabled={disabled}
               aria-label={`Execution Style: ${activeLabel}`}
               className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary shadow-xs transition-all',
+                'inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary shadow-xs transition-all',
                 'hover:border-border-medium hover:bg-surface-tertiary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
                 disabled && 'pointer-events-none opacity-50',
               )}

@@ -131,6 +131,8 @@ export { createOpenApiRouter } from './openapi/router';
 export type { OpenApiRouterDeps } from './openapi/router';
 /* OpenCode */
 export * from './opencode';
+/* Realtime Voice */
+export * from './voice/realtimeProxy';
 /* types */
 export type * from './mcp/types';
 export type * from './flow/types';

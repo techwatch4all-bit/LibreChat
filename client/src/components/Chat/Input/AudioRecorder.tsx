@@ -140,7 +140,7 @@ export default memo(function AudioRecorder({
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex shrink-0 items-center gap-1">
       <TooltipAnchor
         description={localize('com_ui_use_micrphone')}
         render={
@@ -168,7 +168,7 @@ export default memo(function AudioRecorder({
             <button
               type="button"
               onClick={() => setShowLiveVoiceModal(true)}
-              className="relative flex items-center gap-1 rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
+              className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
               aria-label="Satchida Live Voice"
             >
               <span className="relative flex h-2 w-2">
@@ -187,7 +187,7 @@ export default memo(function AudioRecorder({
             <button
               type="button"
               onClick={() => setShowVoiceUpgradeModal(true)}
-              className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400 transition-all duration-150 hover:border-amber-500/50 hover:bg-amber-500/20 active:scale-95"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400 transition-all duration-150 hover:border-amber-500/50 hover:bg-amber-500/20 active:scale-95"
               aria-label="Live Voice Pro Gate"
             >
               <Zap className="h-2.5 w-2.5 text-amber-400" />

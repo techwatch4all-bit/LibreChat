@@ -261,7 +261,7 @@ function SatchiModeSelector({
                 disabled={disabled}
                 aria-label={`AI Mode: ${activeLabel}`}
                 className={cn(
-                  'shadow-xs inline-flex h-8 items-center gap-1.5 rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary transition-all',
+                  'shadow-xs inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border-light bg-surface-secondary/70 px-2.5 text-xs font-medium text-text-primary transition-all',
                   'focus-visible:outline-hidden focus-visible:ring-ring hover:border-border-medium hover:bg-surface-tertiary focus-visible:ring-1',
                   disabled && 'pointer-events-none opacity-50',
                 )}

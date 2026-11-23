@@ -361,3 +361,29 @@ model-selection dropdown once (2026-11-10); it must never happen again.
 - **Mandatory Root Passphrase Authorization**: Modification of the root/superadmin password requires explicit verification of the designated cryptographic root authorization passphrase. Any request, script, or automated tool lacking this passphrase must be strictly rejected at both the API and database levels.
 - **No Ad-Hoc Password Reset Scripts**: Never create or leave standalone ad-hoc scripts (e.g. `set_admin_pwd.js`, `reset-admin-pwd.js`, `reset_root.py`) in `scripts/`, `scratch/`, or `satchida/ops/` containing hardcoded password hashes or direct database mutations.
 - **Tenant Node Protection**: On client/tenant edge installations, local database access must be guarded against unauthorized administrative escalation. Any credential modification must require authenticated master authorization or secondary approval.
+
+### 9. End-User Login, Per-User Seat Token (`seatToken`), Mode Policy & Bifrost Virtual Key (`x-bf-vk`) Invariants (NON-NEGOTIABLE)
+
+Every AI agent and contributor must strictly distinguish the three authentication and routing layers in the Satchida stack and **never conflate or bypass them**:
+
+1. **Three Distinct Credentials — Never Conflate Them**:
+   - **End-User JWT (`req.user` / `?token=<jwt>` / `refreshToken` cookie)**: Authenticates the logged-in LibreChat user (`JWT_SECRET` / `JWT_REFRESH_SECRET`).
+   - **Per-User Satchida Seat Token (`user.seatToken`, `tk_<tenant>_...`)**: Stored on the MongoDB `User` document (`select: false` — must be hydrated explicitly via `+seatToken +satchidaSeatAlias`). This is the user's personal bearer credential for **Satchida Gateway One-API (`http://127.0.0.1:4000`)**, which enforces per-seat quotas, tier entitlements, and seat billing attribution.
+   - **Mode-Scoped Bifrost Virtual Key (`x-bf-vk`, 96-character key in `one-api.db` `channels`)**: The gateway-to-Bifrost (`http://127.0.0.1:8700`) channel key:
+     - Channel 1 (`Cloud Retaining`) -> `Chat`, `Pro`, `Motion`
+     - Channel 2 (`llamacpp-privacy-primary`) -> Local `Privacy` (`:8080`)
+     - Channel 4 (`Cloud ZDR`) -> Cloud Zero-Data-Retention (`ZDR`)
+     - Channel 5 (`Cloud WorkStudy`) -> `Work`, `Study`
+     - **CRITICAL**: `SATCHIDA_GATEWAY_VK` in `.env` (`SPYfLW6...`, 48 chars) is a One-API (`:4000`) token, **NOT** a Bifrost (`:8700`) `x-bf-vk`. Sending `SATCHIDA_GATEWAY_VK` as `x-bf-vk` directly to Bifrost (`:8700`) will always fail with `HTTP 401 Unauthorized`. Always use `selectBifrostVkForMode()` (`packages/api/src/voice/realtimeProxy.ts`) to resolve the 96-char channel virtual key from `BIFROST_VIRTUAL_KEY` or `one-api.db`.
+
+2. **Zero End-User Login or Seat Token Bypass (Fail-Closed)**:
+   - Every HTTP route and WebSocket upgrade handler (`/api/voice/realtime`, `/api/opencode`, `/api/ide`, `/api/agents/chat`) **MUST** require a valid end-user JWT before upgrading or executing. Anonymous connections must be rejected immediately with `HTTP 401 Unauthorized`.
+   - Once the JWT is verified, the handler **MUST** hydrate the user record from MongoDB (`+seatToken +satchidaSeatAlias accountType tenantId role familyRole suspended`) and verify:
+     1. The user exists and `suspended !== true` (`account_unauthorized`).
+     2. The user's `accountType` is entitled to the feature (e.g., `ENTITLED_LIVE_VOICE_TIERS = {'pro', 'pro_family', 'enterprise', 'privacy'}` for Live Voice) — never rely solely on a frontend UI gate.
+     3. The user has a non-empty `user.seatToken` (`seat_not_provisioned`). **Never** silently fall back to an operator or system key (`SATCHIDA_GATEWAY_VK`) when `user.seatToken` is missing or when a request is unauthenticated.
+     4. The requested Satchida mode (`Chat`, `Study`, `Work`, `Pro`, `Privacy`, `Vibecoding`) and tool usage (`hasTools`) are permitted by the user's `accountType` and `familyRole` (`minor`/`child` seats are strictly barred from `Work`, `Pro`, `Vibecoding`, and tool execution).
+
+3. **Mandatory Attribution & Mode Headers**:
+   - Every upstream request to One-API (`:4000`), Bifrost (`:8700`), or local Privacy llama (`:8080`) must include `X-Tenant-Id`, `X-User-Id`, `X-User-Name`, `X-Seat-Alias` (`satchidaSeatAlias`), `X-Satchida-Mode`, `X-Bifrost-Mode`, and `x-bf-dim-*` (`buildSatchidaAttributionHeaders` in `packages/api/src/voice/realtimeProxy.ts` and `packages/api/src/endpoints/openai/config.ts`).
+   - Run `npx --prefix packages/api jest src/voice/realtimeProxy.spec.ts` whenever touching voice, seat-token, or gateway routing code to verify all 9 fail-closed login/seat/mode security gates pass.

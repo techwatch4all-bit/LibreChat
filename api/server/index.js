@@ -63,6 +63,7 @@ const {
   warnOnUnreachableDeliveryPaths,
   createCodeApiUploadRegistry,
   createOpenCodePtyUpgradeHandler,
+  createRealtimeVoiceUpgradeHandler,
   deadManLeaseGuard,
   createStaticPreviewRelayMiddleware,
 } = require('@librechat/api');
@@ -883,52 +884,66 @@ const startServer = async () => {
     next();
   });
 
-  // Studio artifact home — stable directory OUTSIDE client/dist so client
-  // rebuilds can never 404 a delivered creation. The montage server publishes
-  // here and the Studio Library manifest lives alongside the artifacts.
+  // Studio artifact home — per-user storage/users/<username>/generated/ with
+  // fallback to legacy admin-com/generated and storage/exports/generated so
+  // existing /generated/... links never 404.
   const inRepoGeneratedDir = path.resolve('storage', 'exports', 'generated');
+  const adminGeneratedDir = path.resolve('storage', 'users', 'admin-com', 'generated');
   const externalGeneratedDir = path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated');
   const studioGeneratedDir = fs.existsSync(inRepoGeneratedDir) ? inRepoGeneratedDir : externalGeneratedDir;
   if (!fs.existsSync(studioGeneratedDir)) {
     fs.mkdirSync(studioGeneratedDir, { recursive: true });
   }
-  app.use(
-    '/generated',
-    express.static(studioGeneratedDir, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.mp4')) {
-          res.setHeader('Content-Type', 'video/mp4');
-        } else if (filePath.endsWith('.webm')) {
-          res.setHeader('Content-Type', 'video/webm');
-        } else if (filePath.endsWith('.png')) {
-          res.setHeader('Content-Type', 'image/png');
-        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
-          res.setHeader('Content-Type', 'image/jpeg');
-        } else if (filePath.endsWith('.json')) {
-          res.setHeader('Content-Type', 'application/json');
-        }
-        res.setHeader('Access-Control-Allow-Origin', '*');
-      },
-    }),
-  );
+  const generatedStaticOpts = {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.mp4')) {
+        res.setHeader('Content-Type', 'video/mp4');
+      } else if (filePath.endsWith('.webm')) {
+        res.setHeader('Content-Type', 'video/webm');
+      } else if (filePath.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (filePath.endsWith('.json')) {
+        res.setHeader('Content-Type', 'application/json');
+      }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
+  };
+  app.use('/generated', optionalJwtAuth, (req, res, next) => {
+    const uname = (req.user && (req.user.username || req.user.name)) || '';
+    if (uname) {
+      const userGenDir = path.resolve('storage', 'users', uname, 'generated');
+      if (fs.existsSync(userGenDir)) {
+        return express.static(userGenDir, generatedStaticOpts)(req, res, next);
+      }
+    }
+    return next();
+  });
+  if (fs.existsSync(adminGeneratedDir)) {
+    app.use('/generated', express.static(adminGeneratedDir, generatedStaticOpts));
+  }
+  app.use('/generated', express.static(studioGeneratedDir, generatedStaticOpts));
 
   // Per-user Studio Library manifest (operator request, 2026-11-17).
   // Requires a signed-in session: media delivered in chat must be findable
-  // later from the /studio-library.html page. Returns the same manifest the
-  // static /generated/manifest.json exposes, but only for authenticated users.
+  // later from the /studio-library.html page.
   app.get('/api/studio/library', optionalJwtAuth, (req, res) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Sign in to view your Studio Library' });
     }
     try {
-      const manifestPath = fs.existsSync(path.resolve('storage', 'exports', 'generated', 'manifest.json'))
-        ? path.resolve('storage', 'exports', 'generated', 'manifest.json')
-        : path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated\\manifest.json');
+      const owner = (req.user && (req.user.username || req.user.name)) || '';
+      const candidateManifests = [
+        owner ? path.resolve('storage', 'users', owner, 'generated', 'manifest.json') : '',
+        path.resolve('storage', 'users', 'admin-com', 'generated', 'manifest.json'),
+        path.resolve('storage', 'exports', 'generated', 'manifest.json'),
+        path.resolve('D:\\LAN-AI-Infra\\Satchida-Studio\\exports\\generated\\manifest.json'),
+      ].filter((p) => p && fs.existsSync(p));
       let entries = [];
-      if (fs.existsSync(manifestPath)) {
-        entries = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      if (candidateManifests.length > 0) {
+        entries = JSON.parse(fs.readFileSync(candidateManifests[0], 'utf-8'));
       }
-      const owner = (req.user && (req.user.name || req.user.username)) || '';
       const scoped = entries.filter(
         (e) => !e.user || e.user === owner || e.user === 'shared' || e.user === 'template',
       );
@@ -1246,8 +1261,46 @@ RULES FOR YOUR SPOKEN EXPLANATION:
     createUpstreamWebSocket: (wsUrl, opts) =>
       new WebSocket(wsUrl, { ...opts, perMessageDeflate: false }),
   });
+
+  const realtimeVoiceWss = new WebSocket.Server({ noServer: true, perMessageDeflate: false });
+  const handleRealtimeVoiceUpgrade = createRealtimeVoiceUpgradeHandler({
+    wss: realtimeVoiceWss,
+    verifyJwt: (token) => {
+      const secrets = [process.env.JWT_SECRET, process.env.JWT_REFRESH_SECRET].filter(Boolean);
+      for (const secret of secrets) {
+        try {
+          const decoded = jwt.verify(token, secret);
+          if (decoded && typeof decoded === 'object' && typeof decoded.id === 'string') {
+            return { id: decoded.id, role: decoded.role, tenantId: decoded.tenantId };
+          }
+        } catch {
+          /* try next secret */
+        }
+      }
+      return null;
+    },
+    getUserSeatCredential: (userId) =>
+      runAsSystem(async () => {
+        const User = mongoose.models.User;
+        if (!User) {
+          return null;
+        }
+        return User.findById(userId)
+          .select(
+            '+seatToken +satchidaSeatAlias name username email accountType tenantId role familyRole',
+          )
+          .lean();
+      }),
+    createUpstreamWebSocket: (wsUrl, opts) =>
+      new WebSocket(wsUrl, { ...opts, perMessageDeflate: false }),
+  });
+
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname === '/api/voice/realtime') {
+      handleRealtimeVoiceUpgrade(req, socket, head);
+      return;
+    }
     if (url.pathname.startsWith('/api/ide')) {
       logger.info(
         `[IDE-WS] upgrade path=${url.pathname} query=${url.search.slice(0, 120)} host=${req.headers.host ?? ''} ua=${(req.headers['user-agent'] ?? '').slice(0, 60)}`,

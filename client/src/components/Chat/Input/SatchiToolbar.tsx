@@ -705,7 +705,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
               disabled={disabled}
               onClick={toggleResearch}
               className={cn(
-                'shadow-xs relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-all',
+                'shadow-xs relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold transition-all',
                 research
                   ? 'border-indigo-500/70 bg-indigo-950/40 text-indigo-300 shadow-indigo-500/20 ring-1 ring-indigo-500/50'
                   : 'border-border-light bg-surface-secondary/70 text-text-secondary hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary',
@@ -742,7 +742,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                   disabled={disabled}
                   aria-label="Prompt Enhancer & Creative Tools"
                   className={cn(
-                    'shadow-xs inline-flex h-8 items-center gap-1 rounded-full border border-border-light bg-surface-secondary/70 px-2 text-xs font-medium text-text-secondary transition-all',
+                    'shadow-xs inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border-light bg-surface-secondary/70 px-2 text-xs font-medium text-text-secondary transition-all',
                     'focus-visible:outline-hidden focus-visible:ring-ring hover:border-border-medium hover:bg-surface-tertiary hover:text-text-primary focus-visible:ring-1',
                     imageGen && 'border-emerald-500/50 bg-emerald-950/20 text-emerald-400',
                   )}
@@ -881,7 +881,7 @@ Context:\n${current || 'Core problem, technical comparison, real-life devices, a
                   disabled={disabled}
                   aria-label="Knowledge Vault & Document Generation"
                   className={cn(
-                    'shadow-xs inline-flex h-8 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 text-xs font-medium text-purple-400 transition-all',
+                    'shadow-xs inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 text-xs font-medium text-purple-400 transition-all',
                     'focus-visible:outline-hidden focus-visible:ring-ring hover:border-purple-500 hover:bg-purple-950/40 hover:text-purple-300 focus-visible:ring-1',
                   )}
                 >

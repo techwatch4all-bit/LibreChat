@@ -47,6 +47,7 @@ export default function OpenCodePreviewPanel({
   const [commandInput, setCommandInput] = useState('');
   const [reloadNonce, setReloadNonce] = useState(0);
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [previewRoutePath, setPreviewRoutePath] = useState<string>('/');
   const viewportMaxWidth = { desktop: '100%', tablet: '768px', mobile: '390px' }[viewportMode];
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const prevRunStateRef = useRef(runState);
@@ -296,6 +297,22 @@ export default function OpenCodePreviewPanel({
           ) : null}
 
           {isRunning && proxyPath ? (
+            <input
+              type="text"
+              value={previewRoutePath}
+              onChange={(e) => setPreviewRoutePath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setReloadNonce((n) => n + 1);
+                }
+              }}
+              aria-label="Preview route path"
+              className="h-7 w-32 rounded border border-border-light bg-surface-primary px-2 font-mono text-[11px] text-text-primary focus:border-border-medium focus:outline-none sm:w-44"
+              placeholder="/"
+            />
+          ) : null}
+
+          {isRunning && proxyPath ? (
             <div className="flex items-center rounded-md border border-border-light bg-surface-primary p-0.5">
               <button
                 type="button"
@@ -364,8 +381,10 @@ export default function OpenCodePreviewPanel({
         {isRunning && proxyPath ? (
           <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-surface-secondary/50">
             <iframe
-              key={`${proxyPath}-${reloadNonce}`}
-              src={proxyPath}
+              key={`${proxyPath}-${previewRoutePath}-${reloadNonce}`}
+              src={`${proxyPath.replace(/\/+$/, '')}${
+                previewRoutePath.startsWith('/') ? previewRoutePath : `/${previewRoutePath}`
+              }`}
               title={localize('com_opencode_preview_iframe_title')}
               className="min-h-0 flex-1 border-0 bg-white shadow-sm transition-all"
               style={{ maxWidth: viewportMaxWidth }}

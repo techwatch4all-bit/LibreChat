@@ -46,7 +46,7 @@ export default function ProjectWorkspace() {
   });
   const [sortBy, setSortBy] = useState<ChatSortField>('updatedAt');
   const [viewMode, setViewMode] = useState<'chats' | 'vibe' | null>(null);
-  const activeViewMode = hasOpenCodeAccess ? (viewMode ?? 'vibe') : 'chats';
+  const activeViewMode: 'chats' | 'vibe' = hasOpenCodeAccess ? (viewMode ?? 'vibe') : 'chats';
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const sortMenuId = useId();
@@ -180,7 +180,7 @@ export default function ProjectWorkspace() {
             ) : null}
             <Button
               type="button"
-              variant={activeViewMode === 'chats' ? 'default' : 'ghost'}
+              variant="ghost"
               size="sm"
               onClick={() => setViewMode('chats')}
               className="h-6 px-2.5 text-xs"
@@ -240,11 +240,7 @@ export default function ProjectWorkspace() {
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-presentation text-text-primary">
       <header className="shrink-0 border-b border-border-light bg-presentation">
-        <div
-          className={`mx-auto flex h-12 w-full items-center gap-2 px-4 md:px-6 ${
-            activeViewMode === 'vibe' ? 'max-w-[1600px]' : 'max-w-6xl'
-          }`}
-        >
+        <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-2 px-4 md:px-6">
           {isSmallScreen ? <OpenSidebar className="size-9 shrink-0" /> : null}
           <Button
             type="button"
@@ -259,11 +255,7 @@ export default function ProjectWorkspace() {
         </div>
       </header>
 
-      <div
-        className={`mx-auto flex w-full flex-1 flex-col px-4 pb-6 pt-4 md:px-6 ${
-          activeViewMode === 'vibe' ? 'max-w-[1600px]' : 'max-w-6xl'
-        }`}
-      >
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-4 md:px-6">
         <div className="flex items-start gap-3.5">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface-secondary text-text-secondary">
             <Folder className="h-6 w-6" aria-hidden="true" />
@@ -328,7 +320,7 @@ export default function ProjectWorkspace() {
             {hasOpenCodeAccess ? (
               <Button
                 type="button"
-                variant={activeViewMode === 'vibe' ? 'default' : 'ghost'}
+                variant="ghost"
                 size="sm"
                 onClick={() => setViewMode('vibe')}
                 className="gap-1.5"
@@ -339,7 +331,7 @@ export default function ProjectWorkspace() {
             ) : null}
             <Button
               type="button"
-              variant={activeViewMode === 'chats' ? 'default' : 'ghost'}
+              variant="ghost"
               size="sm"
               onClick={() => setViewMode('chats')}
               className="gap-1.5"
@@ -361,77 +353,63 @@ export default function ProjectWorkspace() {
           )}
         </div>
 
-        {activeViewMode === 'vibe' ? (
-          <div className="mt-5 flex min-h-[580px] flex-1 flex-col">
-            <VibeWorkspace
-              projectId={project._id}
-              projectName={project.name}
-              localPath={project.localPath}
+        <button
+          type="button"
+          onClick={startProjectChat}
+          className={cn(
+            'mt-6 flex w-full items-center gap-3 rounded-2xl border border-border-light bg-surface-secondary px-3.5 py-3 text-left',
+            'transition-colors duration-150 hover:bg-surface-hover',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
+          )}
+          aria-label={localize('com_ui_new_chat_in_project', { name: project.name })}
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-tertiary text-text-primary">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+            {localize('com_ui_new_chat_in_project', { name: project.name })}
+          </span>
+        </button>
+
+        <section className="mt-6 flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="flex items-baseline gap-2 text-sm font-medium text-text-primary">
+              {localize('com_ui_chats')}
+              <span className="tabular-nums text-text-secondary">{project.conversationCount}</span>
+            </h2>
+            <DropdownPopup
+              portal={true}
+              focusLoop={true}
+              unmountOnHide={true}
+              menuId={sortMenuId}
+              isOpen={isSortMenuOpen}
+              setIsOpen={setIsSortMenuOpen}
+              className="z-[125] min-w-44"
+              trigger={
+                <Ariakit.MenuButton
+                  aria-label={localize('com_ui_sort_chats_by')}
+                  className={cn(
+                    'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
+                    isSortMenuOpen && 'bg-surface-hover text-text-primary',
+                  )}
+                >
+                  <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                  {selectedSortLabel}
+                </Ariakit.MenuButton>
+              }
+              items={sortMenuItems}
             />
           </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={startProjectChat}
-              className={cn(
-                'mt-6 flex w-full items-center gap-3 rounded-2xl border border-border-light bg-surface-secondary px-3.5 py-3 text-left',
-                'transition-colors duration-150 hover:bg-surface-hover',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
-              )}
-              aria-label={localize('com_ui_new_chat_in_project', { name: project.name })}
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-tertiary text-text-primary">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
-                {localize('com_ui_new_chat_in_project', { name: project.name })}
-              </span>
-            </button>
-
-            <section className="mt-6 flex min-h-0 flex-1 flex-col">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="flex items-baseline gap-2 text-sm font-medium text-text-primary">
-                  {localize('com_ui_chats')}
-                  <span className="tabular-nums text-text-secondary">
-                    {project.conversationCount}
-                  </span>
-                </h2>
-                <DropdownPopup
-                  portal={true}
-                  focusLoop={true}
-                  unmountOnHide={true}
-                  menuId={sortMenuId}
-                  isOpen={isSortMenuOpen}
-                  setIsOpen={setIsSortMenuOpen}
-                  className="z-[125] min-w-44"
-                  trigger={
-                    <Ariakit.MenuButton
-                      aria-label={localize('com_ui_sort_chats_by')}
-                      className={cn(
-                        'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary',
-                        isSortMenuOpen && 'bg-surface-hover text-text-primary',
-                      )}
-                    >
-                      <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-                      {selectedSortLabel}
-                    </Ariakit.MenuButton>
-                  }
-                  items={sortMenuItems}
-                />
-              </div>
-              <ProjectChatList
-                conversations={conversations}
-                isLoading={isConversationsLoading}
-                isFetchingNextPage={isFetchingNextPage}
-                hasNextPage={hasNextPage}
-                sortBy={sortBy}
-                emptyLabel={localize('com_ui_no_project_chats')}
-                loadMore={() => fetchNextPage()}
-              />
-            </section>
-          </>
-        )}
+          <ProjectChatList
+            conversations={conversations}
+            isLoading={isConversationsLoading}
+            isFetchingNextPage={isFetchingNextPage}
+            hasNextPage={hasNextPage}
+            sortBy={sortBy}
+            emptyLabel={localize('com_ui_no_project_chats')}
+            loadMore={() => fetchNextPage()}
+          />
+        </section>
       </div>
     </main>
   );

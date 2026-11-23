@@ -756,6 +756,7 @@ const initializeClientWithProvider = async ({
       getAccessibleMcpServerNames,
       updateFilesUsage: db.updateFilesUsage,
       getUserKeyValues: db.getUserKeyValues,
+      getUserById: db.getUserById,
       /**
        * The tenant-local Privacy authority.
        *
@@ -862,6 +863,7 @@ const initializeClientWithProvider = async ({
         getAccessibleMcpServerNames,
         updateFilesUsage: db.updateFilesUsage,
         getUserKeyValues: db.getUserKeyValues,
+      getUserById: db.getUserById,
         getUserCodeFiles: db.getUserCodeFiles,
         getDeferredProvisionFiles: db.getDeferredProvisionFiles,
         getToolFilesByIds: db.getToolFilesByIds,
@@ -1347,6 +1349,7 @@ const initializeClientWithProvider = async ({
           getAccessibleMcpServerNames,
           updateFilesUsage: db.updateFilesUsage,
           getUserKeyValues: db.getUserKeyValues,
+      getUserById: db.getUserById,
           /**
            * The tenant-local Privacy authority.
            *

@@ -2127,7 +2127,9 @@ def _publish_artifact(
     thumbnail next to the media so the library and chat embeds can show one.
     """
     try:
-        stable_dir = _STABLE_GENERATED_DIR
+        owner_dir = (user or os.environ.get("SATCHIDA_DEFAULT_USER", "admin-com")).strip()
+        owner_dir = re.sub(r"[^a-zA-Z0-9._-]", "_", owner_dir) or "admin-com"
+        stable_dir = _LIBRECHAT_ROOT / "storage" / "users" / owner_dir / "generated"
         stable_dir.mkdir(parents=True, exist_ok=True)
         is_video = path.name.lower().endswith((".mp4", ".webm", ".mkv", ".mov"))
         is_audio = path.name.lower().endswith((".mp3", ".wav", ".aac", ".m4a", ".ogg"))

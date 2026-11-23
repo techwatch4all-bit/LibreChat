@@ -142,6 +142,7 @@ export const starter = ({
 export interface StarterSlot {
   start: number;
   end: number;
+  label: string;
 }
 
 /**
@@ -156,7 +157,7 @@ export const findStarterSlots = (text: string): StarterSlot[] => {
   while (match !== null) {
     const end = match.index + match[0].length;
     if (text[end] !== '(') {
-      slots.push({ start: match.index, end });
+      slots.push({ start: match.index, end, label: match[1] });
     }
     match = pattern.exec(text);
   }

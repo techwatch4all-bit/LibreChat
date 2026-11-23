@@ -361,38 +361,71 @@ export default function Breakdown({
   const activeSegment =
     hoveredSegment != null && hoverIsValid(hoveredSegment) ? hoveredSegment : null;
 
+  const roundedPct = Math.round(percent);
+  const healthBorder =
+    roundedPct >= 90
+      ? 'border-red-500/35 bg-red-500/5'
+      : roundedPct >= 70
+        ? 'border-amber-500/35 bg-amber-500/5'
+        : 'border-emerald-500/25 bg-emerald-500/5';
+  const healthBadge =
+    roundedPct >= 90
+      ? 'bg-red-500/15 text-red-400 border-red-500/30'
+      : roundedPct >= 70
+        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+        : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+  const healthDot =
+    roundedPct >= 90 ? 'bg-red-500' : roundedPct >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+
   return (
     <div className="w-72" role="region" aria-label={localize('com_ui_context_usage')}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger
-          className="group flex w-full items-center justify-between gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary"
-          data-testid="context-breakdown-toggle"
-        >
-          <span className="whitespace-nowrap text-sm font-medium text-text-primary">
-            {localize('com_ui_context_window')}
-          </span>
-          <span className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-text-secondary">
-            {maxTokens != null
-              ? `${formatTokens(usedTokens)} / ${formatTokens(maxTokens)} (${Math.round(percent)}%)`
-              : formatTokens(usedTokens)}
-            <ChevronDown
-              aria-hidden="true"
-              className="size-3.5 shrink-0 text-text-tertiary transition-transform duration-300 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none"
-            />
-          </span>
-        </CollapsibleTrigger>
+        <div className={cn('rounded-lg border p-2.5 transition-colors', healthBorder)}>
+          <CollapsibleTrigger
+            className="group flex w-full items-center justify-between gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary"
+            data-testid="context-breakdown-toggle"
+          >
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-text-primary">
+              <span className={cn('size-2 rounded-full', healthDot)} aria-hidden="true" />
+              {localize('com_ui_context_window')}
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-text-secondary">
+              {maxTokens != null ? (
+                <>
+                  <span className="font-mono text-[11px]">
+                    {formatTokens(usedTokens)} / {formatTokens(maxTokens)}
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none',
+                      healthBadge,
+                    )}
+                  >
+                    {roundedPct}%
+                  </span>
+                </>
+              ) : (
+                <span className="font-mono text-[11px]">{formatTokens(usedTokens)}</span>
+              )}
+              <ChevronDown
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-text-tertiary transition-transform duration-300 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+              />
+            </span>
+          </CollapsibleTrigger>
 
-        <SegmentedMeter
-          className="mt-3"
-          segments={maxTokens != null ? meterSegments : []}
-          max={maxTokens ?? 1}
-          highlightId={activeSegment}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={maxTokens != null ? Math.round(percent) : undefined}
-          aria-label={localize('com_ui_context_usage')}
-        />
+          <SegmentedMeter
+            className="mt-2.5"
+            segments={maxTokens != null ? meterSegments : []}
+            max={maxTokens ?? 1}
+            highlightId={activeSegment}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={maxTokens != null ? roundedPct : undefined}
+            aria-label={localize('com_ui_context_usage')}
+          />
+        </div>
 
         {/* The gap to the meter lives INSIDE the animated element (mt-3 below),
             so it collapses with the height. On the parent it would be a margin

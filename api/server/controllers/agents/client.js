@@ -1017,8 +1017,11 @@ class AgentClient extends BaseClient {
         db: {
           getUserKey: db.getUserKey,
           getUserKeyValues: db.getUserKeyValues,
+          getUserById: db.getUserById,
           getPrivacyAssertion: db.getPrivacyAssertion,
           isPrivacyLocalReady: db.isPrivacyLocalReady,
+          authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+          getTenantSeatPolicy: db.getTenantSeatPolicy,
         },
       }).catch((error) => {
         /** Never cache a rejection: a transient credential read failure would
@@ -1045,8 +1048,11 @@ class AgentClient extends BaseClient {
         db: {
           getUserKey: db.getUserKey,
           getUserKeyValues: db.getUserKeyValues,
+          getUserById: db.getUserById,
           getPrivacyAssertion: db.getPrivacyAssertion,
           isPrivacyLocalReady: db.isPrivacyLocalReady,
+          authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+          getTenantSeatPolicy: db.getTenantSeatPolicy,
         },
       }).catch((error) => {
         this.activityPhaseLabelLLMPromise = null;
@@ -1071,8 +1077,11 @@ class AgentClient extends BaseClient {
         db: {
           getUserKey: db.getUserKey,
           getUserKeyValues: db.getUserKeyValues,
+          getUserById: db.getUserById,
           getPrivacyAssertion: db.getPrivacyAssertion,
           isPrivacyLocalReady: db.isPrivacyLocalReady,
+          authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+          getTenantSeatPolicy: db.getTenantSeatPolicy,
         },
       }).catch((error) => {
         this.reasoningLabelLLMPromise = null;
@@ -6050,8 +6059,11 @@ class AgentClient extends BaseClient {
       db: {
         getUserKey: db.getUserKey,
         getUserKeyValues: db.getUserKeyValues,
+        getUserById: db.getUserById,
         getPrivacyAssertion: db.getPrivacyAssertion,
         isPrivacyLocalReady: db.isPrivacyLocalReady,
+        authorizeTenantSeatRequest: db.authorizeTenantSeatRequest,
+        getTenantSeatPolicy: db.getTenantSeatPolicy,
       },
     });
 

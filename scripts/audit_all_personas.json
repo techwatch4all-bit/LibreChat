@@ -1,0 +1,946 @@
+[
+  {
+    "title": "📊 Family & Home Budget Tracker",
+    "badge": "Family Budget"
+  },
+  {
+    "title": "📑 Multi-Year Financial Forecast & DCF Model",
+    "badge": "Financial KPI"
+  },
+  {
+    "title": "🛒 Weekly Grocery & Kitchen Inventory",
+    "badge": "Kitchen & Pantry"
+  },
+  {
+    "title": "📈 Small Business Revenue & Expense Sheet",
+    "badge": "Business P&L"
+  },
+  {
+    "title": "📦 Supply Chain & Inventory Restock Model",
+    "badge": "Inventory EOQ"
+  },
+  {
+    "title": "📅 Student Study Timetable & Grade Tracker",
+    "badge": "Student Schedule"
+  },
+  {
+    "title": "📈 Statistical Data & Outlier Analysis",
+    "badge": "Pandas Analytics"
+  },
+  {
+    "title": "📊 Executive KPI Dashboard & Gantt Flow",
+    "badge": "Gantt Flow"
+  },
+  {
+    "title": "✉️ Formal Letter & Application Writer",
+    "badge": "Official Letter"
+  },
+  {
+    "title": "🏢 Residential Society Notice & Circular",
+    "badge": "Notice & Bill"
+  },
+  {
+    "title": "🏦 Bank Account Transfer & KYC Update Request",
+    "badge": "Banking Request"
+  },
+  {
+    "title": "📑 Standard House Rental Agreement Draft",
+    "badge": "Rental Draft"
+  },
+  {
+    "title": "📚 Compile Polished Multi-Format Document",
+    "badge": "Document Compiler"
+  },
+  {
+    "title": "🔍 LanceDB Isolated Vector Search & Citations",
+    "badge": "LanceDB RAG"
+  },
+  {
+    "title": "📁 Inspect & Manage Shared Document Folder",
+    "badge": "Shared Drive"
+  },
+  {
+    "title": "🧸 Magical Bedtime Story",
+    "badge": "Bedtime Story"
+  },
+  {
+    "title": "📑 Plain-English Bill & PDF Breakdown",
+    "badge": "Bill Explainer"
+  },
+  {
+    "title": "📐 Residential Floor Plan Planner",
+    "badge": "Floor Plan"
+  },
+  {
+    "title": "☀️ Sun-Path, Daylight & Ventilation Audit",
+    "badge": "Daylight Sim"
+  },
+  {
+    "title": "🏠 Photo to 3D Room Reconstruction",
+    "badge": "3D Room"
+  },
+  {
+    "title": "🤖 Smart Arduino / ESP32 Project",
+    "badge": "Arduino / IoT"
+  },
+  {
+    "title": "🔧 Home Appliance & Safe Repair Guide",
+    "badge": "DIY Repair"
+  },
+  {
+    "title": "Market Overview",
+    "badge": "Markets"
+  },
+  {
+    "title": "Bullion Desk",
+    "badge": "Bullion"
+  },
+  {
+    "title": "Equity Dossier",
+    "badge": "Equity"
+  },
+  {
+    "title": "DeFi Contract Review",
+    "badge": "DeFi Security"
+  },
+  {
+    "title": "Generic Medicine Prices",
+    "badge": "Pharma"
+  },
+  {
+    "title": "Clinical DDx Workup",
+    "badge": "Clinical DDx"
+  },
+  {
+    "title": "Drug Interaction Check",
+    "badge": "Drug Safety"
+  },
+  {
+    "title": "Emergency & AQI Triage",
+    "badge": "Emergency SOS"
+  },
+  {
+    "title": "Panchang & Muhurta",
+    "badge": "Panchang"
+  },
+  {
+    "title": "Ayurvedic Daily Regimen",
+    "badge": "Ayurveda"
+  },
+  {
+    "title": "Festival Calendar & Vrats",
+    "badge": "Festivals"
+  },
+  {
+    "title": "Yoga & Pranayama Plan",
+    "badge": "Yoga/Pranayama"
+  },
+  {
+    "title": "WCAG Contrast Audit",
+    "badge": "WCAG 2.2"
+  },
+  {
+    "title": "Fuel & LPG Prices",
+    "badge": "Energy & Fuel"
+  },
+  {
+    "title": "Water & Food Safety",
+    "badge": "Food & Water"
+  },
+  {
+    "title": "School Orders & Exams",
+    "badge": "Exam/School"
+  },
+  {
+    "title": "Banking & EPFO Help",
+    "badge": "Banking & PF"
+  },
+  {
+    "title": "Transit & Route Alerts",
+    "badge": "Transit"
+  },
+  {
+    "title": "RBI Compliance Check",
+    "badge": "RBI Regulatory"
+  },
+  {
+    "title": "Case Law & Gazette",
+    "badge": "Supreme Court"
+  },
+  {
+    "title": "ISO 27001 / SOC 2 Audit",
+    "badge": "GRC Audit"
+  },
+  {
+    "title": "Contract Clause Review",
+    "badge": "Contracts"
+  },
+  {
+    "title": "Border & Defence Brief",
+    "badge": "Border Intel"
+  },
+  {
+    "title": "Critical Minerals Map",
+    "badge": "Supply Chains"
+  },
+  {
+    "title": "Alliance & Sanctions Map",
+    "badge": "Foreign Policy"
+  },
+  {
+    "title": "State Cyber Threat Brief",
+    "badge": "Cyber Warfare"
+  },
+  {
+    "title": "CVE Threat Brief",
+    "badge": "CVE Intel"
+  },
+  {
+    "title": "GPU Cluster Comparison",
+    "badge": "GPU Compute"
+  },
+  {
+    "title": "Edge Vision Architecture",
+    "badge": "Edge Vision"
+  },
+  {
+    "title": "Code & Secret Scan",
+    "badge": "Code Security"
+  },
+  {
+    "title": "Symbolic Math Solver",
+    "badge": "Symbolic Math"
+  },
+  {
+    "title": "Pedagogical Algebra Coach",
+    "badge": "Algebra Coach"
+  },
+  {
+    "title": "Offline Interactive STEM Lab",
+    "badge": "Interactive Lab"
+  },
+  {
+    "title": "Visual Concept & Animated Physics Lab",
+    "badge": "Visual Physics & STEM"
+  },
+  {
+    "title": "Concept Book Builder",
+    "badge": "DeepTutor"
+  },
+  {
+    "title": "Derivation Coach",
+    "badge": "Physics"
+  },
+  {
+    "title": "Academic Literature Preview",
+    "badge": "Academic Lit Preview"
+  },
+  {
+    "title": "Algorithm Comparison",
+    "badge": "CS Algorithms"
+  },
+  {
+    "title": "CBSE Chapter Tutor",
+    "badge": "CBSE Tutor"
+  },
+  {
+    "title": "IGCSE Topic Tutor",
+    "badge": "IGCSE Tutor"
+  },
+  {
+    "title": "IB DP Science & Math Coach",
+    "badge": "IB DP Coach"
+  },
+  {
+    "title": "Chemistry Equation & Stoichiometry Lab",
+    "badge": "Chemistry / Stoichiometry"
+  },
+  {
+    "title": "Board Exam Drill",
+    "badge": "Board Drill"
+  },
+  {
+    "title": "Book-Back Exercise Solver",
+    "badge": "Book Exercises"
+  },
+  {
+    "title": "Doubt Clinic",
+    "badge": "Doubt Clinic"
+  },
+  {
+    "title": "Formula Flashcards",
+    "badge": "Flashcards"
+  },
+  {
+    "title": "Biology & Living Systems Visual Lab",
+    "badge": "Visual Biology Lab"
+  },
+  {
+    "title": "Concept Gap Diagnostic",
+    "badge": "Diagnostic"
+  },
+  {
+    "title": "Textbook Page Guide",
+    "badge": "Page Guide"
+  },
+  {
+    "title": "Homework Helper",
+    "badge": "Homework"
+  },
+  {
+    "title": "Chapter Summary & Map",
+    "badge": "Summary"
+  },
+  {
+    "title": "Exercise Answer Bank",
+    "badge": "Answer Bank"
+  },
+  {
+    "title": "Multi-Source Concept Explainer & Video Hub",
+    "badge": "Visual Concept & Video Hub"
+  },
+  {
+    "title": "Python Lesson",
+    "badge": "Lesson"
+  },
+  {
+    "title": "Python Course Map",
+    "badge": "Syllabus"
+  },
+  {
+    "title": "Python Practice Set",
+    "badge": "Practice"
+  },
+  {
+    "title": "Python Debug Coach",
+    "badge": "Debug Coach"
+  },
+  {
+    "title": "Python Quiz",
+    "badge": "Quiz"
+  },
+  {
+    "title": "Python Mini-Project",
+    "badge": "Mini-Project"
+  },
+  {
+    "title": "Deep Research Dossier",
+    "badge": "Deep Research"
+  },
+  {
+    "title": "PhD Thesis & Defense Synthesizer",
+    "badge": "PhD Thesis & Defense"
+  },
+  {
+    "title": "Advanced Theoretical Physics & Math Lab",
+    "badge": "Advanced Math & Physics"
+  },
+  {
+    "title": "Robotics Kinematics & Embedded Hardware Lab",
+    "badge": "Robotics & Embedded"
+  },
+  {
+    "title": "E-Book Blueprint",
+    "badge": "E-Book / PRD"
+  },
+  {
+    "title": "Transformer Sizing",
+    "badge": "AI Architecture"
+  },
+  {
+    "title": "Peer-Reviewed Survey",
+    "badge": "Scholar/arXiv"
+  },
+  {
+    "title": "API Architecture Blueprint",
+    "badge": "Architecture"
+  },
+  {
+    "title": "Plan Execution Audit",
+    "badge": "Plan Supervisor"
+  },
+  {
+    "title": "UI Component Build",
+    "badge": "Vibe UI"
+  },
+  {
+    "title": "Query Performance Review",
+    "badge": "Database"
+  },
+  {
+    "title": "Offline Document Build",
+    "badge": "Document Gen"
+  },
+  {
+    "title": "Vault Search",
+    "badge": "Vault RAG"
+  },
+  {
+    "title": "Confidential Strategy",
+    "badge": "Zero Telemetry"
+  },
+  {
+    "title": "Forensic Document Audit",
+    "badge": "Forensic Audit"
+  },
+  {
+    "title": "2D-to-3D Architectural Floor Plan",
+    "badge": "CAD · 3D Floorplan"
+  },
+  {
+    "title": "Solar Sun-Path & Ventilation Sim",
+    "badge": "Sun & Vastu Sim"
+  },
+  {
+    "title": "MEP & Structural X-Ray Layers",
+    "badge": "MEP X-Ray"
+  },
+  {
+    "title": "Interior Elevation & Kelvin Lab",
+    "badge": "Room Lighting"
+  },
+  {
+    "title": "Multirotor TWR & Propulsion Lab",
+    "badge": "UAV Propulsion"
+  },
+  {
+    "title": "Drone SLAM & Waypoint Mission",
+    "badge": "Flight Pathfinding"
+  },
+  {
+    "title": "Airfoil Lift, Stall & Vortex Lab",
+    "badge": "Aerodynamics"
+  },
+  {
+    "title": "Bridge Truss Stress & Load Sim",
+    "badge": "Structural Truss"
+  },
+  {
+    "title": "Supply & Cold-Chain Digital Twin",
+    "badge": "Logistics Twin"
+  },
+  {
+    "title": "Smart Traffic & EV Microgrid Flow",
+    "badge": "Smart Mobility"
+  },
+  {
+    "title": "6-DOF Robotic Arm IK & Torque Lab",
+    "badge": "Arm Kinematics"
+  },
+  {
+    "title": "Rover SLAM & LiDAR Maze Mapper",
+    "badge": "SLAM Navigation"
+  },
+  {
+    "title": "Factory Cell & PLC State Machine",
+    "badge": "PLC Automation"
+  },
+  {
+    "title": "Engine & Drivetrain Cutaway Lab",
+    "badge": "Engine Cutaway"
+  },
+  {
+    "title": "Gearbox, Hydraulics & Lever Lab",
+    "badge": "Mechanical Lab"
+  },
+  {
+    "title": "Optics, Lens & Laser Ray-Tracing",
+    "badge": "Optics Lab"
+  },
+  {
+    "title": "Inside Everyday Appliances & Tech",
+    "badge": "Inside Devices"
+  },
+  {
+    "title": "Circuit Simulator & Oscilloscope",
+    "badge": "Circuit Scope"
+  },
+  {
+    "title": "CPU Pipeline & LLM AI Silicon",
+    "badge": "Compute Arch"
+  },
+  {
+    "title": "Solar MPPT & EV Battery BMS Lab",
+    "badge": "Power Electronics"
+  },
+  {
+    "title": "Physics Forces & Wave-Field Lab",
+    "badge": "Physics Sim"
+  },
+  {
+    "title": "Dynamic Math & Calculus Proofs",
+    "badge": "Math Morph"
+  },
+  {
+    "title": "Chemistry Orbitals & Kinetics",
+    "badge": "Chemistry Lab"
+  },
+  {
+    "title": "Cellular Biology Micro-Journey",
+    "badge": "Bio Animation"
+  },
+  {
+    "title": "Algorithm & Recursion Tracer",
+    "badge": "Algo & Code"
+  },
+  {
+    "title": "DNS, TCP & TLS 1.3 Packet Journey",
+    "badge": "Packet Flow"
+  },
+  {
+    "title": "K8s Autoscaling & Failover Sim",
+    "badge": "Cloud Topology"
+  },
+  {
+    "title": "Kill-Chain vs Zero-Trust Defense",
+    "badge": "Cyber Defense"
+  },
+  {
+    "title": "Orbital & Hohmann Transfer Sim",
+    "badge": "Orbital Sim"
+  },
+  {
+    "title": "Tectonics, Cyclones & Clean Grid",
+    "badge": "Earth & Climate"
+  },
+  {
+    "title": "Standing Waves & Music Acoustics",
+    "badge": "Sound & Music"
+  },
+  {
+    "title": "Historical Atlas & Trade Timeline",
+    "badge": "History Map"
+  },
+  {
+    "title": "Kids Fractions & Phonics Play",
+    "badge": "Kids Playbook"
+  },
+  {
+    "title": "Vedic Astronomy & Sundial Lab",
+    "badge": "Cosmic Heritage"
+  },
+  {
+    "title": "3D Executive QBR & Revenue Deck",
+    "badge": "Executive"
+  },
+  {
+    "title": "Investor Pitch & Market Traction",
+    "badge": "Investor Pitch"
+  },
+  {
+    "title": "Strategic Milestone Roadmap",
+    "badge": "Milestone Roadmap"
+  },
+  {
+    "title": "Animated Workflow & SOP Replay",
+    "badge": "Workflow SOP"
+  },
+  {
+    "title": "SaaS Unit Economics & Runway Lab",
+    "badge": "Financial Sim"
+  },
+  {
+    "title": "Incident Postmortem & SLA Replay",
+    "badge": "Incident Replay"
+  },
+  {
+    "title": "Sprint Velocity & Gantt Timeline",
+    "badge": "Sprint & Gantt"
+  },
+  {
+    "title": "Kinetic Typography Manifesto",
+    "badge": "Kinetic Speech"
+  },
+  {
+    "title": "Distributed Systems & API Flow",
+    "badge": "Tech Explainer"
+  },
+  {
+    "title": "Book & Mental-Model Summary",
+    "badge": "Book Digest"
+  },
+  {
+    "title": "Dark-Mode SaaS Hero Launch",
+    "badge": "SaaS Launch"
+  },
+  {
+    "title": "Live Animated Analytics Dashboard",
+    "badge": "KPI Analytics"
+  },
+  {
+    "title": "3D Mobile App UX Showcase",
+    "badge": "Mobile UX"
+  },
+  {
+    "title": "Procedural Watercolor & Wash Art",
+    "badge": "Procedural Art"
+  },
+  {
+    "title": "3B1B Math & Geometric Animation",
+    "badge": "3B1B Vector"
+  },
+  {
+    "title": "Traditional Ink Wash & Chinese Painting",
+    "badge": "Ink Wash"
+  },
+  {
+    "title": "2D Rigged Character Walk-Cycle",
+    "badge": "Character Rig"
+  },
+  {
+    "title": "Pencil Sketch to Ink Line Reveal",
+    "badge": "Sketch Draw"
+  },
+  {
+    "title": "Cartoon Storyboard & Comic",
+    "badge": "Cartoon Story"
+  },
+  {
+    "title": "Sacred Geometry & Perspective",
+    "badge": "Generative Art"
+  },
+  {
+    "title": "Brand Intro & 3D Logo Stinger",
+    "badge": "Brand Stinger"
+  },
+  {
+    "title": "Vertical 9:16 Kinetic Social Reel",
+    "badge": "Social Reel"
+  },
+  {
+    "title": "Playwright 60fps MP4 Video Exporter",
+    "badge": "MP4 Exporter"
+  },
+  {
+    "title": "Disease & Anatomical Progression",
+    "badge": "Clinical Pathology"
+  },
+  {
+    "title": "ECG, Lab Panel & Spirometry",
+    "badge": "Lab & Vitals"
+  },
+  {
+    "title": "Drug Mechanism of Action (MoA)",
+    "badge": "Drug MoA"
+  },
+  {
+    "title": "Surgical, Inhaler & CPR Trainer",
+    "badge": "Clinical Skills"
+  },
+  {
+    "title": "Exercise Form & Joint Angle Lab",
+    "badge": "Exercise Form"
+  },
+  {
+    "title": "Yoga Asana Flow & Breath Pacer",
+    "badge": "Yoga Alignment"
+  },
+  {
+    "title": "Metabolic Calorie & Macro Plate",
+    "badge": "Nutrition Lab"
+  },
+  {
+    "title": "Desk Rehab & Meal Glycemic Curve",
+    "badge": "Rehab & Glucose"
+  },
+  {
+    "title": "Room Layout & Festive Makeover",
+    "badge": "Décor & Room"
+  },
+  {
+    "title": "Weekly Family Meal & Pantry Plan",
+    "badge": "Meal Rhythm"
+  },
+  {
+    "title": "Wardrobe & Kitchen Decluttering",
+    "badge": "Home Organize"
+  },
+  {
+    "title": "Balcony Garden & Home Budget",
+    "badge": "Home Garden"
+  },
+  {
+    "title": "Large-Print Medicine & Water",
+    "badge": "Senior Routine"
+  },
+  {
+    "title": "Smartphone & UPI Safety Tutor",
+    "badge": "Phone & UPI Tutor"
+  },
+  {
+    "title": "Chair Physio & Joint Mobility",
+    "badge": "Senior Mobility"
+  },
+  {
+    "title": "Elder Fraud & OTP Scam Shield",
+    "badge": "Safety Alert"
+  },
+  {
+    "title": "Code Review Pass",
+    "badge": "Chat"
+  },
+  {
+    "title": "API Architecture",
+    "badge": "Chat"
+  },
+  {
+    "title": "Async Task Queue",
+    "badge": "Chat"
+  },
+  {
+    "title": "SQL Query Tuning",
+    "badge": "Chat"
+  },
+  {
+    "title": "Gold, Silver & Fuel",
+    "badge": "Chat"
+  },
+  {
+    "title": "AI Model Releases",
+    "badge": "Chat"
+  },
+  {
+    "title": "Govt & Court Roundup",
+    "badge": "Chat"
+  },
+  {
+    "title": "Disaster & Weather Alerts",
+    "badge": "Chat"
+  },
+  {
+    "title": "Market Wrap",
+    "badge": "Chat"
+  },
+  {
+    "title": "Health & AQI Bulletin",
+    "badge": "Chat"
+  },
+  {
+    "title": "Rail, Flight & Road Status",
+    "badge": "Chat"
+  },
+  {
+    "title": "Policy Research Audit",
+    "badge": "Chat"
+  },
+  {
+    "title": "Vault Knowledge Query",
+    "badge": "Chat"
+  },
+  {
+    "title": "First-Principles Explainer",
+    "badge": "Chat"
+  },
+  {
+    "title": "CBSE / IGCSE Chapter Tutor",
+    "badge": "Chat"
+  },
+  {
+    "title": "Textbook Navigator",
+    "badge": "Chat"
+  },
+  {
+    "title": "Python from Zero",
+    "badge": "Chat"
+  },
+  {
+    "title": "PRD from Requirement",
+    "badge": "Chat"
+  },
+  {
+    "title": "Architecture Diagram",
+    "badge": "Chat"
+  },
+  {
+    "title": "Data Anomaly Audit",
+    "badge": "Chat"
+  },
+  {
+    "title": "Security Code Review",
+    "badge": "Chat"
+  },
+  {
+    "title": "EMI Problem Walkthrough",
+    "badge": "Chat"
+  },
+  {
+    "title": "Dijkstra vs A*",
+    "badge": "Chat"
+  },
+  {
+    "title": "Backprop for Attention",
+    "badge": "Chat"
+  },
+  {
+    "title": "Wave-Particle Duality",
+    "badge": "Chat"
+  },
+  {
+    "title": "Thermodynamics Quiz",
+    "badge": "Chat"
+  },
+  {
+    "title": "Differential Equation Walkthrough",
+    "badge": "Chat"
+  },
+  {
+    "title": "Quadratic Formula Derivation",
+    "badge": "Chat"
+  },
+  {
+    "title": "Newton's Laws",
+    "badge": "Chat"
+  },
+  {
+    "title": "Kirchhoff Circuit Walkthrough",
+    "badge": "Chat"
+  },
+  {
+    "title": "Binary Search Coach",
+    "badge": "Chat"
+  },
+  {
+    "title": "On-Device Deck",
+    "badge": "Chat"
+  },
+  {
+    "title": "Offline Document Review",
+    "badge": "Chat"
+  },
+  {
+    "title": "Private Strategy Draft",
+    "badge": "Chat"
+  },
+  {
+    "title": "Local PDF Summary",
+    "badge": "Chat"
+  },
+  {
+    "title": "Private Image Analysis",
+    "badge": "Chat"
+  },
+  {
+    "title": "Room Reconstruction",
+    "badge": "Chat"
+  },
+  {
+    "title": "Living & Study Studio",
+    "badge": "Chat"
+  },
+  {
+    "title": "Whole Floor Plan Integration",
+    "badge": "Chat"
+  },
+  {
+    "title": "📖 Make a Study Book",
+    "badge": "Chat"
+  },
+  {
+    "title": "🎯 Test My Knowledge (Quiz Me!)",
+    "badge": "Chat"
+  },
+  {
+    "title": "🔍 Explain Like I'm 10",
+    "badge": "Chat"
+  },
+  {
+    "title": "📝 My Study Notes & Summary",
+    "badge": "Chat"
+  },
+  {
+    "title": "✍️ Essay & Letter Helper",
+    "badge": "Chat"
+  },
+  {
+    "title": "🧘 Daily Gentle Yoga & Stretching",
+    "badge": "Chat"
+  },
+  {
+    "title": "🥗 Nutritious Family Meal Plan",
+    "badge": "Chat"
+  },
+  {
+    "title": "💊 Medicine Safety & Interaction Check",
+    "badge": "Chat"
+  },
+  {
+    "title": "🩺 Joint & Back Comfort Guide",
+    "badge": "Chat"
+  },
+  {
+    "title": "🌅 Today's Panchang & Auspicious Timings",
+    "badge": "Chat"
+  },
+  {
+    "title": "📅 Upcoming Festivals & Vrats",
+    "badge": "Chat"
+  },
+  {
+    "title": "✨ Shubh Muhurat Finder",
+    "badge": "Chat"
+  },
+  {
+    "title": "📐 Ready-Made 1,400 sq ft 3BHK Vastu Villa",
+    "badge": "Chat"
+  },
+  {
+    "title": "🏡 30 × 40 ft Independent Duplex House",
+    "badge": "Chat"
+  },
+  {
+    "title": "🚶 Indoor Virtual Walkthrough (WASD)",
+    "badge": "Chat"
+  },
+  {
+    "title": "☀️ Vastu & Solar Daylighting Audit",
+    "badge": "Chat"
+  },
+  {
+    "title": "🤖 Smart Arduino / ESP32 Project",
+    "badge": "Chat"
+  },
+  {
+    "title": "🔧 Home Appliance & DIY Fix",
+    "badge": "Chat"
+  },
+  {
+    "title": "✉️ Formal Letter & Application Writer",
+    "badge": "Chat"
+  },
+  {
+    "title": "📑 Explain My Bill or Statement",
+    "badge": "Chat"
+  },
+  {
+    "title": "🧸 Magical Bedtime Story",
+    "badge": "Chat"
+  },
+  {
+    "title": "📊 Family & Home Budget Tracker",
+    "badge": "Chat"
+  },
+  {
+    "title": "🛒 Grocery & Kitchen Inventory",
+    "badge": "Chat"
+  },
+  {
+    "title": "📈 Small Business Sales & Expense Sheet",
+    "badge": "Chat"
+  },
+  {
+    "title": "✉️ Formal Letter & Application",
+    "badge": "Chat"
+  },
+  {
+    "title": "🎬 3D Science Explainer",
+    "badge": "Chat"
+  },
+  {
+    "title": "🚀 3D Product & Tech Showcase",
+    "badge": "Chat"
+  },
+  {
+    "title": "📐 3D Architectural Walkthrough",
+    "badge": "Chat"
+  }
+]

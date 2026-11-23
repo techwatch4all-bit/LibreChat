@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRecoilValue } from 'recoil';
-import { QueryKeys } from 'librechat-data-provider';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { QueryKeys, request } from 'librechat-data-provider';
 import {
   Zap,
   Calendar,
@@ -15,6 +15,7 @@ import {
   Coins,
   Cpu,
   Cloud,
+  HardDrive,
 } from 'lucide-react';
 import { useGetUserUsageStats, useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { formatTokens, cn } from '~/utils';
@@ -25,13 +26,31 @@ import store from '~/store';
 const SHOW_DELAY_MS = 100;
 const HIDE_DELAY_MS = 150;
 
-type TimeTab = 'month' | '7days' | '30days';
+const formatMillions = (n: number): string => {
+  if (!n || Number.isNaN(n)) return '0';
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n));
+};
+
+const formatStorageBytes = (bytes: number): string => {
+  if (!bytes || Number.isNaN(bytes) || bytes <= 0) return '0 MB';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 1 : 2)} GB`;
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 0.1) return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+  const kb = bytes / 1024;
+  return `${kb.toFixed(0)} KB`;
+};
+
+type TimeTab = 'today' | '7days' | 'month';
 
 export default function HeaderBillingGauge() {
   const { user, isAuthenticated } = useAuthContext();
   const { data: startupConfig } = useGetStartupConfig();
   const queryClient = useQueryClient();
   const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
+  const setShowStudioLibrary = useSetRecoilState(store.showStudioLibraryPanel);
 
   const popover = Ariakit.usePopoverStore({ placement: 'bottom-end' });
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
@@ -113,27 +132,27 @@ export default function HeaderBillingGauge() {
   useEffect(() => cancelTimers, [cancelTimers]);
 
   // Date boundaries for tracking:
-  // 1. Current calendar month (1st of month 00:00:00 to now)
+  // 1. Today (since local midnight)
   // 2. Last 7 days
-  // 3. Last 30 days (rolling 1 month, aligned with chat breakdown)
+  // 3. Current calendar month (1st of month 00:00:00 to now)
   // No endDate so live session activity is never excluded.
   const dateRanges = useMemo(() => {
     const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
     const last7DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0).toISOString();
-    const last30DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0, 0).toISOString();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
 
     return {
-      month: { startDate: currentMonthStart },
+      today: { startDate: todayStart },
       '7days': { startDate: last7DaysStart },
-      '30days': { startDate: last30DaysStart },
+      month: { startDate: currentMonthStart },
     };
   }, []);
 
   // Fetch token usage stats for each range
-  const { data: monthStats, isLoading: loadingMonth } = useGetUserUsageStats(dateRanges.month);
+  const { data: statsToday, isLoading: loadingToday } = useGetUserUsageStats(dateRanges.today);
   const { data: stats7d, isLoading: loading7d } = useGetUserUsageStats(dateRanges['7days']);
-  const { data: stats30d, isLoading: loading30d } = useGetUserUsageStats(dateRanges['30days']);
+  const { data: monthStats, isLoading: loadingMonth } = useGetUserUsageStats(dateRanges.month);
 
   // Fetch user balance / credits
   const balanceQuery = useGetUserBalance({
@@ -141,16 +160,69 @@ export default function HeaderBillingGauge() {
   });
   const balanceData = balanceQuery.data;
 
+  // Fetch live per-seat token balance & tier storage from LibreChat backend
+  const [seatBalance, setSeatBalance] = useState<{
+    available: boolean;
+    tier?: string;
+    remainingTokens?: number;
+    ceilingTokens?: number;
+    usedTokens?: number;
+    storage?: {
+      usedBytes: number;
+      quotaBytes: number;
+      availableBytes: number;
+      quotaMb: number;
+    };
+  } | null>(null);
+
+  const fetchSeatBalance = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await request.get<{
+        available?: boolean;
+        tier?: string;
+        remainingTokens?: number;
+        ceilingTokens?: number;
+        usedTokens?: number;
+        storage?: {
+          usedBytes: number;
+          quotaBytes: number;
+          availableBytes: number;
+          quotaMb: number;
+        };
+      }>('/api/user/seat-balance');
+      if (res?.available || res?.storage) {
+        setSeatBalance({
+          available: !!res.available,
+          tier: res.tier,
+          remainingTokens: res.remainingTokens ?? 0,
+          ceilingTokens: res.ceilingTokens ?? 0,
+          usedTokens: res.usedTokens ?? 0,
+          storage: res.storage,
+        });
+      }
+    } catch {
+      // silent fallback
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchSeatBalance();
+    const timer = setInterval(fetchSeatBalance, 30000);
+    return () => clearInterval(timer);
+  }, [fetchSeatBalance]);
+
   // Active tab selection data
   const currentStats = useMemo(() => {
+    if (activeTab === 'today') return statsToday;
     if (activeTab === '7days') return stats7d;
-    if (activeTab === '30days') return stats30d;
     return monthStats;
-  }, [activeTab, stats7d, stats30d, monthStats]);
+  }, [activeTab, statsToday, stats7d, monthStats]);
 
   const isLoading =
-    activeTab === '7days' ? loading7d : activeTab === '30days' ? loading30d : loadingMonth;
+    activeTab === 'today' ? loadingToday : activeTab === '7days' ? loading7d : loadingMonth;
 
+  const hasSeatBalance = !!seatBalance?.available && typeof seatBalance.remainingTokens === 'number';
   const hasCredits = typeof balanceData?.tokenCredits === 'number';
   const hasQuota = typeof balanceData?.refillAmount === 'number' && balanceData.refillAmount > 0;
 
@@ -159,18 +231,30 @@ export default function HeaderBillingGauge() {
   let pillLabel: string;
   let iconColor = 'text-amber-500 fill-amber-500';
 
-  if (hasCredits) {
-    pillValue = formatTokens(balanceData!.tokenCredits);
-    pillLabel = 'Credits';
+  if (hasSeatBalance) {
+    const rem = seatBalance!.remainingTokens ?? 0;
+    const ceil = seatBalance!.ceilingTokens ?? 1;
+    pillValue = formatMillions(rem);
+    pillLabel = 'Balance';
+    if (rem <= 0) {
+      iconColor = 'text-rose-500 fill-rose-500';
+    } else if (ceil > 0 && rem / ceil <= 0.2) {
+      iconColor = 'text-amber-500 fill-amber-500';
+    } else {
+      iconColor = 'text-emerald-500 fill-emerald-500';
+    }
+  } else if (hasCredits) {
+    pillValue = formatMillions(balanceData!.tokenCredits);
+    pillLabel = 'Balance';
   } else if (hasQuota) {
     const remaining = Math.max(0, (balanceData!.refillAmount ?? 0) - (monthStats?.totalTokens ?? 0));
-    pillValue = formatTokens(remaining);
-    pillLabel = 'Left';
+    pillValue = formatMillions(remaining);
+    pillLabel = 'Balance';
     if (remaining <= 0) {
       iconColor = 'text-rose-500 fill-rose-500';
     }
   } else {
-    pillValue = loadingMonth ? '...' : formatTokens(monthStats?.totalTokens ?? 0);
+    pillValue = loadingMonth ? '...' : formatMillions(monthStats?.totalTokens ?? 0);
     pillLabel = 'Month';
     iconColor = 'text-emerald-500 fill-emerald-500';
   }
@@ -250,34 +334,139 @@ export default function HeaderBillingGauge() {
           if (e.pointerType !== 'touch') scheduleHide();
         }}
         className={cn(
-          'z-50 rounded-xl border border-border-light bg-surface-primary p-4 shadow-xl outline-none',
+          'z-50 rounded-xl border border-border-light bg-surface-primary p-3 shadow-xl outline-none',
           'origin-top-right translate-y-1 scale-95 opacity-0 transition-[opacity,transform] duration-150 ease-out',
           'data-[enter]:translate-y-0 data-[enter]:scale-100 data-[enter]:opacity-100',
           'data-[leave]:translate-y-1 data-[leave]:scale-95 data-[leave]:opacity-0',
         )}
       >
-        <div className="w-84 space-y-3.5 text-text-primary">
+        <div className="w-[330px] space-y-2.5 text-text-primary">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border-light pb-2.5">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between border-b border-border-light pb-2">
+            <div className="flex items-center gap-1.5">
               <Coins className="size-4 text-amber-500" />
-              <span className="text-sm font-semibold text-text-primary">Balance & Token Usage</span>
+              <span className="text-xs font-semibold text-text-primary">Balance & Token Usage</span>
             </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live Synced
             </span>
           </div>
 
           {/* Balance / Entitlement Card */}
-          {hasCredits ? (
+          {hasSeatBalance ? (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                  Available Token Balance
+                </span>
+                <span className="rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase text-text-secondary">
+                  {seatBalance?.tier || user?.accountType || 'Standard'}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-bold text-emerald-500">
+                  {formatMillions(seatBalance!.remainingTokens ?? 0)}
+                </span>
+                <span className="font-mono text-[11px] text-text-tertiary">
+                  {(seatBalance!.remainingTokens ?? 0).toLocaleString('en-US')}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                  style={{
+                    width: `${
+                      (seatBalance!.ceilingTokens ?? 0) > 0
+                        ? Math.min(
+                            100,
+                            Math.round(
+                              ((seatBalance!.remainingTokens ?? 0) /
+                                (seatBalance!.ceilingTokens ?? 1)) *
+                                100,
+                            ),
+                          )
+                        : 100
+                    }%`,
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-text-secondary">
+                <span>Used: {formatMillions(seatBalance!.usedTokens ?? 0)}</span>
+                <span>Limit: {formatMillions(seatBalance!.ceilingTokens ?? 0)}</span>
+              </div>
+              {seatBalance?.storage && (() => {
+                const usedPct =
+                  seatBalance.storage.quotaBytes > 0
+                    ? Math.min(
+                        100,
+                        Math.round(
+                          (seatBalance.storage.usedBytes / seatBalance.storage.quotaBytes) * 100,
+                        ),
+                      )
+                    : 0;
+                const storageTextColor =
+                  usedPct >= 90
+                    ? 'text-red-500'
+                    : usedPct >= 70
+                      ? 'text-amber-500'
+                      : 'text-emerald-500';
+                const storageBarColor =
+                  usedPct >= 90
+                    ? 'bg-red-500'
+                    : usedPct >= 70
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500';
+                return (
+                  <div className="mt-1.5 pt-1.5 border-t border-emerald-500/15 space-y-1">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wider text-text-tertiary">
+                        <HardDrive className={`size-3 ${storageTextColor}`} />
+                        Available Storage
+                      </span>
+                      <span className={`font-semibold ${storageTextColor}`}>
+                        {formatStorageBytes(seatBalance.storage.availableBytes)} free
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${storageBarColor}`}
+                        style={{ width: `${usedPct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-text-secondary">
+                      <span>Used: {formatStorageBytes(seatBalance.storage.usedBytes)} ({usedPct}%)</span>
+                      <span>
+                        Tier Quota:{' '}
+                        {seatBalance.storage.quotaMb >= 1024
+                          ? `${(seatBalance.storage.quotaMb / 1024).toFixed(0)} GB`
+                          : `${seatBalance.storage.quotaMb} MB`}
+                      </span>
+                    </div>
+                    <div className="pt-0.5 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStudioLibrary(true);
+                          popover.hide();
+                        }}
+                        className="text-[10px] font-medium text-sky-400 hover:text-sky-300 hover:underline transition-colors"
+                      >
+                        Manage storage →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : hasCredits ? (
             <div className="rounded-lg border border-border-light bg-surface-secondary/50 p-3 space-y-1.5">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
                 Available Token Balance
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-bold text-text-primary">
-                  {balanceData!.tokenCredits.toLocaleString()}
+                  {balanceData!.tokenCredits.toLocaleString('en-US')}
                 </span>
                 <span className="text-xs text-text-tertiary font-medium">Credits</span>
               </div>
@@ -285,7 +474,7 @@ export default function HeaderBillingGauge() {
                 <div className="flex items-center gap-1.5 text-xs text-text-secondary pt-1 border-t border-border-light/60">
                   <RefreshCw className="size-3 text-primary shrink-0" />
                   <span>
-                    Refills {balanceData.refillAmount?.toLocaleString()} every {balanceData.refillIntervalValue}{' '}
+                    Refills {balanceData.refillAmount?.toLocaleString('en-US')} every {balanceData.refillIntervalValue}{' '}
                     {balanceData.refillIntervalUnit}
                   </span>
                 </div>
@@ -315,8 +504,8 @@ export default function HeaderBillingGauge() {
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-text-secondary">
-                <span>Used: {formatTokens(monthStats?.totalTokens ?? 0)}</span>
-                <span>Quota: {formatTokens(balanceData!.refillAmount!)}</span>
+                <span>Used: {formatMillions(monthStats?.totalTokens ?? 0)}</span>
+                <span>Quota: {formatMillions(balanceData!.refillAmount!)}</span>
               </div>
             </div>
           ) : (
@@ -337,15 +526,15 @@ export default function HeaderBillingGauge() {
           <div className="flex rounded-md bg-surface-secondary p-0.5 text-xs">
             <button
               type="button"
-              onClick={() => setActiveTab('month')}
+              onClick={() => setActiveTab('today')}
               className={cn(
                 'flex-1 rounded py-1 font-medium transition-colors',
-                activeTab === 'month'
+                activeTab === 'today'
                   ? 'bg-surface-primary text-text-primary shadow-sm font-semibold'
                   : 'text-text-secondary hover:text-text-primary',
               )}
             >
-              Current Month
+              Today
             </button>
             <button
               type="button"
@@ -361,15 +550,15 @@ export default function HeaderBillingGauge() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('30days')}
+              onClick={() => setActiveTab('month')}
               className={cn(
                 'flex-1 rounded py-1 font-medium transition-colors',
-                activeTab === '30days'
+                activeTab === 'month'
                   ? 'bg-surface-primary text-text-primary shadow-sm font-semibold'
                   : 'text-text-secondary hover:text-text-primary',
               )}
             >
-              30 Days
+              Current Month
             </button>
           </div>
 
@@ -377,11 +566,11 @@ export default function HeaderBillingGauge() {
           <div className="flex items-center justify-between text-[11px] text-text-tertiary">
             <span className="flex items-center gap-1">
               <Calendar className="size-3 text-text-tertiary" />
-              {activeTab === 'month'
-                ? `${currentMonthName} (to date)`
+              {activeTab === 'today'
+                ? 'Today (since midnight)'
                 : activeTab === '7days'
                   ? 'Past 7 consecutive days'
-                  : 'Past 30 consecutive days'}
+                  : `${currentMonthName} (to date)`}
             </span>
             <span>{currentStats?.transactionCount ?? 0} requests</span>
           </div>
@@ -391,11 +580,11 @@ export default function HeaderBillingGauge() {
             <div className="text-[11px] font-medium text-text-secondary">Total Consumed Tokens</div>
             <div className="mt-0.5 flex items-baseline justify-between">
               <span className="text-xl font-bold text-text-primary">
-                {isLoading ? '...' : formatTokens(currentStats?.totalTokens ?? 0)}
+                {isLoading ? '...' : formatMillions(currentStats?.totalTokens ?? 0)}
               </span>
               {currentStats?.totalTokens != null && currentStats.totalTokens >= 1000 && (
                 <span className="text-xs text-text-tertiary font-mono">
-                  {currentStats.totalTokens.toLocaleString()}
+                  {currentStats.totalTokens.toLocaleString('en-US')}
                 </span>
               )}
             </div>
@@ -410,11 +599,11 @@ export default function HeaderBillingGauge() {
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-text-primary">
-                  {isLoading ? '...' : formatTokens(currentStats?.inputTokens ?? 0)}
+                  {isLoading ? '...' : formatMillions(currentStats?.inputTokens ?? 0)}
                 </span>
                 {currentStats?.local?.inputTokens ? (
                   <span className="text-[10px] text-text-tertiary">
-                    (Cloud {formatTokens(currentStats?.cloud?.inputTokens ?? 0)} + Local {formatTokens(currentStats?.local?.inputTokens ?? 0)})
+                    (Cloud {formatMillions(currentStats?.cloud?.inputTokens ?? 0)} + Local {formatMillions(currentStats?.local?.inputTokens ?? 0)})
                   </span>
                 ) : null}
               </div>
@@ -427,11 +616,11 @@ export default function HeaderBillingGauge() {
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-text-primary">
-                  {isLoading ? '...' : formatTokens(currentStats?.outputTokens ?? 0)}
+                  {isLoading ? '...' : formatMillions(currentStats?.outputTokens ?? 0)}
                 </span>
                 {currentStats?.local?.outputTokens ? (
                   <span className="text-[10px] text-text-tertiary">
-                    (Cloud {formatTokens(currentStats?.cloud?.outputTokens ?? 0)} + Local {formatTokens(currentStats?.local?.outputTokens ?? 0)})
+                    (Cloud {formatMillions(currentStats?.cloud?.outputTokens ?? 0)} + Local {formatMillions(currentStats?.local?.outputTokens ?? 0)})
                   </span>
                 ) : null}
               </div>
@@ -444,7 +633,7 @@ export default function HeaderBillingGauge() {
                   Cached Read
                 </span>
                 <span className="font-semibold text-text-primary">
-                  {formatTokens(currentStats.cacheRead)}
+                  {formatMillions(currentStats.cacheRead)}
                 </span>
               </div>
             )}
@@ -472,19 +661,19 @@ export default function HeaderBillingGauge() {
                 <div className="flex justify-between pt-1 border-t border-border-light/50 text-[11px]">
                   <span className="text-text-secondary">In:</span>
                   <span className="font-semibold text-text-primary">
-                    {isLoading ? '...' : formatTokens(currentStats?.local?.inputTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.local?.inputTokens ?? 0)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px]">
                   <span className="text-text-secondary">Out:</span>
                   <span className="font-semibold text-text-primary">
-                    {isLoading ? '...' : formatTokens(currentStats?.local?.outputTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.local?.outputTokens ?? 0)}
                   </span>
                 </div>
                 <div className="flex justify-between pt-0.5 border-t border-border-light/40 text-[11px] font-medium text-text-primary">
                   <span>Total:</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                    {isLoading ? '...' : formatTokens(currentStats?.local?.totalTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.local?.totalTokens ?? 0)}
                   </span>
                 </div>
               </div>
@@ -503,27 +692,27 @@ export default function HeaderBillingGauge() {
                 <div className="flex justify-between pt-1 border-t border-border-light/50 text-[11px]">
                   <span className="text-text-secondary">In:</span>
                   <span className="font-semibold text-text-primary">
-                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.inputTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.cloud?.inputTokens ?? 0)}
                   </span>
                 </div>
                 {Boolean(currentStats?.cloud?.cacheRead) && (
                   <div className="flex justify-between text-[11px]">
                     <span className="text-text-secondary">Cache:</span>
                     <span className="font-semibold text-purple-500">
-                      {formatTokens(currentStats!.cloud!.cacheRead)}
+                      {formatMillions(currentStats!.cloud!.cacheRead)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-[11px]">
                   <span className="text-text-secondary">Out:</span>
                   <span className="font-semibold text-text-primary">
-                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.outputTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.cloud?.outputTokens ?? 0)}
                   </span>
                 </div>
                 <div className="flex justify-between pt-0.5 border-t border-border-light/40 text-[11px] font-medium text-text-primary">
                   <span>Total:</span>
                   <span className="text-blue-600 dark:text-blue-400 font-bold">
-                    {isLoading ? '...' : formatTokens(currentStats?.cloud?.totalTokens ?? 0)}
+                    {isLoading ? '...' : formatMillions(currentStats?.cloud?.totalTokens ?? 0)}
                   </span>
                 </div>
               </div>

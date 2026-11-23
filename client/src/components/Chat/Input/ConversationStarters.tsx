@@ -1,10 +1,19 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import type { ComponentType } from 'react';
 import { useAtom } from 'jotai';
-import { Search, X } from 'lucide-react';
+import { Search, X, Send } from 'lucide-react';
 import { resolvePersonaVisual } from '~/common/personaVisuals';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
-import type { MotionStudioGroupId, StarterItem } from '~/common/starters';
+import {
+  Button,
+  Input,
+  Label,
+  OGDialog,
+  OGDialogContent,
+  OGDialogHeader,
+  OGDialogTitle,
+} from '@librechat/client';
+import type { MotionStudioGroupId, StarterItem, StarterSlot } from '~/common/starters';
 import {
   useChatContext,
   useChatFormContext,
@@ -22,7 +31,7 @@ import { getIconEndpoint, getEntity, getModelSpec, cn } from '~/utils';
 import { mcpValuesAtomFamily } from '~/store/mcp';
 import { forceResize } from '~/utils/textarea';
 import { mainTextareaId } from '~/common';
-import { useLocalize } from '~/hooks';
+import { useSubmitMessage, useLocalize } from '~/hooks';
 
 /**
  * Active Tab-cycling handler for the staged textarea. Exactly one at a time:
@@ -38,6 +47,7 @@ const ConversationStarters = () => {
   const assistantMap = useAssistantsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();
   const { data: startupConfig } = useGetStartupConfig();
+  const { submitMessage } = useSubmitMessage();
   const localize = useLocalize();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedGroup, setSelectedGroup] = useState<'spotlight' | MotionStudioGroupId>(
@@ -48,17 +58,40 @@ const ConversationStarters = () => {
   const [stagedHint, setStagedHint] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Phase 2: Interactive Parameter Modal State
+  const [parameterModalState, setParameterModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    icon?: string;
+    rawTemplate: string;
+    slots: StarterSlot[];
+    values: Record<string, string>;
+    servers: string[];
+  }>({
+    isOpen: false,
+    title: '',
+    rawTemplate: '',
+    slots: [],
+    values: {},
+    servers: [],
+  });
+
   const activeMode = conversation?.spec ?? 'Chat';
+  const isAgentEndpoint = conversation?.endpoint === EModelEndpoint.agents;
 
   // Filter categories according to the current model spec / mode
   const modeCategories = useMemo(() => {
+    if (isAgentEndpoint) {
+      return [];
+    }
     const matched = ALL_CATEGORIES.filter((cat) => !cat.modes || cat.modes.includes(activeMode));
     return matched.length > 0 ? matched : ALL_CATEGORIES;
-  }, [activeMode]);
+  }, [activeMode, isAgentEndpoint]);
 
   const hasGroupedNavigation = useMemo(
-    () => modeCategories.some((cat) => Boolean(cat.group)),
-    [modeCategories],
+    () => !isAgentEndpoint && modeCategories.some((cat) => Boolean(cat.group)),
+    [isAgentEndpoint, modeCategories],
   );
 
   const groupCategories = useMemo(() => {
@@ -141,7 +174,7 @@ const ConversationStarters = () => {
   }, [documentsMap, isAgent, entity, modelSpec]);
 
   const handleStarterClick = useCallback(
-    (starter: StarterItem | string) => {
+    (starter: StarterItem | string, autoExecute = false) => {
       const text = typeof starter === 'string' ? starter : starter.prompt;
       const servers = typeof starter === 'string' ? [] : (starter.mcpServers ?? []);
 
@@ -154,11 +187,31 @@ const ConversationStarters = () => {
         }
       }
 
-      // Every persona starter stages into the textarea for the user to edit and
-      // customize before sending — clicking a card never auto-executes. The
-      // first real input slot is highlighted so it can be overwritten at once,
-      // and Tab cycles forward through the remaining slots.
       const slots = findStarterSlots(text);
+
+      // Phase 2: For Agent endpoints with parameter slots, pop the interactive task modal for structured form inputs
+      if (isAgentEndpoint && slots.length > 0) {
+        const initialValues: Record<string, string> = {};
+        slots.forEach((s) => {
+          initialValues[s.label] = '';
+        });
+        const title =
+          typeof starter === 'string' ? 'Configure Agent Task' : starter.title || 'Configure Agent Task';
+        const description = typeof starter === 'string' ? undefined : starter.description;
+        const icon = typeof starter === 'string' ? '⚡' : starter.icon || '⚡';
+        setParameterModalState({
+          isOpen: true,
+          title,
+          description,
+          icon,
+          rawTemplate: text,
+          slots,
+          values: initialValues,
+          servers,
+        });
+        return;
+      }
+
       const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
       if (textarea) {
         textarea.value = text;
@@ -194,10 +247,49 @@ const ConversationStarters = () => {
         };
         textarea.addEventListener('keydown', stagedTabHandler);
       }
-      setStagedHint(true);
+
+      if (autoExecute && slots.length === 0) {
+        submitMessage({ text });
+      } else {
+        setStagedHint(true);
+      }
     },
-    [setMCPValues, badgeContext, methods],
+    [isAgentEndpoint, setMCPValues, badgeContext, methods, submitMessage],
   );
+
+  const handleExecuteParameterizedTask = useCallback(() => {
+    const { rawTemplate, values, servers } = parameterModalState;
+    if (!rawTemplate) return;
+
+    if (servers.length > 0) {
+      setMCPValues((prev = []) => Array.from(new Set([...prev, ...servers])));
+      if (badgeContext?.mcpServerManager?.setMCPValues) {
+        const curr = badgeContext.mcpServerManager.mcpValues ?? [];
+        badgeContext.mcpServerManager.setMCPValues(Array.from(new Set([...curr, ...servers])));
+      }
+    }
+
+    // Replace all [Slot Label] with user provided values or fallback (split/join avoids regex escaping issues)
+    let compiled = rawTemplate;
+    Object.entries(values).forEach(([label, val]) => {
+      const cleanVal = val.trim();
+      const target = `[${label}]`;
+      compiled = compiled.split(target).join(cleanVal || target);
+    });
+
+    const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
+    if (textarea) {
+      textarea.value = compiled;
+      if (methods?.setValue) {
+        methods.setValue('text', compiled, { shouldDirty: true, shouldValidate: true });
+      }
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      forceResize(textarea);
+    }
+
+    setParameterModalState((prev) => ({ ...prev, isOpen: false }));
+    submitMessage({ text: compiled });
+  }, [parameterModalState, setMCPValues, badgeContext, methods, submitMessage]);
 
   const displayedStarters = useMemo(() => {
     if (hasGroupedNavigation) {
@@ -487,7 +579,7 @@ const ConversationStarters = () => {
                 key={`${item.badgeKey ?? item.badge ?? index}-${cleanTitle ?? index}`}
                 type="button"
                 aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
-                onClick={() => handleStarterClick(item)}
+                onClick={() => handleStarterClick(item, isAgentEndpoint)}
                 style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
                 className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3.5 py-2.5 sm:py-3 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
               >
@@ -552,6 +644,79 @@ const ConversationStarters = () => {
           </button>
         </div>
       )}
+
+      {/* Phase 2: Interactive Parameter Inputs (Form-to-Agent Modal) */}
+      <OGDialog
+        open={parameterModalState.isOpen}
+        onOpenChange={(open) => setParameterModalState((prev) => ({ ...prev, isOpen: open }))}
+      >
+        <OGDialogContent className="max-w-md rounded-2xl border border-border-medium bg-surface-primary p-6 shadow-2xl">
+          <OGDialogHeader className="mb-4 text-left">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-surface-tertiary text-sm">
+                {parameterModalState.icon || '⚡'}
+              </span>
+              <OGDialogTitle className="text-base font-semibold text-text-primary">
+                {parameterModalState.title}
+              </OGDialogTitle>
+            </div>
+            {parameterModalState.description && (
+              <p className="mt-1 text-xs text-text-secondary">
+                {parameterModalState.description}
+              </p>
+            )}
+          </OGDialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleExecuteParameterizedTask();
+            }}
+            className="flex flex-col gap-3.5"
+          >
+            {parameterModalState.slots.map((slot, index) => (
+              <div key={`${slot.label}-${index}`} className="flex flex-col gap-1.5">
+                <Label className="text-xs font-medium text-text-primary">{slot.label}</Label>
+                <Input
+                  autoFocus={index === 0}
+                  value={parameterModalState.values[slot.label] ?? ''}
+                  placeholder={`Enter ${slot.label}...`}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setParameterModalState((prev) => ({
+                      ...prev,
+                      values: {
+                        ...prev.values,
+                        [slot.label]: val,
+                      },
+                    }));
+                  }}
+                  className="h-9 w-full rounded-lg border border-border-light bg-surface-secondary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-border-heavy focus:outline-none"
+                />
+              </div>
+            ))}
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setParameterModalState((prev) => ({ ...prev, isOpen: false }))}
+                className="h-8 rounded-lg px-3 text-xs text-text-secondary hover:bg-surface-tertiary"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="default"
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground shadow-sm hover:opacity-90"
+              >
+                <Send className="size-3.5" />
+                <span>Run Agent Task</span>
+              </Button>
+            </div>
+          </form>
+        </OGDialogContent>
+      </OGDialog>
     </div>
   );
 };

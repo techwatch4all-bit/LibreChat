@@ -2232,8 +2232,13 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       } else {
         job.abortController.signal.addEventListener('abort', abortTitleOnJobAbort, { once: true });
       }
+      const needsTitle =
+        isNewConvo ||
+        req.resolvedConversation === null ||
+        (req.resolvedConversation != null &&
+          (!req.resolvedConversation.title || req.resolvedConversation.title === 'New Chat'));
       const titleEligible =
-        addTitle && parentMessageId === Constants.NO_PARENT && isNewConvo && !req.body?.isTemporary;
+        addTitle && parentMessageId === Constants.NO_PARENT && needsTitle && !req.body?.isTemporary;
       logger.info(
         `[addTitle] eligible=${titleEligible} hasAddTitle=${Boolean(addTitle)} parentIsRoot=${parentMessageId === Constants.NO_PARENT} isNewConvo=${isNewConvo} temporary=${Boolean(req.body?.isTemporary)} titleTiming=${titleTiming}`,
       );
@@ -2955,7 +2960,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         const shouldGenerateTitle =
           addTitle &&
           parentMessageId === Constants.NO_PARENT &&
-          isNewConvo &&
+          needsTitle &&
           !terminalWasAborted &&
           !preemptIncomplete;
 

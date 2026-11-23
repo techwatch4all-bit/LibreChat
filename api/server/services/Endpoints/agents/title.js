@@ -1,9 +1,37 @@
-const { isEnabled } = require('@librechat/api');
+const { isEnabled, sanitizeTitle } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const { CacheKeys } = require('librechat-data-provider');
 const getLogStores = require('~/cache/getLogStores');
 const { saveConvo } = require('~/models');
 const { resolveConversationTitle } = require('../titlePolicy');
+
+/**
+ * Derives a clean, concise fallback title from the user's prompt text when
+ * LLM title generation fails, times out, or returns an empty response.
+ *
+ * @param {string} [rawText]
+ * @returns {string}
+ */
+const derivePromptFallbackTitle = (rawText) => {
+  if (typeof rawText !== 'string') {
+    return '';
+  }
+  const cleaned = rawText
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#*_`~>[\]]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return '';
+  }
+  if (cleaned.length <= 45) {
+    return sanitizeTitle(cleaned);
+  }
+  const slice = cleaned.slice(0, 42);
+  const lastSpace = slice.lastIndexOf(' ');
+  const truncated = (lastSpace > 15 ? slice.slice(0, lastSpace) : slice).trim();
+  return sanitizeTitle(`${truncated}...`);
+};
 
 /**
  * Add title to conversation in a way that avoids memory retention.
@@ -119,12 +147,16 @@ const addTitle = async (
       return;
     }
 
-    const generatedTitle = await titlePromise;
+    let generatedTitle = await titlePromise;
     if (!abortController.signal.aborted) {
       abortController.abort();
     }
     if (timeoutId) {
       clearTimeout(timeoutId);
+    }
+
+    if (!generatedTitle && !signal?.aborted && !discardSignal?.aborted) {
+      generatedTitle = derivePromptFallbackTitle(text);
     }
 
     if (!generatedTitle) {

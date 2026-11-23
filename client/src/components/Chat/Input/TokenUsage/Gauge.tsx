@@ -14,15 +14,15 @@ interface GaugeProps {
 
 function getStrokeClass(percent: number, indeterminate: boolean): string {
   if (indeterminate) {
-    return 'stroke-text-secondary';
+    return 'stroke-sky-400/70';
   }
-  if (percent > 90) {
-    return 'stroke-status-error';
+  if (percent >= 90) {
+    return 'stroke-red-500';
   }
-  if (percent > 75) {
-    return 'stroke-status-warning';
+  if (percent >= 70) {
+    return 'stroke-amber-500';
   }
-  return 'stroke-text-secondary';
+  return 'stroke-emerald-500';
 }
 
 export default function Gauge({ percent, indeterminate }: GaugeProps) {

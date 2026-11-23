@@ -219,12 +219,42 @@ export async function initializeCustom(
   }
 
   const requestedModel = typeof model_parameters?.model === 'string' ? model_parameters.model : '';
-  const satchidaMode = typeof requestBody.model === 'string' ? requestBody.model : requestedModel;
+  const bodyModel =
+    typeof requestBody.model === 'string' && !requestBody.model.startsWith('agent_')
+      ? requestBody.model
+      : '';
+  const satchidaMode = requestedModel || bodyModel;
   const normalizedMode = satchidaMode.trim().toLowerCase();
   const isSatchidaEndpoint =
     endpoint.toLowerCase() === 'satchida' || endpoint.toLowerCase() === 'satchida-gateway';
   const isPrivacyMode = isSatchidaEndpoint && normalizedMode === 'privacy';
-  const satchidaSeatAlias = (user as IUser & { satchidaSeatAlias?: string })?.satchidaSeatAlias;
+  let resolvedSeatToken = user?.seatToken;
+  let satchidaSeatAlias = (user as IUser & { satchidaSeatAlias?: string })?.satchidaSeatAlias;
+  // userDocCache strips seatToken from cached req.user documents; hydrate directly from DB
+  // for Satchida endpoints when missing so authenticated users never hit NO_USER_KEY on cached JWTs.
+  if (isSatchidaEndpoint && (!resolvedSeatToken || !satchidaSeatAlias) && user?.id) {
+    const getUserById = (
+      db as {
+        getUserById?: (
+          userId: string,
+          fields?: string,
+        ) => Promise<{ seatToken?: string; satchidaSeatAlias?: string } | null>;
+      }
+    )?.getUserById;
+    if (typeof getUserById === 'function') {
+      try {
+        const freshUser = await getUserById(user.id, '+seatToken +satchidaSeatAlias');
+        if (freshUser?.seatToken) {
+          resolvedSeatToken = freshUser.seatToken;
+        }
+        if (freshUser?.satchidaSeatAlias) {
+          satchidaSeatAlias = freshUser.satchidaSeatAlias;
+        }
+      } catch (err) {
+        logger.warn('[satchida][custom] failed to hydrate seatToken from DB:', err);
+      }
+    }
+  }
   // Operational trace for the Privacy path.
   //
   // The Privacy chain is fail-closed, so a refusal here is invisible from the
@@ -241,7 +271,7 @@ export async function initializeCustom(
   if (isPrivacyMode && (userProvidesKey || userProvidesURL)) {
     throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
   }
-  const isTenantCloudMode = !!user?.seatToken && !isPrivacyMode;
+  const isTenantCloudMode = !!resolvedSeatToken && !isPrivacyMode;
   const isFamilySeat = user?.accountType === 'family';
   const isChildSeat =
     (user?.familyRole as string | null | undefined) === 'minor' ||
@@ -273,11 +303,13 @@ export async function initializeCustom(
     } else {
       // Without an explicit per-seat policy record, fall back to the accountType standard modes
       const fallback =
-        user?.accountType === 'privacy'
-          ? ['privacy']
-          : user?.accountType === 'pro' || user?.accountType === 'enterprise'
+        user?.accountType === 'privacy' || user?.accountType === 'enterprise'
+          ? ['chat', 'study', 'work', 'privacy', 'vibecoding', 'pro']
+          : user?.accountType === 'pro' || user?.accountType === 'pro_family'
             ? ['chat', 'study', 'work', 'vibecoding', 'pro']
-            : ['chat', 'study'];
+            : user?.accountType === 'standard' || user?.accountType === 'family'
+              ? ['chat', 'study', 'work']
+              : ['chat', 'study'];
       if (!fallback.includes(normalizedMode)) {
         throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
       }
@@ -350,11 +382,11 @@ export async function initializeCustom(
   } else if (
     process.env.SATCHIDA_TENANT_MODE === 'true' &&
     isSatchidaEndpoint &&
-    !user?.seatToken
+    !resolvedSeatToken
   ) {
     throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
   } else {
-    apiKey = user?.seatToken ?? CUSTOM_API_KEY;
+    apiKey = resolvedSeatToken ?? CUSTOM_API_KEY;
   }
 
   let baseURL: string | undefined = CUSTOM_BASE_URL;

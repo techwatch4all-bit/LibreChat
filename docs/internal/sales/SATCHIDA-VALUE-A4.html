@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Satchida AI for Teams — Business Proposal (A4)</title>
+<link rel="stylesheet" href="client/public/decks/fonts/fonts.css">
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  :root {
+    --navy: #122A47; --navy-2: #0C1D33;
+    --ink: #16233A; --ink-2: #3D4A5E; --ink-3: #778092;
+    --line: #E5E2DA; --paper: #FFFFFF; --tint: #F6F5F1;
+    --cyan: #0E7490; --indigo: #4338CA; --emerald: #047857; --amber: #B45309; --rose: #B42318;
+    --cyan-soft: #EBF5F8; --emerald-soft: #ECF7F1; --amber-soft: #FBF3E7; --indigo-soft: #EEF0FB;
+    --rose-soft: #FBEFED;
+    --serif: 'Source Serif 4', Georgia, serif;
+    --sans: 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: var(--sans); color: var(--ink); background: #ECECE8; font-variant-numeric: tabular-nums; }
+  .page {
+    width: 210mm; height: 297mm; margin: 8mm auto; background: var(--paper);
+    padding: 10mm 13mm 8mm; display: flex; flex-direction: column;
+    box-shadow: 0 2mm 8mm rgba(18,42,71,.14); position: relative; overflow: hidden;
+    break-after: page; page-break-after: always;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+  @media print { body { background: #fff; } .page { margin: 0; box-shadow: none; } }
+
+  .lh { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 3mm; border-bottom: 0.6mm solid var(--navy); }
+  .brand { font-family: var(--mono); font-size: 9pt; font-weight: 600; letter-spacing: .14em; color: var(--navy); }
+  .logo-mark { width: 6mm; height: 6mm; border-radius: 1.2mm; background: linear-gradient(135deg,#0EA5E9,#6366F1); display: inline-grid; place-items: center; color:#fff; font-weight:800; font-size: 8pt; vertical-align: -2.1mm; margin-right: 2mm; }
+  .lh-r { text-align: right; }
+  .doc-type { font-family: var(--mono); font-size: 8.5pt; font-weight: 600; letter-spacing: .18em; color: var(--navy); }
+  .lh-r .sub { font-family: var(--mono); font-size: 6.4pt; letter-spacing: .08em; color: var(--ink-3); margin-top: .8mm; }
+
+  .meta { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 1.4mm 6mm; margin-top: 2.2mm; font-size: 7.6pt; color: var(--ink-2); }
+  .meta .k { font-family: var(--mono); font-size: 6.2pt; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: .8mm; }
+  .blank { display: inline-block; min-width: 52mm; border-bottom: 0.35mm dotted #A8B0BC; padding: 0 2mm 0.6mm; font-weight: 600; color: var(--navy); }
+
+  .h-title { font-family: var(--serif); font-size: 15.5pt; font-weight: 700; letter-spacing: -.01em; line-height: 1.16; color: var(--navy); margin-top: 3mm; }
+  .h-title .grad { color: var(--cyan); }
+
+  .sec { margin-top: 2.8mm; }
+  .sec-h { display: flex; align-items: baseline; gap: 2.4mm; border-bottom: 0.35mm solid var(--line); padding-bottom: 1.2mm; margin-bottom: 1.7mm; }
+  .sec-h .num { font-family: var(--serif); font-size: 11pt; font-weight: 700; color: var(--cyan); }
+  .sec-h .t { font-family: var(--serif); font-size: 11.5pt; font-weight: 700; color: var(--navy); letter-spacing: -.01em; }
+  .sec p, .sec li { font-size: 7.7pt; line-height: 1.5; color: var(--ink-2); }
+  .sec b { color: var(--ink); font-weight: 600; }
+
+  .hero { border: 0.4mm solid var(--line); border-radius: 2.6mm; background: linear-gradient(165deg,#FFFFFF 0%,#F5F8FB 100%); padding: 2.6mm 2.6mm 2mm; margin-top: 2.2mm; }
+  .hero svg { width: 60%; height: auto; display: block; margin: 0 auto; }
+  .hero-caps { display: flex; gap: 2.4mm; margin-top: 1.3mm; }
+  .cap { flex: 1; background: #FFFFFF; border: 0.3mm solid var(--line); border-radius: 1.8mm; padding: 1.5mm 2.2mm; font-size: 6.9pt; line-height: 1.35; color: var(--ink-2); }
+  .cap b { color: var(--navy); font-size: 7.1pt; }
+  .cap .n { font-family: var(--mono); font-size: 6.2pt; color: var(--cyan); font-weight: 600; margin-right: 1mm; }
+
+  ul.dash { list-style: none; }
+  ul.dash li { padding: .55mm 0 .55mm 4.6mm; position: relative; }
+  ul.dash li::before { content: "—"; position: absolute; left: 0; color: var(--cyan); font-weight: 600; }
+  .two-col { column-count: 2; column-gap: 6mm; }
+  .two-col li { break-inside: avoid; }
+
+  table.com { width: 100%; border-collapse: collapse; font-size: 7.4pt; }
+  table.com th { font-family: var(--mono); font-size: 6.2pt; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: 1.7mm 2.2mm; border-bottom: 0.55mm solid var(--navy); }
+  table.com td { padding: 1.2mm 2.2mm; border-bottom: 0.3mm solid var(--line); color: var(--ink-2); vertical-align: top; line-height: 1.4; }
+  table.com td:first-child { font-weight: 600; color: var(--ink); }
+  table.com .p { font-family: var(--serif); font-size: 10.5pt; font-weight: 700; color: var(--navy); white-space: nowrap; }
+  table.com .p small { font-family: var(--sans); font-size: 6.4pt; font-weight: 500; color: var(--ink-3); }
+  table.com tr.flag td { background: var(--indigo-soft); }
+  .note { font-size: 6.8pt; line-height: 1.45; color: var(--ink-3); margin-top: 1.6mm; }
+  .note b { color: var(--ink-2); }
+
+  .steps { display: grid; gap: 1.5mm; }
+  .step { display: flex; gap: 2.2mm; font-size: 7.6pt; line-height: 1.45; color: var(--ink-2); }
+  .step .sn { flex: none; width: 4.6mm; height: 4.6mm; border-radius: 50%; background: var(--navy); color: #fff; font-size: 6.4pt; font-weight: 600; display: grid; place-items: center; margin-top: .3mm; }
+  .step b { color: var(--ink); }
+
+  .uc3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6mm; }
+  .uc { border: 0.4mm solid var(--line); border-radius: 2.4mm; overflow: hidden; background: var(--paper); display: flex; flex-direction: column; }
+  .uc .tag { font-family: var(--mono); font-size: 6pt; font-weight: 600; letter-spacing: .1em; color: var(--cyan); padding: 1.8mm 2.6mm 0; }
+  .uc svg { width: 100%; height: auto; padding: 1.3mm 2.6mm 0; }
+  .uc .t { font-size: 7.9pt; font-weight: 700; color: var(--navy); padding: 1.4mm 2.6mm 0; line-height: 1.3; }
+  .uc ul { list-style: none; padding: 1.3mm 2.6mm 0; }
+  .uc li { font-size: 6.9pt; line-height: 1.42; color: var(--ink-2); padding: .4mm 0; display: flex; gap: 1.4mm; }
+  .uc li::before { content: "✓"; color: var(--emerald); font-weight: 700; }
+  .uc .out { margin: auto 2.6mm 2.2mm; background: var(--emerald-soft); border: 0.3mm solid #BFE3D2; border-radius: 1.6mm; padding: 1.3mm 2mm; font-size: 6.6pt; font-weight: 600; color: var(--emerald); }
+
+  /* ROI */
+  .bar-row { display: grid; grid-template-columns: 32mm 1fr 17mm; align-items: center; gap: 2.4mm; padding: 1mm 0; }
+  .bar-row .bl { font-size: 7pt; font-weight: 600; color: var(--ink); }
+  .bar-row .btrack { height: 3.2mm; background: #EFEDE6; border-radius: 1mm; overflow: hidden; }
+  .bar-row .bfill { display: block; height: 100%; border-radius: 1mm; }
+  .bar-row .bv { font-family: var(--mono); font-size: 6.8pt; font-weight: 600; color: var(--ink-2); text-align: right; white-space: nowrap; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 1.7mm; }
+  .chip { display: inline-block; border-radius: 5mm; padding: 1.2mm 2.4mm; font-size: 6.8pt; font-weight: 600; }
+  .chip.e { background: var(--emerald-soft); color: var(--emerald); border: 0.3mm solid #BFE3D2; }
+  .chip.c { background: var(--cyan-soft); color: var(--cyan); border: 0.3mm solid #C4E0EA; }
+  .chip.a { background: var(--amber-soft); color: var(--amber); border: 0.3mm solid #EAD4B4; }
+  .chip.r { background: var(--rose-soft); color: var(--rose); border: 0.3mm solid #EFCBC5; }
+
+  .signs { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 2mm; }
+  .sign { border: 0.4mm solid var(--line); border-radius: 2.4mm; padding: 2.4mm 3.2mm; }
+  .sign .st { font-family: var(--mono); font-size: 6.4pt; font-weight: 600; letter-spacing: .12em; color: var(--navy); margin-bottom: 2.6mm; }
+  .sign .fl { margin-top: 2.6mm; font-size: 7.2pt; color: var(--ink-2); }
+  .sign .fl .blank { min-width: 58mm; }
+  .accept { font-size: 7.4pt; line-height: 1.5; color: var(--ink-2); }
+  .accept b { color: var(--ink); }
+
+  .cta { margin-top: auto; background: linear-gradient(150deg, var(--navy), var(--navy-2)); color: #fff; border-radius: 2.4mm; padding: 2.6mm 5mm; display: flex; justify-content: space-between; align-items: center; }
+  .cta .big { font-family: var(--serif); font-size: 10.5pt; font-weight: 600; }
+  .cta .link { font-family: var(--mono); font-size: 7.4pt; color: #7DD3E8; letter-spacing: .06em; text-align: right; }
+
+  .foot { margin-top: 2mm; padding-top: 1.6mm; border-top: 0.3mm solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); font-size: 6pt; letter-spacing: .1em; color: var(--ink-3); }
+  .foot b { color: var(--cyan); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 ═══════════ -->
+<div class="page">
+  <div class="lh">
+    <span class="brand"><span class="logo-mark">S</span>SATCHIDA AI</span>
+    <span class="lh-r"><span class="doc-type">BUSINESS PROPOSAL</span><br><span class="sub">AI.SATCHIDA.COM · SUPPORT@SATCHIDA.COM</span></span>
+  </div>
+
+  <div class="meta">
+    <div><div class="k">Prepared for</div><span class="blank">&nbsp;</span></div>
+    <div><div class="k">Proposal reference</div><b>SAC/PROP/2026-11/T-001</b></div>
+    <div><div class="k">Prepared by</div>Satchida AI Commercial Operations</div>
+    <div><div class="k">Attn</div><span class="blank" style="min-width:40mm;">&nbsp;</span></div>
+  </div>
+
+  <h1 class="h-title">Supply of the Satchida AI for Teams workspace —<br><span class="grad">frontier AI for every desk at ₹249 a seat, with school-safe tutoring</span></h1>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">1</span><span class="t">Executive summary</span></div>
+    <p>Satchida proposes the supply and support of a <b>private AI workspace</b> for your team and their families: frontier reasoning, a <b>Knowledge Vault</b> that answers with exact page citations, and <b>Study mode</b> tutoring — Socratic by design, POCSO-aligned for minors, with live usage oversight for parents. Pooled seats keep the effective cost at <b>₹249.75 per seat</b>, billed in Rupees over NPCI UPI with GST invoicing.</p>
+  </div>
+
+  <div class="hero">
+    <svg viewBox="0 0 840 345" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Satchida family and office diagram"><defs><linearGradient id="vh-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0EA5E9"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><linearGradient id="vh-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9E4EF"/></linearGradient><linearGradient id="vh-co" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5B84F"/><stop offset="1" stop-color="#D97706"/></linearGradient><marker id="vh-mnav" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#122A47"/></marker><marker id="vh-mcyan" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#0E7490"/></marker><marker id="vh-mred" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#C2372F"/></marker><marker id="vh-mgreen" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#059669"/></marker><marker id="vh-mgray" markerWidth="6" markerHeight="6" refX="4.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8B98A8"/></marker><marker id="vh-mgray2" markerWidth="6" markerHeight="6" refX="1.5" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6 Z" fill="#8B98A8"/></marker><filter id="vh-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs><ellipse cx="180" cy="300" rx="150" ry="16" fill="#122A47" opacity="0.10" filter="url(#vh-blur)"/><ellipse cx="470" cy="288" rx="110" ry="14" fill="#122A47" opacity="0.10" filter="url(#vh-blur)"/><ellipse cx="690" cy="300" rx="120" ry="14" fill="#122A47" opacity="0.10" filter="url(#vh-blur)"/><g><circle cx="52" cy="66" r="13" fill="#D97706"/><circle cx="52" cy="66" r="10" fill="#F0A63C"/><text x="52" y="71" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#FFFFFF" text-anchor="middle">₹</text></g><g><circle cx="82" cy="56" r="13" fill="#D97706"/><circle cx="82" cy="56" r="10" fill="#F0A63C"/><text x="82" y="61" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#FFFFFF" text-anchor="middle">₹</text></g><g><circle cx="112" cy="66" r="13" fill="#D97706"/><circle cx="112" cy="66" r="10" fill="#F0A63C"/><text x="112" y="71" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#FFFFFF" text-anchor="middle">₹</text></g><line x1="130" y1="62" x2="158" y2="58" stroke="#122A47" stroke-width="2.4" marker-end="url(#vh-mnav)"/><g><rect x="162" y="34" width="48" height="44" rx="7" fill="#FFFFFF" stroke="#B9C6D4" stroke-width="1.8"/><rect x="172" y="42" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="183" y="42" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="194" y="42" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="172" y="52" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="183" y="52" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="194" y="52" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="172" y="62" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="183" y="62" width="7" height="7" rx="1.6" fill="#122A47"/><rect x="194" y="62" width="7" height="7" rx="1.6" fill="#122A47"/></g><text x="120" y="106" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#7A4308" text-anchor="middle" letter-spacing=".12em">UPI · GST INVOICE · NO FOREX</text><g opacity="1"><polygon points="150,120 340,215 200,285 10,190" fill="#F1F5F9" /><polygon points="10,190 200,285 200,297 10,202" fill="#D9E1EA" /><polygon points="340,215 200,285 200,297 340,227" fill="#C4D1DE" /></g><g opacity="1"><polygon points="185,52 251,85 203,109 137,76" fill="#EDF3F9" /><polygon points="137,76 203,109 203,179 137,146" fill="#C4D4E3" /><polygon points="251,85 203,109 203,179 251,155" fill="#9FB6CB" /></g><polygon points="138,86 150,92 150,102 138,96" fill="#2A4A73" opacity="0.35"/><polygon points="158,86 170,92 170,102 158,96" fill="#2A4A73" opacity="0.35"/><polygon points="138,104 150,110 150,120 138,114" fill="#2A4A73" opacity="0.35"/><polygon points="158,104 170,110 170,120 158,114" fill="#2A4A73" opacity="0.35"/><polygon points="138,122 150,128 150,138 138,132" fill="#2A4A73" opacity="0.35"/><polygon points="158,122 170,128 170,138 158,132" fill="#2A4A73" opacity="0.35"/><polygon points="214,100 228,107 228,129 214,122" fill="#122A47" opacity="0.45"/><text x="180" y="208" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">YOUR OFFICE · YOUR HOME</text><g><circle cx="272" cy="158" r="7.5" fill="#EFC29B"/><rect x="262" y="168" width="20" height="25" rx="9.0" fill="#2A4A73"/><rect x="265" y="191" width="5.5" height="11.0" rx="2.5" fill="#16273F"/><rect x="274" y="191" width="5.5" height="11.0" rx="2.5" fill="#16273F"/></g><g><circle cx="302" cy="149" r="7.5" fill="#EFC29B"/><rect x="292" y="159" width="20" height="25" rx="9.0" fill="#122A47"/><rect x="295" y="182" width="5.5" height="11.0" rx="2.5" fill="#16273F"/><rect x="304" y="182" width="5.5" height="11.0" rx="2.5" fill="#16273F"/></g><g><circle cx="332" cy="155" r="4.9" fill="#EFC29B"/><rect x="326" y="162" width="13" height="16" rx="5.8" fill="#0E7490"/><rect x="327" y="177" width="3.6" height="7.1" rx="1.6" fill="#16273F"/><rect x="333" y="177" width="3.6" height="7.1" rx="1.6" fill="#16273F"/></g><g><circle cx="360" cy="146" r="4.9" fill="#EFC29B"/><rect x="354" y="153" width="13" height="16" rx="5.8" fill="#B45309"/><rect x="355" y="168" width="3.6" height="7.1" rx="1.6" fill="#16273F"/><rect x="361" y="168" width="3.6" height="7.1" rx="1.6" fill="#16273F"/></g><text x="302" y="232" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">4 POOLED SEATS</text><g opacity="1"><polygon points="462,192 518,220 478,240 422,212" fill="#EDF2F7" /><polygon points="422,212 478,240 478,250 422,222" fill="#C2CFDB" /><polygon points="518,220 478,240 478,250 518,230" fill="#A9BACA" /></g><g opacity="1"><polygon points="470,158 518,182 484,199 436,175" fill="#FFFFFF" /><polygon points="436,175 484,199 484,208 436,184" fill="#D7DFE8" /><polygon points="518,182 484,199 484,208 518,191" fill="#C4D1DE" /></g><g opacity="1"><polygon points="476,146 524,170 490,187 442,163" fill="#FFFFFF" /><polygon points="442,163 490,187 490,196 442,172" fill="#D7DFE8" /><polygon points="524,170 490,187 490,196 524,179" fill="#C4D1DE" /></g><path d="M492,87 C523,96 522,126 492,145 C462,126 461,96 492,87 Z" transform="translate(7,7)" fill="#0B2C4E" opacity="0.5"/><path d="M492,87 C523,96 522,126 492,145 C462,126 461,96 492,87 Z" fill="url(#vh-sh)" stroke="#FFFFFF" stroke-width="2.5"/><path d="M483,116 L491,124 L503,106" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="480" y="262" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">SATCHIDA VAULT</text><text x="480" y="277" font-family="Inter, sans-serif" font-size="8.5" font-weight="500" fill="#71829B" text-anchor="middle" letter-spacing=".12em">per-seat isolated · cited answers</text><line x1="296" y1="186" x2="436" y2="176" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 5" marker-end="url(#vh-mgray)"/><line x1="344" y1="170" x2="438" y2="166" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 5" marker-end="url(#vh-mgray)"/><circle cx="368" cy="177" r="3.2" fill="#059669"/><circle cx="394" cy="168" r="3.2" fill="#059669"/><g><circle cx="612" cy="112" r="7.9" fill="#EFC29B"/><rect x="602" y="122" width="21" height="26" rx="9.5" fill="#122A47"/><rect x="605" y="146" width="5.8" height="11.6" rx="2.6" fill="#16273F"/><rect x="614" y="146" width="5.8" height="11.6" rx="2.6" fill="#16273F"/></g><text x="612" y="178" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">PARENT</text><g><rect x="630" y="52" width="158" height="92" rx="10" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="646" cy="68" r="3.4" fill="#E2A03F"/><circle cx="657" cy="68" r="3.4" fill="#C2372F"/><circle cx="668" cy="68" r="3.4" fill="#22C55E"/><text x="760" y="72" font-family="IBM Plex Mono, monospace" font-size="8.5" font-weight="600" fill="#71829B" text-anchor="end" letter-spacing=".12em">WEEK 34%</text><text x="709" y="92" font-family="IBM Plex Mono, monospace" font-size="8.5" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">POOLED USAGE — STUDY MODE</text><rect x="645" y="100" width="128" height="8" rx="4" fill="#EDF1F6"/><rect x="645" y="100" width="78" height="8" rx="4" fill="#059669"/><g><circle cx="656" cy="126" r="9" fill="#122A47"/><path d="M650,126 Q656,121 662,126 Q656,131 650,126 Z" fill="#FFFFFF"/></g><g><rect x="676" y="118" width="62" height="16" rx="8" fill="#EEF2F7"/><text x="707.0" y="128.52" font-family="IBM Plex Mono, monospace" font-size="7" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">LIVE OVERSIGHT</text></g></g><line x1="616" y1="116" x2="636" y2="122" stroke="#122A47" stroke-width="1.8" stroke-dasharray="2.5 4"/><g opacity="1"><polygon points="692,240 742,265 706,283 656,258" fill="#EDF2F7" /><polygon points="656,258 706,283 706,290 656,265" fill="#C2CFDB" /><polygon points="742,265 706,283 706,290 742,272" fill="#A9BACA" /></g><g><circle cx="706" cy="202" r="5.1" fill="#EFC29B"/><rect x="699" y="209" width="14" height="17" rx="6.2" fill="#0E7490"/><rect x="701" y="224" width="3.8" height="7.5" rx="1.7" fill="#16273F"/><rect x="707" y="224" width="3.8" height="7.5" rx="1.7" fill="#16273F"/></g><rect x="716" y="206" width="15" height="21" rx="2.5" fill="#16273F" transform="rotate(-8 723 216)"/><rect x="719" y="210" width="9" height="13" rx="1.5" fill="#67E8F9" transform="rotate(-8 723 216)"/><text x="730" y="288" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">STUDY MODE</text><g><circle cx="806" cy="182" r="17" fill="#C2372F"/><text x="806" y="187" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing=".12em">18+</text></g><line x1="795" y1="196" x2="764" y2="216" stroke="#C2372F" stroke-width="2.4" stroke-dasharray="6 5" marker-end="url(#vh-mred)"/><path d="M748,208 C774,216 773,241 748,256 C723,241 722,216 748,208 Z" transform="translate(7,7)" fill="#0B2C4E" opacity="0.5"/><path d="M748,208 C774,216 773,241 748,256 C723,241 722,216 748,208 Z" fill="url(#vh-sh)" stroke="#FFFFFF" stroke-width="2"/><path d="M741,232 L747,239 L757,224" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="760" y1="211" x2="753" y2="205" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><line x1="766" y1="208" x2="766" y2="199" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><line x1="772" y1="211" x2="779" y2="205" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><line x1="740" y1="254" x2="718" y2="264" stroke="#059669" stroke-width="2.4" marker-end="url(#vh-mgreen)"/><text x="830" y="300" font-family="IBM Plex Mono, monospace" font-size="8.5" font-weight="600" fill="#047857" text-anchor="end" letter-spacing=".12em">POCSO FILTERING · PARENT SEES USAGE, NOT CHATS</text></svg>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">2</span><span class="t">Scope of the offer</span></div>
+    <ul class="dash two-col">
+      <li><b>Private workspace</b> — tenant at ai.satchida.com; seats per the commercial option selected; any phone, tablet or PC — no hardware, no installation.</li>
+      <li><b>Working modes</b> — Chat and Work on every tier; Study mode (Socratic tutoring) from Family &amp; Team upward. All modes run on frontier cloud providers.</li>
+      <li><b>Satchida Knowledge Vault</b> — per-seat isolated document workspaces; answers cite document, page and paragraph; automated PPTX / PDF / DOCX / XLSX generation.</li>
+      <li><b>Study mode safety</b> — Socratic pedagogy (hints and step-checks, never finished homework), POCSO Act (2012)-aligned real-time filtering, clean audio read-aloud; where study material is loaded into the vault, answers cite it page by page.</li>
+      <li><b>Pooled seats &amp; oversight</b> — one shared usage budget flexing across member accounts; pooled usage visible to parents and administrators — private chats are never exposed.</li>
+  </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">3</span><span class="t">Commercial proposal</span></div>
+    <table class="com">
+      <tr><th style="width:22%;">Option</th><th style="width:20%;">Licence fee</th><th style="width:26%;">What is included</th><th>Suited to</th></tr>
+      <tr><td>Option A<br>Standard</td><td class="p">₹299 <small>/ mo</small><br><small>₹2,990 / yr — save 2 months</small></td><td>Chat + Work · Knowledge Vault with citations · ₹9.90 a day</td><td>Accountants, brokers, assistants, office staff</td></tr>
+      <tr class="flag"><td>Option B<br>Family &amp; Team</td><td class="p">₹999 <small>/ mo</small><br><small>₹9,990 / yr — 4 seats (₹249.75/seat)</small></td><td>4 pooled seats · Chat + Study + Work · tutoring &amp; child safety · Vault</td><td>Small teams, home offices &amp; families with students</td></tr>
+      <tr><td>Option C<br>Pro Developer</td><td class="p">₹1,499 <small>/ mo</small><br><small>₹14,990 / yr</small></td><td>Priority routing · dual-screen developer suite (VS Code Web IDE, sandbox, agents) · full Vault suite</td><td>Your lead developer, analyst or technical manager</td></tr>
+      <tr><td>All options<br>One-time setup</td><td class="p">₹ <span class="blank" style="min-width:14mm;">&nbsp;</span> <small>one-time</small></td><td>Setup, deployment, dependency installation &amp; end-to-end testing</td><td>Charged once at go-live</td></tr>
+      <tr><td>All options<br>Managed service</td><td class="p">₹ <span class="blank" style="min-width:14mm;">&nbsp;</span> <small>/ month</small></td><td>Monitoring, updates, backups &amp; support for the duration of the subscription</td><td>Billed with the monthly licence</td></tr>
+    </table>
+    <p class="note"><b>Terms:</b> prices exclusive of GST · GST invoice on every settlement · no annual lock-in · data export &amp; deletion from your dashboard · enterprise fleets from ₹15,000/mo on request. On-premise Privacy mode is available under the separate Sovereign Privacy tier. <b>Payment:</b> NPCI UPI / IMPS / NEFT on acceptance; monthly or annual in advance; seats issued on UTR confirmation.</p>
+  </div>
+
+  <div class="cta">
+    <div class="big">Accept below to schedule your deployment.</div>
+    <div class="link">SUPPORT@SATCHIDA.COM · AI.SATCHIDA.COM</div>
+  </div>
+
+  <div class="foot"><span>SATCHIDA AI · PRIVATE &amp; CONFIDENTIAL</span><span><b>REV 04</b> · 09 NOV 2026 · SAC/PROP/2026-11/T-001</span><span>PAGE 1 / 2</span></div>
+</div>
+
+<!-- ═══════════ PAGE 2 ═══════════ -->
+<div class="page">
+  <div class="lh">
+    <span class="brand"><span class="logo-mark">S</span>SATCHIDA AI</span>
+    <span class="lh-r"><span class="doc-type">BUSINESS PROPOSAL · SAC/PROP/2026-11/T-001</span><br><span class="sub">DEPLOYMENT · EVIDENCE · ROI · COMPLIANCE · ACCEPTANCE</span></span>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">5</span><span class="t">Deployment &amp; activation plan</span></div>
+    <div class="steps">
+      <div class="step"><span class="sn">1</span><span><b>Days 1–2 — Joint:</b> option finalized and settled; member name list shared; environment prepared.</span></div>
+      <div class="step"><span class="sn">2</span><span><b>Days 3–5 — Satchida:</b> dependencies installed; LibreChat and platform services (gateway, document vault, storage) deployed and configured.</span></div>
+      <div class="step"><span class="sn">3</span><span><b>Days 6–7 — Satchida:</b> every mode tested end to end; security and relay validation.</span></div>
+      <div class="step"><span class="sn">4</span><span><b>Days 8+ — Joint:</b> admin training, handover and go-live.</span></div>
+    </div>
+    <p class="note">Typical end-to-end timeline: <b>1–2 weeks from acceptance</b>, depending on site readiness.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">6</span><span class="t">Capability evidence — illustrative deployments</span></div>
+    <div class="uc3">
+      <div class="uc">
+        <div class="tag">CHARTERED ACCOUNTANCY</div>
+        <svg viewBox="0 0 240 132" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Agency vignette"><rect x="1" y="1" width="238" height="130" rx="10" fill="#F4F6FA"/><rect x="1.8" y="1.8" width="236.4" height="128.4" rx="9.2" fill="none" stroke="#E4E7ED" stroke-width="1.6"/><defs><linearGradient id="v3-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0EA5E9"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><linearGradient id="v3-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9E4EF"/></linearGradient><linearGradient id="v3-co" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5B84F"/><stop offset="1" stop-color="#D97706"/></linearGradient><marker id="v3-mnav" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#122A47"/></marker><marker id="v3-mcyan" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#0E7490"/></marker><marker id="v3-mred" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#C2372F"/></marker><marker id="v3-mgreen" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#059669"/></marker><marker id="v3-mgray" markerWidth="6" markerHeight="6" refX="4.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8B98A8"/></marker><marker id="v3-mgray2" markerWidth="6" markerHeight="6" refX="1.5" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6 Z" fill="#8B98A8"/></marker><filter id="v3-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs><circle cx="120" cy="60" r="27" fill="url(#v3-sh)"/><text x="120" y="62" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">₹999</text><text x="120" y="76" font-family="Inter, sans-serif" font-size="6.5" font-weight="600" fill="#DBEAFE" text-anchor="middle" letter-spacing=".06em">4 SEATS</text><g><circle cx="58" cy="26" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="58" cy="22.6" r="3.2" fill="#2A4A73"/><path d="M52.6,31.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="182" cy="26" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="182" cy="22.6" r="3.2" fill="#2A4A73"/><path d="M176.6,31.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="58" cy="94" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="58" cy="90.6" r="3.2" fill="#2A4A73"/><path d="M52.6,99.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="182" cy="94" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="182" cy="90.6" r="3.2" fill="#2A4A73"/><path d="M176.6,99.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><line x1="74" y1="36" x2="98" y2="48" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="166" y1="36" x2="142" y2="48" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="74" y1="84" x2="98" y2="72" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="166" y1="84" x2="142" y2="72" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><g><circle cx="120" cy="108" r="11" fill="#D97706"/><circle cx="120" cy="108" r="8" fill="#F0A63C"/><text x="120" y="112" font-family="Inter, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">₹</text></g><text x="120" y="122" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="600" fill="#047857" text-anchor="middle" letter-spacing=".12em">ONE BUDGET FLEXES ACROSS 4 SEATS</text></svg>
+        <div class="t">A CA office turns circulars into deliverables</div>
+        <ul>
+          <li><span>Work mode drafts replies citing the exact circular page</span></li>
+          <li><span>Computation sheets arrive as XLSX with live formulas</span></li>
+        </ul>
+        <div class="out">One ₹999 plan covers both partners and both assistants</div>
+      </div>
+      <div class="uc">
+        <div class="tag">COACHING &amp; SCHOOLS</div>
+        <svg viewBox="0 0 240 132" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Coaching and monitoring vignette"><rect x="1" y="1" width="238" height="130" rx="10" fill="#F4F6FA"/><rect x="1.8" y="1.8" width="236.4" height="128.4" rx="9.2" fill="none" stroke="#E4E7ED" stroke-width="1.6"/><defs><linearGradient id="v2-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0EA5E9"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><linearGradient id="v2-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9E4EF"/></linearGradient><linearGradient id="v2-co" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5B84F"/><stop offset="1" stop-color="#D97706"/></linearGradient><marker id="v2-mnav" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#122A47"/></marker><marker id="v2-mcyan" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#0E7490"/></marker><marker id="v2-mred" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#C2372F"/></marker><marker id="v2-mgreen" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#059669"/></marker><marker id="v2-mgray" markerWidth="6" markerHeight="6" refX="4.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8B98A8"/></marker><marker id="v2-mgray2" markerWidth="6" markerHeight="6" refX="1.5" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6 Z" fill="#8B98A8"/></marker><filter id="v2-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs><rect x="52" y="96" width="104" height="9" rx="4" fill="#8FA9C0"/><g><circle cx="88" cy="65" r="4.6" fill="#EFC29B"/><rect x="82" y="71" width="12" height="15" rx="5.5" fill="#0E7490"/><rect x="84" y="85" width="3.4" height="6.7" rx="1.5" fill="#16273F"/><rect x="89" y="85" width="3.4" height="6.7" rx="1.5" fill="#16273F"/></g><rect x="100" y="76" width="17" height="24" rx="2.5" fill="#16273F" transform="rotate(-8 108 88)"/><rect x="103" y="80" width="10" height="15" rx="1.5" fill="#67E8F9" transform="rotate(-8 108 88)"/><path d="M140,43 Q141.98,50.02 149,52 Q141.98,53.98 140,61 Q138.02,53.98 131,52 Q138.02,50.02 140,43 Z" fill="#0EA5E9"/><path d="M126,60.5 Q127.21,64.79 131.5,66 Q127.21,67.21 126,71.5 Q124.79,67.21 120.5,66 Q124.79,64.79 126,60.5 Z" fill="#4F46E5"/><g><circle cx="196" cy="50" r="7.1" fill="#EFC29B"/><rect x="186" y="60" width="19" height="24" rx="8.5" fill="#122A47"/><rect x="189" y="82" width="5.2" height="10.4" rx="2.4" fill="#16273F"/><rect x="197" y="82" width="5.2" height="10.4" rx="2.4" fill="#16273F"/></g><g><rect x="146" y="14" width="82" height="48" rx="8" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.5"/><text x="187" y="28" font-family="IBM Plex Mono, monospace" font-size="7.5" font-weight="600" fill="#41556E" text-anchor="middle" letter-spacing=".12em">PARENT VIEW</text><rect x="154" y="34" width="66" height="7" rx="3.5" fill="#EDF1F6"/><rect x="154" y="34" width="40" height="7" rx="3.5" fill="#059669"/><g><circle cx="162" cy="50" r="6.5" fill="#122A47"/><path d="M157.5,50 Q162,46.6 166.5,50 Q162,53.4 157.5,50 Z" fill="#FFFFFF"/></g></g><line x1="192" y1="64" x2="196" y2="74" stroke="#122A47" stroke-width="1.6" stroke-dasharray="2.5 4"/><g><circle cx="222" cy="72" r="12" fill="#C2372F"/><text x="222" y="76" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing=".12em">18+</text></g><line x1="218" y1="82" x2="208" y2="92" stroke="#C2372F" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#v2-mred)"/><path d="M196,85 C216,91 215,111 196,123 C177,111 176,91 196,85 Z" transform="translate(7,7)" fill="#0B2C4E" opacity="0.5"/><path d="M196,85 C216,91 215,111 196,123 C177,111 176,91 196,85 Z" fill="url(#v2-sh)" stroke="#FFFFFF" stroke-width="1.8"/><path d="M190,104 L195,109 L203,98" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="205" y1="88" x2="199" y2="82" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><line x1="210" y1="86" x2="210" y2="77" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><line x1="215" y1="88" x2="221" y2="82" stroke="#C2372F" stroke-width="2.6" stroke-linecap="round"/><text x="120" y="122" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="600" fill="#047857" text-anchor="middle" letter-spacing=".12em">POCSO GUARDRAILS · PARENT OVERSIGHT</text></svg>
+        <div class="t">Safe after-hours tutoring, parents in the loop</div>
+        <ul>
+          <li><span>Study mode teaches with hints and step-checks — never cheats</span></li>
+          <li><span>POCSO-aligned filtering; parents see usage, not chats</span></li>
+        </ul>
+        <div class="out">Citations and guardrails on every answer</div>
+      </div>
+      <div class="uc">
+        <div class="tag">BOUTIQUE AGENCY</div>
+        <svg viewBox="0 0 240 132" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Agency vignette"><rect x="1" y="1" width="238" height="130" rx="10" fill="#F4F6FA"/><rect x="1.8" y="1.8" width="236.4" height="128.4" rx="9.2" fill="none" stroke="#E4E7ED" stroke-width="1.6"/><defs><linearGradient id="v3-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0EA5E9"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><linearGradient id="v3-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9E4EF"/></linearGradient><linearGradient id="v3-co" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5B84F"/><stop offset="1" stop-color="#D97706"/></linearGradient><marker id="v3-mnav" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#122A47"/></marker><marker id="v3-mcyan" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#0E7490"/></marker><marker id="v3-mred" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#C2372F"/></marker><marker id="v3-mgreen" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#059669"/></marker><marker id="v3-mgray" markerWidth="6" markerHeight="6" refX="4.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8B98A8"/></marker><marker id="v3-mgray2" markerWidth="6" markerHeight="6" refX="1.5" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6 Z" fill="#8B98A8"/></marker><filter id="v3-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs><circle cx="120" cy="60" r="27" fill="url(#v3-sh)"/><text x="120" y="62" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">₹999</text><text x="120" y="76" font-family="Inter, sans-serif" font-size="6.5" font-weight="600" fill="#DBEAFE" text-anchor="middle" letter-spacing=".06em">4 SEATS</text><g><circle cx="58" cy="26" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="58" cy="22.6" r="3.2" fill="#2A4A73"/><path d="M52.6,31.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="182" cy="26" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="182" cy="22.6" r="3.2" fill="#2A4A73"/><path d="M176.6,31.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="58" cy="94" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="58" cy="90.6" r="3.2" fill="#2A4A73"/><path d="M52.6,99.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><g><circle cx="182" cy="94" r="12" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="1.6"/><circle cx="182" cy="90.6" r="3.2" fill="#2A4A73"/><path d="M176.6,99.6 a5.4,5.4 0 0 1 10.8,0 Z" fill="#2A4A73"/></g><line x1="74" y1="36" x2="98" y2="48" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="166" y1="36" x2="142" y2="48" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="74" y1="84" x2="98" y2="72" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><line x1="166" y1="84" x2="142" y2="72" stroke="#8B98A8" stroke-width="1.8" stroke-dasharray="2.5 4" marker-end="url(#v3-mgray)"/><g><circle cx="120" cy="108" r="11" fill="#D97706"/><circle cx="120" cy="108" r="8" fill="#F0A63C"/><text x="120" y="112" font-family="Inter, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">₹</text></g><text x="120" y="122" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="600" fill="#047857" text-anchor="middle" letter-spacing=".12em">ONE BUDGET FLEXES ACROSS 4 SEATS</text></svg>
+        <div class="t">Four people, one budget, zero admin</div>
+        <ul>
+          <li><span>Proposals in Work mode; trackers and decks from the Vault</span></li>
+          <li><span>A quiet week's allowance flexes to the launch sprint</span></li>
+        </ul>
+        <div class="out">One UPI payment, one GST invoice, four seats same-day</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">7</span><span class="t">Return on investment — 4-person team</span></div>
+    <div class="bar-row">
+      <span class="bl">Office AI suite, 4 users</span>
+      <span class="btrack"><span class="bfill" style="width:100%;background:#C0614F;"></span></span>
+      <span class="bv">₹1,20,000/yr</span>
+    </div>
+    <div class="bar-row">
+      <span class="bl">Leading chatbot, 4 accounts</span>
+      <span class="btrack"><span class="bfill" style="width:68%;background:#C98A3D;"></span></span>
+      <span class="bv">₹81,600/yr</span>
+    </div>
+    <div class="bar-row">
+      <span class="bl" style="color:var(--emerald);">Satchida Family &amp; Team, 4 seats</span>
+      <span class="btrack"><span class="bfill" style="width:8.3%;background:#059669;"></span></span>
+      <span class="bv" style="color:var(--emerald);">₹9,990/yr</span>
+    </div>
+    <p class="note" style="margin-top:1.4mm;">Basis: leading subscription at ~₹1,700/user/mo and office suites at ~₹2,500/user/mo — typical retail before forex and GST on USD billing; Satchida Family &amp; Team at ₹999/mo. <b>Net annual saving vs the chatbot route: ₹71,610 (88% less).</b> Solo professional? Standard at ₹299/mo is 82% off a leading seat — ₹16,808/yr less.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">8</span><span class="t">Data protection, safety &amp; compliance</span></div>
+    <ul class="dash two-col">
+      <li><b>Per-seat isolation:</b> each member's documents live in their own vault workspace — commingling is structurally impossible.</li>
+      <li><b>Child safety:</b> POCSO Act (2012)-aligned real-time filtering on Study mode; read-aloud strips internal reasoning before speech.</li>
+      <li><b>Parent &amp; admin oversight:</b> pooled usage visible; private conversations are never exposed.</li>
+      <li><b>Cited answers:</b> vault responses carry document, page and paragraph — verifiable, not paraphrase.</li>
+      <li><b>Data portability:</b> export and deletion of your data from the dashboard at any time; no annual lock-in.</li>
+      <li><b>DPDP Act (2023):</b> workspace architecture designed for Indian data-protection compliance.</li>
+    </ul>
+    <div style="margin-top:2mm;padding:2.2mm 3mm;background:#FEF2F2;border-left:3px solid #C2372F;border-radius:1.5mm;font-size:7.5pt;line-height:1.36;color:#7F1D1D;">
+      <b>Why DIY Cloud API Keys Are a Security Nightmare (Nov 2026 Case Study):</b> In Nov 2026, OpenRouter disclosed a month-long breach at downstream provider GMI Cloud (Oct 18–Nov 18) where an internal troubleshooting system kept ~3 days of raw prompts. Attackers searched those logs for credentials—harvesting canary AWS keys from prompts and executing live AWS calls to create rogue accounts. With Satchida, staff never hold raw API keys, cloud queries are identity-stripped via our Zero-Knowledge Relay, and your files stay in your isolated Knowledge Vault.
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="num">9</span><span class="t">Acceptance</span></div>
+    <p class="accept">Signature by an authorized representative of the client constitutes acceptance of the scope, commercials and terms herein and authorizes Satchida AI to provision the selected option. Payment is made over NPCI rails on acceptance.</p>
+    <div class="signs">
+      <div class="sign">
+        <div class="st">FOR &amp; ON BEHALF OF THE CLIENT</div>
+        <div class="fl">Name: <span class="blank">&nbsp;</span></div>
+        <div class="fl">Designation: <span class="blank">&nbsp;</span></div>
+        <div class="fl">Signature: <span class="blank">&nbsp;</span>&nbsp;&nbsp;Date: <span class="blank" style="min-width:22mm;">&nbsp;</span></div>
+        <div class="fl">Selected option: <span class="blank">&nbsp;</span> A / B / C</div>
+      </div>
+      <div class="sign">
+        <div class="st">FOR SATCHIDA AI</div>
+        <div class="fl">Name: <span class="blank">&nbsp;</span></div>
+        <div class="fl">Designation: <span class="blank">&nbsp;</span></div>
+        <div class="fl">Signature: <span class="blank">&nbsp;</span>&nbsp;&nbsp;Date: <span class="blank" style="min-width:22mm;">&nbsp;</span></div>
+        <div class="fl">Proposal ref: SAC/PROP/2026-11/T-001 · REV 04</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span>SATCHIDA AI · PRIVATE &amp; CONFIDENTIAL</span><span><b>REV 03</b> · 08 NOV 2026</span><span>PAGE 2 / 2</span></div>
+</div>
+
+</body>
+</html>

@@ -3,22 +3,25 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { memo, useState, useEffect, useCallback } from 'react';
 import { Button } from '@librechat/client';
+import { request } from 'librechat-data-provider';
 import { useSetRecoilState, useRecoilState } from 'recoil';
 import {
   X,
-  ExternalLink,
   RefreshCw,
   Copy,
   Check,
   Film,
-  Image as ImageIcon,
   FileText,
+  Music,
   Sliders,
+  Trash2,
+  HardDrive,
 } from 'lucide-react';
 import type { Artifact } from '~/common';
 import store from '~/store';
 
 interface MediaItem {
+  id?: string;
   name: string;
   kind?: string;
   url: string;
@@ -29,6 +32,22 @@ interface MediaItem {
   user?: string;
 }
 
+interface StorageInfo {
+  usedBytes: number;
+  quotaBytes: number;
+  availableBytes: number;
+  quotaMb: number;
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes || Number.isNaN(bytes) || bytes <= 0) return '0 MB';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 1 : 2)} GB`;
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 0.1) return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   const setShowStudioLibrary = useSetRecoilState(store.showStudioLibraryPanel);
   const setArtifactsVisibility = useSetRecoilState(store.artifactsVisibility);
@@ -37,8 +56,11 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   const [visibleArtifacts, setVisibleArtifacts] = useRecoilState(store.visibleArtifacts);
 
   const [items, setItems] = useState<MediaItem[]>([]);
-  const [filter, setFilter] = useState<'all' | 'image' | 'video' | 'document'>('all');
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
+  const [filter, setFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'document'>('all');
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [copiedName, setCopiedName] = useState<string | null>(null);
 
   const openInFilmStudio = useCallback((item: MediaItem) => {
@@ -94,32 +116,20 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      let data: { items?: MediaItem[] } = {};
-      const r = await fetch('/api/studio/library', { credentials: 'include' });
-      if (r.ok) {
-        data = await r.json();
-      } else {
-        const fallback = await fetch('/generated/manifest.json');
-        if (fallback.ok) {
-          const raw = await fallback.json();
-          data = { items: raw };
-        }
-      }
-      const loaded = data.items || [];
+      const data = await request.get<{ items?: MediaItem[]; storage?: StorageInfo }>(
+        '/api/user/storage/items',
+      );
+      const loaded = Array.isArray(data?.items) ? data.items : [];
       loaded.forEach((it) => {
         it.kind = it.kind || (it.url?.match(/\.(mp4|webm)$/i) ? 'video' : 'image');
       });
       setItems(loaded);
-    } catch {
-      try {
-        const fallback = await fetch('/generated/manifest.json');
-        if (fallback.ok) {
-          const raw = await fallback.json();
-          setItems(raw || []);
-        }
-      } catch {
-        setItems([]);
+      if (data?.storage) {
+        setStorage(data.storage);
       }
+      setSelectedIds(new Set());
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -128,6 +138,48 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedIds.size === 0 || deleting) return;
+    const count = selectedIds.size;
+    if (
+      !window.confirm(
+        `Permanently delete ${count} selected file${count > 1 ? 's' : ''} from your storage library?`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await request.post<{ success?: boolean; storage?: StorageInfo }>(
+        '/api/user/storage/delete',
+        { ids },
+      );
+      if (res?.success) {
+        const removed = new Set(ids);
+        setItems((prev) => prev.filter((it) => !removed.has(it.id || it.name)));
+        setSelectedIds(new Set());
+        if (res.storage) {
+          setStorage(res.storage);
+        }
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedIds, deleting]);
 
   const copyForPrompt = (name: string) => {
     navigator.clipboard.writeText(`"${name}"`);
@@ -163,16 +215,6 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-text-secondary hover:text-text-primary"
-            onClick={() => window.open('/studio-library.html', '_blank')}
-            title="Open Fullscreen Gallery"
-            aria-label="Open Fullscreen Gallery"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-text-secondary hover:text-text-primary"
             onClick={() => setShowStudioLibrary(false)}
             title="Close Panel"
             aria-label="Close Panel"
@@ -182,24 +224,76 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 border-b border-border-light bg-surface-secondary/40 px-3 py-1.5 text-xs">
-        {(['all', 'video', 'image', 'document'] as const).map((k) => (
+      {/* Storage usage bar */}
+      {storage && (() => {
+        const usedPct =
+          storage.quotaBytes > 0
+            ? Math.min(100, Math.round((storage.usedBytes / storage.quotaBytes) * 100))
+            : 0;
+        const textColor =
+          usedPct >= 90 ? 'text-red-500' : usedPct >= 70 ? 'text-amber-500' : 'text-emerald-500';
+        const barColor =
+          usedPct >= 90 ? '#ef4444' : usedPct >= 70 ? '#f59e0b' : '#10b981';
+        return (
+          <div className="border-b border-border-light bg-surface-secondary/30 px-3 py-2 space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="inline-flex items-center gap-1 font-medium text-text-secondary">
+                <HardDrive className={`h-3 w-3 ${textColor}`} />
+                {formatBytes(storage.usedBytes)} /{' '}
+                {storage.quotaMb >= 1024
+                  ? `${(storage.quotaMb / 1024).toFixed(0)} GB`
+                  : `${storage.quotaMb} MB`}{' '}
+                ({usedPct}%)
+              </span>
+              <span className={`font-semibold ${textColor}`}>
+                {formatBytes(storage.availableBytes)} free
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${usedPct}%`,
+                  backgroundColor: barColor,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Filter tabs + Delete Selected action */}
+      <div className="flex flex-wrap items-center justify-between gap-1 border-b border-border-light bg-surface-secondary/40 px-3 py-1.5 text-xs">
+        <div className="flex flex-wrap gap-1">
+          {(['all', 'video', 'image', 'audio', 'document'] as const).map((k) => (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                filter === k
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-text-secondary hover:bg-surface-active hover:text-text-primary'
+              }`}
+            >
+              {k === 'all' && 'All'}
+              {k === 'video' && 'Videos'}
+              {k === 'image' && 'Images'}
+              {k === 'audio' && 'Audio'}
+              {k === 'document' && 'Docs'}
+            </button>
+          ))}
+        </div>
+        {selectedIds.size > 0 && (
           <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              filter === k
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-text-secondary hover:bg-surface-active hover:text-text-primary'
-            }`}
+            type="button"
+            disabled={deleting}
+            onClick={handleDeleteSelected}
+            className="inline-flex items-center gap-1 rounded-md border border-red-500/60 bg-red-500/15 px-2 py-1 text-[11px] font-semibold text-red-400 hover:bg-red-500/25 disabled:opacity-50"
           >
-            {k === 'all' && 'All'}
-            {k === 'video' && 'Videos'}
-            {k === 'image' && 'Images'}
-            {k === 'document' && 'Docs'}
+            <Trash2 className="h-3 w-3" />
+            <span>{deleting ? 'Deleting…' : `Delete (${selectedIds.size})`}</span>
           </button>
-        ))}
+        )}
       </div>
 
       {/* Grid container */}
@@ -216,18 +310,26 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {filtered.map((it) => {
-              const isVideo = it.kind === 'video' || it.url.match(/\.(mp4|webm)$/i);
-              const sizeMB = it.size ? (it.size / (1024 * 1024)).toFixed(1) + ' MB' : '';
+              const itemId = it.id || it.name;
+              const isSelected = selectedIds.has(itemId);
+              const isVideo = it.kind === 'video' || Boolean(it.url.match(/\.(mp4|webm)$/i));
+              const isAudio = it.kind === 'audio';
+              const isDoc = it.kind === 'document';
+              const sizeLabel = it.size ? formatBytes(it.size) : '';
               return (
                 <div
-                  key={it.name}
-                  className="hover:border-primary/50 group relative flex flex-col overflow-hidden rounded-lg border border-border-light bg-surface-secondary/60 transition-all"
+                  key={itemId}
+                  className={`group relative flex flex-col overflow-hidden rounded-lg border bg-surface-secondary/60 transition-all ${
+                    isSelected
+                      ? 'border-red-400/70 ring-1 ring-red-400/40'
+                      : 'border-border-light hover:border-primary/50'
+                  }`}
                 >
                   {/* Media preview */}
                   <div
                     className="group/media relative aspect-video w-full cursor-pointer bg-black/40"
-                    onClick={() => openInFilmStudio(it)}
-                    title="Click to open in Film Studio Editor"
+                    onClick={() => (!isAudio && !isDoc ? openInFilmStudio(it) : toggleSelect(itemId))}
+                    title={isAudio || isDoc ? 'Click to select' : 'Click to open in Film Studio Editor'}
                   >
                     {isVideo ? (
                       <video
@@ -237,6 +339,16 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
                         muted
                         className="h-full w-full object-cover transition-transform group-hover/media:scale-105"
                       />
+                    ) : isAudio ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-2 text-text-secondary">
+                        <Music className="h-6 w-6 text-sky-400" />
+                        <audio src={it.url} controls className="h-7 w-full" onClick={(e) => e.stopPropagation()} />
+                      </div>
+                    ) : isDoc ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-text-secondary">
+                        <FileText className="h-6 w-6 text-amber-400" />
+                        <span className="max-w-full truncate text-[10px]">{it.name}</span>
+                      </div>
                     ) : (
                       <img
                         src={it.thumb || it.url}
@@ -245,12 +357,14 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
                         className="h-full w-full object-cover transition-transform group-hover/media:scale-105"
                       />
                     )}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover/media:opacity-100">
-                      <div className="backdrop-blur-xs flex items-center gap-1.5 rounded-full bg-purple-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow-lg">
-                        <Film className="h-3.5 w-3.5" />
-                        <span>Open in Studio</span>
-                      </div>
-                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(itemId)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select ${it.name}`}
+                      className="absolute right-1.5 top-1.5 z-10 h-4 w-4 cursor-pointer rounded accent-red-500"
+                    />
                     <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
                       {it.kind || 'media'}
                     </span>
@@ -261,12 +375,12 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
                     <span
                       className="cursor-pointer truncate text-[11px] font-medium text-text-primary hover:text-purple-400"
                       title={it.name}
-                      onClick={() => openInFilmStudio(it)}
+                      onClick={() => (!isAudio && !isDoc ? openInFilmStudio(it) : toggleSelect(itemId))}
                     >
                       {it.name}
                     </span>
                     <div className="flex items-center justify-between text-[10px] text-text-secondary">
-                      <span>{sizeMB}</span>
+                      <span>{sizeLabel}</span>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => openInFilmStudio(it)}

@@ -110,20 +110,17 @@ async function buildEndpointOption(req, res, next) {
   const userAccountType = String(req.user?.accountType || '').toLowerCase();
   const isProTier = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
 
-  const isByokOrAgent =
-    req.body.endpoint === 'openAI' ||
-    req.body.endpoint === 'anthropic' ||
-    req.body.endpoint === 'agents' ||
-    Boolean(req.body.agent_id);
+  const isByok = req.body.endpoint === 'openAI' || req.body.endpoint === 'anthropic';
+  const isAgentRequest = req.body.endpoint === 'agents' || Boolean(req.body.agent_id);
 
   // Tenant Admin and ordinary users cannot use BYOK keys to bypass paywalled Satchida tools
-  if (!isOperator && isByokOrAgent) {
+  if (!isOperator && isByok) {
     return res.status(403).json({
       error: 'External cloud API keys (BYOK) are restricted to super administrators.',
     });
   }
 
-  if (!isOperator && !isByokOrAgent) {
+  if (!isOperator && !isByok && !isAgentRequest) {
     const requestedSpec = typeof req.body.spec === 'string' ? req.body.spec : undefined;
     const requestedModel = typeof req.body.model === 'string' ? req.body.model : undefined;
     const spec =
@@ -151,7 +148,7 @@ async function buildEndpointOption(req, res, next) {
     req.body.endpoint = configuredSpec.preset.endpoint;
     req.body.model = configuredSpec.preset.model;
     delete req.body.endpointType;
-  } else {
+  } else if (!isAgentRequest) {
     // If an operator supplies a spec or spec name as model, normalize to preset model
     const requestedSpec = typeof req.body.spec === 'string' ? req.body.spec : undefined;
     const requestedModel = typeof req.body.model === 'string' ? req.body.model : undefined;

@@ -238,3 +238,10 @@ client/public/temp_audio/
 # live session tokens for e2e replay - secrets, never commit
 e2e/storageState_live.json
 /test-results/
+
+# Local deployment artifacts
+.satchida-deployment-id
+*.db-shm
+satchida-gateway.exe
+releases/
+storage/

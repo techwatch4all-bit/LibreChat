@@ -27,6 +27,7 @@ import Footer, { useConfiguredFooter } from './Footer';
 import { AskAnswerHostProvider } from './ask/state';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
+import TokenOfferBanner from './TokenOfferBanner';
 import ChatForm from './Input/ChatForm';
 import { TraceSurface } from './Trace';
 import Landing from './Landing';
@@ -227,6 +228,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                           {!isLandingPage && configuredFooter && <Footer configuredOnly />}
                         </div>
                         {isLandingPage && <Footer />}
+                        <TokenOfferBanner />
                       </div>
                     </>
                   </TraceSurface>

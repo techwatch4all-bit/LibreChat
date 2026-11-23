@@ -1,0 +1,578 @@
+[
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "📊 Family & Home Budget Tracker",
+    "clean": "Family & Home Budget Tracker"
+  },
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "📑 Multi-Year Financial Forecast & DCF Model",
+    "clean": "Multi-Year Financial Forecast & DCF Model"
+  },
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "🛒 Weekly Grocery & Kitchen Inventory",
+    "clean": "Weekly Grocery & Kitchen Inventory"
+  },
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "📈 Small Business Revenue & Expense Sheet",
+    "clean": "Small Business Revenue & Expense Sheet"
+  },
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "📦 Supply Chain & Inventory Restock Model",
+    "clean": "Supply Chain & Inventory Restock Model"
+  },
+  {
+    "catId": "office_sheets",
+    "catLabel": "📊 Family & Business Sheets",
+    "raw": "📅 Student Study Timetable & Grade Tracker",
+    "clean": "Student Study Timetable & Grade Tracker"
+  },
+  {
+    "catId": "office_analytics",
+    "catLabel": "📈 Pandas Data & Statistical Analysis",
+    "raw": "📈 Statistical Data & Outlier Analysis",
+    "clean": "Statistical Data & Outlier Analysis"
+  },
+  {
+    "catId": "office_analytics",
+    "catLabel": "📈 Pandas Data & Statistical Analysis",
+    "raw": "📊 Executive KPI Dashboard & Gantt Flow",
+    "clean": "Executive KPI Dashboard & Gantt Flow"
+  },
+  {
+    "catId": "office_docs",
+    "catLabel": "📄 Letters & Official Documents",
+    "raw": "✉️ Formal Letter & Application Writer",
+    "clean": "Formal Letter & Application Writer"
+  },
+  {
+    "catId": "office_docs",
+    "catLabel": "📄 Letters & Official Documents",
+    "raw": "🏢 Residential Society Notice & Circular",
+    "clean": "Residential Society Notice & Circular"
+  },
+  {
+    "catId": "office_docs",
+    "catLabel": "📄 Letters & Official Documents",
+    "raw": "🏦 Bank Account Transfer & KYC Update Request",
+    "clean": "Bank Account Transfer & KYC Update Request"
+  },
+  {
+    "catId": "office_docs",
+    "catLabel": "📄 Letters & Official Documents",
+    "raw": "📑 Standard House Rental Agreement Draft",
+    "clean": "Standard House Rental Agreement Draft"
+  },
+  {
+    "catId": "office_knowledge",
+    "catLabel": "📚 Multi-Tenant RAG & Document Compiler",
+    "raw": "📚 Compile Polished Multi-Format Document",
+    "clean": "Compile Polished Multi-Format Document"
+  },
+  {
+    "catId": "office_knowledge",
+    "catLabel": "📚 Multi-Tenant RAG & Document Compiler",
+    "raw": "🔍 LanceDB Isolated Vector Search & Citations",
+    "clean": "LanceDB Isolated Vector Search & Citations"
+  },
+  {
+    "catId": "office_files",
+    "catLabel": "📁 Shared Workspace & File System",
+    "raw": "📁 Inspect & Manage Shared Document Folder",
+    "clean": "Inspect & Manage Shared Document Folder"
+  },
+  {
+    "catId": "stories_creative",
+    "catLabel": "🧸 Bedtime Stories & Creative",
+    "raw": "🧸 Magical Bedtime Story",
+    "clean": "Magical Bedtime Story"
+  },
+  {
+    "catId": "stories_creative",
+    "catLabel": "🧸 Bedtime Stories & Creative",
+    "raw": "📑 Plain-English Bill & PDF Breakdown",
+    "clean": "Plain-English Bill & PDF Breakdown"
+  },
+  {
+    "catId": "architect_plans",
+    "catLabel": "📐 Floor Plans & Layouts",
+    "raw": "📐 Residential Floor Plan Planner",
+    "clean": "Residential Floor Plan Planner"
+  },
+  {
+    "catId": "architect_plans",
+    "catLabel": "📐 Floor Plans & Layouts",
+    "raw": "☀️ Sun-Path, Daylight & Ventilation Audit",
+    "clean": "Sun-Path, Daylight & Ventilation Audit"
+  },
+  {
+    "catId": "scenemosaic_rooms",
+    "catLabel": "🏠 3D Room Reconstruction",
+    "raw": "🏠 Photo to 3D Room Reconstruction",
+    "clean": "Photo to 3D Room Reconstruction"
+  },
+  {
+    "catId": "maker_diy",
+    "catLabel": "🛠️ Electronics & DIY Repair",
+    "raw": "🤖 Smart Arduino / ESP32 Project",
+    "clean": "Smart Arduino / ESP32 Project"
+  },
+  {
+    "catId": "maker_diy",
+    "catLabel": "🛠️ Electronics & DIY Repair",
+    "raw": "🔧 Home Appliance & Safe Repair Guide",
+    "clean": "Home Appliance & Safe Repair Guide"
+  },
+  {
+    "catId": "markets_finance",
+    "catLabel": "📊 Markets & Bullion",
+    "raw": "Market Overview",
+    "clean": "Market Overview"
+  },
+  {
+    "catId": "markets_finance",
+    "catLabel": "📊 Markets & Bullion",
+    "raw": "Bullion Desk",
+    "clean": "Bullion Desk"
+  },
+  {
+    "catId": "markets_finance",
+    "catLabel": "📊 Markets & Bullion",
+    "raw": "Equity Dossier",
+    "clean": "Equity Dossier"
+  },
+  {
+    "catId": "markets_finance",
+    "catLabel": "📊 Markets & Bullion",
+    "raw": "DeFi Contract Review",
+    "clean": "DeFi Contract Review"
+  },
+  {
+    "catId": "family_health",
+    "catLabel": "🩺 Health & Emergency",
+    "raw": "Generic Medicine Prices",
+    "clean": "Generic Medicine Prices"
+  },
+  {
+    "catId": "family_health",
+    "catLabel": "🩺 Health & Emergency",
+    "raw": "Clinical DDx Workup",
+    "clean": "Clinical DDx Workup"
+  },
+  {
+    "catId": "family_health",
+    "catLabel": "🩺 Health & Emergency",
+    "raw": "Drug Interaction Check",
+    "clean": "Drug Interaction Check"
+  },
+  {
+    "catId": "family_health",
+    "catLabel": "🩺 Health & Emergency",
+    "raw": "Emergency & AQI Triage",
+    "clean": "Emergency & AQI Triage"
+  },
+  {
+    "catId": "vedic_wellness",
+    "catLabel": "🕉️ Vedic & Holistic Wellness",
+    "raw": "Panchang & Muhurta",
+    "clean": "Panchang & Muhurta"
+  },
+  {
+    "catId": "vedic_wellness",
+    "catLabel": "🕉️ Vedic & Holistic Wellness",
+    "raw": "Ayurvedic Daily Regimen",
+    "clean": "Ayurvedic Daily Regimen"
+  },
+  {
+    "catId": "vedic_wellness",
+    "catLabel": "🕉️ Vedic & Holistic Wellness",
+    "raw": "Festival Calendar & Vrats",
+    "clean": "Festival Calendar & Vrats"
+  },
+  {
+    "catId": "vedic_wellness",
+    "catLabel": "🕉️ Vedic & Holistic Wellness",
+    "raw": "Yoga & Pranayama Plan",
+    "clean": "Yoga & Pranayama Plan"
+  },
+  {
+    "catId": "vedic_wellness",
+    "catLabel": "🕉️ Vedic & Holistic Wellness",
+    "raw": "WCAG Contrast Audit",
+    "clean": "WCAG Contrast Audit"
+  },
+  {
+    "catId": "citizen_essentials",
+    "catLabel": "🛡️ Citizen Essentials",
+    "raw": "Fuel & LPG Prices",
+    "clean": "Fuel & LPG Prices"
+  },
+  {
+    "catId": "citizen_essentials",
+    "catLabel": "🛡️ Citizen Essentials",
+    "raw": "Water & Food Safety",
+    "clean": "Water & Food Safety"
+  },
+  {
+    "catId": "citizen_essentials",
+    "catLabel": "🛡️ Citizen Essentials",
+    "raw": "School Orders & Exams",
+    "clean": "School Orders & Exams"
+  },
+  {
+    "catId": "citizen_essentials",
+    "catLabel": "🛡️ Citizen Essentials",
+    "raw": "Banking & EPFO Help",
+    "clean": "Banking & EPFO Help"
+  },
+  {
+    "catId": "citizen_essentials",
+    "catLabel": "🛡️ Citizen Essentials",
+    "raw": "Transit & Route Alerts",
+    "clean": "Transit & Route Alerts"
+  },
+  {
+    "catId": "governance_law",
+    "catLabel": "⚖️ Legal & Governance",
+    "raw": "RBI Compliance Check",
+    "clean": "RBI Compliance Check"
+  },
+  {
+    "catId": "governance_law",
+    "catLabel": "⚖️ Legal & Governance",
+    "raw": "Case Law & Gazette",
+    "clean": "Case Law & Gazette"
+  },
+  {
+    "catId": "governance_law",
+    "catLabel": "⚖️ Legal & Governance",
+    "raw": "ISO 27001 / SOC 2 Audit",
+    "clean": "ISO 27001 / SOC 2 Audit"
+  },
+  {
+    "catId": "governance_law",
+    "catLabel": "⚖️ Legal & Governance",
+    "raw": "Contract Clause Review",
+    "clean": "Contract Clause Review"
+  },
+  {
+    "catId": "geopolitics_intel",
+    "catLabel": "🛰️ Geopolitics & Defence",
+    "raw": "Border & Defence Brief",
+    "clean": "Border & Defence Brief"
+  },
+  {
+    "catId": "geopolitics_intel",
+    "catLabel": "🛰️ Geopolitics & Defence",
+    "raw": "Critical Minerals Map",
+    "clean": "Critical Minerals Map"
+  },
+  {
+    "catId": "geopolitics_intel",
+    "catLabel": "🛰️ Geopolitics & Defence",
+    "raw": "Alliance & Sanctions Map",
+    "clean": "Alliance & Sanctions Map"
+  },
+  {
+    "catId": "geopolitics_intel",
+    "catLabel": "🛰️ Geopolitics & Defence",
+    "raw": "State Cyber Threat Brief",
+    "clean": "State Cyber Threat Brief"
+  },
+  {
+    "catId": "security_hardware",
+    "catLabel": "🔒 Cyber & AI Hardware",
+    "raw": "CVE Threat Brief",
+    "clean": "CVE Threat Brief"
+  },
+  {
+    "catId": "security_hardware",
+    "catLabel": "🔒 Cyber & AI Hardware",
+    "raw": "GPU Cluster Comparison",
+    "clean": "GPU Cluster Comparison"
+  },
+  {
+    "catId": "security_hardware",
+    "catLabel": "🔒 Cyber & AI Hardware",
+    "raw": "Edge Vision Architecture",
+    "clean": "Edge Vision Architecture"
+  },
+  {
+    "catId": "security_hardware",
+    "catLabel": "🔒 Cyber & AI Hardware",
+    "raw": "Code & Secret Scan",
+    "clean": "Code & Secret Scan"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Symbolic Math Solver",
+    "clean": "Symbolic Math Solver"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Pedagogical Algebra Coach",
+    "clean": "Pedagogical Algebra Coach"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Offline Interactive STEM Lab",
+    "clean": "Offline Interactive STEM Lab"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Visual Concept & Animated Physics Lab",
+    "clean": "Visual Concept & Animated Physics Lab"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Concept Book Builder",
+    "clean": "Concept Book Builder"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Derivation Coach",
+    "clean": "Derivation Coach"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Academic Literature Preview",
+    "clean": "Academic Literature Preview"
+  },
+  {
+    "catId": "study_core",
+    "catLabel": "🎓 STEM & Math",
+    "raw": "Algorithm Comparison",
+    "clean": "Algorithm Comparison"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "CBSE Chapter Tutor",
+    "clean": "CBSE Chapter Tutor"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "IGCSE Topic Tutor",
+    "clean": "IGCSE Topic Tutor"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "IB DP Science & Math Coach",
+    "clean": "IB DP Science & Math Coach"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Chemistry Equation & Stoichiometry Lab",
+    "clean": "Chemistry Equation & Stoichiometry Lab"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Board Exam Drill",
+    "clean": "Board Exam Drill"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Book-Back Exercise Solver",
+    "clean": "Book-Back Exercise Solver"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Doubt Clinic",
+    "clean": "Doubt Clinic"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Formula Flashcards",
+    "clean": "Formula Flashcards"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Biology & Living Systems Visual Lab",
+    "clean": "Biology & Living Systems Visual Lab"
+  },
+  {
+    "catId": "school_boards",
+    "catLabel": "🎒 CBSE, IGCSE & IB STEM",
+    "raw": "Concept Gap Diagnostic",
+    "clean": "Concept Gap Diagnostic"
+  },
+  {
+    "catId": "textbook_navigator",
+    "catLabel": "📖 Textbook Navigator",
+    "raw": "Textbook Page Guide",
+    "clean": "Textbook Page Guide"
+  },
+  {
+    "catId": "textbook_navigator",
+    "catLabel": "📖 Textbook Navigator",
+    "raw": "Homework Helper",
+    "clean": "Homework Helper"
+  },
+  {
+    "catId": "textbook_navigator",
+    "catLabel": "📖 Textbook Navigator",
+    "raw": "Chapter Summary & Map",
+    "clean": "Chapter Summary & Map"
+  },
+  {
+    "catId": "textbook_navigator",
+    "catLabel": "📖 Textbook Navigator",
+    "raw": "Exercise Answer Bank",
+    "clean": "Exercise Answer Bank"
+  },
+  {
+    "catId": "textbook_navigator",
+    "catLabel": "📖 Textbook Navigator",
+    "raw": "Multi-Source Concept Explainer & Video Hub",
+    "clean": "Multi-Source Concept Explainer & Video Hub"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Lesson",
+    "clean": "Python Lesson"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Course Map",
+    "clean": "Python Course Map"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Practice Set",
+    "clean": "Python Practice Set"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Debug Coach",
+    "clean": "Python Debug Coach"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Quiz",
+    "clean": "Python Quiz"
+  },
+  {
+    "catId": "python_from_zero",
+    "catLabel": "🐍 Python from Zero",
+    "raw": "Python Mini-Project",
+    "clean": "Python Mini-Project"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "Deep Research Dossier",
+    "clean": "Deep Research Dossier"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "PhD Thesis & Defense Synthesizer",
+    "clean": "PhD Thesis & Defense Synthesizer"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "Advanced Theoretical Physics & Math Lab",
+    "clean": "Advanced Theoretical Physics & Math Lab"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "Robotics Kinematics & Embedded Hardware Lab",
+    "clean": "Robotics Kinematics & Embedded Hardware Lab"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "E-Book Blueprint",
+    "clean": "E-Book Blueprint"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "Transformer Sizing",
+    "clean": "Transformer Sizing"
+  },
+  {
+    "catId": "ai_research_books",
+    "catLabel": "🔬 Deep Research, PhD & Thesis",
+    "raw": "Peer-Reviewed Survey",
+    "clean": "Peer-Reviewed Survey"
+  },
+  {
+    "catId": "vibecoding_dev",
+    "catLabel": "💻 Vibe Coding & Architecture",
+    "raw": "API Architecture Blueprint",
+    "clean": "API Architecture Blueprint"
+  },
+  {
+    "catId": "vibecoding_dev",
+    "catLabel": "💻 Vibe Coding & Architecture",
+    "raw": "Plan Execution Audit",
+    "clean": "Plan Execution Audit"
+  },
+  {
+    "catId": "vibecoding_dev",
+    "catLabel": "💻 Vibe Coding & Architecture",
+    "raw": "UI Component Build",
+    "clean": "UI Component Build"
+  },
+  {
+    "catId": "vibecoding_dev",
+    "catLabel": "💻 Vibe Coding & Architecture",
+    "raw": "Query Performance Review",
+    "clean": "Query Performance Review"
+  },
+  {
+    "catId": "privacy_vault",
+    "catLabel": "🔒 Sovereign Vault & Privacy",
+    "raw": "Offline Document Build",
+    "clean": "Offline Document Build"
+  },
+  {
+    "catId": "privacy_vault",
+    "catLabel": "🔒 Sovereign Vault & Privacy",
+    "raw": "Vault Search",
+    "clean": "Vault Search"
+  },
+  {
+    "catId": "privacy_vault",
+    "catLabel": "🔒 Sovereign Vault & Privacy",
+    "raw": "Confidential Strategy",
+    "clean": "Confidential Strategy"
+  },
+  {
+    "catId": "privacy_vault",
+    "catLabel": "🔒 Sovereign Vault & Privacy",
+    "raw": "Forensic Document Audit",
+    "clean": "Forensic Document Audit"
+  }
+]

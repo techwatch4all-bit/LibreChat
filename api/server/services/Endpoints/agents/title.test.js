@@ -362,4 +362,34 @@ describe('agents addTitle', () => {
       expect.objectContaining({ noUpsert: true, appendMessageIds: [] }),
     );
   });
+
+  it('falls back to a concise snippet of the prompt text when LLM title generation fails', async () => {
+    const client = {
+      options: { titleConvo: true },
+      titleConvo: jest.fn().mockResolvedValue(undefined),
+    };
+    const onTitleGenerated = jest.fn();
+
+    await addTitle(makeReq(), {
+      text: 'List 3 mandatory child safety safeguards for a school campus in 1 short sentence each.',
+      client,
+      conversationId: 'cid-fallback',
+      immediate: true,
+      convoReady: Promise.resolve(),
+      onTitleGenerated,
+    });
+
+    expect(onTitleGenerated).toHaveBeenCalledWith({
+      conversationId: 'cid-fallback',
+      title: 'List 3 mandatory child safety safeguards...',
+    });
+    expect(mockSaveConvo).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        conversationId: 'cid-fallback',
+        title: 'List 3 mandatory child safety safeguards...',
+      }),
+      expect.objectContaining({ noUpsert: true }),
+    );
+  });
 });

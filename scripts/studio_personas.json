@@ -1,0 +1,440 @@
+[
+  {
+    "catId": "motion_architecture",
+    "catLabel": "🏛️ Floor Plans & Arch",
+    "raw": "2D-to-3D Architectural Floor Plan",
+    "clean": "2D-to-3D Architectural Floor Plan"
+  },
+  {
+    "catId": "motion_architecture",
+    "catLabel": "🏛️ Floor Plans & Arch",
+    "raw": "Solar Sun-Path & Ventilation Sim",
+    "clean": "Solar Sun-Path & Ventilation Sim"
+  },
+  {
+    "catId": "motion_architecture",
+    "catLabel": "🏛️ Floor Plans & Arch",
+    "raw": "MEP & Structural X-Ray Layers",
+    "clean": "MEP & Structural X-Ray Layers"
+  },
+  {
+    "catId": "motion_architecture",
+    "catLabel": "🏛️ Floor Plans & Arch",
+    "raw": "Interior Elevation & Kelvin Lab",
+    "clean": "Interior Elevation & Kelvin Lab"
+  },
+  {
+    "catId": "motion_drones",
+    "catLabel": "🚁 Drones & UAV",
+    "raw": "Multirotor TWR & Propulsion Lab",
+    "clean": "Multirotor TWR & Propulsion Lab"
+  },
+  {
+    "catId": "motion_drones",
+    "catLabel": "🚁 Drones & UAV",
+    "raw": "Drone SLAM & Waypoint Mission",
+    "clean": "Drone SLAM & Waypoint Mission"
+  },
+  {
+    "catId": "motion_drones",
+    "catLabel": "🚁 Drones & UAV",
+    "raw": "Airfoil Lift, Stall & Vortex Lab",
+    "clean": "Airfoil Lift, Stall & Vortex Lab"
+  },
+  {
+    "catId": "motion_civil_logistics",
+    "catLabel": "🌉 Civil & Supply Chains",
+    "raw": "Bridge Truss Stress & Load Sim",
+    "clean": "Bridge Truss Stress & Load Sim"
+  },
+  {
+    "catId": "motion_civil_logistics",
+    "catLabel": "🌉 Civil & Supply Chains",
+    "raw": "Supply & Cold-Chain Digital Twin",
+    "clean": "Supply & Cold-Chain Digital Twin"
+  },
+  {
+    "catId": "motion_civil_logistics",
+    "catLabel": "🌉 Civil & Supply Chains",
+    "raw": "Smart Traffic & EV Microgrid Flow",
+    "clean": "Smart Traffic & EV Microgrid Flow"
+  },
+  {
+    "catId": "motion_robotics",
+    "catLabel": "🤖 Robotics & Kinematics",
+    "raw": "6-DOF Robotic Arm IK & Torque Lab",
+    "clean": "6-DOF Robotic Arm IK & Torque Lab"
+  },
+  {
+    "catId": "motion_robotics",
+    "catLabel": "🤖 Robotics & Kinematics",
+    "raw": "Rover SLAM & LiDAR Maze Mapper",
+    "clean": "Rover SLAM & LiDAR Maze Mapper"
+  },
+  {
+    "catId": "motion_robotics",
+    "catLabel": "🤖 Robotics & Kinematics",
+    "raw": "Factory Cell & PLC State Machine",
+    "clean": "Factory Cell & PLC State Machine"
+  },
+  {
+    "catId": "motion_how_it_works",
+    "catLabel": "⚙️ How Things Work",
+    "raw": "Engine & Drivetrain Cutaway Lab",
+    "clean": "Engine & Drivetrain Cutaway Lab"
+  },
+  {
+    "catId": "motion_how_it_works",
+    "catLabel": "⚙️ How Things Work",
+    "raw": "Gearbox, Hydraulics & Lever Lab",
+    "clean": "Gearbox, Hydraulics & Lever Lab"
+  },
+  {
+    "catId": "motion_how_it_works",
+    "catLabel": "⚙️ How Things Work",
+    "raw": "Optics, Lens & Laser Ray-Tracing",
+    "clean": "Optics, Lens & Laser Ray-Tracing"
+  },
+  {
+    "catId": "motion_how_it_works",
+    "catLabel": "⚙️ How Things Work",
+    "raw": "Inside Everyday Appliances & Tech",
+    "clean": "Inside Everyday Appliances & Tech"
+  },
+  {
+    "catId": "motion_electronics",
+    "catLabel": "🔌 Circuits & AI Silicon",
+    "raw": "Circuit Simulator & Oscilloscope",
+    "clean": "Circuit Simulator & Oscilloscope"
+  },
+  {
+    "catId": "motion_electronics",
+    "catLabel": "🔌 Circuits & AI Silicon",
+    "raw": "CPU Pipeline & LLM AI Silicon",
+    "clean": "CPU Pipeline & LLM AI Silicon"
+  },
+  {
+    "catId": "motion_electronics",
+    "catLabel": "🔌 Circuits & AI Silicon",
+    "raw": "Solar MPPT & EV Battery BMS Lab",
+    "clean": "Solar MPPT & EV Battery BMS Lab"
+  },
+  {
+    "catId": "motion_education",
+    "catLabel": "🎓 STEM, Chem & Coding",
+    "raw": "Physics Forces & Wave-Field Lab",
+    "clean": "Physics Forces & Wave-Field Lab"
+  },
+  {
+    "catId": "motion_education",
+    "catLabel": "🎓 STEM, Chem & Coding",
+    "raw": "Dynamic Math & Calculus Proofs",
+    "clean": "Dynamic Math & Calculus Proofs"
+  },
+  {
+    "catId": "motion_education",
+    "catLabel": "🎓 STEM, Chem & Coding",
+    "raw": "Chemistry Orbitals & Kinetics",
+    "clean": "Chemistry Orbitals & Kinetics"
+  },
+  {
+    "catId": "motion_education",
+    "catLabel": "🎓 STEM, Chem & Coding",
+    "raw": "Cellular Biology Micro-Journey",
+    "clean": "Cellular Biology Micro-Journey"
+  },
+  {
+    "catId": "motion_education",
+    "catLabel": "🎓 STEM, Chem & Coding",
+    "raw": "Algorithm & Recursion Tracer",
+    "clean": "Algorithm & Recursion Tracer"
+  },
+  {
+    "catId": "motion_networks",
+    "catLabel": "🌐 Networks & Cyber",
+    "raw": "DNS, TCP & TLS 1.3 Packet Journey",
+    "clean": "DNS, TCP & TLS 1.3 Packet Journey"
+  },
+  {
+    "catId": "motion_networks",
+    "catLabel": "🌐 Networks & Cyber",
+    "raw": "K8s Autoscaling & Failover Sim",
+    "clean": "K8s Autoscaling & Failover Sim"
+  },
+  {
+    "catId": "motion_networks",
+    "catLabel": "🌐 Networks & Cyber",
+    "raw": "Kill-Chain vs Zero-Trust Defense",
+    "clean": "Kill-Chain vs Zero-Trust Defense"
+  },
+  {
+    "catId": "motion_earth_space",
+    "catLabel": "🌌 Space, Earth & Sound",
+    "raw": "Orbital & Hohmann Transfer Sim",
+    "clean": "Orbital & Hohmann Transfer Sim"
+  },
+  {
+    "catId": "motion_earth_space",
+    "catLabel": "🌌 Space, Earth & Sound",
+    "raw": "Tectonics, Cyclones & Clean Grid",
+    "clean": "Tectonics, Cyclones & Clean Grid"
+  },
+  {
+    "catId": "motion_earth_space",
+    "catLabel": "🌌 Space, Earth & Sound",
+    "raw": "Standing Waves & Music Acoustics",
+    "clean": "Standing Waves & Music Acoustics"
+  },
+  {
+    "catId": "motion_history_kids",
+    "catLabel": "🏛️ History & Early Learning",
+    "raw": "Historical Atlas & Trade Timeline",
+    "clean": "Historical Atlas & Trade Timeline"
+  },
+  {
+    "catId": "motion_history_kids",
+    "catLabel": "🏛️ History & Early Learning",
+    "raw": "Kids Fractions & Phonics Play",
+    "clean": "Kids Fractions & Phonics Play"
+  },
+  {
+    "catId": "motion_history_kids",
+    "catLabel": "🏛️ History & Early Learning",
+    "raw": "Vedic Astronomy & Sundial Lab",
+    "clean": "Vedic Astronomy & Sundial Lab"
+  },
+  {
+    "catId": "motion_executive",
+    "catLabel": "📊 Executive & Metrics",
+    "raw": "3D Executive QBR & Revenue Deck",
+    "clean": "3D Executive QBR & Revenue Deck"
+  },
+  {
+    "catId": "motion_executive",
+    "catLabel": "📊 Executive & Metrics",
+    "raw": "Investor Pitch & Market Traction",
+    "clean": "Investor Pitch & Market Traction"
+  },
+  {
+    "catId": "motion_executive",
+    "catLabel": "📊 Executive & Metrics",
+    "raw": "Strategic Milestone Roadmap",
+    "clean": "Strategic Milestone Roadmap"
+  },
+  {
+    "catId": "motion_productivity",
+    "catLabel": "💼 Professional & SOPs",
+    "raw": "Animated Workflow & SOP Replay",
+    "clean": "Animated Workflow & SOP Replay"
+  },
+  {
+    "catId": "motion_productivity",
+    "catLabel": "💼 Professional & SOPs",
+    "raw": "SaaS Unit Economics & Runway Lab",
+    "clean": "SaaS Unit Economics & Runway Lab"
+  },
+  {
+    "catId": "motion_productivity",
+    "catLabel": "💼 Professional & SOPs",
+    "raw": "Incident Postmortem & SLA Replay",
+    "clean": "Incident Postmortem & SLA Replay"
+  },
+  {
+    "catId": "motion_productivity",
+    "catLabel": "💼 Professional & SOPs",
+    "raw": "Sprint Velocity & Gantt Timeline",
+    "clean": "Sprint Velocity & Gantt Timeline"
+  },
+  {
+    "catId": "motion_kinetic",
+    "catLabel": "⚡ Kinetic Typography",
+    "raw": "Kinetic Typography Manifesto",
+    "clean": "Kinetic Typography Manifesto"
+  },
+  {
+    "catId": "motion_kinetic",
+    "catLabel": "⚡ Kinetic Typography",
+    "raw": "Distributed Systems & API Flow",
+    "clean": "Distributed Systems & API Flow"
+  },
+  {
+    "catId": "motion_kinetic",
+    "catLabel": "⚡ Kinetic Typography",
+    "raw": "Book & Mental-Model Summary",
+    "clean": "Book & Mental-Model Summary"
+  },
+  {
+    "catId": "motion_product",
+    "catLabel": "✨ Product & SaaS Launch",
+    "raw": "Dark-Mode SaaS Hero Launch",
+    "clean": "Dark-Mode SaaS Hero Launch"
+  },
+  {
+    "catId": "motion_product",
+    "catLabel": "✨ Product & SaaS Launch",
+    "raw": "Live Animated Analytics Dashboard",
+    "clean": "Live Animated Analytics Dashboard"
+  },
+  {
+    "catId": "motion_product",
+    "catLabel": "✨ Product & SaaS Launch",
+    "raw": "3D Mobile App UX Showcase",
+    "clean": "3D Mobile App UX Showcase"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "Procedural Watercolor & Wash Art",
+    "clean": "Procedural Watercolor & Wash Art"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "3B1B Math & Geometric Animation",
+    "clean": "3B1B Math & Geometric Animation"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "Traditional Ink Wash & Chinese Painting",
+    "clean": "Traditional Ink Wash & Chinese Painting"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "2D Rigged Character Walk-Cycle",
+    "clean": "2D Rigged Character Walk-Cycle"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "Pencil Sketch to Ink Line Reveal",
+    "clean": "Pencil Sketch to Ink Line Reveal"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "Cartoon Storyboard & Comic",
+    "clean": "Cartoon Storyboard & Comic"
+  },
+  {
+    "catId": "motion_creative",
+    "catLabel": "🎨 Art, Cartoon & Sketch",
+    "raw": "Sacred Geometry & Perspective",
+    "clean": "Sacred Geometry & Perspective"
+  },
+  {
+    "catId": "motion_media",
+    "catLabel": "🎬 Teasers & Video Render",
+    "raw": "Brand Intro & 3D Logo Stinger",
+    "clean": "Brand Intro & 3D Logo Stinger"
+  },
+  {
+    "catId": "motion_media",
+    "catLabel": "🎬 Teasers & Video Render",
+    "raw": "Vertical 9:16 Kinetic Social Reel",
+    "clean": "Vertical 9:16 Kinetic Social Reel"
+  },
+  {
+    "catId": "motion_media",
+    "catLabel": "🎬 Teasers & Video Render",
+    "raw": "Playwright 60fps MP4 Video Exporter",
+    "clean": "Playwright 60fps MP4 Video Exporter"
+  },
+  {
+    "catId": "motion_medical",
+    "catLabel": "🫀 Medical & Clinical",
+    "raw": "Disease & Anatomical Progression",
+    "clean": "Disease & Anatomical Progression"
+  },
+  {
+    "catId": "motion_medical",
+    "catLabel": "🫀 Medical & Clinical",
+    "raw": "ECG, Lab Panel & Spirometry",
+    "clean": "ECG, Lab Panel & Spirometry"
+  },
+  {
+    "catId": "motion_medical",
+    "catLabel": "🫀 Medical & Clinical",
+    "raw": "Drug Mechanism of Action (MoA)",
+    "clean": "Drug Mechanism of Action (MoA)"
+  },
+  {
+    "catId": "motion_medical",
+    "catLabel": "🫀 Medical & Clinical",
+    "raw": "Surgical, Inhaler & CPR Trainer",
+    "clean": "Surgical, Inhaler & CPR Trainer"
+  },
+  {
+    "catId": "motion_wellness",
+    "catLabel": "🥗 Fitness, Yoga & Diet",
+    "raw": "Exercise Form & Joint Angle Lab",
+    "clean": "Exercise Form & Joint Angle Lab"
+  },
+  {
+    "catId": "motion_wellness",
+    "catLabel": "🥗 Fitness, Yoga & Diet",
+    "raw": "Yoga Asana Flow & Breath Pacer",
+    "clean": "Yoga Asana Flow & Breath Pacer"
+  },
+  {
+    "catId": "motion_wellness",
+    "catLabel": "🥗 Fitness, Yoga & Diet",
+    "raw": "Metabolic Calorie & Macro Plate",
+    "clean": "Metabolic Calorie & Macro Plate"
+  },
+  {
+    "catId": "motion_wellness",
+    "catLabel": "🥗 Fitness, Yoga & Diet",
+    "raw": "Desk Rehab & Meal Glycemic Curve",
+    "clean": "Desk Rehab & Meal Glycemic Curve"
+  },
+  {
+    "catId": "motion_home",
+    "catLabel": "🏡 Home, Interior & Living",
+    "raw": "Room Layout & Festive Makeover",
+    "clean": "Room Layout & Festive Makeover"
+  },
+  {
+    "catId": "motion_home",
+    "catLabel": "🏡 Home, Interior & Living",
+    "raw": "Weekly Family Meal & Pantry Plan",
+    "clean": "Weekly Family Meal & Pantry Plan"
+  },
+  {
+    "catId": "motion_home",
+    "catLabel": "🏡 Home, Interior & Living",
+    "raw": "Wardrobe & Kitchen Decluttering",
+    "clean": "Wardrobe & Kitchen Decluttering"
+  },
+  {
+    "catId": "motion_home",
+    "catLabel": "🏡 Home, Interior & Living",
+    "raw": "Balcony Garden & Home Budget",
+    "clean": "Balcony Garden & Home Budget"
+  },
+  {
+    "catId": "motion_elderly",
+    "catLabel": "👵 Golden Years & Living",
+    "raw": "Large-Print Medicine & Water",
+    "clean": "Large-Print Medicine & Water"
+  },
+  {
+    "catId": "motion_elderly",
+    "catLabel": "👵 Golden Years & Living",
+    "raw": "Smartphone & UPI Safety Tutor",
+    "clean": "Smartphone & UPI Safety Tutor"
+  },
+  {
+    "catId": "motion_elderly",
+    "catLabel": "👵 Golden Years & Living",
+    "raw": "Chair Physio & Joint Mobility",
+    "clean": "Chair Physio & Joint Mobility"
+  },
+  {
+    "catId": "motion_elderly",
+    "catLabel": "👵 Golden Years & Living",
+    "raw": "Elder Fraud & OTP Scam Shield",
+    "clean": "Elder Fraud & OTP Scam Shield"
+  }
+]

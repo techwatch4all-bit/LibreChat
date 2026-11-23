@@ -1,0 +1,807 @@
+[
+  [
+    "Pill",
+    [
+      {
+        "title": "Drug Interaction Check",
+        "original": "Drug Interaction Check",
+        "badge": "Drug Safety"
+      },
+      {
+        "title": "Drug Mechanism of Action (MoA)",
+        "original": "Drug Mechanism of Action (MoA)",
+        "badge": "Drug MoA"
+      },
+      {
+        "title": "Medicine Safety & Interaction Check",
+        "original": "💊 Medicine Safety & Interaction Check",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "ShieldAlert",
+    [
+      {
+        "title": "Border & Defence Brief",
+        "original": "Border & Defence Brief",
+        "badge": "Border Intel"
+      },
+      {
+        "title": "Kill-Chain vs Zero-Trust Defense",
+        "original": "Kill-Chain vs Zero-Trust Defense",
+        "badge": "Cyber Defense"
+      },
+      {
+        "title": "Security Code Review",
+        "original": "Security Code Review",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Binary",
+    [
+      {
+        "title": "Symbolic Math Solver",
+        "original": "Symbolic Math Solver",
+        "badge": "Symbolic Math"
+      },
+      {
+        "title": "Algorithm & Recursion Tracer",
+        "original": "Algorithm & Recursion Tracer",
+        "badge": "Algo & Code"
+      },
+      {
+        "title": "Binary Search Coach",
+        "original": "Binary Search Coach",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Calculator",
+    [
+      {
+        "title": "Pedagogical Algebra Coach",
+        "original": "Pedagogical Algebra Coach",
+        "badge": "Algebra Coach"
+      },
+      {
+        "title": "SaaS Unit Economics & Runway Lab",
+        "original": "SaaS Unit Economics & Runway Lab",
+        "badge": "Financial Sim"
+      },
+      {
+        "title": "EMI Problem Walkthrough",
+        "original": "EMI Problem Walkthrough",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Sigma",
+    [
+      {
+        "title": "Derivation Coach",
+        "original": "Derivation Coach",
+        "badge": "Physics"
+      },
+      {
+        "title": "3B1B Math & Geometric Animation",
+        "original": "3B1B Math & Geometric Animation",
+        "badge": "3B1B Vector"
+      },
+      {
+        "title": "Quadratic Formula Derivation",
+        "original": "Quadratic Formula Derivation",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Compass",
+    [
+      {
+        "title": "IGCSE Topic Tutor",
+        "original": "IGCSE Topic Tutor",
+        "badge": "IGCSE Tutor"
+      },
+      {
+        "title": "Sacred Geometry & Perspective",
+        "original": "Sacred Geometry & Perspective",
+        "badge": "Generative Art"
+      },
+      {
+        "title": "Shubh Muhurat Finder",
+        "original": "✨ Shubh Muhurat Finder",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "BookOpen",
+    [
+      {
+        "title": "Textbook Page Guide",
+        "original": "Textbook Page Guide",
+        "badge": "Page Guide"
+      },
+      {
+        "title": "Book & Mental-Model Summary",
+        "original": "Book & Mental-Model Summary",
+        "badge": "Book Digest"
+      },
+      {
+        "title": "Textbook Navigator",
+        "original": "Textbook Navigator",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Atom",
+    [
+      {
+        "title": "Advanced Theoretical Physics & Math Lab",
+        "original": "Advanced Theoretical Physics & Math Lab",
+        "badge": "Advanced Math & Physics"
+      },
+      {
+        "title": "Physics Forces & Wave-Field Lab",
+        "original": "Physics Forces & Wave-Field Lab",
+        "badge": "Physics Sim"
+      },
+      {
+        "title": "Newton's Laws",
+        "original": "Newton's Laws",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Bot",
+    [
+      {
+        "title": "Robotics Kinematics & Embedded Hardware Lab",
+        "original": "Robotics Kinematics & Embedded Hardware Lab",
+        "badge": "Robotics & Embedded"
+      },
+      {
+        "title": "6-DOF Robotic Arm IK & Torque Lab",
+        "original": "6-DOF Robotic Arm IK & Torque Lab",
+        "badge": "Arm Kinematics"
+      },
+      {
+        "title": "AI Model Releases",
+        "original": "AI Model Releases",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Layers",
+    [
+      {
+        "title": "Transformer Sizing",
+        "original": "Transformer Sizing",
+        "badge": "AI Architecture"
+      },
+      {
+        "title": "MEP & Structural X-Ray Layers",
+        "original": "MEP & Structural X-Ray Layers",
+        "badge": "MEP X-Ray"
+      },
+      {
+        "title": "Async Task Queue",
+        "original": "Async Task Queue",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Network",
+    [
+      {
+        "title": "API Architecture Blueprint",
+        "original": "API Architecture Blueprint",
+        "badge": "Architecture"
+      },
+      {
+        "title": "DNS, TCP & TLS 1.3 Packet Journey",
+        "original": "DNS, TCP & TLS 1.3 Packet Journey",
+        "badge": "Packet Flow"
+      },
+      {
+        "title": "API Architecture",
+        "original": "API Architecture",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "PiggyBank",
+    [
+      {
+        "title": "Family & Home Budget Tracker",
+        "original": "📊 Family & Home Budget Tracker",
+        "badge": "Family Budget"
+      },
+      {
+        "title": "Family & Home Budget Tracker",
+        "original": "📊 Family & Home Budget Tracker",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "ShoppingCart",
+    [
+      {
+        "title": "Weekly Grocery & Kitchen Inventory",
+        "original": "🛒 Weekly Grocery & Kitchen Inventory",
+        "badge": "Kitchen & Pantry"
+      },
+      {
+        "title": "Grocery & Kitchen Inventory",
+        "original": "🛒 Grocery & Kitchen Inventory",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Receipt",
+    [
+      {
+        "title": "Small Business Revenue & Expense Sheet",
+        "original": "📈 Small Business Revenue & Expense Sheet",
+        "badge": "Business P&L"
+      },
+      {
+        "title": "Small Business Sales & Expense Sheet",
+        "original": "📈 Small Business Sales & Expense Sheet",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "BarChart2",
+    [
+      {
+        "title": "Executive KPI Dashboard & Gantt Flow",
+        "original": "📊 Executive KPI Dashboard & Gantt Flow",
+        "badge": "Gantt Flow"
+      },
+      {
+        "title": "Data Anomaly Audit",
+        "original": "Data Anomaly Audit",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "MailCheck",
+    [
+      {
+        "title": "Formal Letter & Application Writer",
+        "original": "✉️ Formal Letter & Application Writer",
+        "badge": "Official Letter"
+      },
+      {
+        "title": "Formal Letter & Application Writer",
+        "original": "✉️ Formal Letter & Application Writer",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Landmark",
+    [
+      {
+        "title": "Bank Account Transfer & KYC Update Request",
+        "original": "🏦 Bank Account Transfer & KYC Update Request",
+        "badge": "Banking Request"
+      },
+      {
+        "title": "Historical Atlas & Trade Timeline",
+        "original": "Historical Atlas & Trade Timeline",
+        "badge": "History Map"
+      }
+    ]
+  ],
+  [
+    "FileSignature",
+    [
+      {
+        "title": "Standard House Rental Agreement Draft",
+        "original": "📑 Standard House Rental Agreement Draft",
+        "badge": "Rental Draft"
+      },
+      {
+        "title": "My Study Notes & Summary",
+        "original": "📝 My Study Notes & Summary",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Sparkle",
+    [
+      {
+        "title": "Magical Bedtime Story",
+        "original": "🧸 Magical Bedtime Story",
+        "badge": "Bedtime Story"
+      },
+      {
+        "title": "Magical Bedtime Story",
+        "original": "🧸 Magical Bedtime Story",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "FileText",
+    [
+      {
+        "title": "Plain-English Bill & PDF Breakdown",
+        "original": "📑 Plain-English Bill & PDF Breakdown",
+        "badge": "Bill Explainer"
+      },
+      {
+        "title": "Local PDF Summary",
+        "original": "Local PDF Summary",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "CircuitBoard",
+    [
+      {
+        "title": "Smart Arduino / ESP32 Project",
+        "original": "🤖 Smart Arduino / ESP32 Project",
+        "badge": "Arduino / IoT"
+      },
+      {
+        "title": "Smart Arduino / ESP32 Project",
+        "original": "🤖 Smart Arduino / ESP32 Project",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Coins",
+    [
+      {
+        "title": "Bullion Desk",
+        "original": "Bullion Desk",
+        "badge": "Bullion"
+      },
+      {
+        "title": "Gold, Silver & Fuel",
+        "original": "Gold, Silver & Fuel",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "ShieldCheck",
+    [
+      {
+        "title": "DeFi Contract Review",
+        "original": "DeFi Contract Review",
+        "badge": "DeFi Security"
+      },
+      {
+        "title": "Vault Knowledge Query",
+        "original": "Vault Knowledge Query",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "GraduationCap",
+    [
+      {
+        "title": "School Orders & Exams",
+        "original": "School Orders & Exams",
+        "badge": "Exam/School"
+      },
+      {
+        "title": "CBSE / IGCSE Chapter Tutor",
+        "original": "CBSE / IGCSE Chapter Tutor",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Building",
+    [
+      {
+        "title": "Banking & EPFO Help",
+        "original": "Banking & EPFO Help",
+        "badge": "Banking & PF"
+      },
+      {
+        "title": "30 × 40 ft Independent Duplex House",
+        "original": "🏡 30 × 40 ft Independent Duplex House",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Scale",
+    [
+      {
+        "title": "RBI Compliance Check",
+        "original": "RBI Compliance Check",
+        "badge": "RBI Regulatory"
+      },
+      {
+        "title": "Govt & Court Roundup",
+        "original": "Govt & Court Roundup",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "FileSearch",
+    [
+      {
+        "title": "Contract Clause Review",
+        "original": "Contract Clause Review",
+        "badge": "Contracts"
+      },
+      {
+        "title": "Policy Research Audit",
+        "original": "Policy Research Audit",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Cpu",
+    [
+      {
+        "title": "GPU Cluster Comparison",
+        "original": "GPU Cluster Comparison",
+        "badge": "GPU Compute"
+      },
+      {
+        "title": "CPU Pipeline & LLM AI Silicon",
+        "original": "CPU Pipeline & LLM AI Silicon",
+        "badge": "Compute Arch"
+      }
+    ]
+  ],
+  [
+    "BookMarked",
+    [
+      {
+        "title": "Concept Book Builder",
+        "original": "Concept Book Builder",
+        "badge": "DeepTutor"
+      },
+      {
+        "title": "Make a Study Book",
+        "original": "📖 Make a Study Book",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "FileQuestion",
+    [
+      {
+        "title": "Board Exam Drill",
+        "original": "Board Exam Drill",
+        "badge": "Board Drill"
+      },
+      {
+        "title": "Explain My Bill or Statement",
+        "original": "📑 Explain My Bill or Statement",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "HelpCircle",
+    [
+      {
+        "title": "Doubt Clinic",
+        "original": "Doubt Clinic",
+        "badge": "Doubt Clinic"
+      },
+      {
+        "title": "Test My Knowledge (Quiz Me!)",
+        "original": "🎯 Test My Knowledge (Quiz Me!)",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Presentation",
+    [
+      {
+        "title": "Multi-Source Concept Explainer & Video Hub",
+        "original": "Multi-Source Concept Explainer & Video Hub",
+        "badge": "Visual Concept & Video Hub"
+      },
+      {
+        "title": "On-Device Deck",
+        "original": "On-Device Deck",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Milestone",
+    [
+      {
+        "title": "Python Course Map",
+        "original": "Python Course Map",
+        "badge": "Syllabus"
+      },
+      {
+        "title": "Strategic Milestone Roadmap",
+        "original": "Strategic Milestone Roadmap",
+        "badge": "Milestone Roadmap"
+      }
+    ]
+  ],
+  [
+    "Boxes",
+    [
+      {
+        "title": "Python Mini-Project",
+        "original": "Python Mini-Project",
+        "badge": "Mini-Project"
+      },
+      {
+        "title": "Bridge Truss Stress & Load Sim",
+        "original": "Bridge Truss Stress & Load Sim",
+        "badge": "Structural Truss"
+      }
+    ]
+  ],
+  [
+    "FileSpreadsheet",
+    [
+      {
+        "title": "Peer-Reviewed Survey",
+        "original": "Peer-Reviewed Survey",
+        "badge": "Scholar/arXiv"
+      },
+      {
+        "title": "PRD from Requirement",
+        "original": "PRD from Requirement",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Zap",
+    [
+      {
+        "title": "Query Performance Review",
+        "original": "Query Performance Review",
+        "badge": "Database"
+      },
+      {
+        "title": "Kirchhoff Circuit Walkthrough",
+        "original": "Kirchhoff Circuit Walkthrough",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "DraftingCompass",
+    [
+      {
+        "title": "2D-to-3D Architectural Floor Plan",
+        "original": "2D-to-3D Architectural Floor Plan",
+        "badge": "CAD · 3D Floorplan"
+      },
+      {
+        "title": "Architecture Diagram",
+        "original": "Architecture Diagram",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "SunMedium",
+    [
+      {
+        "title": "Solar Sun-Path & Ventilation Sim",
+        "original": "Solar Sun-Path & Ventilation Sim",
+        "badge": "Sun & Vastu Sim"
+      },
+      {
+        "title": "Vastu & Solar Daylighting Audit",
+        "original": "☀️ Vastu & Solar Daylighting Audit",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Wrench",
+    [
+      {
+        "title": "Gearbox, Hydraulics & Lever Lab",
+        "original": "Gearbox, Hydraulics & Lever Lab",
+        "badge": "Mechanical Lab"
+      },
+      {
+        "title": "Home Appliance & DIY Fix",
+        "original": "🔧 Home Appliance & DIY Fix",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Activity",
+    [
+      {
+        "title": "Circuit Simulator & Oscilloscope",
+        "original": "Circuit Simulator & Oscilloscope",
+        "badge": "Circuit Scope"
+      },
+      {
+        "title": "Daily Gentle Yoga & Stretching",
+        "original": "🧘 Daily Gentle Yoga & Stretching",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Sun",
+    [
+      {
+        "title": "Vedic Astronomy & Sundial Lab",
+        "original": "Vedic Astronomy & Sundial Lab",
+        "badge": "Cosmic Heritage"
+      },
+      {
+        "title": "Today's Panchang & Auspicious Timings",
+        "original": "🌅 Today's Panchang & Auspicious Timings",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "TrendingUp",
+    [
+      {
+        "title": "Investor Pitch & Market Traction",
+        "original": "Investor Pitch & Market Traction",
+        "badge": "Investor Pitch"
+      },
+      {
+        "title": "Market Wrap",
+        "original": "Market Wrap",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Calendar",
+    [
+      {
+        "title": "Sprint Velocity & Gantt Timeline",
+        "original": "Sprint Velocity & Gantt Timeline",
+        "badge": "Sprint & Gantt"
+      },
+      {
+        "title": "Upcoming Festivals & Vrats",
+        "original": "📅 Upcoming Festivals & Vrats",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Rocket",
+    [
+      {
+        "title": "Dark-Mode SaaS Hero Launch",
+        "original": "Dark-Mode SaaS Hero Launch",
+        "badge": "SaaS Launch"
+      },
+      {
+        "title": "3D Product & Tech Showcase",
+        "original": "🚀 3D Product & Tech Showcase",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Clapperboard",
+    [
+      {
+        "title": "Brand Intro & 3D Logo Stinger",
+        "original": "Brand Intro & 3D Logo Stinger",
+        "badge": "Brand Stinger"
+      },
+      {
+        "title": "3D Science Explainer",
+        "original": "🎬 3D Science Explainer",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "HeartPulse",
+    [
+      {
+        "title": "Disease & Anatomical Progression",
+        "original": "Disease & Anatomical Progression",
+        "badge": "Clinical Pathology"
+      },
+      {
+        "title": "Health & AQI Bulletin",
+        "original": "Health & AQI Bulletin",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Stethoscope",
+    [
+      {
+        "title": "ECG, Lab Panel & Spirometry",
+        "original": "ECG, Lab Panel & Spirometry",
+        "badge": "Lab & Vitals"
+      },
+      {
+        "title": "Joint & Back Comfort Guide",
+        "original": "🩺 Joint & Back Comfort Guide",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Apple",
+    [
+      {
+        "title": "Metabolic Calorie & Macro Plate",
+        "original": "Metabolic Calorie & Macro Plate",
+        "badge": "Nutrition Lab"
+      },
+      {
+        "title": "Nutritious Family Meal Plan",
+        "original": "🥗 Nutritious Family Meal Plan",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Flame",
+    [
+      {
+        "title": "Desk Rehab & Meal Glycemic Curve",
+        "original": "Desk Rehab & Meal Glycemic Curve",
+        "badge": "Rehab & Glucose"
+      },
+      {
+        "title": "Thermodynamics Quiz",
+        "original": "Thermodynamics Quiz",
+        "badge": "Chat"
+      }
+    ]
+  ],
+  [
+    "Smile",
+    [
+      {
+        "title": "Chair Physio & Joint Mobility",
+        "original": "Chair Physio & Joint Mobility",
+        "badge": "Senior Mobility"
+      },
+      {
+        "title": "Explain Like I'm 10",
+        "original": "🔍 Explain Like I'm 10",
+        "badge": "Chat"
+      }
+    ]
+  ]
+]

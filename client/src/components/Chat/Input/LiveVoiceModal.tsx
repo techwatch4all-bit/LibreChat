@@ -473,6 +473,7 @@ export default function LiveVoiceModal({
 
   const handleAccentChange = useCallback((nextVoiceId: VoiceProfileId) => {
     setVoiceId(nextVoiceId);
+    voiceIdRef.current = nextVoiceId;
     localStorage.setItem('satchida_voice_profile', nextVoiceId);
     const opt = VOICE_OPTIONS.find((v) => v.id === nextVoiceId);
     if (recognitionRef.current && opt) {
@@ -645,7 +646,12 @@ export default function LiveVoiceModal({
           /\b(switch|change|use|set|speak|talk)\b/i.test(lower) &&
           /\b(accent|voice|male|female|us|american|uk|british|indian|india)\b/i.test(lower)
         ) {
-          let nextRegion: 'in' | 'us' | 'uk' = 'in';
+          const currentOpt = VOICE_OPTIONS.find((v) => v.id === voiceIdRef.current);
+          let nextRegion: 'in' | 'us' | 'uk' = currentOpt?.id.startsWith('us')
+            ? 'us'
+            : currentOpt?.id.startsWith('uk')
+              ? 'uk'
+              : 'in';
           if (/\b(us|u\.s\.|american|united states)\b/i.test(lower)) {
             nextRegion = 'us';
           } else if (/\b(uk|u\.k\.|british|england|london)\b/i.test(lower)) {
@@ -654,7 +660,10 @@ export default function LiveVoiceModal({
             nextRegion = 'in';
           }
 
-          let nextGender: 'female' | 'male' = 'female';
+          let nextGender: 'female' | 'male' =
+            currentOpt?.id.includes('male') && !currentOpt?.id.includes('female')
+              ? 'male'
+              : 'female';
           if (/\b(male|man|guy|boy)\b/i.test(lower)) {
             nextGender = 'male';
           } else if (/\b(female|woman|lady|girl)\b/i.test(lower)) {
@@ -663,25 +672,26 @@ export default function LiveVoiceModal({
 
           const nextId = `${nextRegion}_${nextGender}` as VoiceProfileId;
           handleAccentChange(nextId);
-          setStatusText(`Switched to ${nextId}`);
-          setSpokenTranscript(`Switched to ${nextId.replace('_', ' ')} voice`);
+          const found = VOICE_OPTIONS.find((v) => v.id === nextId);
+          setStatusText(`Switched to ${found?.shortLabel || nextId}`);
+          setSpokenTranscript(`Switched to ${found?.label || nextId}`);
+          showToast({ message: `Voice: ${found?.shortLabel || nextId}`, status: 'info' });
           return;
         }
 
-        // 3. Work mode or chat execution intent
-        const isWorkIntent =
-          liveVoiceModeRef.current === 'work' ||
-          hasToolsRef.current ||
-          TOOL_INTENT_REGEX.test(cleanFinal) ||
-          /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|run (?:deep )?research|write code in chat)\b/i.test(
+        // 4. Work mode or explicit chat insertion intent
+        const isExplicitChatCommand =
+          /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|put in chat)\b/i.test(
             cleanFinal,
           );
+        const isWorkIntent =
+          liveVoiceModeRef.current === 'work' || isExplicitChatCommand;
 
         if (isWorkIntent) {
           const promptForChat =
             cleanFinal
               .replace(
-                /^(?:please\s+)?(?:insert|send|type|write|ask)\s+(?:this\s+)?(?:in|into|to)\s+chat(?:\s*[:,-]?\s*)?/i,
+                /^(?:please\s+)?(?:insert|send|type|write|ask|put)\s+(?:this\s+)?(?:in|into|to)\s+chat(?:\s*[:,-]?\s*)?/i,
                 '',
               )
               .trim() || cleanFinal;

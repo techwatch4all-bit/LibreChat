@@ -12,6 +12,7 @@ export interface RealtimeWebSocketLike {
   send(data: string | Buffer | ArrayBuffer | Buffer[], cb?: (err?: Error) => void): void;
   close(code?: number, reason?: string): void;
   terminate?: () => void;
+  removeAllListeners?: (event?: string) => void;
   on(event: string, listener: (...args: unknown[]) => void): void;
 }
 
@@ -1281,12 +1282,16 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
         try {
           if (upstreamWs) {
+            const oldWs = upstreamWs;
+            upstreamWs = null;
+            if (typeof oldWs.removeAllListeners === 'function') {
+              oldWs.removeAllListeners();
+            }
             try {
-              upstreamWs.close(1000, 'Reconnecting with new voice');
+              oldWs.close(1000, 'Reconnecting with new voice');
             } catch {
               // Ignore close error on stale socket
             }
-            upstreamWs = null;
           }
 
           const minter =
@@ -1303,13 +1308,14 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
           const prebuiltVoice = mapVoiceToGeminiPrebuilt(profile);
 
-          upstreamWs = createUpstreamWebSocket(geminiWsUrl, {
+          const currentSocket = createUpstreamWebSocket(geminiWsUrl, {
             headers: {
               Authorization: `Token ${ephemeralToken}`,
             },
           });
+          upstreamWs = currentSocket;
 
-          upstreamWs.on('open', () => {
+          currentSocket.on('open', () => {
             logger.info(
               `[RealtimeVoice] Google Gemini Live S2S WebSocket connected (model=gemini-3.8-live, voice=${prebuiltVoice})`,
             );
@@ -1341,17 +1347,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         '2. Under NO circumstances should you ever say, admit, or imply that you are made by Google, Gemini, OpenAI, or any other third party. If asked who made, trained, or created you, you must always reply: "I am Satchida Live Voice, created by Satchida AI."\n' +
                         '3. NEVER disclose internal routing, backend providers, or model names.\n' +
                         '4. Speak naturally, warmly, and concisely in 1 to 3 spoken sentences. Avoid markdown, bullet points, asterisks, and emojis.\n' +
-                        '5. REALTIME SEARCH: You have live real-time access to the web via Google Search. When the user asks about current events, today\'s date, latest news, weather, or live data, use your search tool to provide accurate and fresh spoken answers.',
+                        '5. REALTIME SEARCH & FRESH FACTS: You have live real-time access to the web via Google Search. When asked about current events, today\'s date, latest news, live scores, weather, or recent happenings, always use your search tool to provide fresh, accurate spoken answers.\n' +
+                        '6. SEARCH CAPABILITY: If asked whether you can perform web search or access current live info, always confirm affirmatively that you have live web search enabled and can find current information for the user.',
                     },
                   ],
                 },
               },
             };
-            upstreamWs?.send(JSON.stringify(setupMsg));
+            currentSocket.send(JSON.stringify(setupMsg));
           });
 
-          upstreamWs.on('message', (data: unknown) => {
-            if (clientClosed || clientWs.readyState !== WS_OPEN) {
+          currentSocket.on('message', (data: unknown) => {
+            if (upstreamWs !== currentSocket || clientClosed || clientWs.readyState !== WS_OPEN) {
               return;
             }
             const textData = Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
@@ -1375,6 +1382,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
               if (msg.setupComplete) {
                 isGeminiS2sActive = true;
+                bridgeMode = false;
+                upstreamClosed = false;
                 sendJson(clientWs, {
                   type: 'session.created',
                   mode: 'gemini_live_s2s',
@@ -1421,7 +1430,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             }
           });
 
-          upstreamWs.on('error', (err: unknown) => {
+          currentSocket.on('error', (err: unknown) => {
+            if (upstreamWs !== currentSocket) {
+              return;
+            }
             logger.warn(
               `[RealtimeVoice] Gemini Live S2S socket error, switching to cascaded bridge: ${err instanceof Error ? err.message : String(err)}`,
             );
@@ -1435,7 +1447,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             );
           });
 
-          upstreamWs.on('close', () => {
+          currentSocket.on('close', () => {
+            if (upstreamWs !== currentSocket) {
+              return;
+            }
             upstreamClosed = true;
             if (isGeminiS2sActive) {
               isGeminiS2sActive = false;

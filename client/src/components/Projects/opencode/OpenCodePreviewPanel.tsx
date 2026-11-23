@@ -3,7 +3,17 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { Button, Spinner } from '@librechat/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MutationKeys, QueryKeys, dataService } from 'librechat-data-provider';
-import { AlertTriangle, Globe, Play, RotateCw, Sparkles, Square } from 'lucide-react';
+import {
+  AlertTriangle,
+  Globe,
+  Monitor,
+  Play,
+  RotateCw,
+  Smartphone,
+  Sparkles,
+  Square,
+  Tablet,
+} from 'lucide-react';
 import {
   openCodePendingAutoPromptAtom,
   openCodeRunStateAtom,
@@ -36,6 +46,8 @@ export default function OpenCodePreviewPanel({
   const setPendingAutoPrompt = useSetAtom(openCodePendingAutoPromptAtom);
   const [commandInput, setCommandInput] = useState('');
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const viewportMaxWidth = { desktop: '100%', tablet: '768px', mobile: '390px' }[viewportMode];
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const prevRunStateRef = useRef(runState);
   const autoStartedRef = useRef<string | null>(null);
@@ -279,8 +291,52 @@ export default function OpenCodePreviewPanel({
 
           {!simpleMode && status?.port ? (
             <span className="rounded bg-surface-tertiary px-2 py-0.5 font-mono text-[11px] text-text-secondary">
-              127.0.0.1:{status.port}
+              {`127.0.0.1:${status.port}`}
             </span>
+          ) : null}
+
+          {isRunning && proxyPath ? (
+            <div className="flex items-center rounded-md border border-border-light bg-surface-primary p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewportMode('desktop')}
+                className={`rounded p-1 transition-colors ${
+                  viewportMode === 'desktop'
+                    ? 'bg-surface-active text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title="Desktop viewport (100%)"
+                aria-label="Desktop viewport"
+              >
+                <Monitor className="size-3" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewportMode('tablet')}
+                className={`rounded p-1 transition-colors ${
+                  viewportMode === 'tablet'
+                    ? 'bg-surface-active text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title="Tablet viewport (768px)"
+                aria-label="Tablet viewport"
+              >
+                <Tablet className="size-3" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewportMode('mobile')}
+                className={`rounded p-1 transition-colors ${
+                  viewportMode === 'mobile'
+                    ? 'bg-surface-active text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title="Mobile viewport (390px)"
+                aria-label="Mobile viewport"
+              >
+                <Smartphone className="size-3" aria-hidden="true" />
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -306,12 +362,15 @@ export default function OpenCodePreviewPanel({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {isRunning && proxyPath ? (
-          <iframe
-            key={`${proxyPath}-${reloadNonce}`}
-            src={proxyPath}
-            title={localize('com_opencode_preview_iframe_title')}
-            className="min-h-0 w-full flex-1 border-0 bg-white"
-          />
+          <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-surface-secondary/50">
+            <iframe
+              key={`${proxyPath}-${reloadNonce}`}
+              src={proxyPath}
+              title={localize('com_opencode_preview_iframe_title')}
+              className="min-h-0 flex-1 border-0 bg-white shadow-sm transition-all"
+              style={{ maxWidth: viewportMaxWidth }}
+            />
+          </div>
         ) : null}
         {!(isRunning && proxyPath) && (isRunning || startMutation.isLoading) ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-text-secondary">

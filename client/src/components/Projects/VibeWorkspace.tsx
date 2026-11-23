@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Cloud,
   Code2,
   Columns,
   Download,
@@ -91,6 +92,22 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const { token, user } = useAuthContext();
   const isPrivacyAccount =
     ((user as { accountType?: string } | undefined)?.accountType ?? '').toLowerCase() === 'privacy';
+  const hasGoogleCloud = Boolean(
+    (user as { googleId?: string; provider?: string } | undefined)?.googleId ||
+      (user as { provider?: string } | undefined)?.provider === 'google',
+  );
+  const hasOneDrive = Boolean(
+    (user as { openidId?: string; provider?: string } | undefined)?.provider === 'openid',
+  );
+  let cloudDriveLabel = 'Cloud Drive';
+  let cloudDriveTitle = 'Connect Google or Microsoft account for Cloud Drive sync';
+  if (hasGoogleCloud) {
+    cloudDriveLabel = 'Google Drive';
+    cloudDriveTitle = 'Google Drive / Docs connected via Google OAuth';
+  } else if (hasOneDrive) {
+    cloudDriveLabel = 'OneDrive';
+    cloudDriveTitle = 'OneDrive connected via Microsoft OAuth';
+  }
   const queryClient = useQueryClient();
 
   const activeSessionId = useAtomValue(activeOpenCodeSessionIdAtom);
@@ -713,6 +730,18 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
           >
             <ShieldCheck className="size-3" aria-hidden="true" />
             {isPrivacyAccount ? 'Local Privacy · :8080' : 'Gateway · :4000'}
+          </span>
+
+          <span
+            className={`hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium xl:inline-flex ${
+              hasGoogleCloud || hasOneDrive
+                ? 'border-border-medium bg-surface-primary text-text-primary'
+                : 'border-border-light bg-surface-primary/60 text-text-secondary'
+            }`}
+            title={cloudDriveTitle}
+          >
+            <Cloud className="size-3" aria-hidden="true" />
+            {cloudDriveLabel}
           </span>
 
           {!isNormalMode ? (

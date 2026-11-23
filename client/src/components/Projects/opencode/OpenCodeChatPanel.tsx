@@ -365,6 +365,42 @@ export default function OpenCodeChatPanel({
     { enabled: reachable && Boolean(projectId), refetchOnWindowFocus: false },
   );
 
+  const treeQuery = useQuery(
+    [QueryKeys.opencodeTree, projectId],
+    () => dataService.getOpenCodeTree(projectId),
+    { enabled: reachable && Boolean(projectId), refetchOnWindowFocus: false },
+  );
+
+  const projectFilePaths = useMemo(() => {
+    const out: string[] = [];
+    const walk = (nodes: Array<{ type: string; path: string; children?: unknown[] }>) => {
+      for (const n of nodes) {
+        if (n.type === 'file') {
+          out.push(n.path);
+        } else if (Array.isArray(n.children)) {
+          walk(n.children as Array<{ type: string; path: string; children?: unknown[] }>);
+        }
+      }
+    };
+    walk(treeQuery.data?.tree ?? []);
+    return out;
+  }, [treeQuery.data?.tree]);
+
+  const mentionMatch = /(?:^|\s)@([^\s@]*)$/.exec(promptInput);
+  const mentionQuery = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) {
+      return [];
+    }
+    return projectFilePaths
+      .filter((p) => !mentionQuery || p.toLowerCase().includes(mentionQuery))
+      .slice(0, 8);
+  }, [mentionQuery, projectFilePaths]);
+
+  const insertFileMention = (filePath: string) => {
+    setPromptInput((prev) => prev.replace(/(^|\s)@[^\s@]*$/, `$1@${filePath} `));
+  };
+
   const providersQuery = useQuery(
     [QueryKeys.opencodeProviders, projectId],
     () => dataService.getOpenCodeProviders(projectId),
@@ -1133,6 +1169,21 @@ export default function OpenCodeChatPanel({
           onChange={handleFileInputChange}
           className="hidden"
         />
+        {mentionSuggestions.length > 0 ? (
+          <div className="mb-1.5 max-h-40 overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-1 shadow-md">
+            {mentionSuggestions.map((filePath) => (
+              <button
+                key={filePath}
+                type="button"
+                onClick={() => insertFileMention(filePath)}
+                className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left font-mono text-xs text-text-primary hover:bg-surface-hover"
+              >
+                <span className="text-text-secondary">{'@'}</span>
+                <span className="truncate">{filePath}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="flex items-end gap-1.5">
           <Button
             type="button"

@@ -29,6 +29,7 @@ import {
   Rows,
   Save,
   Search,
+  ShieldCheck,
   Sparkles,
   Terminal as TerminalIcon,
   Trash2,
@@ -87,7 +88,9 @@ function getLanguageFromPath(filePath: string): string {
 
 export default function VibeWorkspace({ projectId, projectName, localPath }: VibeWorkspaceProps) {
   const localize = useLocalize();
-  const { token } = useAuthContext();
+  const { token, user } = useAuthContext();
+  const isPrivacyAccount =
+    ((user as { accountType?: string } | undefined)?.accountType ?? '').toLowerCase() === 'privacy';
   const queryClient = useQueryClient();
 
   const activeSessionId = useAtomValue(activeOpenCodeSessionIdAtom);
@@ -696,6 +699,22 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
             </button>
           </div>
 
+          <span
+            className={`hidden items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium md:inline-flex ${
+              isPrivacyAccount
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500'
+                : 'border-border-light bg-surface-primary text-text-secondary'
+            }`}
+            title={
+              isPrivacyAccount
+                ? 'Privacy tier: strictly routed to local llama.cpp fleet (127.0.0.1:8080)'
+                : 'Routed via Satchida AutoRouter Gateway (127.0.0.1:4000)'
+            }
+          >
+            <ShieldCheck className="size-3" aria-hidden="true" />
+            {isPrivacyAccount ? 'Local Privacy · :8080' : 'Gateway · :4000'}
+          </span>
+
           {!isNormalMode ? (
             <>
               <span className="mx-1 h-4 w-px bg-border-light" aria-hidden="true" />
@@ -1032,7 +1051,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                                         className="shrink-0 rounded bg-surface-active px-1.5 py-0.5 text-[10px] text-text-primary hover:bg-surface-hover"
                                         title={`Replace all in ${filePath}`}
                                       >
-                                        {localize('com_ui_replace')}
+                                        {'Replace'}
                                       </button>
                                     ) : null}
                                   </div>

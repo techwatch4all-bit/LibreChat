@@ -366,7 +366,12 @@ model-selection dropdown once (2026-11-10); it must never happen again.
 
 Every AI agent and contributor must strictly distinguish the three authentication and routing layers in the Satchida stack and **never conflate or bypass them**:
 
-1. **Three Distinct Credentials — Never Conflate Them**:
+1. **Mandatory Satchida Gateway Routing (One-API :4000) — HARD LINE DIRECTIVE**:
+   - **All traffic from LibreChat MUST flow through Satchida Gateway (`http://127.0.0.1:4000`, One-API)** before reaching Bifrost or any external upstream provider.
+   - Never configure LibreChat services, proxies, or voice backends to connect directly or exclusively to Bifrost or external endpoints, bypassing One-API.
+   - For Live Voice / Realtime on Pro, Privacy, and Pro_Family seats, the request must be authenticated with the user's `seatToken`, sent to Satchida Gateway (`:4000`), and the gateway channels/abilities must route the `Motion` model directly to Bifrost under the designated channel virtual key so that Bifrost triggers `rule-motion-realtime`.
+
+2. **Three Distinct Credentials — Never Conflate Them**:
    - **End-User JWT (`req.user` / `?token=<jwt>` / `refreshToken` cookie)**: Authenticates the logged-in LibreChat user (`JWT_SECRET` / `JWT_REFRESH_SECRET`).
    - **Per-User Satchida Seat Token (`user.seatToken`, `tk_<tenant>_...`)**: Stored on the MongoDB `User` document (`select: false` — must be hydrated explicitly via `+seatToken +satchidaSeatAlias`). This is the user's personal bearer credential for **Satchida Gateway One-API (`http://127.0.0.1:4000`)**, which enforces per-seat quotas, tier entitlements, and seat billing attribution.
    - **Mode-Scoped Bifrost Virtual Key (`x-bf-vk`, 96-character key in `one-api.db` `channels`)**: The gateway-to-Bifrost (`http://127.0.0.1:8700`) channel key:

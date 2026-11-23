@@ -149,6 +149,10 @@ export default function LiveVoiceModal({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const nextPlayTimeRef = useRef<number>(0);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioQueueRef = useRef<Array<{ audioBase64: string; mimeType: string }>>([]);
   const isPlayingQueueRef = useRef<boolean>(false);
   const isAssistantSpeakingRef = useRef<boolean>(false);
@@ -163,6 +167,25 @@ export default function LiveVoiceModal({
   hasToolsRef.current = hasActiveComposerTools;
   const askRef = useRef(ask);
   askRef.current = ask;
+
+  const getAudioContext = useCallback((): AudioContext | null => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) {
+      return null;
+    }
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      void audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
 
   const pauseRecognitionForEchoGuard = useCallback(() => {
     if (recognitionRef.current) {
@@ -199,6 +222,21 @@ export default function LiveVoiceModal({
       isAssistantSpeakingRef.current = false;
       ignoreSpeechUntilRef.current = Date.now() + ECHO_COOLDOWN_MS;
 
+      if (finishTimerRef.current) {
+        clearTimeout(finishTimerRef.current);
+        finishTimerRef.current = null;
+      }
+      for (const src of activeSourcesRef.current) {
+        try {
+          src.stop();
+          src.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+      activeSourcesRef.current = [];
+      nextPlayTimeRef.current = 0;
+
       if (htmlAudioRef.current) {
         htmlAudioRef.current.onended = null;
         htmlAudioRef.current.onerror = null;
@@ -219,6 +257,74 @@ export default function LiveVoiceModal({
       }
     },
     [resumeRecognitionAfterEchoGuard],
+  );
+
+  const schedulePcmChunk = useCallback(
+    (base64: string) => {
+      const ctx = getAudioContext();
+      if (!ctx) {
+        return;
+      }
+
+      // Convert base64 to Float32Array (16-bit little-endian PCM at 24000Hz)
+      const binaryStr = window.atob(base64);
+      const len = binaryStr.length;
+      if (len < 2) {
+        return;
+      }
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const int16 = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(len / 2));
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768.0;
+      }
+
+      const audioBuffer = ctx.createBuffer(1, float32.length, 24000);
+      audioBuffer.copyToChannel(float32, 0);
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      const startTime = Math.max(now + 0.02, nextPlayTimeRef.current);
+      source.start(startTime);
+      nextPlayTimeRef.current = startTime + audioBuffer.duration;
+
+      activeSourcesRef.current.push(source);
+      source.onended = () => {
+        const idx = activeSourcesRef.current.indexOf(source);
+        if (idx !== -1) {
+          activeSourcesRef.current.splice(idx, 1);
+        }
+      };
+
+      // Continuous speaking state
+      isAssistantSpeakingRef.current = true;
+      pauseRecognitionForEchoGuard();
+      setIsAssistantSpeaking(true);
+      setStatusText('Speaking...');
+
+      if (finishTimerRef.current) {
+        clearTimeout(finishTimerRef.current);
+      }
+      const remainingMs = Math.max(50, Math.round((nextPlayTimeRef.current - ctx.currentTime) * 1000));
+      finishTimerRef.current = setTimeout(() => {
+        if (activeSourcesRef.current.length === 0) {
+          isAssistantSpeakingRef.current = false;
+          ignoreSpeechUntilRef.current = Date.now() + ECHO_COOLDOWN_MS;
+          setIsAssistantSpeaking(false);
+          setStatusText(isMutedRef.current ? 'Muted' : 'Listening...');
+          setTimeout(() => {
+            resumeRecognitionAfterEchoGuard();
+          }, ECHO_COOLDOWN_MS);
+        }
+      }, remainingMs + 50);
+    },
+    [getAudioContext, pauseRecognitionForEchoGuard, resumeRecognitionAfterEchoGuard],
   );
 
   const playNextQueuedAudio = useCallback(() => {
@@ -260,14 +366,28 @@ export default function LiveVoiceModal({
 
   const enqueueAudioBase64 = useCallback(
     (audioBase64: string, mimeType: string) => {
+      if (mimeType.includes('pcm')) {
+        schedulePcmChunk(audioBase64);
+        return;
+      }
       audioQueueRef.current.push({ audioBase64, mimeType });
       playNextQueuedAudio();
     },
-    [playNextQueuedAudio],
+    [playNextQueuedAudio, schedulePcmChunk],
   );
 
   const cleanupSession = useCallback(() => {
     stopAssistantAudio(false);
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        void audioContextRef.current.close();
+      } catch {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+    nextPlayTimeRef.current = 0;
 
     if (recognitionRef.current) {
       recognitionRef.current.onend = null;
@@ -480,6 +600,7 @@ export default function LiveVoiceModal({
         return;
       }
       mediaStreamRef.current = stream;
+      getAudioContext();
 
       setStatusText('Connecting...');
 
@@ -552,6 +673,11 @@ export default function LiveVoiceModal({
           if (msg.type === 'error') {
             receivedExplicitError = true;
             reportError(sanitizeVoiceError(msg.error?.message));
+            return;
+          }
+
+          if (msg.type === 'voice.interrupted') {
+            stopAssistantAudio(true);
             return;
           }
 

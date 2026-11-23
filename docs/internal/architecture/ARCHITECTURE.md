@@ -3027,6 +3027,101 @@ To ensure that older/inferior models (such as `dots-3-note-preview:free`) can **
    - The test must confirm that `extra_fields.resolved_model_used` exactly matches the intended new model.
    - **Automated Tooling**: The script `D:\LAN-AI-Infra\ops-scripts\promote-model.py` enforces this 4-step atomic cutover with automated verification.
 
+### 28.5 Satchida Realtime Speech-to-Speech (S2S) Architecture & Google Ephemeral Tokens Broker
+
+#### 28.5.1 The Architectural Paradigm: Cascaded Pipeline vs. Native S2S
+Previous voice implementations in web chat interfaces suffered from the **Cascaded Pipeline Triad**:
+1. **Speech-to-Text (STT)**: Browser Web Speech API or whisper endpoints transcribe user audio to text.
+2. **Text Inference (LLM)**: Text transcript sent via standard HTTP `/v1/chat/completions` to conversational text models (e.g., GLM-5.3, Llama-3.1).
+3. **Text-to-Speech (TTS)**: Response text parsed into chunks and synthesized via Edge-TTS or Web Speech synthesis.
+
+**Critical Weaknesses of Cascaded Systems**:
+- **High Latency (1.5s - 3.5s)**: Serialization at every stage causes unnatural conversational pauses.
+- **Loss of Nuance & Emotion**: Intonation, cadence, and vocal affect are completely lost in text tokens.
+- **Robotic Turn-Taking**: No full-duplex interruption (barge-in); speech must finish before listening resumes.
+- **Model Identity Leaks**: Text LLMs frequently hallucinate or recite backend identity metadata (e.g., "I'm z-ai/glm-5.3-flash").
+
+By contrast, **Native Speech-to-Speech (S2S)** uses a single multimodal neural model (such as `models/gemini-3.8-live` or `gemini-2.5-flash-native-audio-latest`) connected over a bidirectional WebSocket (`BidiGenerateContentConstrained`). Audio PCM is consumed and generated natively at 24kHz with sub-300ms latency and real-time human-like barge-in capability.
+
+#### 28.5.2 The Master Key Dilemma & Zero-Knowledge Enforcement
+Connecting clients to `wss://generativelanguage.googleapis.com` directly requires API credentials. However, under the **Satchida Sovereign Multi-Tenant Architecture Rules**:
+- **Rule 3 (Master Credential Protection)**: Real Google, Anthropic, and OpenAI API keys must **NEVER** exist on client machines or be exposed in browser network inspection.
+- Proxying multi-megabyte binary audio streams across intermediate servers adds round-trip latency and buffer bloat.
+
+#### 28.5.3 The Solution: Scoped Ephemeral Token Broker Pattern
+To achieve zero key disclosure, strict seat quota governance, and native S2S performance, the harness employs the **Google Ephemeral Tokens Broker Pattern**:
+
+```
+[ Client Browser: Satchida Live Voice ]
+        │
+        │ 1. Request Voice Session (Bearer JWT)
+        ▼
+[ LibreChat API Gateway (:3080) ] ───► [ One-API (:4000) Quota Check ]
+        │                              (Verifies seat tier, active tokens)
+        │ 2. Mint Ephemeral Token (Internal Bifrost Key ID 11)
+        ▼
+[ Google Cloud / Gemini AI Studio Auth Engine ]
+  POST /v1beta/auth_tokens
+  Payload:
+    - uses: 1
+    - expire_time: now + 30m
+    - live_connect_constraints: { model: "models/gemini-3.8-live", response_modalities: ["AUDIO"] }
+        │
+        │ 3. Ephemeral Token Returned: "auth_tokens/xxxx..."
+        ▼
+[ Satchida Live Voice WebSocket Tunnel (:3080/api/voice/realtime) ]
+        │
+        │ 4. Full-Duplex BidiStream Handshake
+        │    Header: Authorization: Token auth_tokens/xxxx...
+        ▼
+[ Google GenerativeService.BidiGenerateContentConstrained (WSS) ]
+  • Sub-300ms bidirectional PCM (24kHz, 16-bit Mono)
+  • Scoped exclusively to active call session (Max 30 mins)
+  • Master key is 100% hidden and untouched by client
+  • Usage telemetry asynchronously logged back to One-API seat_token_usages
+```
+
+#### 28.5.4 Session Lifecycle & Governance Flow
+1. **Token Minting (`POST /api/voice/session` / WebSocket Init)**:
+   - Client initiates connection to `/api/voice/realtime`.
+   - Backend decodes user JWT, verifies seat quota via One-API (`/v1/users/` or `seat_token_usages`), and obtains the master Google API key securely from Bifrost's encrypted keystore.
+   - Backend calls Google AI Studio `POST https://generativelanguage.googleapis.com/v1beta/auth_tokens` with:
+     ```json
+     {
+       "config": {
+         "uses": 1,
+         "expireTime": "<now + 30 minutes in RFC3339>",
+         "liveConnectConstraints": {
+           "model": "models/gemini-3.8-live",
+           "config": {
+             "responseModalities": ["AUDIO"],
+             "speechConfig": {
+               "voiceConfig": {
+                 "prebuiltVoiceConfig": {
+                   "voiceName": "Aoede"
+                 }
+               }
+             },
+             "systemInstruction": {
+               "parts": [{ "text": "You are Satchida Live Voice, a concise, warm conversational AI." }]
+             }
+           }
+         }
+       }
+     }
+     ```
+2. **Constrained Full-Duplex Stream Bridge**:
+   - LibreChat's backend opens an upstream WebSocket to:
+     `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained`
+     passing the HTTP header `Authorization: Token auth_tokens/<token>`.
+   - Browser client streams audio PCM (16kHz / 24kHz) to `/api/voice/realtime`, and Google streams native 24kHz synthesized audio back to the client.
+3. **Usage Accounting & Seat Reconciliation**:
+   - On session teardown (or at 60-second periodic heartbeat intervals), the proxy calculates total connection duration and audio token throughput.
+   - It issues an atomic update to One-API `seat_token_usages` in `one-api.db` for the active seat ID.
+4. **Fallback Safety Net**:
+   - If Google AI Studio returns rate limits (HTTP 429) or the upstream WebSocket is unavailable, the voice proxy automatically falls back to the cascaded Voxtral/Gemini-Flash HTTP stream + Edge-TTS pipeline without interrupting the user.
+
+
 
 ---
 

@@ -207,49 +207,57 @@ export default function HeaderAudioSpeaker() {
   return (
     <div className="flex items-center gap-1">
       {/* Primary Teacher Speaker Button */}
-      <TooltipAnchor
-        description={mainTooltip}
-        render={
-          <button
-            id="header-audio-speaker-button"
-            type="button"
-            aria-label={mainTooltip}
-            onClick={handleToggleSpeak}
-            className={`relative inline-flex size-9 flex-shrink-0 items-center justify-center rounded-xl border border-border-light bg-presentation text-text-primary transition-all ease-in-out hover:bg-surface-tertiary disabled:pointer-events-none disabled:opacity-50 ${
-              isPlaying
-                ? 'border-primary bg-primary/20 text-primary animate-pulse ring-2 ring-primary/40'
-                : isPaused
-                ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-500'
-                : ''
-            }`}
-          >
-            {isLoading ? (
-              <Spinner className="h-5 w-5 text-primary" />
-            ) : isPlaying ? (
-              <Pause
-                style={{ width: '1.25rem', height: '1.25rem' }}
-                className="text-primary"
-                aria-hidden="true"
-                focusable="false"
-              />
-            ) : isPaused ? (
-              <Play
-                style={{ width: '1.25rem', height: '1.25rem' }}
-                className="text-yellow-500 ml-0.5"
-                aria-hidden="true"
-                focusable="false"
-              />
-            ) : (
-              <Volume2
-                style={{ width: '1.25rem', height: '1.25rem' }}
-                className="text-text-primary"
-                aria-hidden="true"
-                focusable="false"
-              />
-            )}
-          </button>
-        }
-      />
+      <div className="relative flex items-center">
+        <TooltipAnchor
+          description={`${mainTooltip} (Local / On-device)`}
+          render={
+            <button
+              id="header-audio-speaker-button"
+              type="button"
+              aria-label={mainTooltip}
+              onClick={handleToggleSpeak}
+              className={`relative inline-flex size-9 flex-shrink-0 items-center justify-center rounded-xl border border-border-light bg-presentation text-text-primary transition-all ease-in-out hover:bg-surface-tertiary disabled:pointer-events-none disabled:opacity-50 ${
+                isPlaying
+                  ? 'border-primary bg-primary/20 text-primary animate-pulse ring-2 ring-primary/40'
+                  : isPaused
+                  ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-500'
+                  : ''
+              }`}
+            >
+              {isLoading ? (
+                <Spinner className="h-5 w-5 text-primary" />
+              ) : isPlaying ? (
+                <Pause
+                  style={{ width: '1.25rem', height: '1.25rem' }}
+                  className="text-primary"
+                  aria-hidden="true"
+                  focusable="false"
+                />
+              ) : isPaused ? (
+                <Play
+                  style={{ width: '1.25rem', height: '1.25rem' }}
+                  className="text-yellow-500 ml-0.5"
+                  aria-hidden="true"
+                  focusable="false"
+                />
+              ) : (
+                <Volume2
+                  style={{ width: '1.25rem', height: '1.25rem' }}
+                  className="text-text-primary"
+                  aria-hidden="true"
+                  focusable="false"
+                />
+              )}
+            </button>
+          }
+        />
+        <span
+          className="pointer-events-none absolute -bottom-1 -right-1 select-none rounded bg-emerald-500/15 px-1 py-[0.5px] text-[7.5px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-xs"
+          title="On-device Local Speech"
+        >
+          Local
+        </span>
+      </div>
 
       {/* Voice Toggle: Neerja (F) vs Prabhat (M) - Indian English */}
       <TooltipAnchor

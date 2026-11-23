@@ -854,3 +854,10 @@ skill aborts the whole registry, killing all 22 existing deployment skills; (2) 
    immediately); fine-art presets carry vendored 640px benchmark previews from
    `/assets/art-presets/<id>.jpg` (83 files, 4.4MB, mirrored to client/dist) and document the exact
    MCP regeneration call. Client rebuilt; presets present in the production bundle.
+
+### 2026-11-23 — Google Ephemeral Tokens Design & Realtime S2S Live Voice
+1. **Architecture Documentation**: Added Section 28.5 to `docs/internal/architecture/ARCHITECTURE.md` documenting the Google Ephemeral Tokens Broker pattern for native full-duplex Speech-to-Speech (S2S) voice streaming. Details the transition from legacy cascaded STT->LLM->TTS pipelines to direct multimodal bidirectional streaming (`gemini-3.8-live` via `BidiGenerateContentConstrained`).
+2. **Zero-Knowledge Key Custody**: Encrypted Google API keys reside strictly inside Bifrost keystore (`config.db`). Backend broker provisions short-lived, constrained ephemeral tokens (`auth_tokens/...`) valid for 30 minutes with `uses: 1` and scoped exclusively to `models/gemini-3.8-live` and audio modalities. Master credentials never leak to clients.
+3. **Usage Accounting & Seat Telemetry**: Session lifecycle updates One-API `seat_token_usages` in `one-api.db` for the user's active seat alias upon disconnect or via periodic heartbeat.
+4. **Resilient Fallback**: Automatic failover to cascaded Voxtral/Gemini-Flash HTTP stream + Edge-TTS if Google Live API reaches rate limits or WebSocket connectivity drops.
+

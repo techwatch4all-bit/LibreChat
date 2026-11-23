@@ -141,35 +141,43 @@ export default memo(function AudioRecorder({
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <TooltipAnchor
-        description={localize('com_ui_use_micrphone')}
-        render={
-          <IconButton
-            id="audio-recorder"
-            type="button"
-            variant="ghost"
-            size="theme"
-            shape="theme"
-            label={localize('com_ui_use_micrphone')}
-            onClick={isListening === true ? handleStopRecording : handleStartRecording}
-            disabled={recorderDisabled}
-            className="p-1 hover:bg-surface-composer-hover"
-            aria-pressed={isListening}
-          >
-            {renderIcon()}
-          </IconButton>
-        }
-      />
+      <div className="relative flex items-center">
+        <TooltipAnchor
+          description={`${localize('com_ui_use_micrphone')} (On-device / Local)`}
+          render={
+            <IconButton
+              id="audio-recorder"
+              type="button"
+              variant="ghost"
+              size="theme"
+              shape="theme"
+              label={localize('com_ui_use_micrphone')}
+              onClick={isListening === true ? handleStopRecording : handleStartRecording}
+              disabled={recorderDisabled}
+              className="p-1 hover:bg-surface-composer-hover"
+              aria-pressed={isListening}
+            >
+              {renderIcon()}
+            </IconButton>
+          }
+        />
+        <span
+          className="pointer-events-none absolute -bottom-1 -right-0.5 select-none rounded bg-emerald-500/15 px-1 py-[0.5px] text-[7.5px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+          title="On-device Local Speech"
+        >
+          Local
+        </span>
+      </div>
 
       {isProVoice ? (
         <TooltipAnchor
-          description="Satchida Live Voice (Realtime Conversational Speech)"
+          description="Satchida Live Voice (Continuous Voice Mode: Browser STT + Fast LLM + Neural TTS)"
           render={
             <button
               type="button"
               onClick={() => setShowLiveVoiceModal(true)}
               className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
-              aria-label="Satchida Live Voice"
+              aria-label="Satchida Live Voice (Continuous Mode)"
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
@@ -182,7 +190,7 @@ export default memo(function AudioRecorder({
         />
       ) : (
         <TooltipAnchor
-          description="Live Realtime Voice (Pro Feature) — Upgrade via Site Admin"
+          description="Live Voice Mode (Continuous STT + Fast LLM + TTS, Pro Feature) — Upgrade via Site Admin"
           render={
             <button
               type="button"

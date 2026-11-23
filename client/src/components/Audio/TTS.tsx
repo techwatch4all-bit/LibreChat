@@ -60,7 +60,7 @@ export function BrowserTTS({
     toggleSpeech();
   };
 
-  const title = isSpeaking === true ? localize('com_ui_stop') : localize('com_ui_read_aloud');
+  const title = isSpeaking === true ? localize('com_ui_stop') : `${localize('com_ui_read_aloud')} (Local / On-device)`;
 
   return (
     <>

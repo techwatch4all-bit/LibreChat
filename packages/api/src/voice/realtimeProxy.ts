@@ -264,6 +264,193 @@ function readBifrostChannelVksFromOneApiDb(): CachedChannelVks {
   return empty;
 }
 
+let cachedGoogleApiKey = '';
+
+export function getDecryptedGoogleApiKey(): string {
+  if (cachedGoogleApiKey) {
+    return cachedGoogleApiKey;
+  }
+  const dbCandidates = [
+    'D:\\LAN-AI-Infra\\Bifrost\\data\\config.db',
+    path.resolve(process.cwd(), '../Bifrost/data/config.db'),
+  ];
+  for (const dbPath of dbCandidates) {
+    if (!fs.existsSync(dbPath)) {
+      continue;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sqlite = require('node:sqlite') as {
+        DatabaseSync: new (
+          p: string,
+          opts?: { readOnly?: boolean },
+        ) => {
+          prepare: (sql: string) => {
+            all: () => Array<{ value?: string }>;
+          };
+          close: () => void;
+        };
+      };
+      const db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
+      const row = db
+        .prepare("SELECT value FROM config_keys WHERE provider='google' AND enabled = 1 LIMIT 1")
+        .all()[0];
+      db.close();
+
+      if (!row?.value) {
+        continue;
+      }
+
+      const passphrase =
+        process.env.BIFROST_ENCRYPTION_KEY || '42b2b99d83b38d7d2fc057731177df47d0af10a51412ac01';
+      const salt = Buffer.from('bifrost-encryption-v1-salt-2024');
+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { argon2id } = require('@noble/hashes/argon2') as {
+        argon2id: (
+          p: string | Uint8Array,
+          s: string | Uint8Array,
+          opts: { t: number; m: number; p: number; dkLen: number },
+        ) => Uint8Array;
+      };
+      const aesKey = argon2id(passphrase, salt, {
+        t: 1,
+        m: 64 * 1024,
+        p: 4,
+        dkLen: 32,
+      });
+
+      const buf = Buffer.from(row.value, 'base64');
+      const nonce = buf.subarray(0, 12);
+      const tag = buf.subarray(buf.length - 16);
+      const ciphertext = buf.subarray(12, buf.length - 16);
+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const crypto = require('crypto');
+      const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, nonce);
+      decipher.setAuthTag(tag);
+      const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+
+      if (plain) {
+        cachedGoogleApiKey = plain.trim();
+        return cachedGoogleApiKey;
+      }
+    } catch (err) {
+      logger.warn('[RealtimeVoice] Failed to decrypt Google key from config.db:', err);
+    }
+  }
+  return '';
+}
+
+export async function mintGoogleEphemeralToken(
+  model = 'models/gemini-3.8-live',
+): Promise<string> {
+  const masterKey = getDecryptedGoogleApiKey();
+  if (!masterKey) {
+    throw new Error('Google master API key not available');
+  }
+
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': masterKey,
+    },
+    body: JSON.stringify({
+      uses: 1,
+      bidiGenerateContentSetup: {
+        model,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(
+      `Failed to mint ephemeral token (status ${res.status}): ${text.slice(0, 200)}`,
+    );
+  }
+
+  const data = (await res.json()) as { name?: string };
+  if (!data?.name) {
+    throw new Error('Empty token response from Google auth_tokens API');
+  }
+  return data.name;
+}
+
+export function mapVoiceToGeminiPrebuilt(
+  voiceProfile: VoiceProfile,
+): 'Aoede' | 'Charon' | 'Fenrir' | 'Kore' | 'Puck' {
+  if (voiceProfile.gender === 'female') {
+    return voiceProfile.region === 'in' ? 'Kore' : 'Aoede';
+  }
+  return voiceProfile.region === 'in' ? 'Puck' : 'Fenrir';
+}
+
+export function pcmToWavBuffer(
+  pcmBuffer: Buffer,
+  sampleRate = 24000,
+  numChannels = 1,
+  bitsPerSample = 16,
+): Buffer {
+  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const dataSize = pcmBuffer.length;
+  const chunkSize = 36 + dataSize;
+  const header = Buffer.alloc(44);
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(chunkSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM format
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+function recordVoiceUsageInOneApi(
+  seatAliasOrId: string,
+  outputTokens: number,
+): void {
+  const candidates = [
+    'D:\\LAN-AI-Infra\\one-api\\one-api.db',
+    path.resolve(process.cwd(), 'one-api.db'),
+  ];
+  for (const dbPath of candidates) {
+    if (!fs.existsSync(dbPath)) {
+      continue;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sqlite = require('node:sqlite') as {
+        DatabaseSync: new (p: string) => {
+          prepare: (sql: string) => {
+            run: (...args: unknown[]) => void;
+          };
+          close: () => void;
+        };
+      };
+      const db = new sqlite.DatabaseSync(dbPath);
+      const now = Math.floor(Date.now() / 1000);
+      db.prepare(
+        'UPDATE seat_token_usages SET output_tokens = output_tokens + ?, updated_at = ? WHERE seat_alias = ? OR user_id = ?',
+      ).run(outputTokens, now, seatAliasOrId, seatAliasOrId);
+      db.close();
+      return;
+    } catch {
+      // Ignore
+    }
+  }
+}
+
 export function selectBifrostVkForMode(mode: string, accountType?: string | null): string {
   const envVk = (process.env.BIFROST_VIRTUAL_KEY || '').trim();
   if (envVk) {
@@ -273,8 +460,17 @@ export function selectBifrostVkForMode(mode: string, accountType?: string | null
   const normalizedMode = mode.trim().toLowerCase();
   const normalizedTier = (accountType || '').trim().toLowerCase();
 
-  if (normalizedMode === 'privacy' || normalizedTier === 'privacy') {
+  // Motion/Voice requests route via Cloud Retaining/Cloud ZDR virtual key
+  if (normalizedMode === 'motion') {
+    return normalizedTier === 'privacy' ? (vks.zdr || vks.retaining) : (vks.retaining || vks.workStudy);
+  }
+
+  // Only true local Privacy mode uses the localPrivacy key
+  if (normalizedMode === 'privacy') {
     return vks.localPrivacy || vks.zdr || vks.retaining;
+  }
+  if (normalizedTier === 'privacy') {
+    return vks.zdr || vks.retaining;
   }
   if (normalizedMode === 'work' || normalizedMode === 'study') {
     return vks.workStudy || vks.retaining;
@@ -380,6 +576,8 @@ export function buildSatchidaAttributionHeaders(params: {
     'X-User-Id': userId,
     'X-User-Name': userName,
     'X-Seat-Alias': seatAlias,
+    'x-satchida-seat-alias': seatAlias,
+    'x-satchida-account-type': user?.accountType || 'pro',
     'X-Satchida-Mode': params.semanticMode,
     'X-Bifrost-Mode': params.normalizedMode,
     'X-Bifrost-User-Id': userId,
@@ -784,7 +982,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         {
           role: 'system',
           content:
-            'You are Satchida Live Voice, a warm, natural, concise conversational voice assistant. Keep responses clear, direct, and under 2-3 spoken sentences with no markdown, bullet points, or emojis.',
+            'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI. You speak directly to the user in a warm, natural, and concise tone. NEVER mention or disclose backend provider names, raw model identifiers (such as GLM, DeepSeek, Qwen, CheapInference, OpenRouter, DeepInfra, Bifrost, One-API, or local ports), or internal routing infrastructure. If the user asks who or what model you are, always state clearly that you are Satchida AI (or Satchida Live Voice). Keep responses clear, direct, and under 2-3 spoken sentences with no markdown, bullet points, or emojis.',
         },
       ];
       let upstreamClosed = false;
@@ -882,14 +1080,21 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           return;
         }
 
+        const liveVoiceTargetModel =
+          ['pro', 'pro_family', 'privacy', 'enterprise'].includes(
+            (userSeat.accountType || '').toLowerCase(),
+          )
+            ? 'Motion'
+            : activePolicy.semanticMode;
+
         const turnHeaders = buildSatchidaAttributionHeaders({
           user: userSeat,
           userId: authenticatedUserId,
-          semanticMode: activePolicy.semanticMode,
-          normalizedMode: activePolicy.normalizedMode,
+          semanticMode: liveVoiceTargetModel,
+          normalizedMode: liveVoiceTargetModel.toLowerCase(),
           hasTools: false,
         });
-        const activeVk = selectBifrostVkForMode(activePolicy.semanticMode, userSeat.accountType);
+        const activeVk = selectBifrostVkForMode(liveVoiceTargetModel, userSeat.accountType);
 
         conversationHistory.push({ role: 'user', content: trimmed });
         sendJson(clientWs, {
@@ -945,18 +1150,36 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               onDelta,
             });
           } else {
+            // Live Voice routes via Motion S2S channel on Satchida Gateway (One-API)
+            const liveVoiceTargetModel =
+              ['pro', 'pro_family', 'privacy', 'enterprise'].includes(
+                (userSeat.accountType || '').toLowerCase(),
+              )
+                ? 'Motion'
+                : activePolicy.semanticMode;
+
             try {
+              const gatewayToken =
+                seatToken ||
+                (process.env.SATCHIDA_GATEWAY_VK || '').trim() ||
+                (process.env.AUTOROUTER_API_KEY || '').trim();
               replyText = await streamChatCompletion({
                 baseUrl: config.oneApiBaseUrl,
-                authBearer: seatToken,
-                extraHeaders: turnHeaders,
-                model: activePolicy.semanticMode,
+                authBearer: gatewayToken,
+                extraHeaders: {
+                  ...turnHeaders,
+                  'X-Satchida-Voice': 'true',
+                  'X-Satchida-Mode': liveVoiceTargetModel,
+                  'x-satchida-account-type': userSeat.accountType || 'pro',
+                  'x-satchida-seat-alias': userSeat.satchidaSeatAlias || userSeat.id || 'usr_1',
+                },
+                model: liveVoiceTargetModel,
                 messages: conversationHistory.slice(-11),
                 onDelta,
               });
             } catch (oneApiErr) {
               logger.info(
-                `[RealtimeVoice] Primary gateway fallback mode=${activePolicy.semanticMode}: ${oneApiErr instanceof Error ? oneApiErr.message : 'err'}`,
+                `[RealtimeVoice] Primary gateway fallback mode=${liveVoiceTargetModel}: ${oneApiErr instanceof Error ? oneApiErr.message : 'err'}`,
               );
               sentenceBuffer = '';
             }
@@ -969,8 +1192,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   extraHeaders: {
                     ...turnHeaders,
                     'X-Satchida-Seat-Token': seatToken,
+                    'X-Satchida-Voice': 'true',
                   },
-                  model: activePolicy.semanticMode,
+                  model: liveVoiceTargetModel,
                   messages: conversationHistory.slice(-11),
                   onDelta,
                 });
@@ -982,6 +1206,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   extraHeaders: {
                     ...turnHeaders,
                     'X-Satchida-Seat-Token': seatToken,
+                    'X-Satchida-Voice': 'true',
                   },
                   model: config.chatModel,
                   messages: conversationHistory.slice(-11),
@@ -1013,12 +1238,155 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         }
       };
 
-      const useNativeUpstream =
-        !modePolicy.isPrivacyMode && process.env.BIFROST_NATIVE_REALTIME_ENABLED === 'true';
+      const sessionStartTime = Date.now();
+      let totalAudioBytesStreamed = 0;
+      let isGeminiS2sActive = false;
+      let upstreamWs: RealtimeWebSocketLike | null = null;
 
-      if (!useNativeUpstream) {
+      // Attempt Native S2S with Google Ephemeral Token first (unless Privacy mode)
+      if (!modePolicy.isPrivacyMode) {
+        try {
+          const ephemeralToken = await mintGoogleEphemeralToken('models/gemini-3.8-live');
+          const geminiWsUrl =
+            'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
+          const prebuiltVoice = mapVoiceToGeminiPrebuilt(activeVoiceProfile);
+
+          upstreamWs = createUpstreamWebSocket(geminiWsUrl, {
+            headers: {
+              Authorization: `Token ${ephemeralToken}`,
+            },
+          });
+
+          upstreamWs.on('open', () => {
+            logger.info(
+              `[RealtimeVoice] Google Gemini Live S2S WebSocket connected (model=gemini-3.8-live, voice=${prebuiltVoice})`,
+            );
+            const setupMsg = {
+              setup: {
+                model: 'models/gemini-3.8-live',
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: {
+                        voiceName: prebuiltVoice,
+                      },
+                    },
+                  },
+                },
+                systemInstruction: {
+                  parts: [
+                    {
+                      text:
+                        'You are Satchida Live Voice, the official conversational AI assistant for Satchida AI. You speak directly to the user in a warm, natural, and concise tone. NEVER mention backend providers, models (like GLM, DeepSeek, Google, or Llama), or internal infrastructure. Keep answers clear, direct, and under 2-3 spoken sentences with no markdown, bullet points, or emojis. If asked who or what you are, state that you are Satchida Live Voice.',
+                    },
+                  ],
+                },
+              },
+            };
+            upstreamWs?.send(JSON.stringify(setupMsg));
+          });
+
+          upstreamWs.on('message', (data: unknown) => {
+            if (clientClosed || clientWs.readyState !== WS_OPEN) {
+              return;
+            }
+            const textData = Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
+            if (!textData.trim()) {
+              return;
+            }
+            try {
+              const msg = JSON.parse(textData) as {
+                setupComplete?: unknown;
+                serverContent?: {
+                  modelTurn?: {
+                    parts?: Array<{
+                      text?: string;
+                      inlineData?: { mimeType?: string; data?: string };
+                    }>;
+                  };
+                  turnComplete?: boolean;
+                  interrupted?: boolean;
+                };
+              };
+
+              if (msg.setupComplete) {
+                isGeminiS2sActive = true;
+                sendJson(clientWs, {
+                  type: 'session.created',
+                  mode: 'gemini_live_s2s',
+                  satchidaMode: modePolicy.semanticMode,
+                  seatAttributed: true,
+                  toolsAllowed: modePolicy.toolsAllowed,
+                  voiceId: activeVoiceProfile.id,
+                  voiceLabel: activeVoiceProfile.label,
+                });
+                return;
+              }
+
+              const sc = msg.serverContent;
+              if (sc?.interrupted) {
+                sendJson(clientWs, { type: 'voice.interrupted' });
+              }
+              if (sc?.modelTurn?.parts) {
+                for (const part of sc.modelTurn.parts) {
+                  if (part.text) {
+                    sendJson(clientWs, {
+                      type: 'response.audio_transcript.delta',
+                      delta: part.text,
+                    });
+                  }
+                  if (part.inlineData?.data) {
+                    const pcmData = part.inlineData.data;
+                    totalAudioBytesStreamed += Buffer.byteLength(pcmData, 'base64');
+                    sendJson(clientWs, {
+                      type: 'voice.audio_chunk',
+                      audioBase64: pcmData,
+                      mimeType: 'audio/pcm;rate=24000',
+                      voiceId: activeVoiceProfile.id,
+                    });
+                  }
+                }
+              }
+              if (sc?.turnComplete) {
+                sendJson(clientWs, {
+                  type: 'response.audio_transcript.done',
+                });
+              }
+            } catch {
+              // Ignore non-json or unparseable frames
+            }
+          });
+
+          upstreamWs.on('error', (err: unknown) => {
+            logger.warn(
+              `[RealtimeVoice] Gemini Live S2S socket error, switching to cascaded bridge: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            isGeminiS2sActive = false;
+            bridgeMode = true;
+            upstreamClosed = true;
+          });
+
+          upstreamWs.on('close', () => {
+            upstreamClosed = true;
+            if (isGeminiS2sActive) {
+              isGeminiS2sActive = false;
+              bridgeMode = true;
+            }
+          });
+        } catch (ephemeralErr) {
+          logger.warn(
+            `[RealtimeVoice] Ephemeral token minting failed, using cascaded bridge: ${ephemeralErr instanceof Error ? ephemeralErr.message : String(ephemeralErr)}`,
+          );
+          bridgeMode = true;
+          upstreamClosed = true;
+        }
+      } else {
         bridgeMode = true;
         upstreamClosed = true;
+      }
+
+      if (bridgeMode) {
         sendJson(clientWs, {
           type: 'session.created',
           mode: 'bifrost_bridge',
@@ -1027,124 +1395,6 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           toolsAllowed: modePolicy.toolsAllowed,
           voiceId: activeVoiceProfile.id,
           voiceLabel: activeVoiceProfile.label,
-        });
-      }
-
-      const upstreamUrlObj = new URL(config.realtimeUrl);
-      if (model && !upstreamUrlObj.searchParams.has('model')) {
-        upstreamUrlObj.searchParams.set('model', model);
-      }
-      const upstreamUrl = upstreamUrlObj.toString();
-
-      const wsHeaders: Record<string, string> = {
-        ...attributionHeaders,
-        'OpenAI-Beta': 'realtime=v1',
-        'X-Satchida-Seat-Token': seatToken,
-      };
-      if (modeVk) {
-        wsHeaders['x-bf-vk'] = modeVk;
-        wsHeaders.Authorization = `Bearer ${modeVk}`;
-      }
-
-      let upstreamWs: RealtimeWebSocketLike | null = null;
-      if (!bridgeMode) {
-        try {
-          upstreamWs = createUpstreamWebSocket(upstreamUrl, { headers: wsHeaders });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Failed to initialize realtime gateway';
-          logger.error(`[RealtimeVoice] Upstream init failed: ${msg}`);
-          sendClientError(
-            clientWs,
-            'voice_unavailable',
-            'Live Voice is temporarily unavailable right now. Please try again later.',
-          );
-          clientWs.close(1011, 'Voice service unavailable');
-          return;
-        }
-
-        upstreamWs.on('open', () => {
-          logger.info(
-            `[RealtimeVoice] Upstream session open (model=${model}, mode=${modePolicy.semanticMode})`,
-          );
-          while (pendingMessages.length > 0 && upstreamWs && upstreamWs.readyState === WS_OPEN) {
-            const msg = pendingMessages.shift();
-            if (msg !== undefined) {
-              upstreamWs.send(msg);
-            }
-          }
-        });
-
-        upstreamWs.on('message', (data: unknown) => {
-          if (clientClosed || clientWs.readyState !== WS_OPEN || bridgeMode) {
-            return;
-          }
-          const textData = Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
-          if (
-            textData.includes('provider does not support realtime') ||
-            textData.includes('model_not_allowed') ||
-            textData.includes('upstream realtime websocket stream interrupted')
-          ) {
-            bridgeMode = true;
-            upstreamClosed = true;
-            sendJson(clientWs, {
-              type: 'session.created',
-              mode: 'bifrost_bridge',
-              satchidaMode: modePolicy.semanticMode,
-              seatAttributed: true,
-              toolsAllowed: modePolicy.toolsAllowed,
-              voiceId: activeVoiceProfile.id,
-              voiceLabel: activeVoiceProfile.label,
-            });
-            return;
-          }
-          clientWs.send(data as string | Buffer);
-        });
-
-        upstreamWs.on('unexpected-response', (_req: unknown, res: unknown) => {
-          const statusCode =
-            res && typeof res === 'object' && 'statusCode' in res
-              ? Number((res as { statusCode?: number }).statusCode)
-              : 502;
-          logger.warn(`[RealtimeVoice] Upstream rejected handshake with HTTP ${statusCode}`);
-          sendClientError(
-            clientWs,
-            'voice_unavailable',
-            'Live Voice is temporarily unavailable right now. Please try again later.',
-          );
-          if (!clientClosed) {
-            clientWs.close(1011, 'Voice service unavailable');
-          }
-        });
-
-        upstreamWs.on('error', (err: unknown) => {
-          const errMsg = err instanceof Error ? err.message : 'Upstream socket error';
-          logger.warn(`[RealtimeVoice] Upstream error: ${errMsg}`);
-          if (bridgeMode) {
-            return;
-          }
-          sendClientError(
-            clientWs,
-            'voice_unavailable',
-            'Live Voice is temporarily unavailable right now. Please try again later.',
-          );
-          if (!clientClosed) {
-            clientWs.close(1011, 'Voice service unavailable');
-          }
-        });
-
-        upstreamWs.on('close', (code: unknown, reason: unknown) => {
-          upstreamClosed = true;
-          if (bridgeMode) {
-            return;
-          }
-          if (!clientClosed) {
-            const closeCode =
-              typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000;
-            const closeReason = Buffer.isBuffer(reason)
-              ? reason.toString('utf8')
-              : String(reason || '');
-            clientWs.close(closeCode, closeReason.slice(0, 120));
-          }
         });
       }
 
@@ -1170,7 +1420,23 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               return;
             }
             if (parsed.type === 'voice.turn' && typeof parsed.text === 'string') {
-              void handleBridgeTurn(parsed.text, parsed.voice, parsed.mode, parsed.hasTools);
+              if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
+                upstreamWs.send(
+                  JSON.stringify({
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: parsed.text }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  }),
+                );
+              } else {
+                void handleBridgeTurn(parsed.text, parsed.voice, parsed.mode, parsed.hasTools);
+              }
               return;
             }
             if (parsed.type === 'voice.synthesize' && typeof parsed.text === 'string') {
@@ -1204,6 +1470,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
       clientWs.on('close', () => {
         clientClosed = true;
+        const sessionDurationSec = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+        const estimatedTokens = Math.max(10, Math.round(totalAudioBytesStreamed / 160));
+        recordVoiceUsageInOneApi(userSeat.satchidaSeatAlias || authenticatedUserId, estimatedTokens);
         if (!upstreamClosed && upstreamWs) {
           upstreamWs.close(1000, 'Client disconnected');
         }

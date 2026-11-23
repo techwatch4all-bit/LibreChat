@@ -27,11 +27,16 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 
-const STORAGE_ROOT = path.resolve('storage/users');
-const UPLOADS_SOURCE_DIR = path.resolve('uploads');
-const IMAGES_SOURCE_DIR = path.resolve('client/public/images');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LIBRE_ROOT = path.resolve(__dirname, '..');
+
+const STORAGE_ROOT = path.join(LIBRE_ROOT, 'storage', 'users');
+const UPLOADS_SOURCE_DIR = path.join(LIBRE_ROOT, 'uploads');
+const IMAGES_SOURCE_DIR = path.join(LIBRE_ROOT, 'client', 'public', 'images');
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/LibreChat';
 
 const QUOTA_MAP_MB = {
@@ -94,6 +99,20 @@ export async function syncAndEnforceStorage() {
         for (const imgName of imgFiles) {
           const srcPath = path.join(userImgDir, imgName);
           const destPath = path.join(uploadsDir, imgName);
+          if (!fs.existsSync(destPath) && fs.statSync(srcPath).isFile()) {
+            try {
+              fs.copyFileSync(srcPath, destPath);
+            } catch (_) {}
+          }
+        }
+      }
+
+      const userDocsDir = path.join(UPLOADS_SOURCE_DIR, userIdStr);
+      if (fs.existsSync(userDocsDir)) {
+        const docFiles = fs.readdirSync(userDocsDir);
+        for (const docName of docFiles) {
+          const srcPath = path.join(userDocsDir, docName);
+          const destPath = path.join(uploadsDir, docName);
           if (!fs.existsSync(destPath) && fs.statSync(srcPath).isFile()) {
             try {
               fs.copyFileSync(srcPath, destPath);

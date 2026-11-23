@@ -1731,6 +1731,23 @@ export const writeOpenCodeFile = (
 ): Promise<oc.OpenCodeFileWriteResponse> =>
   request.post(endpoints.opencodeFile(projectId), payload);
 
+export const deleteOpenCodeFile = (
+  projectId: string,
+  filePath: string,
+): Promise<oc.OpenCodeFileDeleteResponse> =>
+  request.delete(endpoints.opencodeFile(projectId, filePath));
+
+export const renameOpenCodeFile = (
+  projectId: string,
+  payload: { fromPath: string; toPath: string },
+): Promise<oc.OpenCodeFileRenameResponse> =>
+  request.post(endpoints.opencodeFileRename(projectId), payload);
+
+export const searchOpenCodeFiles = (
+  projectId: string,
+  payload: { query: string; isRegex?: boolean; caseSensitive?: boolean; maxResults?: number },
+): Promise<oc.OpenCodeSearchResponse> => request.post(endpoints.opencodeSearch(projectId), payload);
+
 export const createOpenCodePty = (
   projectId: string,
   payload: { command?: string; args?: string[]; title?: string; mode?: 'opencode' | 'shell' } = {},

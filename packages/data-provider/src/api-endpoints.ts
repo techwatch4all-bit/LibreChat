@@ -633,6 +633,10 @@ export const opencodeFile = (projectId: string, filePath?: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/file${
     filePath ? `?path=${encodeURIComponent(filePath)}` : ''
   }`;
+export const opencodeFileRename = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/file/rename`;
+export const opencodeSearch = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/search`;
 export const opencodePty = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/pty`;
 export const opencodePtyResize = (projectId: string, ptyId: string) =>

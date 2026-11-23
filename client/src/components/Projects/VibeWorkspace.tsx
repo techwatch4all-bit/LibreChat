@@ -14,6 +14,7 @@ import {
   Download,
   FileCode,
   FileDiff,
+  FilePlus,
   Folder,
   GitBranch,
   Globe,
@@ -22,15 +23,18 @@ import {
   PanelBottomClose,
   PanelBottomOpen,
   PanelLeft,
+  Pencil,
+  Replace,
   RotateCw,
   Rows,
   Save,
   Search,
   Sparkles,
   Terminal as TerminalIcon,
+  Trash2,
   X,
 } from 'lucide-react';
-import type { OpenCodeDirTreeEntry } from 'librechat-data-provider';
+import type { OpenCodeDirTreeEntry, OpenCodeSearchMatch } from 'librechat-data-provider';
 import {
   activeOpenCodeSessionIdAtom,
   openCodeDiffsAtom,
@@ -93,8 +97,25 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [dirtyFiles, setDirtyFiles] = useState<Record<string, boolean>>({});
-  const [editorContent, setEditorContent] = useState<string>('');
+  const [fileBuffers, setFileBuffers] = useState<Record<string, string>>({});
+  const editorContent = selectedFile ? (fileBuffers[selectedFile] ?? '') : '';
+  const editorRef = useRef<{
+    revealLineInCenter?: (line: number) => void;
+    setPosition?: (pos: { lineNumber: number; column: number }) => void;
+    focus?: () => void;
+  } | null>(null);
+  const pendingJumpRef = useRef<{ path: string; line: number; column: number } | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState<string>('');
+  const [replaceText, setReplaceText] = useState<string>('');
+  const [searchIsRegex, setSearchIsRegex] = useState<boolean>(false);
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState<boolean>(false);
+  const [searchMatches, setSearchMatches] = useState<OpenCodeSearchMatch[]>([]);
+  const [searchTruncated, setSearchTruncated] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isCreatingFile, setIsCreatingFile] = useState<boolean>(false);
+  const [newFilePath, setNewFilePath] = useState<string>('');
+  const [quickOpenVisible, setQuickOpenVisible] = useState<boolean>(false);
+  const [quickOpenQuery, setQuickOpenQuery] = useState<string>('');
   const [sidebarView, setSidebarView] = useState<'files' | 'search'>('files');
   const [terminalSplit, setTerminalSplit] = useState<'horizontal' | 'vertical'>('horizontal');
   const [expandedDirs, setExpandedDirs] = useState<Record<string, boolean>>({});
@@ -159,14 +180,33 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     },
   );
 
-  const handleOpenFile = (filePath: string) => {
+  const handleOpenFile = (filePath: string, jumpTo?: { line: number; column?: number }) => {
     setSelectedFile(filePath);
     setOpenFiles((prev) => (prev.includes(filePath) ? prev : [...prev, filePath]));
     setWorkbenchTab('editor');
+    if (jumpTo) {
+      pendingJumpRef.current = {
+        path: filePath,
+        line: jumpTo.line,
+        column: jumpTo.column ?? 1,
+      };
+      if (selectedFile === filePath && editorRef.current?.revealLineInCenter) {
+        editorRef.current.revealLineInCenter(jumpTo.line);
+        editorRef.current.setPosition?.({ lineNumber: jumpTo.line, column: jumpTo.column ?? 1 });
+        editorRef.current.focus?.();
+        pendingJumpRef.current = null;
+      }
+    }
   };
 
-  const handleCloseFile = (filePath: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCloseFile = (filePath: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (dirtyFiles[filePath] && typeof window !== 'undefined') {
+      const ok = window.confirm(`Discard unsaved changes in ${filePath}?`);
+      if (!ok) {
+        return;
+      }
+    }
     setOpenFiles((prev) => {
       const filtered = prev.filter((f) => f !== filePath);
       if (selectedFile === filePath) {
@@ -179,13 +219,19 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
       delete next[filePath];
       return next;
     });
+    setFileBuffers((prev) => {
+      const next = { ...prev };
+      delete next[filePath];
+      return next;
+    });
   };
 
   useEffect(() => {
     setSelectedFile(null);
     setOpenFiles([]);
     setDirtyFiles({});
-    setEditorContent('');
+    setFileBuffers({});
+    setSearchMatches([]);
     setExpandedDirs({});
     setProvisionedPath(null);
     autoProvisionedRef.current = null;
@@ -204,7 +250,9 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
           .map((pref) => topFiles.find((f) => f.name.toLowerCase() === pref.toLowerCase()))
           .find(Boolean) ?? topFiles[0];
       if (match) {
-        handleOpenFile(match.path);
+        setSelectedFile(match.path);
+        setOpenFiles((prev) => (prev.includes(match.path) ? prev : [...prev, match.path]));
+        setWorkbenchTab('editor');
       }
     }
   }, [selectedFile, treeQuery.data?.tree]);
@@ -256,9 +304,29 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
       enabled: isEnabled && Boolean(projectId) && Boolean(selectedFile),
       refetchOnWindowFocus: false,
       onSuccess: (data) => {
-        setEditorContent(data.content);
-        if (selectedFile) {
+        if (!selectedFile) {
+          return;
+        }
+        setFileBuffers((prev) => {
+          if (dirtyFiles[selectedFile] && prev[selectedFile] !== undefined) {
+            return prev;
+          }
+          return { ...prev, [selectedFile]: data.content };
+        });
+        if (!dirtyFiles[selectedFile]) {
           setDirtyFiles((prev) => ({ ...prev, [selectedFile]: false }));
+        }
+        if (
+          pendingJumpRef.current?.path === selectedFile &&
+          editorRef.current?.revealLineInCenter
+        ) {
+          const { line, column } = pendingJumpRef.current;
+          pendingJumpRef.current = null;
+          setTimeout(() => {
+            editorRef.current?.revealLineInCenter?.(line);
+            editorRef.current?.setPosition?.({ lineNumber: line, column });
+            editorRef.current?.focus?.();
+          }, 30);
         }
       },
     },
@@ -281,6 +349,160 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
       },
     },
   );
+
+  const createFileMutation = useMutation(
+    (filePath: string) => dataService.writeOpenCodeFile(projectId, { path: filePath, content: '' }),
+    {
+      onSuccess: (_, filePath) => {
+        setIsCreatingFile(false);
+        setNewFilePath('');
+        setFileBuffers((prev) => ({ ...prev, [filePath]: '' }));
+        handleOpenFile(filePath);
+        queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
+      },
+    },
+  );
+
+  const deleteFileMutation = useMutation(
+    (filePath: string) => dataService.deleteOpenCodeFile(projectId, filePath),
+    {
+      onSuccess: (_, filePath) => {
+        setOpenFiles((prev) => {
+          const filtered = prev.filter((f) => f !== filePath);
+          if (selectedFile === filePath) {
+            setSelectedFile(filtered.length > 0 ? filtered[filtered.length - 1] : null);
+          }
+          return filtered;
+        });
+        setDirtyFiles((prev) => {
+          const next = { ...prev };
+          delete next[filePath];
+          return next;
+        });
+        setFileBuffers((prev) => {
+          const next = { ...prev };
+          delete next[filePath];
+          return next;
+        });
+        queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
+        queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
+      },
+    },
+  );
+
+  const renameFileMutation = useMutation(
+    (payload: { fromPath: string; toPath: string }) =>
+      dataService.renameOpenCodeFile(projectId, payload),
+    {
+      onSuccess: (_, { fromPath, toPath }) => {
+        setOpenFiles((prev) => prev.map((f) => (f === fromPath ? toPath : f)));
+        if (selectedFile === fromPath) {
+          setSelectedFile(toPath);
+        }
+        setFileBuffers((prev) => {
+          if (prev[fromPath] === undefined) {
+            return prev;
+          }
+          const next = { ...prev, [toPath]: prev[fromPath] };
+          delete next[fromPath];
+          return next;
+        });
+        setDirtyFiles((prev) => {
+          const next = { ...prev, [toPath]: Boolean(prev[fromPath]) };
+          delete next[fromPath];
+          return next;
+        });
+        queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
+        queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
+      },
+    },
+  );
+
+  const runContentSearch = async (queryOverride?: string) => {
+    const q = (queryOverride ?? fileSearchQuery).trim();
+    if (!q || !projectId) {
+      setSearchMatches([]);
+      setSearchTruncated(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const res = await dataService.searchOpenCodeFiles(projectId, {
+        query: q,
+        isRegex: searchIsRegex,
+        caseSensitive: searchCaseSensitive,
+        maxResults: 150,
+      });
+      setSearchMatches(res.matches ?? []);
+      setSearchTruncated(Boolean(res.truncated));
+    } catch {
+      setSearchMatches([]);
+      setSearchTruncated(false);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleReplaceInFile = async (filePath: string) => {
+    const q = fileSearchQuery.trim();
+    if (!q || !projectId) {
+      return;
+    }
+    try {
+      const currentContent =
+        fileBuffers[filePath] !== undefined
+          ? fileBuffers[filePath]
+          : (await dataService.readOpenCodeFile(projectId, filePath)).content;
+      const pattern = searchIsRegex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(pattern, searchCaseSensitive ? 'g' : 'gi');
+      const updated = currentContent.replace(regex, replaceText);
+      if (updated === currentContent) {
+        return;
+      }
+      await dataService.writeOpenCodeFile(projectId, { path: filePath, content: updated });
+      setFileBuffers((prev) => ({ ...prev, [filePath]: updated }));
+      setDirtyFiles((prev) => ({ ...prev, [filePath]: false }));
+      queryClient.invalidateQueries([QueryKeys.opencodeFile, projectId, filePath]);
+      queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
+      await runContentSearch();
+    } catch {
+      /* ignore invalid regex or failed replace */
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) {
+        if (e.key === 'Escape' && quickOpenVisible) {
+          setQuickOpenVisible(false);
+        }
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        if (selectedFile) {
+          e.preventDefault();
+          if (!saveFileMutation.isLoading) {
+            saveFileMutation.mutate();
+          }
+        }
+      } else if (key === 'p') {
+        e.preventDefault();
+        setQuickOpenQuery('');
+        setQuickOpenVisible((v) => !v);
+      } else if (key === 'w' && selectedFile && workbenchTab === 'editor') {
+        e.preventDefault();
+        handleCloseFile(selectedFile);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile, workbenchTab, quickOpenVisible, saveFileMutation.isLoading, dirtyFiles]);
 
   const toggleDir = (dirPath: string) => {
     setExpandedDirs((prev) => ({ ...prev, [dirPath]: !prev[dirPath] }));
@@ -316,23 +538,67 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
       }
 
       return (
-        <button
+        <div
           key={node.path}
-          type="button"
-          onClick={() => handleOpenFile(node.path)}
-          className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs ${
+          className={`group flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs ${
             isSelected
               ? 'bg-surface-active font-medium text-text-primary'
               : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
           }`}
           style={{ paddingLeft: `${depth * 12 + 20}px` }}
         >
-          <FileCode className="size-3.5 shrink-0 opacity-75" aria-hidden="true" />
-          <span className="truncate">{node.name}</span>
-          {dirtyFiles[node.path] ? (
-            <span className="ml-auto size-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
-          ) : null}
-        </button>
+          <button
+            type="button"
+            onClick={() => handleOpenFile(node.path)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          >
+            <FileCode className="size-3.5 shrink-0 opacity-75" aria-hidden="true" />
+            <span className="truncate">{node.name}</span>
+            {dirtyFiles[node.path] ? (
+              <span
+                className="ml-1 size-1.5 shrink-0 rounded-full bg-amber-400"
+                title="Unsaved changes"
+              />
+            ) : null}
+          </button>
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (typeof window === 'undefined') {
+                  return;
+                }
+                const nextPath = window.prompt('Rename file to:', node.path);
+                if (nextPath && nextPath.trim() && nextPath.trim() !== node.path) {
+                  renameFileMutation.mutate({ fromPath: node.path, toPath: nextPath.trim() });
+                }
+              }}
+              className="rounded p-0.5 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary"
+              title="Rename file"
+              aria-label={`Rename ${node.name}`}
+            >
+              <Pencil className="size-3" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (typeof window === 'undefined') {
+                  return;
+                }
+                if (window.confirm(`Delete ${node.path}?`)) {
+                  deleteFileMutation.mutate(node.path);
+                }
+              }}
+              className="rounded p-0.5 text-text-secondary hover:bg-surface-tertiary hover:text-text-destructive"
+              title="Delete file"
+              aria-label={`Delete ${node.name}`}
+            >
+              <Trash2 className="size-3" />
+            </button>
+          </div>
+        </div>
       );
     });
 
@@ -454,12 +720,12 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                     ...(isPlatformAdmin
                       ? ([
                           ['terminal', localize('com_opencode_terminal_mode_tui'), TerminalIcon],
-                        ] as const)
+                        ] as Array<[WorkbenchTab, string, typeof Code2]>)
                       : []),
                     ['preview', localize('com_opencode_view_preview'), Globe],
                     ['changes', localize('com_opencode_view_changes'), GitBranch],
                     ['diffs', `${localize('com_opencode_view_diffs')} (${diffs.length})`, FileDiff],
-                  ] as const
+                  ] as Array<[WorkbenchTab, string, typeof Code2]>
                 ).map(([tabKey, label, Icon]) => (
                   <Button
                     key={tabKey}
@@ -581,68 +847,248 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                     <span>{localize('com_ui_search') || 'Search'}</span>
                   </button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => treeQuery.refetch()}
-                  className="size-6 shrink-0"
-                  aria-label={localize('com_opencode_refresh')}
-                >
-                  <RotateCw className="size-3" aria-hidden="true" />
-                </Button>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setSidebarView('files');
+                      setIsCreatingFile((v) => !v);
+                    }}
+                    className="size-6 shrink-0"
+                    title="New file"
+                    aria-label="New file"
+                  >
+                    <FilePlus className="size-3" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => treeQuery.refetch()}
+                    className="size-6 shrink-0"
+                    aria-label={localize('com_opencode_refresh')}
+                  >
+                    <RotateCw className="size-3" aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
+
+              {isCreatingFile && sidebarView === 'files' ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const trimmed = newFilePath.trim();
+                    if (trimmed && !createFileMutation.isLoading) {
+                      createFileMutation.mutate(trimmed);
+                    }
+                  }}
+                  className="flex items-center gap-1 border-b border-border-light bg-surface-primary px-2 py-1.5"
+                >
+                  <input
+                    type="text"
+                    value={newFilePath}
+                    onChange={(e) => setNewFilePath(e.target.value)}
+                    placeholder="src/newFile.ts"
+                    className="min-w-0 flex-1 rounded border border-border-light bg-surface-secondary px-1.5 py-0.5 font-mono text-xs text-text-primary focus:border-border-medium focus:outline-none"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="default"
+                    disabled={!newFilePath.trim() || createFileMutation.isLoading}
+                    className="h-6 px-2 text-[11px]"
+                  >
+                    {localize('com_ui_add')}
+                  </Button>
+                </form>
+              ) : null}
 
               {sidebarView === 'search' ? (
                 <div className="flex flex-1 flex-col overflow-hidden p-2">
-                  <div className="relative mb-2">
-                    <Search className="pointer-events-none absolute left-2 top-2 size-3.5 text-text-secondary" />
-                    <input
-                      type="text"
-                      value={fileSearchQuery}
-                      onChange={(e) => setFileSearchQuery(e.target.value)}
-                      placeholder={localize('com_ui_search') || 'Find files in project...'}
-                      className="w-full rounded border border-border-light bg-surface-primary py-1 pl-7 pr-2 text-xs text-text-primary placeholder:text-text-secondary focus:border-border-medium focus:outline-none"
-                    />
-                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void runContentSearch();
+                    }}
+                    className="mb-2 space-y-1.5"
+                  >
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2 top-2 size-3.5 text-text-secondary" />
+                      <input
+                        type="text"
+                        value={fileSearchQuery}
+                        onChange={(e) => setFileSearchQuery(e.target.value)}
+                        placeholder="Search in files (Enter)..."
+                        className="w-full rounded border border-border-light bg-surface-primary py-1 pl-7 pr-14 text-xs text-text-primary placeholder:text-text-secondary focus:border-border-medium focus:outline-none"
+                      />
+                      <div className="absolute right-1 top-1 flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setSearchCaseSensitive((v) => !v)}
+                          className={`rounded px-1 font-mono text-[10px] ${
+                            searchCaseSensitive
+                              ? 'bg-surface-active text-text-primary'
+                              : 'text-text-secondary hover:text-text-primary'
+                          }`}
+                          title="Match Case"
+                        >
+                          {'Aa'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSearchIsRegex((v) => !v)}
+                          className={`rounded px-1 font-mono text-[10px] ${
+                            searchIsRegex
+                              ? 'bg-surface-active text-text-primary'
+                              : 'text-text-secondary hover:text-text-primary'
+                          }`}
+                          title="Use Regular Expression"
+                        >
+                          .*
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative flex items-center gap-1">
+                      <Replace className="pointer-events-none absolute left-2 size-3 text-text-secondary" />
+                      <input
+                        type="text"
+                        value={replaceText}
+                        onChange={(e) => setReplaceText(e.target.value)}
+                        placeholder="Replace with..."
+                        className="min-w-0 flex-1 rounded border border-border-light bg-surface-primary py-1 pl-7 pr-2 text-xs text-text-primary placeholder:text-text-secondary focus:border-border-medium focus:outline-none"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={isSearching || !fileSearchQuery.trim()}
+                        className="h-6 px-2 text-[11px]"
+                      >
+                        {isSearching ? '...' : 'Find'}
+                      </Button>
+                    </div>
+                  </form>
                   <div className="flex-1 overflow-y-auto">
                     {(() => {
                       if (fileSearchQuery.trim() === '') {
                         return (
                           <p className="p-2 text-center text-xs text-text-secondary">
-                            {localize('com_ui_search') || 'Type to search files...'}
+                            {localize('com_ui_search')}
                           </p>
                         );
                       }
-                      if (matchingFiles.length === 0) {
+                      if (isSearching) {
+                        return (
+                          <div className="flex items-center justify-center p-4">
+                            <Spinner className="size-4 text-text-primary" />
+                          </div>
+                        );
+                      }
+                      if (searchMatches.length === 0 && matchingFiles.length === 0) {
                         return (
                           <p className="p-2 text-center text-xs text-text-secondary">
-                            {localize('com_ui_no_results') || 'No files match'}
+                            {localize('com_ui_no_results_found')}
                           </p>
                         );
                       }
+                      const grouped = searchMatches.reduce<Record<string, OpenCodeSearchMatch[]>>(
+                        (acc, m) => {
+                          if (!acc[m.path]) {
+                            acc[m.path] = [];
+                          }
+                          acc[m.path].push(m);
+                          return acc;
+                        },
+                        {},
+                      );
+                      const groupedEntries = Object.entries(grouped);
                       return (
-                        <div className="space-y-0.5">
-                          {matchingFiles.map((file) => (
-                            <button
-                              key={file.path}
-                              type="button"
-                              onClick={() => handleOpenFile(file.path)}
-                              className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs ${
-                                selectedFile === file.path
-                                  ? 'bg-surface-active font-medium text-text-primary'
-                                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                              }`}
-                            >
-                              <FileCode className="size-3.5 shrink-0 opacity-75" />
-                              <div className="truncate">
-                                <span className="font-medium text-text-primary">{file.name}</span>
-                                <span className="ml-1 text-[10px] text-text-secondary">
-                                  {file.path}
-                                </span>
+                        <div className="space-y-2">
+                          {groupedEntries.length > 0 ? (
+                            <div className="space-y-1.5">
+                              <div className="px-1 text-[10px] font-medium uppercase tracking-wide text-text-secondary">
+                                {`${searchMatches.length}${searchTruncated ? '+' : ''} matches in ${groupedEntries.length} files`}
                               </div>
-                            </button>
-                          ))}
+                              {groupedEntries.map(([filePath, matches]) => (
+                                <div
+                                  key={filePath}
+                                  className="rounded border border-border-light bg-surface-primary/60 p-1"
+                                >
+                                  <div className="mb-1 flex items-center justify-between gap-1 px-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenFile(filePath)}
+                                      className="truncate font-mono text-[11px] font-medium text-text-primary hover:underline"
+                                      title={filePath}
+                                    >
+                                      {filePath}
+                                    </button>
+                                    {replaceText !== '' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleReplaceInFile(filePath)}
+                                        className="shrink-0 rounded bg-surface-active px-1.5 py-0.5 text-[10px] text-text-primary hover:bg-surface-hover"
+                                        title={`Replace all in ${filePath}`}
+                                      >
+                                        {localize('com_ui_replace')}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    {matches.slice(0, 12).map((m, idx) => (
+                                      <button
+                                        key={`${filePath}:${m.line}:${m.column}:${idx}`}
+                                        type="button"
+                                        onClick={() =>
+                                          handleOpenFile(filePath, {
+                                            line: m.line,
+                                            column: m.column,
+                                          })
+                                        }
+                                        className="flex w-full items-baseline gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[11px] text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                                      >
+                                        <span className="shrink-0 text-[10px] opacity-60">
+                                          L{m.line}
+                                        </span>
+                                        <span className="truncate">{m.text.trim()}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {matchingFiles.length > 0 ? (
+                            <div className="space-y-0.5">
+                              <div className="px-1 text-[10px] font-medium uppercase tracking-wide text-text-secondary">
+                                {localize('com_opencode_files_label')}
+                              </div>
+                              {matchingFiles.map((file) => (
+                                <button
+                                  key={file.path}
+                                  type="button"
+                                  onClick={() => handleOpenFile(file.path)}
+                                  className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs ${
+                                    selectedFile === file.path
+                                      ? 'bg-surface-active font-medium text-text-primary'
+                                      : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                                  }`}
+                                >
+                                  <FileCode className="size-3.5 shrink-0 opacity-75" />
+                                  <div className="truncate">
+                                    <span className="font-medium text-text-primary">
+                                      {file.name}
+                                    </span>
+                                    <span className="ml-1 text-[10px] text-text-secondary">
+                                      {file.path}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })()}
@@ -864,9 +1310,22 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                           theme={isDarkTheme ? 'vs-dark' : 'light'}
                           language={getLanguageFromPath(selectedFile)}
                           value={editorContent}
+                          onMount={(editor) => {
+                            editorRef.current = editor;
+                            if (pendingJumpRef.current?.path === selectedFile) {
+                              const { line, column } = pendingJumpRef.current;
+                              pendingJumpRef.current = null;
+                              editor.revealLineInCenter(line);
+                              editor.setPosition({ lineNumber: line, column });
+                              editor.focus();
+                            }
+                          }}
                           onChange={(value) => {
-                            setEditorContent(value ?? '');
                             if (selectedFile) {
+                              setFileBuffers((prev) => ({
+                                ...prev,
+                                [selectedFile]: value ?? '',
+                              }));
                               setDirtyFiles((prev) => ({ ...prev, [selectedFile]: true }));
                             }
                           }}
@@ -980,6 +1439,77 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
           ) : null}
         </div>
       )}
+
+      {/* Ctrl+P Quick Open Palette */}
+      {quickOpenVisible ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-20"
+          onClick={() => setQuickOpenVisible(false)}
+          role="dialog"
+          aria-label="Quick Open File"
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-border-medium bg-surface-primary shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-border-light px-3 py-2">
+              <Search className="size-4 text-text-secondary" aria-hidden="true" />
+              <input
+                type="text"
+                value={quickOpenQuery}
+                onChange={(e) => setQuickOpenQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setQuickOpenVisible(false);
+                  } else if (e.key === 'Enter') {
+                    const q = quickOpenQuery.trim().toLowerCase();
+                    const first = allFiles.find(
+                      (f) =>
+                        !q || f.path.toLowerCase().includes(q) || f.name.toLowerCase().includes(q),
+                    );
+                    if (first) {
+                      handleOpenFile(first.path);
+                      setQuickOpenVisible(false);
+                    }
+                  }
+                }}
+                placeholder="Go to file (type name or path, Enter to open)..."
+                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary focus:outline-none"
+              />
+              <kbd className="rounded bg-surface-secondary px-1.5 py-0.5 font-mono text-[10px] text-text-secondary">
+                ESC
+              </kbd>
+            </div>
+            <div className="max-h-72 overflow-y-auto p-1.5">
+              {allFiles
+                .filter((f) => {
+                  const q = quickOpenQuery.trim().toLowerCase();
+                  return !q || f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q);
+                })
+                .slice(0, 30)
+                .map((file) => (
+                  <button
+                    key={file.path}
+                    type="button"
+                    onClick={() => {
+                      handleOpenFile(file.path);
+                      setQuickOpenVisible(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded px-2.5 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+                  >
+                    <span className="flex items-center gap-2 truncate font-medium">
+                      <FileCode className="size-3.5 shrink-0 opacity-75" />
+                      {file.name}
+                    </span>
+                    <span className="truncate font-mono text-[10px] text-text-secondary">
+                      {file.path}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

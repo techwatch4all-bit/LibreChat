@@ -93,6 +93,9 @@ export interface OpenCodeHttpHandlers {
   getTree: (req: Request, res: Response) => Promise<Response>;
   readFile: (req: Request, res: Response) => Promise<Response>;
   writeFile: (req: Request, res: Response) => Promise<Response>;
+  deleteFile: (req: Request, res: Response) => Promise<Response>;
+  renameFile: (req: Request, res: Response) => Promise<Response>;
+  searchFiles: (req: Request, res: Response) => Promise<Response>;
   createPty: (req: Request, res: Response) => Promise<Response>;
   resizePty: (req: Request, res: Response) => Promise<Response>;
   createPtyConnectToken: (req: Request, res: Response) => Promise<Response>;
@@ -785,6 +788,218 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         return res.json({ ok: true, path: resolved.value });
       } catch (error) {
         logger.error('[OpenCodeHttp] writeFile failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    deleteFile: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+
+        let rawPath = '';
+        if (typeof req.query?.path === 'string') {
+          rawPath = req.query.path;
+        } else if (typeof (req.body as { path?: unknown } | undefined)?.path === 'string') {
+          rawPath = (req.body as { path: string }).path;
+        }
+        if (!rawPath) {
+          return sendError(res, { code: 'INVALID_REQUEST', status: 400 });
+        }
+
+        const resolved = resolveInsideRoot(ctx.projectRoot, rawPath, { mustExist: true });
+        if (!resolved.ok) {
+          return sendError(res, resolved.error);
+        }
+        if (path.resolve(resolved.value) === path.resolve(ctx.projectRoot)) {
+          return sendError(res, { code: 'PATH_OUTSIDE_ROOT', status: 403 });
+        }
+
+        const writable = assertWritablePath(ctx.projectRoot, resolved.value);
+        if (!writable.ok) {
+          return sendError(res, writable.error);
+        }
+
+        fs.rmSync(resolved.value, { recursive: true, force: false });
+        return res.json({ ok: true, path: resolved.value });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] deleteFile failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    renameFile: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+
+        const body = req.body as { fromPath?: unknown; toPath?: unknown } | undefined;
+        if (
+          typeof body?.fromPath !== 'string' ||
+          typeof body?.toPath !== 'string' ||
+          !body.fromPath.trim() ||
+          !body.toPath.trim()
+        ) {
+          return sendError(res, { code: 'INVALID_REQUEST', status: 400 });
+        }
+
+        const fromResolved = resolveInsideRoot(ctx.projectRoot, body.fromPath, { mustExist: true });
+        if (!fromResolved.ok) {
+          return sendError(res, fromResolved.error);
+        }
+        const toResolved = resolveInsideRoot(ctx.projectRoot, body.toPath, { mustExist: false });
+        if (!toResolved.ok) {
+          return sendError(res, toResolved.error);
+        }
+
+        const fromWritable = assertWritablePath(ctx.projectRoot, fromResolved.value);
+        if (!fromWritable.ok) {
+          return sendError(res, fromWritable.error);
+        }
+        const toWritable = assertWritablePath(ctx.projectRoot, toResolved.value);
+        if (!toWritable.ok) {
+          return sendError(res, toWritable.error);
+        }
+
+        if (fs.existsSync(toResolved.value)) {
+          return sendError(res, { code: 'PATH_INVALID', status: 400 });
+        }
+
+        fs.mkdirSync(path.dirname(toResolved.value), { recursive: true });
+        fs.renameSync(fromResolved.value, toResolved.value);
+        return res.json({ ok: true, fromPath: fromResolved.value, toPath: toResolved.value });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] renameFile failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    searchFiles: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+
+        const body = req.body as
+          | {
+              query?: unknown;
+              isRegex?: unknown;
+              caseSensitive?: unknown;
+              maxResults?: unknown;
+            }
+          | undefined;
+        const rawQuery = typeof body?.query === 'string' ? body.query : '';
+        if (!rawQuery.trim()) {
+          return res.json({ ok: true, matches: [], truncated: false });
+        }
+
+        const isRegex = body?.isRegex === true;
+        const caseSensitive = body?.caseSensitive === true;
+        const maxResults = Math.min(
+          Math.max(typeof body?.maxResults === 'number' ? Math.floor(body.maxResults) : 100, 1),
+          200,
+        );
+
+        let regex: RegExp;
+        try {
+          const pattern = isRegex ? rawQuery : rawQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          regex = new RegExp(pattern, caseSensitive ? 'g' : 'gi');
+        } catch {
+          return sendError(res, { code: 'INVALID_REQUEST', status: 400 });
+        }
+
+        const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage']);
+        const MAX_FILE_BYTES = 512 * 1024;
+        const matches: Array<{
+          path: string;
+          line: number;
+          column: number;
+          text: string;
+          matchLength: number;
+        }> = [];
+        let truncated = false;
+
+        function walk(dir: string, relPrefix: string) {
+          if (truncated) {
+            return;
+          }
+          let entries: fs.Dirent[];
+          try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+          } catch {
+            return;
+          }
+          for (const entry of entries) {
+            if (truncated) {
+              return;
+            }
+            if (entry.name.startsWith('.env') && entry.name !== '.env.example') {
+              continue;
+            }
+            const fullPath = path.join(dir, entry.name);
+            const relPath = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
+            if (entry.isDirectory()) {
+              if (!SKIP_DIRS.has(entry.name)) {
+                walk(fullPath, relPath);
+              }
+            } else if (entry.isFile()) {
+              try {
+                const st = fs.statSync(fullPath);
+                if (st.size === 0 || st.size > MAX_FILE_BYTES) {
+                  continue;
+                }
+                const buf = fs.readFileSync(fullPath);
+                const probeLen = Math.min(buf.length, 1024);
+                let isBinary = false;
+                for (let i = 0; i < probeLen; i += 1) {
+                  if (buf[i] === 0) {
+                    isBinary = true;
+                    break;
+                  }
+                }
+                if (isBinary) {
+                  continue;
+                }
+                const content = buf.toString('utf8');
+                const lines = content.split(/\r?\n/);
+                for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
+                  const lineText = lines[lineIdx];
+                  regex.lastIndex = 0;
+                  let m: RegExpExecArray | null;
+                  while ((m = regex.exec(lineText)) !== null) {
+                    if (m[0].length === 0) {
+                      regex.lastIndex += 1;
+                      continue;
+                    }
+                    matches.push({
+                      path: relPath,
+                      line: lineIdx + 1,
+                      column: m.index + 1,
+                      text: lineText.slice(0, 240),
+                      matchLength: m[0].length,
+                    });
+                    if (matches.length >= maxResults) {
+                      truncated = true;
+                      return;
+                    }
+                  }
+                }
+              } catch {
+                /* skip unreadable file */
+              }
+            }
+          }
+        }
+
+        walk(ctx.projectRoot, '');
+        return res.json({ ok: true, matches, truncated });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] searchFiles failed', getSafeErrorMetadata(error));
         return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
       }
     },
@@ -2132,7 +2347,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         }
 
         // Privacy Mode & Tier Enforcement:
-        // When a Privacy-tier user selects 'privacy' mode, route STRICTLY to the
+        // When a Privacy-tier user is active OR 'privacy' mode is requested, route STRICTLY to the
         // local llama.cpp fleet on 127.0.0.1:8080 using the currently loaded model
         // (zero cloud/gateway routing). For all other modes and entitled tiers,
         // route through Satchida Gateway using the user's seatToken.
@@ -2146,7 +2361,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         )
           .trim()
           .toLowerCase();
-        const isPrivacyMode = isPrivacyTier && requestedMode === 'privacy';
+        const isPrivacyMode = isPrivacyTier || requestedMode === 'privacy';
 
         const fetchFn = deps.fetchImpl ?? fetch;
         const isGetOrHead = req.method === 'GET' || req.method === 'HEAD';
@@ -2158,7 +2373,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           'X-Satchida-Mode': 'Vibecoding',
           'X-Tenant-Id': caller?.tenantId || 'satchida-master',
         };
-        let forwardBody: Record<string, unknown> | undefined =
+        const forwardBody: Record<string, unknown> | undefined =
           !isGetOrHead && req.body && typeof req.body === 'object'
             ? { ...(req.body as Record<string, unknown>) }
             : undefined;
@@ -2188,9 +2403,8 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
                 };
                 const modelsList = Array.isArray(modelsJson?.data) ? modelsJson.data : [];
                 const loadedModel =
-                  modelsList.find(
-                    (m) => m.status?.value === 'loaded' || m.loaded === true,
-                  ) ?? modelsList[0];
+                  modelsList.find((m) => m.status?.value === 'loaded' || m.loaded === true) ??
+                  modelsList[0];
                 if (loadedModel?.id) {
                   forwardBody.model = loadedModel.id;
                 }

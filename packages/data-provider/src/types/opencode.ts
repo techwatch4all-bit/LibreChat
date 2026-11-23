@@ -30,6 +30,31 @@ export interface OpenCodeFileWriteResponse {
   path: string;
 }
 
+export interface OpenCodeFileDeleteResponse {
+  ok: boolean;
+  path: string;
+}
+
+export interface OpenCodeFileRenameResponse {
+  ok: boolean;
+  fromPath: string;
+  toPath: string;
+}
+
+export interface OpenCodeSearchMatch {
+  path: string;
+  line: number;
+  column: number;
+  text: string;
+  matchLength: number;
+}
+
+export interface OpenCodeSearchResponse {
+  ok: boolean;
+  matches: OpenCodeSearchMatch[];
+  truncated: boolean;
+}
+
 export interface OpenCodeSessionDto {
   id: string;
   slug?: string;

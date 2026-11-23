@@ -691,6 +691,12 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
             if (urlStr.includes('/prompt_async')) {
               return new Response(null, { status: 204 });
             }
+            if (urlStr.endsWith('/models')) {
+              return new Response(JSON.stringify({ data: [] }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              });
+            }
             // Gateway LLM call
             const auth = (init?.headers as Record<string, string> | undefined)?.Authorization ?? '';
             seenAuthHeaders.push(auth);
@@ -1066,6 +1072,67 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
         const sentHeaders2 = fetchCalls[0]?.init?.headers as Record<string, string>;
         expect(sentHeaders2.Authorization).toBe('Bearer seat-pro-1');
         expect(sentHeaders2['X-Tenant-Id']).toBe('tenant-b');
+
+        // 3. Privacy-tier user in non-privacy mode (e.g. vibecoding) is STILL forced to local :8080
+        const recRes3 = makeRes();
+        await handlers.createSessionPrompt(
+          {
+            user: { id: 'user-priv', accountType: 'privacy' },
+            params: { projectId: 'proj-priv' },
+            headers: { 'x-satchida-mode': 'vibecoding' },
+            body: { prompt: 'hello privacy fallback' },
+          } as unknown as Request,
+          recRes3.res,
+        );
+        expect(recRes3.state.statusCode).toBe(202);
+
+        fetchCalls.length = 0;
+        const proxyRes3 = makeRes();
+        await handlers.proxyLlmToGateway(
+          {
+            method: 'POST',
+            path: '/chat/completions',
+            headers: { authorization: 'Bearer test-vk-secret' },
+            body: {
+              model: 'satchida-pro',
+              messages: [
+                {
+                  role: 'system',
+                  content: '[Satchida-Context: projectId=proj-priv userId=user-priv]',
+                },
+              ],
+            },
+          } as unknown as Request,
+          proxyRes3.res,
+        );
+        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:8080/v1/models');
+        expect(fetchCalls[1]?.url).toBe('http://127.0.0.1:8080/v1/chat/completions');
+
+        // 4. Pro-tier user explicitly requesting X-Satchida-Mode: privacy routes to local :8080
+        fetchCalls.length = 0;
+        const proxyRes4 = makeRes();
+        await handlers.proxyLlmToGateway(
+          {
+            method: 'POST',
+            path: '/chat/completions',
+            headers: {
+              authorization: 'Bearer test-vk-secret',
+              'x-satchida-mode': 'privacy',
+            },
+            body: {
+              model: 'satchida-pro',
+              messages: [
+                {
+                  role: 'system',
+                  content: '[Satchida-Context: projectId=proj-pro userId=user-pro]',
+                },
+              ],
+            },
+          } as unknown as Request,
+          proxyRes4.res,
+        );
+        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:8080/v1/models');
+        expect(fetchCalls[1]?.url).toBe('http://127.0.0.1:8080/v1/chat/completions');
       } finally {
         if (prevVk === undefined) delete process.env.SATCHIDA_GATEWAY_VK;
         else process.env.SATCHIDA_GATEWAY_VK = prevVk;
@@ -1074,6 +1141,101 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
         if (prevLlama === undefined) delete process.env.SATCHIDA_LLAMA_BASE_URL;
         else process.env.SATCHIDA_LLAMA_BASE_URL = prevLlama;
       }
+    });
+  });
+
+  describe('Sprint 1 IDE endpoints: deleteFile, renameFile, searchFiles', () => {
+    it('supports renameFile, searchFiles (text + regex), and deleteFile while blocking traversal and .env', async () => {
+      const allowedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-sprint1-'));
+      const projectRoot = path.join(allowedRoot, 'proj-crud');
+      fs.mkdirSync(projectRoot, { recursive: true });
+      const handlers = createOpenCodeHttpHandlers({
+        getAppConfig: async () =>
+          ({
+            opencode: {
+              enabled: true,
+              serverUrl: 'http://127.0.0.1:4096',
+              allowedRoots: [allowedRoot],
+              maxFileBytes: 1024 * 1024,
+              requestTimeoutMs: 5000,
+            },
+          }) as never,
+        getChatProject: async () => ({
+          id: 'proj-crud',
+          localPath: projectRoot,
+          name: 'CRUD App',
+        }),
+        getServerPassword: () => 'pw',
+      });
+
+      // Write initial file
+      const wRes = makeRes();
+      await handlers.writeFile(
+        {
+          user: { id: 'user-1' },
+          params: { projectId: 'proj-crud' },
+          body: { path: 'src/hello.ts', content: 'export const greeting = "Hello Satchida";\n' },
+        } as unknown as Request,
+        wRes.res,
+      );
+      expect(wRes.state.statusCode).toBe(200);
+
+      // Search content
+      const sRes = makeRes();
+      await handlers.searchFiles(
+        {
+          user: { id: 'user-1' },
+          params: { projectId: 'proj-crud' },
+          body: { query: 'Satchida', caseSensitive: true },
+        } as unknown as Request,
+        sRes.res,
+      );
+      expect(sRes.state.statusCode).toBe(200);
+      const sBody = sRes.state.body as {
+        ok: boolean;
+        matches: Array<{ path: string; line: number }>;
+      };
+      expect(sBody.ok).toBe(true);
+      expect(sBody.matches.some((m) => m.path === 'src/hello.ts' && m.line === 1)).toBe(true);
+
+      // Rename file
+      const rRes = makeRes();
+      await handlers.renameFile(
+        {
+          user: { id: 'user-1' },
+          params: { projectId: 'proj-crud' },
+          body: { fromPath: 'src/hello.ts', toPath: 'src/renamed.ts' },
+        } as unknown as Request,
+        rRes.res,
+      );
+      expect(rRes.state.statusCode).toBe(200);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'renamed.ts'))).toBe(true);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'hello.ts'))).toBe(false);
+
+      // Block deleting .env / traversal
+      const badDel = makeRes();
+      await handlers.deleteFile(
+        {
+          user: { id: 'user-1' },
+          params: { projectId: 'proj-crud' },
+          query: { path: '..\\outside.txt' },
+        } as unknown as Request,
+        badDel.res,
+      );
+      expect(badDel.state.statusCode).toBe(403);
+
+      // Delete renamed file
+      const dRes = makeRes();
+      await handlers.deleteFile(
+        {
+          user: { id: 'user-1' },
+          params: { projectId: 'proj-crud' },
+          query: { path: 'src/renamed.ts' },
+        } as unknown as Request,
+        dRes.res,
+      );
+      expect(dRes.state.statusCode).toBe(200);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'renamed.ts'))).toBe(false);
     });
   });
 });

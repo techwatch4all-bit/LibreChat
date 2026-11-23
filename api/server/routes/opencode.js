@@ -85,6 +85,9 @@ router.get('/:projectId/export-zip', (req, res) => getHandlers().exportProjectZi
 router.get('/:projectId/tree', (req, res) => getHandlers().getTree(req, res));
 router.get('/:projectId/file', (req, res) => getHandlers().readFile(req, res));
 router.post('/:projectId/file', (req, res) => getHandlers().writeFile(req, res));
+router.delete('/:projectId/file', (req, res) => getHandlers().deleteFile(req, res));
+router.post('/:projectId/file/rename', (req, res) => getHandlers().renameFile(req, res));
+router.post('/:projectId/search', (req, res) => getHandlers().searchFiles(req, res));
 
 /* PTY sessions */
 router.post('/:projectId/pty', (req, res) => getHandlers().createPty(req, res));

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import {
   Mic,
   MicOff,
@@ -19,6 +19,7 @@ import {
   satchiWebSearchAtom,
   satchiResearchAtom,
   satchiImageGenAtom,
+  satchiThinkAtom,
 } from '~/store/satchiStore';
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
@@ -123,10 +124,11 @@ export default function LiveVoiceModal({
 }: LiveVoiceModalProps) {
   const { token } = useAuthContext();
   const { showToast } = useToastContext();
-  const currentMode = useAtomValue(satchiModeAtom);
-  const webSearchEnabled = useAtomValue(satchiWebSearchAtom);
-  const researchEnabled = useAtomValue(satchiResearchAtom);
-  const imageGenEnabled = useAtomValue(satchiImageGenAtom);
+  const [currentMode, setCurrentMode] = useAtom(satchiModeAtom);
+  const [webSearchEnabled, setWebSearchEnabled] = useAtom(satchiWebSearchAtom);
+  const [researchEnabled, setResearchEnabled] = useAtom(satchiResearchAtom);
+  const [imageGenEnabled, setImageGenEnabled] = useAtom(satchiImageGenAtom);
+  const [thinkLevel, setThinkLevel] = useAtom(satchiThinkAtom);
   const activeTailMessage = useLatestMessage(0);
 
   const hasActiveComposerTools = Boolean(webSearchEnabled || researchEnabled || imageGenEnabled);
@@ -539,23 +541,106 @@ export default function LiveVoiceModal({
         const cleanFinal = finalText.trim();
         const lower = cleanFinal.toLowerCase();
 
-        // 1. Verbal voice mode switch commands
-        if (/\b(?:switch|change|set)\s+(?:to\s+)?work\s+mode\b/i.test(lower)) {
+        // 1. Voice UI Control: Satchida Mode Switching
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?work(?:\s+mode)?\b/i.test(lower)) {
+          setCurrentMode('Work');
           setLiveVoiceMode('work');
           localStorage.setItem('satchida_voice_mode', 'work');
           setStatusText('Work mode active');
           setSpokenTranscript('Switched to Work mode');
+          showToast({ message: 'Mode: Work', status: 'info' });
           return;
         }
-        if (/\b(?:switch|change|set)\s+(?:to\s+)?discussion\s+mode\b/i.test(lower)) {
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?study(?:\s+mode)?\b/i.test(lower)) {
+          setCurrentMode('Study');
+          setStatusText('Study mode active');
+          setSpokenTranscript('Switched to Study mode');
+          showToast({ message: 'Mode: Study', status: 'info' });
+          return;
+        }
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?(?:discussion|chat)(?:\s+mode)?\b/i.test(lower)) {
+          setCurrentMode('Chat');
           setLiveVoiceMode('discussion');
           localStorage.setItem('satchida_voice_mode', 'discussion');
           setStatusText('Discussion mode active');
           setSpokenTranscript('Switched to Discussion mode');
+          showToast({ message: 'Mode: Discussion', status: 'info' });
+          return;
+        }
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?(?:vibe\s*coding|coding|coder)(?:\s+mode)?\b/i.test(lower)) {
+          setCurrentMode('VibeCoder');
+          setStatusText('VibeCoder mode active');
+          setSpokenTranscript('Switched to VibeCoder mode');
+          showToast({ message: 'Mode: VibeCoder', status: 'info' });
+          return;
+        }
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?privacy(?:\s+mode)?\b/i.test(lower)) {
+          setCurrentMode('Privacy');
+          setStatusText('Privacy mode active');
+          setSpokenTranscript('Switched to Privacy mode');
+          showToast({ message: 'Mode: Privacy', status: 'info' });
           return;
         }
 
-        // 2. Verbal accent/voice switch commands
+        // 2. Voice UI Control: Tool and MCP Toggles
+        if (/\b(?:enable|turn on|activate)\s+web\s*search\b/i.test(lower)) {
+          setWebSearchEnabled(true);
+          setStatusText('Web Search enabled');
+          setSpokenTranscript('Enabled Web Search');
+          showToast({ message: 'Web Search: ON', status: 'success' });
+          return;
+        }
+        if (/\b(?:disable|turn off|deactivate)\s+web\s*search\b/i.test(lower)) {
+          setWebSearchEnabled(false);
+          setStatusText('Web Search disabled');
+          setSpokenTranscript('Disabled Web Search');
+          showToast({ message: 'Web Search: OFF', status: 'info' });
+          return;
+        }
+        if (/\b(?:enable|turn on|activate)\s+(?:deep\s+)?research\b/i.test(lower)) {
+          setResearchEnabled(true);
+          setStatusText('Deep Research enabled');
+          setSpokenTranscript('Enabled Deep Research');
+          showToast({ message: 'Deep Research: ON', status: 'success' });
+          return;
+        }
+        if (/\b(?:disable|turn off|deactivate)\s+(?:deep\s+)?research\b/i.test(lower)) {
+          setResearchEnabled(false);
+          setStatusText('Deep Research disabled');
+          setSpokenTranscript('Disabled Deep Research');
+          showToast({ message: 'Deep Research: OFF', status: 'info' });
+          return;
+        }
+        if (/\b(?:enable|turn on|activate)\s+image\s*(?:gen|generation)\b/i.test(lower)) {
+          setImageGenEnabled(true);
+          setStatusText('Image generation enabled');
+          setSpokenTranscript('Enabled Image Generation');
+          showToast({ message: 'Image Generation: ON', status: 'success' });
+          return;
+        }
+        if (/\b(?:disable|turn off|deactivate)\s+image\s*(?:gen|generation)\b/i.test(lower)) {
+          setImageGenEnabled(false);
+          setStatusText('Image generation disabled');
+          setSpokenTranscript('Disabled Image Generation');
+          showToast({ message: 'Image Generation: OFF', status: 'info' });
+          return;
+        }
+        if (/\b(?:enable|turn on|activate)\s+(?:deep\s+)?thinking\b/i.test(lower)) {
+          setThinkLevel('high');
+          setStatusText('Deep Thinking enabled');
+          setSpokenTranscript('Enabled Deep Thinking');
+          showToast({ message: 'Thinking: High', status: 'success' });
+          return;
+        }
+        if (/\b(?:disable|turn off|deactivate)\s+(?:deep\s+)?thinking\b/i.test(lower)) {
+          setThinkLevel('off');
+          setStatusText('Thinking disabled');
+          setSpokenTranscript('Disabled Thinking');
+          showToast({ message: 'Thinking: Off', status: 'info' });
+          return;
+        }
+
+        // 3. Verbal accent/voice switch commands
         if (
           /\b(switch|change|use|set|speak|talk)\b/i.test(lower) &&
           /\b(accent|voice|male|female|us|american|uk|british|indian|india)\b/i.test(lower)
@@ -654,7 +739,15 @@ export default function LiveVoiceModal({
     } catch {
       // Ignore start failure
     }
-  }, []);
+  }, [
+    handleAccentChange,
+    setCurrentMode,
+    setImageGenEnabled,
+    setResearchEnabled,
+    setThinkLevel,
+    setWebSearchEnabled,
+    showToast,
+  ]);
 
   useEffect(() => {
     if (!open) {

@@ -3121,7 +3121,42 @@ To achieve zero key disclosure, strict seat quota governance, and native S2S per
 4. **Fallback Safety Net**:
    - If Google AI Studio returns rate limits (HTTP 429) or the upstream WebSocket is unavailable, the voice proxy automatically falls back to the cascaded Voxtral/Gemini-Flash HTTP stream + Edge-TTS pipeline without interrupting the user.
 
+### 28.6 Satchida Live Voice: Dual-Mode Operation (Discussion vs. Work) & Tool Access Matrix
 
+To balance instantaneous voice conversation with heavy agentic execution (MCP servers, code execution, multi-step web scraping), Satchida Live Voice provides a decoupled **Dual-Mode Architecture**:
+
+#### 28.6.1 Comparison Matrix
+
+| Capability / Attribute | 💬 **Discussion Mode** | ⚡ **Work Mode** |
+| :--- | :--- | :--- |
+| **Primary Engine** | Google Gemini Multimodal Live API S2S WebSocket (`gemini-3.8-live`) | Active LibreChat Conversation Model & Agent Pipeline (`ask({ text })`) |
+| **Latency Profile** | **Ultra-Low (<400ms)** direct binary PCM audio streaming | **Turn-Based** (generates in chat, then streams audio summary) |
+| **1. Web Search** | ✅ **YES** (Native Google Search Grounding via `tools: [{ googleSearch: {} }]`) | ✅ **YES** (Via LibreChat's Web Search toggle, Tavily, Google, or Bing) |
+| **2. Web Fetch** | ⚠️ **Google-Indexed Cache Only** (Grounding engine indexes public web) | ✅ **YES** (Full URL retrieval via MCP web-fetch / scraping plugins) |
+| **3. Tool Calls (MCP)** | ⚠️ **Direct WebSocket Function Declarations** (Targeted fast tools) | ✅ **YES** (Full access to all 19+ MCP Servers, Python Sandbox, RAG) |
+| **4. Voice UI Control** | ✅ **YES** (Hands-free state atom mutation for modes, tools & presets) | ✅ **YES** (Hands-free state atom mutation for modes, tools & presets) |
+| **5. Chat Persistence** | Spoken session transcript (transient voice modal) | Persistent multi-turn chat messages & formatted markdown in database |
+
+#### 28.6.2 Deep-Dive: Web Search, Web Fetch & MCP Tool Orchestration in Voice
+
+1. **Web Search**:
+   - In **Discussion Mode**: Powered natively by Gemini Live's Google Search Grounding. The model dynamically searches Google in real time to fetch current news, live stock updates, scores, and factual queries without round-trip orchestration latency.
+   - In **Work Mode**: Executes via LibreChat's configured search providers (Tavily, Google Custom Search, Serper, or local DuckDuckGo), producing citation cards and clickable sources in the main chat.
+
+2. **Web Fetch & Scraping**:
+   - In **Discussion Mode**: Cannot directly issue arbitrary curl or unindexed intranet HTTP requests. However, the proxy can register a `web_fetch` function declaration (`tools: [{ functionDeclarations: [...] }]`) to bridge on-demand web fetches.
+   - In **Work Mode**: Leverages LibreChat's `web-fetch` MCP tool or Puppeteer browser runner to render client-side JavaScript, extract clean DOM text, and pass it to the chat agent.
+
+3. **MCP Tool Integration**:
+   - In **Discussion Mode**: Fast, lightweight function declarations can be passed into the Gemini Live setup message. When a `toolCall` is emitted, the proxy resolves the call via the local MCP Hub and returns a `toolResponse`.
+   - In **Work Mode**: Has unconstrained access to all 86+ tools registered in `skill/satchida-unified-hub.py`, including `indian-acts-and-statutes` LanceDB vault, SQLite, filesystem, code interpreter, and custom tenant extensions.
+
+#### 28.6.3 Voice UI Control (Reactive Atom Architecture)
+
+Rather than fragile, brittle robotic DOM clicks (which break across screen sizes, themes, and client renders), Satchida Live Voice implements **Reactive State Control via Jotai Storage Atoms**:
+- Verbal commands (e.g. *"Enable web search"*, *"Switch to Work mode"*, *"Turn on Deep Research"*) are parsed by the speech recognition engine.
+- Upon intent recognition, the client updates the authoritative Jotai atoms (`satchiModeAtom`, `satchiWebSearchAtom`, `satchiResearchAtom`, `satchiImageGenAtom`, `satchiThinkAtom`).
+- The entire LibreChat chat composer, tool badges, and mode pills reactively update in real time with zero DOM manipulation overhead.
 
 ---
 

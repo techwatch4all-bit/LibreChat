@@ -56,6 +56,7 @@ export interface RealtimeProxyDeps {
     chatModel: string;
     virtualKey: string;
   };
+  mintEphemeralToken?: (model?: string) => Promise<string>;
 }
 
 export type VoiceProfileId =
@@ -381,10 +382,22 @@ export async function mintGoogleEphemeralToken(
 export function mapVoiceToGeminiPrebuilt(
   voiceProfile: VoiceProfile,
 ): 'Aoede' | 'Charon' | 'Fenrir' | 'Kore' | 'Puck' {
-  if (voiceProfile.gender === 'female') {
-    return voiceProfile.region === 'in' ? 'Kore' : 'Aoede';
+  if (voiceProfile.id === 'us_male') {
+    return 'Fenrir';
   }
-  return voiceProfile.region === 'in' ? 'Puck' : 'Fenrir';
+  if (voiceProfile.id === 'us_female') {
+    return 'Aoede';
+  }
+  if (voiceProfile.id === 'uk_male') {
+    return 'Charon';
+  }
+  if (voiceProfile.id === 'uk_female') {
+    return 'Aoede';
+  }
+  if (voiceProfile.id === 'in_male') {
+    return 'Puck';
+  }
+  return 'Kore';
 }
 
 export function pcmToWavBuffer(
@@ -852,7 +865,14 @@ function synthesizeEdgeTtsBase64(speechText: string, edgeVoice: string): Promise
 }
 
 export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
-  const { wss, createUpstreamWebSocket, verifyJwt, getUserSeatCredential, getBifrostConfig } = deps;
+  const {
+    wss,
+    createUpstreamWebSocket,
+    verifyJwt,
+    getUserSeatCredential,
+    getBifrostConfig,
+    mintEphemeralToken,
+  } = deps;
 
   return function handleRealtimeVoiceUpgrade(
     req: IncomingMessage,
@@ -1243,13 +1263,45 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let isGeminiS2sActive = false;
       let upstreamWs: RealtimeWebSocketLike | null = null;
 
-      // Attempt Native S2S with Google Ephemeral Token first (unless Privacy mode)
-      if (!modePolicy.isPrivacyMode) {
+      const connectGeminiUpstream = async (profile: VoiceProfile): Promise<void> => {
+        if (modePolicy.isPrivacyMode || clientClosed) {
+          bridgeMode = true;
+          upstreamClosed = true;
+          sendJson(clientWs, {
+            type: 'session.created',
+            mode: 'bifrost_bridge',
+            satchidaMode: modePolicy.semanticMode,
+            seatAttributed: true,
+            toolsAllowed: modePolicy.toolsAllowed,
+            voiceId: profile.id,
+            voiceLabel: profile.label,
+          });
+          return;
+        }
+
         try {
-          const ephemeralToken = await mintGoogleEphemeralToken('models/gemini-3.8-live');
+          if (upstreamWs) {
+            try {
+              upstreamWs.close(1000, 'Reconnecting with new voice');
+            } catch {
+              // Ignore close error on stale socket
+            }
+            upstreamWs = null;
+          }
+
+          const minter =
+            mintEphemeralToken ||
+            (process.env.NODE_ENV === 'test'
+              ? async () => 'test_mock_token'
+              : mintGoogleEphemeralToken);
+          const ephemeralToken = await minter('models/gemini-3.8-live');
+          if (!ephemeralToken) {
+            throw new Error('No ephemeral token');
+          }
+
           const geminiWsUrl =
             'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
-          const prebuiltVoice = mapVoiceToGeminiPrebuilt(activeVoiceProfile);
+          const prebuiltVoice = mapVoiceToGeminiPrebuilt(profile);
 
           upstreamWs = createUpstreamWebSocket(geminiWsUrl, {
             headers: {
@@ -1274,11 +1326,22 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     },
                   },
                 },
+                tools: [
+                  {
+                    googleSearch: {},
+                  },
+                ],
                 systemInstruction: {
                   parts: [
                     {
                       text:
-                        'You are Satchida Live Voice, the official conversational AI assistant for Satchida AI. You speak directly to the user in a warm, natural, and concise tone. NEVER mention backend providers, models (like GLM, DeepSeek, Google, or Llama), or internal infrastructure. Keep answers clear, direct, and under 2-3 spoken sentences with no markdown, bullet points, or emojis. If asked who or what you are, state that you are Satchida Live Voice.',
+                        'You are Satchida Live Voice, the conversational voice assistant created and developed exclusively by Satchida AI.\n' +
+                        'CRITICAL IDENTITY DIRECTIVES:\n' +
+                        '1. You are Satchida Live Voice, created exclusively by Satchida AI. You were built and trained by Satchida AI.\n' +
+                        '2. Under NO circumstances should you ever say, admit, or imply that you are made by Google, Gemini, OpenAI, or any other third party. If asked who made, trained, or created you, you must always reply: "I am Satchida Live Voice, created by Satchida AI."\n' +
+                        '3. NEVER disclose internal routing, backend providers, or model names.\n' +
+                        '4. Speak naturally, warmly, and concisely in 1 to 3 spoken sentences. Avoid markdown, bullet points, asterisks, and emojis.\n' +
+                        '5. REALTIME SEARCH: You have live real-time access to the web via Google Search. When the user asks about current events, today\'s date, latest news, weather, or live data, use your search tool to provide accurate and fresh spoken answers.',
                     },
                   ],
                 },
@@ -1318,8 +1381,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   satchidaMode: modePolicy.semanticMode,
                   seatAttributed: true,
                   toolsAllowed: modePolicy.toolsAllowed,
-                  voiceId: activeVoiceProfile.id,
-                  voiceLabel: activeVoiceProfile.label,
+                  voiceId: profile.id,
+                  voiceLabel: profile.label,
                 });
                 return;
               }
@@ -1343,7 +1406,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       type: 'voice.audio_chunk',
                       audioBase64: pcmData,
                       mimeType: 'audio/pcm;rate=24000',
-                      voiceId: activeVoiceProfile.id,
+                      voiceId: profile.id,
                     });
                   }
                 }
@@ -1365,6 +1428,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             isGeminiS2sActive = false;
             bridgeMode = true;
             upstreamClosed = true;
+            sendClientError(
+              clientWs,
+              'voice_unavailable',
+              'Live Voice is temporarily unavailable right now. Please try again later.',
+            );
           });
 
           upstreamWs.on('close', () => {
@@ -1380,13 +1448,32 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           );
           bridgeMode = true;
           upstreamClosed = true;
+          sendJson(clientWs, {
+            type: 'session.created',
+            mode: 'bifrost_bridge',
+            satchidaMode: modePolicy.semanticMode,
+            seatAttributed: true,
+            toolsAllowed: modePolicy.toolsAllowed,
+            voiceId: profile.id,
+            voiceLabel: profile.label,
+          });
         }
+      };
+
+      const shouldAttemptGoogleS2s =
+        !modePolicy.isPrivacyMode &&
+        process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED !== 'false' &&
+        (process.env.NODE_ENV !== 'test' ||
+          Boolean(mintEphemeralToken) ||
+          process.env.BIFROST_NATIVE_REALTIME_ENABLED === 'true' ||
+          process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED === 'true');
+
+      // Attempt Native S2S with Google Ephemeral Token first (unless Privacy mode or disabled in test)
+      if (shouldAttemptGoogleS2s) {
+        void connectGeminiUpstream(activeVoiceProfile);
       } else {
         bridgeMode = true;
         upstreamClosed = true;
-      }
-
-      if (bridgeMode) {
         sendJson(clientWs, {
           type: 'session.created',
           mode: 'bifrost_bridge',
@@ -1410,6 +1497,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               hasTools?: boolean;
             };
             if (parsed.type === 'voice.set_accent' && typeof parsed.voice === 'string') {
+              const previousProfile = activeVoiceProfile;
               activeVoiceProfile = resolveVoiceProfile(parsed.voice);
               sendJson(clientWs, {
                 type: 'voice.accent_changed',
@@ -1417,9 +1505,48 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 label: activeVoiceProfile.label,
                 lang: activeVoiceProfile.lang,
               });
+
+              if (
+                !modePolicy.isPrivacyMode &&
+                mapVoiceToGeminiPrebuilt(previousProfile) !==
+                  mapVoiceToGeminiPrebuilt(activeVoiceProfile)
+              ) {
+                logger.info(
+                  `[RealtimeVoice] Dynamic Gemini voice switch: ${previousProfile.id} (${mapVoiceToGeminiPrebuilt(previousProfile)}) -> ${activeVoiceProfile.id} (${mapVoiceToGeminiPrebuilt(activeVoiceProfile)})`,
+                );
+                void connectGeminiUpstream(activeVoiceProfile);
+              }
               return;
             }
             if (parsed.type === 'voice.turn' && typeof parsed.text === 'string') {
+              const isWorkOrToolIntent =
+                parsed.mode === 'work' ||
+                parsed.hasTools === true ||
+                /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|run (?:deep )?research|write code in chat)\b/i.test(
+                  parsed.text,
+                );
+
+              if (isWorkOrToolIntent) {
+                const turnPolicy = resolveSemanticMode(
+                  parsed.mode || initialRawMode,
+                  userSeat.accountType,
+                  userSeat.familyRole,
+                );
+                const cleanPrompt =
+                  parsed.text
+                    .replace(
+                      /^(?:please\s+)?(?:insert|send|type|write|ask)\s+(?:this\s+)?(?:in|into|to)\s+chat(?:\s*[:,-]?\s*)?/i,
+                      '',
+                    )
+                    .trim() || parsed.text;
+                sendJson(clientWs, {
+                  type: 'voice.delegate_tools',
+                  text: cleanPrompt,
+                  mode: turnPolicy.semanticMode,
+                });
+                return;
+              }
+
               if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
                 upstreamWs.send(
                   JSON.stringify({

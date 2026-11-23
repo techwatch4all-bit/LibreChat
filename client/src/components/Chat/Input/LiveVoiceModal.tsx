@@ -43,12 +43,12 @@ interface VoiceOption {
 }
 
 const VOICE_OPTIONS: VoiceOption[] = [
-  { id: 'in_female', label: 'Indian Female (Neerja)', shortLabel: 'IN Female', lang: 'en-IN' },
-  { id: 'in_male', label: 'Indian Male (Prabhat)', shortLabel: 'IN Male', lang: 'en-IN' },
-  { id: 'us_female', label: 'US Female (Jenny)', shortLabel: 'US Female', lang: 'en-US' },
-  { id: 'us_male', label: 'US Male (Guy)', shortLabel: 'US Male', lang: 'en-US' },
-  { id: 'uk_female', label: 'UK Female (Sonia)', shortLabel: 'UK Female', lang: 'en-GB' },
-  { id: 'uk_male', label: 'UK Male (Ryan)', shortLabel: 'UK Male', lang: 'en-GB' },
+  { id: 'in_female', label: 'Indian Female (Neerja / Kore)', shortLabel: 'IN Female', lang: 'en-IN' },
+  { id: 'in_male', label: 'Indian Male (Prabhat / Puck)', shortLabel: 'IN Male', lang: 'en-IN' },
+  { id: 'us_female', label: 'US Female (Jenny / Aoede)', shortLabel: 'US Female', lang: 'en-US' },
+  { id: 'us_male', label: 'US Male (Guy / Fenrir)', shortLabel: 'US Male', lang: 'en-US' },
+  { id: 'uk_female', label: 'UK Female (Sonia / Aoede)', shortLabel: 'UK Female', lang: 'en-GB' },
+  { id: 'uk_male', label: 'UK Male (Ryan / Charon)', shortLabel: 'UK Male', lang: 'en-GB' },
 ];
 
 interface BrowserSpeechRecognitionEvent {
@@ -144,6 +144,17 @@ export default function LiveVoiceModal({
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [voiceId, setVoiceId] = useState<VoiceProfileId>(getInitialVoiceId);
+  const [liveVoiceMode, setLiveVoiceMode] = useState<'discussion' | 'work'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('satchida_voice_mode');
+      if (stored === 'work' || stored === 'discussion') {
+        return stored;
+      }
+    }
+    return 'discussion';
+  });
+  const liveVoiceModeRef = useRef(liveVoiceMode);
+  liveVoiceModeRef.current = liveVoiceMode;
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -458,6 +469,23 @@ export default function LiveVoiceModal({
     }
   }, [open, awaitingToolResponse, activeTailMessage, isSubmitting, lastSpokenMessageId]);
 
+  const handleAccentChange = useCallback((nextVoiceId: VoiceProfileId) => {
+    setVoiceId(nextVoiceId);
+    localStorage.setItem('satchida_voice_profile', nextVoiceId);
+    const opt = VOICE_OPTIONS.find((v) => v.id === nextVoiceId);
+    if (recognitionRef.current && opt) {
+      recognitionRef.current.lang = opt.lang;
+    }
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'voice.set_accent',
+          voice: nextVoiceId,
+        }),
+      );
+    }
+  }, []);
+
   const startSpeechRecognition = useCallback((ws: WebSocket) => {
     if (recognitionRef.current) {
       return;
@@ -509,17 +537,89 @@ export default function LiveVoiceModal({
 
       if (finalText.trim()) {
         const cleanFinal = finalText.trim();
-        const needsTools = hasToolsRef.current || TOOL_INTENT_REGEX.test(cleanFinal);
+        const lower = cleanFinal.toLowerCase();
+
+        // 1. Verbal voice mode switch commands
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?work\s+mode\b/i.test(lower)) {
+          setLiveVoiceMode('work');
+          localStorage.setItem('satchida_voice_mode', 'work');
+          setStatusText('Work mode active');
+          setSpokenTranscript('Switched to Work mode');
+          return;
+        }
+        if (/\b(?:switch|change|set)\s+(?:to\s+)?discussion\s+mode\b/i.test(lower)) {
+          setLiveVoiceMode('discussion');
+          localStorage.setItem('satchida_voice_mode', 'discussion');
+          setStatusText('Discussion mode active');
+          setSpokenTranscript('Switched to Discussion mode');
+          return;
+        }
+
+        // 2. Verbal accent/voice switch commands
+        if (
+          /\b(switch|change|use|set|speak|talk)\b/i.test(lower) &&
+          /\b(accent|voice|male|female|us|american|uk|british|indian|india)\b/i.test(lower)
+        ) {
+          let nextRegion: 'in' | 'us' | 'uk' = 'in';
+          if (/\b(us|u\.s\.|american|united states)\b/i.test(lower)) {
+            nextRegion = 'us';
+          } else if (/\b(uk|u\.k\.|british|england|london)\b/i.test(lower)) {
+            nextRegion = 'uk';
+          } else if (/\b(indian|india)\b/i.test(lower)) {
+            nextRegion = 'in';
+          }
+
+          let nextGender: 'female' | 'male' = 'female';
+          if (/\b(male|man|guy|boy)\b/i.test(lower)) {
+            nextGender = 'male';
+          } else if (/\b(female|woman|lady|girl)\b/i.test(lower)) {
+            nextGender = 'female';
+          }
+
+          const nextId = `${nextRegion}_${nextGender}` as VoiceProfileId;
+          handleAccentChange(nextId);
+          setStatusText(`Switched to ${nextId}`);
+          setSpokenTranscript(`Switched to ${nextId.replace('_', ' ')} voice`);
+          return;
+        }
+
+        // 3. Work mode or chat execution intent
+        const isWorkIntent =
+          liveVoiceModeRef.current === 'work' ||
+          hasToolsRef.current ||
+          TOOL_INTENT_REGEX.test(cleanFinal) ||
+          /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|run (?:deep )?research|write code in chat)\b/i.test(
+            cleanFinal,
+          );
+
+        if (isWorkIntent) {
+          const promptForChat =
+            cleanFinal
+              .replace(
+                /^(?:please\s+)?(?:insert|send|type|write|ask)\s+(?:this\s+)?(?:in|into|to)\s+chat(?:\s*[:,-]?\s*)?/i,
+                '',
+              )
+              .trim() || cleanFinal;
+
+          setSpokenTranscript(cleanFinal);
+          setAssistantTranscript('');
+          setStatusText('Executing in chat...');
+          setAwaitingToolResponse(true);
+          askRef.current({ text: promptForChat });
+          return;
+        }
+
+        // 4. Default: Live S2S Discussion turn
         setSpokenTranscript(cleanFinal);
         setAssistantTranscript('');
-        setStatusText(needsTools ? 'Running tools...' : 'Thinking...');
+        setStatusText('Thinking...');
         ws.send(
           JSON.stringify({
             type: 'voice.turn',
             text: cleanFinal,
             voice: voiceIdRef.current,
-            mode: currentModeRef.current || 'Chat',
-            hasTools: needsTools,
+            mode: 'discussion',
+            hasTools: false,
           }),
         );
       }
@@ -784,23 +884,6 @@ export default function LiveVoiceModal({
     });
   };
 
-  const handleAccentChange = (nextVoiceId: VoiceProfileId) => {
-    setVoiceId(nextVoiceId);
-    localStorage.setItem('satchida_voice_profile', nextVoiceId);
-    const opt = VOICE_OPTIONS.find((v) => v.id === nextVoiceId);
-    if (recognitionRef.current && opt) {
-      recognitionRef.current.lang = opt.lang;
-    }
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'voice.set_accent',
-          voice: nextVoiceId,
-        }),
-      );
-    }
-  };
-
   const handleRetry = () => {
     cleanupSession();
     setRetryNonce((n) => n + 1);
@@ -826,7 +909,7 @@ export default function LiveVoiceModal({
           />
         </span>
         <span className="whitespace-nowrap text-xs font-semibold">
-          {statusText} · {currentVoiceOpt.shortLabel}
+          {statusText} · {currentVoiceOpt.shortLabel} · {liveVoiceMode === 'work' ? 'Work' : 'Discussion'}
         </span>
         {isAssistantSpeaking && (
           <button
@@ -864,7 +947,7 @@ export default function LiveVoiceModal({
     <div
       role="region"
       aria-label="Satchida Live Voice"
-      className="pointer-events-auto fixed bottom-24 right-6 z-50 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-4 text-text-primary shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto fixed bottom-24 right-6 z-50 w-[350px] max-w-[calc(100vw-2rem)] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-4 text-text-primary shadow-2xl backdrop-blur-xl"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
@@ -898,12 +981,43 @@ export default function LiveVoiceModal({
             />
           </span>
           <span className="text-xs font-bold tracking-wide text-text-primary">
-            Satchida Live Voice
+            Live Voice
           </span>
-          <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
-            {activeRoutingMode}
-            {hasActiveComposerTools ? ' + Tools' : ''}
-          </span>
+          {/* Dual Mode Switcher: Discussion vs Work */}
+          <div className="flex items-center rounded-lg border border-violet-500/30 bg-surface-secondary/80 p-0.5 text-[10px] font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setLiveVoiceMode('discussion');
+                localStorage.setItem('satchida_voice_mode', 'discussion');
+                setStatusText('Discussion mode');
+              }}
+              className={`rounded-md px-2 py-0.5 transition-all ${
+                liveVoiceMode === 'discussion'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              title="Discussion Mode (Direct low-latency S2S with live Google Search grounding)"
+            >
+              Discussion
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLiveVoiceMode('work');
+                localStorage.setItem('satchida_voice_mode', 'work');
+                setStatusText('Work mode');
+              }}
+              className={`rounded-md px-2 py-0.5 transition-all ${
+                liveVoiceMode === 'work'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              title="Work Mode (Insert spoken prompts into chat, execute tools/models, and speak back)"
+            >
+              Work
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-1">

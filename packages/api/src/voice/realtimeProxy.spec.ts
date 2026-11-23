@@ -448,4 +448,73 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
       process.env.BIFROST_NATIVE_REALTIME_ENABLED = prevFlag;
     }
   });
+
+  test('configures Gemini Live S2S with Google Search grounding, strict Satchida identity, and Fenrir for us_male', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const createdUpstreamSockets: FakeWebSocket[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => {
+        const sock = new FakeWebSocket();
+        createdUpstreamSockets.push(sock);
+        return sock;
+      },
+      verifyJwt: () => ({ id: 'user-pro-99' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-pro-99',
+        accountType: 'pro',
+        seatToken: 'tk_seat_99',
+      }),
+      mintEphemeralToken: async () => 'mock_gemini_ephemeral_token',
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat&voice=us_male',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+
+    expect(createdUpstreamSockets.length).toBe(1);
+    const initialUpstream = createdUpstreamSockets[0];
+
+    // Simulate upstream open event to trigger setup frame
+    initialUpstream.emit('open');
+
+    expect(initialUpstream.sent.length).toBe(1);
+    const setupFrame = JSON.parse(initialUpstream.sent[0]);
+    expect(setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
+      'Fenrir',
+    );
+    expect(setupFrame.setup.tools).toEqual([{ googleSearch: {} }]);
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Live Voice');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('developed exclusively by Satchida AI');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('REALTIME SEARCH');
+
+    // Simulate setupComplete
+    initialUpstream.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+    const clientWs = getLastClientWs()!;
+    const sessionEvent = JSON.parse(clientWs.sent[0]);
+    expect(sessionEvent.mode).toBe('gemini_live_s2s');
+    expect(sessionEvent.voiceId).toBe('us_male');
+
+    // Now test dynamic voice switch to IN Male (Puck)
+    clientWs.emit(
+      'message',
+      Buffer.from(JSON.stringify({ type: 'voice.set_accent', voice: 'in_male' })),
+    );
+    await new Promise((r) => setImmediate(r));
+
+    // A second upstream connection should have been created with Puck
+    expect(createdUpstreamSockets.length).toBe(2);
+    const secondUpstream = createdUpstreamSockets[1];
+    secondUpstream.emit('open');
+    const secondSetup = JSON.parse(secondUpstream.sent[0]);
+    expect(secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
+      'Puck',
+    );
+  });
 });

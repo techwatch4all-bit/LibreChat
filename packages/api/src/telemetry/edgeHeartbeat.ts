@@ -12,16 +12,16 @@ import fs from 'fs';
 import path from 'path';
 import http from 'http';
 import https from 'https';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import mongoose from 'mongoose';
+import { promisify } from 'util';
+import { execFile } from 'child_process';
 import { logger } from '@librechat/data-schemas';
-import { verifyDeadManLease, updateNodeLicense } from '../middleware/leaseGuard';
 import {
   getLocalHardwareFingerprint,
   getDeploymentId,
   getAppVersion,
 } from '../middleware/hardwareId';
+import { verifyDeadManLease, updateNodeLicense } from '../middleware/leaseGuard';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,7 +38,12 @@ let lastNetBytes: { rx: number; tx: number; time: number } | null = null;
 let cachedOsDetails: { name: string; version: string; release: string; arch: string } | null = null;
 let cachedCpuInfo: { model: string; cores: number; speedMhz: number } | null = null;
 let cachedStaticGpus: EdgeGPUInfo[] | null = null;
-let cachedNetworkAdapter: { name: string; desc: string; mediaType: string; linkSpeed: string } | null = null;
+let cachedNetworkAdapter: {
+  name: string;
+  desc: string;
+  mediaType: string;
+  linkSpeed: string;
+} | null = null;
 
 // MongoDB Object tracking for dynamic diff (+ / -)
 let lastMongoObjects: number = 0;
@@ -89,21 +94,21 @@ export interface EdgeTelemetryPayload {
   os_version: string;
   os_release: string;
   os_arch: string;
-  
+
   // CPU
   cpu_model: string;
   cpu_cores: number;
   cpu_speed_mhz: number;
   cpu_percent: number;
-  
+
   // Memory
   mem_used_mb: number;
   mem_total_mb: number;
   uptime_seconds: number;
-  
+
   // GPU
   gpus: EdgeGPUInfo[];
-  
+
   // Network & Bandwidth
   net_adapter_name: string;
   net_adapter_desc: string;
@@ -111,13 +116,13 @@ export interface EdgeTelemetryPayload {
   net_link_speed: string;
   net_rx_kbps: number;
   net_tx_kbps: number;
-  
+
   // Storage & Disks
   disk_volumes: DiskVolumeInfo[];
 
   // Tenant Tools & Build-Related Processes
   processes: EdgeProcessInfo[];
-  
+
   // MongoDB & Edge Runtime
   mongo_status: string;
   mongo_ping_ms: number;
@@ -146,7 +151,12 @@ export interface EdgeTelemetryPayload {
 /**
  * Probe OS details with windowsHide: true to prevent any console window popup.
  */
-async function probeOsDetails(): Promise<{ name: string; version: string; release: string; arch: string }> {
+async function probeOsDetails(): Promise<{
+  name: string;
+  version: string;
+  release: string;
+  arch: string;
+}> {
   if (cachedOsDetails) return cachedOsDetails;
 
   let osName = os.type();
@@ -158,8 +168,15 @@ async function probeOsDetails(): Promise<{ name: string; version: string; releas
     try {
       const { stdout } = await execFileAsync(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', 'Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber | ConvertTo-Json -Compress'],
-        { windowsHide: true, timeout: 3000 }
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          'Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber | ConvertTo-Json -Compress',
+        ],
+        { windowsHide: true, timeout: 3000 },
       );
       const data = JSON.parse(stdout.trim());
       if (data.Caption) osName = data.Caption.trim();
@@ -239,8 +256,11 @@ async function probeGpus(): Promise<EdgeGPUInfo[]> {
   try {
     const { stdout } = await execFileAsync(
       'nvidia-smi',
-      ['--query-gpu=name,memory.total,memory.used,utilization.gpu,driver_version,temperature.gpu,power.draw', '--format=csv,noheader,nounits'],
-      { windowsHide: true, timeout: 2500 }
+      [
+        '--query-gpu=name,memory.total,memory.used,utilization.gpu,driver_version,temperature.gpu,power.draw',
+        '--format=csv,noheader,nounits',
+      ],
+      { windowsHide: true, timeout: 2500 },
     );
     for (const line of stdout.trim().split('\n')) {
       if (!line.trim()) continue;
@@ -271,8 +291,15 @@ async function probeGpus(): Promise<EdgeGPUInfo[]> {
     try {
       const { stdout } = await execFileAsync(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', 'Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Json -Compress'],
-        { windowsHide: true, timeout: 4000 }
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          'Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Json -Compress',
+        ],
+        { windowsHide: true, timeout: 4000 },
       );
       let items = JSON.parse(stdout.trim());
       if (!Array.isArray(items)) items = [items];
@@ -282,13 +309,22 @@ async function probeGpus(): Promise<EdgeGPUInfo[]> {
         const name = (it.Name || '').trim();
         if (!name) continue;
 
-        if (name.toLowerCase().includes('nvidia') || name.toLowerCase().includes('geforce') || name.toLowerCase().includes('rtx')) {
+        if (
+          name.toLowerCase().includes('nvidia') ||
+          name.toLowerCase().includes('geforce') ||
+          name.toLowerCase().includes('rtx')
+        ) {
           continue;
         }
 
         const nameLower = name.toLowerCase();
         let gpuType = 'Discrete GPU';
-        if (nameLower.includes('virtual') || nameLower.includes('basic render') || nameLower.includes('remote') || nameLower.includes('rdp')) {
+        if (
+          nameLower.includes('virtual') ||
+          nameLower.includes('basic render') ||
+          nameLower.includes('remote') ||
+          nameLower.includes('rdp')
+        ) {
           gpuType = 'Virtual GPU';
         } else if (
           nameLower.includes('intel') ||
@@ -366,7 +402,7 @@ async function probeLiveWmiMetrics(): Promise<EdgeLiveWmiProbe> {
       const { stdout } = await execFileAsync(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
-        { windowsHide: true, timeout: 4500 }
+        { windowsHide: true, timeout: 4500 },
       );
       stdoutText = stdout;
     }
@@ -393,7 +429,12 @@ async function probeLiveWmiMetrics(): Promise<EdgeLiveWmiProbe> {
 /**
  * Probe active primary network adapter and link speed once at boot.
  */
-async function probeActiveNetworkAdapter(): Promise<{ name: string; desc: string; mediaType: string; linkSpeed: string }> {
+async function probeActiveNetworkAdapter(): Promise<{
+  name: string;
+  desc: string;
+  mediaType: string;
+  linkSpeed: string;
+}> {
   if (cachedNetworkAdapter) return cachedNetworkAdapter;
 
   let name = 'Ethernet / WLAN';
@@ -404,12 +445,21 @@ async function probeActiveNetworkAdapter(): Promise<{ name: string; desc: string
   if (process.platform === 'win32') {
     try {
       const psCmd = `Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object Name, InterfaceDescription, MediaType, LinkSpeed | ConvertTo-Json -Compress`;
-      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', psCmd], { windowsHide: true, timeout: 3500 });
+      const { stdout } = await execFileAsync(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', psCmd],
+        { windowsHide: true, timeout: 3500 },
+      );
       let items = JSON.parse(stdout.trim());
       if (!Array.isArray(items)) items = [items];
-      
+
       // Select first non-virtual up adapter (prefer Wi-Fi or physical Ethernet)
-      const nonVirtual = items.find((a: { InterfaceDescription?: string }) => !a.InterfaceDescription?.toLowerCase().includes('hyper-v') && !a.InterfaceDescription?.toLowerCase().includes('virtual')) || items[0];
+      const nonVirtual =
+        items.find(
+          (a: { InterfaceDescription?: string }) =>
+            !a.InterfaceDescription?.toLowerCase().includes('hyper-v') &&
+            !a.InterfaceDescription?.toLowerCase().includes('virtual'),
+        ) || items[0];
       if (nonVirtual) {
         name = nonVirtual.Name || name;
         desc = nonVirtual.InterfaceDescription || desc;
@@ -455,8 +505,8 @@ async function measureNetworkThroughput(): Promise<{ rxKbps: number; txKbps: num
 
     lastNetBytes = { rx: currentRx, tx: currentTx, time: now };
 
-    const rxKbps = Math.round((rxDelta / 1024) / elapsedSec);
-    const txKbps = Math.round((txDelta / 1024) / elapsedSec);
+    const rxKbps = Math.round(rxDelta / 1024 / elapsedSec);
+    const txKbps = Math.round(txDelta / 1024 / elapsedSec);
 
     return { rxKbps, txKbps };
   } catch {
@@ -470,16 +520,17 @@ async function measureNetworkThroughput(): Promise<{ rxKbps: number; txKbps: num
  */
 function probeDiskVolumes(): DiskVolumeInfo[] {
   const volumes: DiskVolumeInfo[] = [];
-  const customDrives = process.env.SATCHIDA_TELEMETRY_DRIVES
-    ?.split(',')
+  const customDrives = process.env.SATCHIDA_TELEMETRY_DRIVES?.split(',')
     .map((d) => d.trim())
     .filter(Boolean);
-  const drives =
-    customDrives && customDrives.length > 0
-      ? customDrives
-      : process.platform === 'win32'
-        ? ['C:\\', 'D:\\', 'E:\\', 'F:\\']
-        : ['/'];
+  let drives: string[];
+  if (customDrives && customDrives.length > 0) {
+    drives = customDrives;
+  } else if (process.platform === 'win32') {
+    drives = ['C:\\', 'D:\\', 'E:\\', 'F:\\'];
+  } else {
+    drives = ['/'];
+  }
 
   for (const drive of drives) {
     try {
@@ -492,9 +543,9 @@ function probeDiskVolumes(): DiskVolumeInfo[] {
       if (totalBytes > 0) {
         volumes.push({
           drive: drive.replace('\\', ''),
-          total_gb: Math.round(totalBytes / (1024 ** 3) * 10) / 10,
-          free_gb: Math.round(freeBytes / (1024 ** 3) * 10) / 10,
-          used_gb: Math.round(usedBytes / (1024 ** 3) * 10) / 10,
+          total_gb: Math.round((totalBytes / 1024 ** 3) * 10) / 10,
+          free_gb: Math.round((freeBytes / 1024 ** 3) * 10) / 10,
+          used_gb: Math.round((usedBytes / 1024 ** 3) * 10) / 10,
           used_percent: Math.round((usedBytes / totalBytes) * 1000) / 10,
         });
       }
@@ -509,7 +560,14 @@ function probeDiskVolumes(): DiskVolumeInfo[] {
 /**
  * Ping local MongoDB instance to measure responsiveness and database metrics.
  */
-async function measureMongoStats(): Promise<{ status: string; pingMs: number; dataSizeMb: number; storageSizeMb: number; objects: number; objectsDiff: number }> {
+async function measureMongoStats(): Promise<{
+  status: string;
+  pingMs: number;
+  dataSizeMb: number;
+  storageSizeMb: number;
+  objects: number;
+  objectsDiff: number;
+}> {
   const readyState = mongoose.connection.readyState;
   let status = 'disconnected';
   if (readyState === 1) status = 'connected';
@@ -541,9 +599,23 @@ async function measureMongoStats(): Promise<{ status: string; pingMs: number; da
     } catch {
       // dbStats fallback if restricted
     }
-    return { status: 'connected', pingMs, dataSizeMb, storageSizeMb, objects, objectsDiff: mongoObjectsDiff };
+    return {
+      status: 'connected',
+      pingMs,
+      dataSizeMb,
+      storageSizeMb,
+      objects,
+      objectsDiff: mongoObjectsDiff,
+    };
   } catch {
-    return { status: 'error', pingMs: -1, dataSizeMb: 0, storageSizeMb: 0, objects: 0, objectsDiff: 0 };
+    return {
+      status: 'error',
+      pingMs: -1,
+      dataSizeMb: 0,
+      storageSizeMb: 0,
+      objects: 0,
+      objectsDiff: 0,
+    };
   }
 }
 
@@ -577,7 +649,7 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
         (res) => {
           res.resume();
           resolve({ ok: res.statusCode === 200, pingMs: Date.now() - start });
-        }
+        },
       );
       req.on('error', () => resolve({ ok: false, pingMs: -1 }));
       req.on('timeout', () => {
@@ -622,11 +694,10 @@ async function measureAnythingLLMStats(): Promise<AnythingLLMStats> {
         const pythonBin =
           process.env.PYTHON_PATH || (process.platform === 'win32' ? 'python.exe' : 'python3');
 
-        const { stdout } = await execFileAsync(
-          pythonBin,
-          [scriptPath, dbPath],
-          { windowsHide: true, timeout: 2500 }
-        );
+        const { stdout } = await execFileAsync(pythonBin, [scriptPath, dbPath], {
+          windowsHide: true,
+          timeout: 2500,
+        });
         const parts = stdout.trim().split('|');
         if (parts.length >= 6) {
           result.workspaces_count = parseInt(parts[0], 10) || 0;
@@ -657,10 +728,19 @@ function syncSharedLockdownState(locked: boolean, reason: string, expiresAt = 0)
     const lockdownPath =
       process.env.SATCHIDA_LOCKDOWN_FILE ||
       path.resolve(process.cwd(), '..', '.satchida-lockdown.json');
+    // Normalize seconds (10 digits) to milliseconds (13 digits) if needed
+    let normalizedExpiresAt = expiresAt;
+    if (typeof expiresAt === 'number' && expiresAt > 0 && expiresAt < 1e11) {
+      normalizedExpiresAt = expiresAt * 1000;
+    }
+    let lockdownReason = '';
+    if (locked) {
+      lockdownReason = reason || 'TENANT_LOCKED_BY_OPERATOR';
+    }
     const state = {
       locked,
-      reason: locked ? reason || 'TENANT_LOCKED_BY_OPERATOR' : '',
-      expiresAt,
+      reason: lockdownReason,
+      expiresAt: normalizedExpiresAt,
       updatedAt: Date.now(),
     };
     fs.writeFileSync(lockdownPath, JSON.stringify(state, null, 2), 'utf8');
@@ -673,10 +753,18 @@ function syncSharedLockdownState(locked: boolean, reason: string, expiresAt = 0)
 /**
  * Send heartbeat to central gateway over HTTPS/HTTP and apply returned lockdown/lease directives.
  */
-function sendHeartbeatRequest(gatewayUrl: string, virtualKey: string, payload: EdgeTelemetryPayload): Promise<void> {
+function sendHeartbeatRequest(
+  gatewayUrl: string,
+  virtualKey: string,
+  payload: EdgeTelemetryPayload,
+): Promise<void> {
   return new Promise((resolve) => {
     try {
-      const url = new URL(gatewayUrl.endsWith('/') ? `${gatewayUrl}api/tenant/heartbeat` : `${gatewayUrl}/api/tenant/heartbeat`);
+      const url = new URL(
+        gatewayUrl.endsWith('/')
+          ? `${gatewayUrl}api/tenant/heartbeat`
+          : `${gatewayUrl}/api/tenant/heartbeat`,
+      );
       const postData = JSON.stringify(payload);
       const isHttps = url.protocol === 'https:';
       const client = isHttps ? https : http;
@@ -749,7 +837,8 @@ function sendHeartbeatRequest(gatewayUrl: string, virtualKey: string, payload: E
  * Perform a single heartbeat cycle gathering actual metrics.
  */
 export async function emitEdgeHeartbeat(): Promise<void> {
-  const gatewayUrl = process.env.SATCHIDA_GATEWAY_URL || process.env.ONE_API_BASE_URL || 'http://127.0.0.1:4000';
+  const gatewayUrl =
+    process.env.SATCHIDA_GATEWAY_URL || process.env.ONE_API_BASE_URL || 'http://127.0.0.1:4000';
   const virtualKey = process.env.SATCHIDA_TENANT_VIRTUAL_KEY || process.env.TENANT_VIRTUAL_KEY;
 
   if (!virtualKey) {
@@ -761,7 +850,7 @@ export async function emitEdgeHeartbeat(): Promise<void> {
     const freeMem = os.freemem();
     const memUsedMb = Math.round((totalMem - freeMem) / (1024 * 1024));
     const memTotalMb = Math.round(totalMem / (1024 * 1024));
-    
+
     const osDetails = await probeOsDetails();
     const cpuDetails = probeCpuDetails();
     const realtimeCpuPercent = getRealtimeCpuPercent();
@@ -798,11 +887,14 @@ export async function emitEdgeHeartbeat(): Promise<void> {
       if (mongoose.connection.db) {
         // Query sessions with valid future expiration
         const now = new Date();
-        const unexpiredSessions = await mongoose.connection.db.collection('sessions').find({
-          expiration: { $gt: now }
-        }).toArray();
+        const unexpiredSessions = await mongoose.connection.db
+          .collection('sessions')
+          .find({
+            expiration: { $gt: now },
+          })
+          .toArray();
         activeSessions = unexpiredSessions.length;
-        const userSet = new Set(unexpiredSessions.map(s => String(s.user)).filter(Boolean));
+        const userSet = new Set(unexpiredSessions.map((s) => String(s.user)).filter(Boolean));
         activeUsers = userSet.size;
         // If no unexpired filter matches due to clock format, check unique users with recent session
         if (activeUsers === 0 && unexpiredSessions.length === 0) {
@@ -879,7 +971,8 @@ export function startEdgeHeartbeatEmitter(intervalMs = 1000): void {
   }
 
   const envInterval = parseInt(process.env.SATCHIDA_TELEMETRY_INTERVAL_MS || '', 10);
-  const effectiveInterval = Number.isFinite(envInterval) && envInterval >= 1000 ? envInterval : intervalMs;
+  const effectiveInterval =
+    Number.isFinite(envInterval) && envInterval >= 1000 ? envInterval : intervalMs;
 
   // Pre-seed CPU sample
   getRealtimeCpuPercent();
@@ -894,7 +987,9 @@ export function startEdgeHeartbeatEmitter(intervalMs = 1000): void {
     emitEdgeHeartbeat();
   }, effectiveInterval);
 
-  logger.info(`[EdgeHeartbeat] Realtime tenant telemetry emitter started (every ${effectiveInterval}ms).`);
+  logger.info(
+    `[EdgeHeartbeat] Realtime tenant telemetry emitter started (every ${effectiveInterval}ms).`,
+  );
 }
 
 export function stopEdgeHeartbeatEmitter(): void {

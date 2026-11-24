@@ -489,8 +489,10 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
     expect(setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
       'Fenrir',
     );
+    expect(setupFrame.setup.generationConfig.temperature).toBe(0.85);
     expect(setupFrame.setup.tools).toEqual([{ googleSearch: {} }]);
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Live Voice');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Intelligence');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('developed exclusively by Satchida AI');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('REALTIME SEARCH');
 

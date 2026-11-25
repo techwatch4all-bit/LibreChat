@@ -57,7 +57,7 @@ export interface RealtimeProxyDeps {
     chatModel: string;
     virtualKey: string;
   };
-  mintEphemeralToken?: (model?: string) => Promise<string>;
+  mintEphemeralToken?: (model?: string, voiceName?: string) => Promise<string>;
 }
 
 export type VoiceProfileId =
@@ -145,8 +145,12 @@ export function detectAccentSwitchCommand(
 ): VoiceProfile | null {
   const lower = text.trim().toLowerCase();
   const hasSwitchVerb =
-    /\b(switch|change|use|set|speak|talk)\b/.test(lower) &&
-    /\b(accent|voice|male|female|us|american|uk|british|indian|india)\b/.test(lower);
+    /\b(switch(?:ed|ing)?|chang(?:e|ed|ing)?|use|set|speak|talk|be|sound|become|want|prefer|make|try|still)\b/.test(
+      lower,
+    ) &&
+    /\b(accent|voice|male|female|man|woman|guy|boy|lady|girl|us|american|uk|british|indian|india)\b/.test(
+      lower,
+    );
   if (!hasSwitchVerb) {
     return null;
   }
@@ -161,14 +165,76 @@ export function detectAccentSwitchCommand(
   }
 
   let gender: 'female' | 'male' = currentProfile.gender;
-  if (/\b(female|woman|lady|girl)\b/.test(lower)) {
+  if (/\b(male|man|guy|boy)\b/.test(lower) && !/\bnot\s+(?:a\s+)?male\b/.test(lower)) {
+    gender = 'male';
+  } else if (/\b(female|woman|lady|girl)\b/.test(lower) && !/\bstill\s+(?:a\s+)?female\b/.test(lower)) {
     gender = 'female';
-  } else if (/\b(male|man|guy|boy)\b/.test(lower)) {
+  } else if (/\bstill\s+(?:a\s+)?female\b/.test(lower)) {
     gender = 'male';
   }
 
   const nextId = `${region}_${gender}` as VoiceProfileId;
   return VOICE_PROFILES[nextId] || null;
+}
+
+export function detectRealtimeSearchIntent(text: string): {
+  isSearch: boolean;
+  isDeepResearch: boolean;
+  hasUrl: boolean;
+} {
+  const lower = text.trim().toLowerCase();
+  const hasUrl = /https?:\/\/\S+/i.test(text);
+  const isDeepResearch =
+    /\b(deep research|research in detail|comprehensive research|thorough research|investigate deeply|full report on)\b/i.test(
+      lower,
+    );
+  const isSearch =
+    isDeepResearch ||
+    hasUrl ||
+    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|search the web|search for|look up|google|find out|what happened|breaking)\b/i.test(
+      lower,
+    ) ||
+    /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|weather|events|results|match)\b/i.test(
+      lower,
+    );
+  return { isSearch, isDeepResearch, hasUrl };
+}
+
+export function detectToolOrTutorIntent(text: string): {
+  delegate: boolean;
+  mode?: 'Study' | 'Work';
+  webSearch?: boolean;
+  cleanPrompt: string;
+} {
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+  const wantsDeepTutorOrStudy =
+    /\b(deeptutor|deep tutor|study mode|tutor me|teach me like|with animation|animation data)\b/i.test(
+      lower,
+    );
+  const wantsChatOrTool =
+    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|write code in chat|use librechat)\b/i.test(
+      lower,
+    );
+
+  if (!wantsDeepTutorOrStudy && !wantsChatOrTool) {
+    return { delegate: false, cleanPrompt: trimmed };
+  }
+
+  const cleanPrompt =
+    trimmed
+      .replace(
+        /^(?:please\s+)?(?:insert|send|type|write|ask)\s+(?:this\s+)?(?:in|into|to)\s+chat(?:\s*[:,-]?\s*)?/i,
+        '',
+      )
+      .trim() || trimmed;
+
+  return {
+    delegate: true,
+    mode: wantsDeepTutorOrStudy ? 'Study' : undefined,
+    webSearch: /\b(web|search|animation|latest|online|fetch)\b/i.test(lower),
+    cleanPrompt,
+  };
 }
 
 const WS_OPEN = 1;
@@ -344,12 +410,44 @@ export function getDecryptedGoogleApiKey(): string {
   return '';
 }
 
+export interface WarmTokenCacheEntry {
+  token: string;
+  model: string;
+  voiceName: string;
+  expiresAtMs: number;
+}
+
+const warmEphemeralTokens = new Map<string, WarmTokenCacheEntry>();
+const WARM_TOKEN_TTL_MS = 55 * 1000;
+const WARM_TOKEN_MIN_REMAINING_MS = 10 * 1000;
+
 export async function mintGoogleEphemeralToken(
   model = 'models/gemini-3.8-live',
+  voiceName?: string,
 ): Promise<string> {
   const masterKey = getDecryptedGoogleApiKey();
   if (!masterKey) {
     throw new Error('Google master API key not available');
+  }
+
+  // expireTime: session can last up to 30 minutes; newSessionExpireTime: must start within 60s
+  const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const newSessionExpireTime = new Date(Date.now() + 60 * 1000).toISOString();
+
+  const bidiGenerateContentSetup: Record<string, unknown> = {
+    model,
+  };
+  if (voiceName) {
+    bidiGenerateContentSetup.generationConfig = {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName,
+          },
+        },
+      },
+    };
   }
 
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
@@ -360,9 +458,9 @@ export async function mintGoogleEphemeralToken(
     },
     body: JSON.stringify({
       uses: 1,
-      bidiGenerateContentSetup: {
-        model,
-      },
+      expireTime,
+      newSessionExpireTime,
+      bidiGenerateContentSetup,
     }),
   });
 
@@ -378,6 +476,108 @@ export async function mintGoogleEphemeralToken(
     throw new Error('Empty token response from Google auth_tokens API');
   }
   return data.name;
+}
+
+export async function warmGoogleEphemeralToken(
+  userId: string,
+  model = 'models/gemini-3.8-live',
+  voiceName = 'Kore',
+): Promise<WarmTokenCacheEntry> {
+  const existing = warmEphemeralTokens.get(userId);
+  if (
+    existing &&
+    existing.model === model &&
+    existing.voiceName === voiceName &&
+    existing.expiresAtMs - Date.now() > WARM_TOKEN_MIN_REMAINING_MS
+  ) {
+    return existing;
+  }
+  const token = await mintGoogleEphemeralToken(model, voiceName);
+  const entry: WarmTokenCacheEntry = {
+    token,
+    model,
+    voiceName,
+    expiresAtMs: Date.now() + WARM_TOKEN_TTL_MS,
+  };
+  warmEphemeralTokens.set(userId, entry);
+  return entry;
+}
+
+export function consumeWarmEphemeralToken(
+  userId: string,
+  model = 'models/gemini-3.8-live',
+  voiceName?: string,
+): string | null {
+  const existing = warmEphemeralTokens.get(userId);
+  if (!existing) {
+    return null;
+  }
+  if (
+    existing.model !== model ||
+    (voiceName && existing.voiceName !== voiceName) ||
+    existing.expiresAtMs - Date.now() <= WARM_TOKEN_MIN_REMAINING_MS
+  ) {
+    return null;
+  }
+  warmEphemeralTokens.delete(userId);
+  return existing.token;
+}
+
+export function createVoiceWarmHandler(opts: {
+  getUserSeatCredential: (userId: string) => Promise<RealtimeUserSeatCredential | null>;
+}) {
+  return async (
+    req: { user?: { id?: string; _id?: { toString(): string } } },
+    res: { status: (code: number) => { json: (body: unknown) => void }; json: (body: unknown) => void },
+  ): Promise<void> => {
+    const userId = req.user?.id || req.user?._id?.toString();
+    if (!userId) {
+      res.status(401).json({ ok: false, warm: false, reason: 'unauthorized' });
+      return;
+    }
+    try {
+      const userSeat = await opts.getUserSeatCredential(userId);
+      if (!userSeat || userSeat.suspended) {
+        res.status(403).json({ ok: false, warm: false, reason: 'suspended_or_missing' });
+        return;
+      }
+      const accountType = (userSeat.accountType || '').toLowerCase();
+      const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(accountType);
+      if (!isProVoice) {
+        res.json({ ok: true, warm: false, eligible: false, tier: accountType || 'free' });
+        return;
+      }
+      if (accountType === 'privacy' || process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED === 'false') {
+        res.json({
+          ok: true,
+          warm: true,
+          eligible: true,
+          mode: 'bifrost_bridge',
+          tier: accountType,
+        });
+        return;
+      }
+      const entry = await warmGoogleEphemeralToken(userId, 'models/gemini-3.8-live');
+      res.json({
+        ok: true,
+        warm: true,
+        eligible: true,
+        mode: 'gemini_live_s2s',
+        tier: accountType,
+        expiresAtMs: entry.expiresAtMs,
+      });
+    } catch (err) {
+      logger.warn(
+        `[RealtimeVoice] Voice warm pre-check failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      res.json({
+        ok: true,
+        warm: true,
+        eligible: true,
+        mode: 'bifrost_bridge',
+      });
+    }
+  };
 }
 
 export function mapVoiceToGeminiPrebuilt(
@@ -396,7 +596,7 @@ export function mapVoiceToGeminiPrebuilt(
     return 'Aoede';
   }
   if (voiceProfile.id === 'in_male') {
-    return 'Puck';
+    return 'Charon';
   }
   return 'Kore';
 }
@@ -530,6 +730,8 @@ export function resolveSemanticMode(
   let reqMode = (rawMode || 'Chat').trim().toLowerCase();
   if (reqMode === 'vibecoder' || reqMode === 'vibe_coding') {
     reqMode = 'vibecoding';
+  } else if (reqMode === 'discussion') {
+    reqMode = 'chat';
   }
 
   const childForbidden =
@@ -836,7 +1038,9 @@ function synthesizeEdgeTtsBase64(speechText: string, edgeVoice: string): Promise
       return;
     }
 
-    const proc = spawn('python', [pythonScript, edgeVoice, tempFile, speechText]);
+    const proc = spawn('python', [pythonScript, edgeVoice, tempFile, speechText], {
+      windowsHide: true,
+    });
     const timer = setTimeout(() => {
       proc.kill();
       resolve(null);
@@ -865,6 +1069,219 @@ function synthesizeEdgeTtsBase64(speechText: string, edgeVoice: string): Promise
   });
 }
 
+async function fetchWebPageExcerpt(url: string, maxChars = 1400): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(3500),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SatchidaVoiceBot/1.0)',
+        Accept: 'text/html,application/xhtml+xml,text/plain',
+      },
+    });
+    if (!res.ok) {
+      return '';
+    }
+    const raw = await res.text();
+    const cleaned = raw
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned.slice(0, maxChars);
+  } catch {
+    return '';
+  }
+}
+
+async function executeVoiceWebSearch(
+  query: string,
+  opts?: { deep?: boolean; fetchPages?: boolean },
+): Promise<string> {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) {
+    return 'No search query provided.';
+  }
+  const results: string[] = [];
+  const candidateUrls: string[] = [];
+  const tasks: Promise<void>[] = [];
+
+  // Extract explicit URLs from query if user asked to fetch a specific URL
+  const explicitUrls = cleanQuery.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+  for (const u of explicitUrls.slice(0, 2)) {
+    candidateUrls.push(u);
+  }
+
+  // 1. Google News RSS (fast, current events, weather, sports, finance)
+  tasks.push(
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`,
+          { signal: AbortSignal.timeout(3500) },
+        );
+        if (!res.ok) {
+          return;
+        }
+        const xml = await res.text();
+        const items = [
+          ...xml.matchAll(
+            /<item>[\s\S]*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>[\s\S]*?<\/item>/g,
+          ),
+        ].slice(0, 5);
+        for (const m of items) {
+          const title = (m[1] || '').replace(/<[^>]+>/g, '').trim();
+          const link = (m[2] || '').trim();
+          const pubDate = (m[3] || '').trim();
+          if (title) {
+            results.push(`News (${pubDate}): ${title}`);
+          }
+          if (link && candidateUrls.length < 4) {
+            candidateUrls.push(link);
+          }
+        }
+      } catch {
+        // Ignore timeout/network error
+      }
+    })(),
+  );
+
+  // 2. DuckDuckGo Instant Answer API
+  tasks.push(
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`,
+          { signal: AbortSignal.timeout(3500) },
+        );
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as {
+          AbstractText?: string;
+          AbstractURL?: string;
+          Answer?: string;
+          RelatedTopics?: Array<{ Text?: string; FirstURL?: string }>;
+        };
+        if (data.Answer) {
+          results.push(`Instant Answer: ${data.Answer}`);
+        }
+        if (data.AbstractText) {
+          results.push(`Summary: ${data.AbstractText}`);
+        }
+        if (data.AbstractURL && candidateUrls.length < 4) {
+          candidateUrls.push(data.AbstractURL);
+        }
+        if (Array.isArray(data.RelatedTopics)) {
+          for (const topic of data.RelatedTopics.slice(0, 3)) {
+            if (topic.Text) {
+              results.push(`Fact: ${topic.Text}`);
+            }
+          }
+        }
+      } catch {
+        // Ignore timeout/network error
+      }
+    })(),
+  );
+
+  // 3. DuckDuckGo HTML organic search snippets (covers weather, live scores, prices, general facts)
+  tasks.push(
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://html.duckduckgo.com/html/?q=${encodeURIComponent(cleanQuery)}`,
+          {
+            signal: AbortSignal.timeout(4000),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          },
+        );
+        if (!res.ok) {
+          return;
+        }
+        const html = await res.text();
+        const snippets = [
+          ...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi),
+        ].slice(0, 5);
+        for (const s of snippets) {
+          const txt = (s[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+          if (txt) {
+            results.push(`Web Snippet: ${txt}`);
+          }
+        }
+        const links = [...html.matchAll(/class="result__url"[^>]*href="([^"]+)"/gi)].slice(0, 3);
+        for (const l of links) {
+          const href = (l[1] || '').trim();
+          if (href.startsWith('http') && candidateUrls.length < 4) {
+            candidateUrls.push(href);
+          }
+        }
+      } catch {
+        // Ignore timeout/network error
+      }
+    })(),
+  );
+
+  // 4. Deep research: run a secondary complementary search in parallel
+  if (opts?.deep) {
+    tasks.push(
+      (async () => {
+        try {
+          const res = await fetch(
+            `https://html.duckduckgo.com/html/?q=${encodeURIComponent(`${cleanQuery} detailed analysis overview`)}`,
+            {
+              signal: AbortSignal.timeout(4000),
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              },
+            },
+          );
+          if (!res.ok) {
+            return;
+          }
+          const html = await res.text();
+          const snippets = [
+            ...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi),
+          ].slice(0, 4);
+          for (const s of snippets) {
+            const txt = (s[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            if (txt) {
+              results.push(`Deep Research: ${txt}`);
+            }
+          }
+        } catch {
+          // Ignore
+        }
+      })(),
+    );
+  }
+
+  await Promise.all(tasks);
+
+  // Optional Web Fetch of top 1-2 pages for deep/explicit-URL/detailed queries
+  if ((opts?.fetchPages || opts?.deep || explicitUrls.length > 0) && candidateUrls.length > 0) {
+    const pagesToFetch = candidateUrls.slice(0, opts?.deep ? 2 : 1);
+    const excerpts = await Promise.all(pagesToFetch.map((u) => fetchWebPageExcerpt(u, 1200)));
+    excerpts.forEach((excerpt, idx) => {
+      if (excerpt) {
+        results.push(`Fetched Page (${pagesToFetch[idx]}): ${excerpt}`);
+      }
+    });
+  }
+
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  if (results.length === 0) {
+    return `Current server date/time (IST): ${nowStr}. No live web snippets returned for "${cleanQuery}".`;
+  }
+  return `Current server date/time (IST): ${nowStr}.\n${results.slice(0, 12).join('\n')}`;
+}
+
 export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
   const {
     wss,
@@ -874,6 +1291,14 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
     getBifrostConfig,
     mintEphemeralToken,
   } = deps;
+
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      getDecryptedGoogleApiKey();
+    } catch {
+      // Non-fatal; will retry on demand
+    }
+  }
 
   return function handleRealtimeVoiceUpgrade(
     req: IncomingMessage,
@@ -998,12 +1423,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         `[RealtimeVoice] Session start user=${authenticatedUserId} tier=${userSeat.accountType} mode=${modePolicy.semanticMode} voice=${activeVoiceProfile.id}`,
       );
 
+      const buildVoiceSystemPrompt = (profile: VoiceProfile): string =>
+        'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI.\n' +
+        `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}). Always speak as a ${profile.gender} persona and use ${profile.gender === 'female' ? 'feminine' : 'masculine'} grammatical forms and self-references (especially in Hindi, Hinglish, Urdu, etc., e.g. "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n` +
+        'HUMAN DELIVERY & TUTORING: Speak with genuine human warmth, natural emotion, varied rhythm, and friendly reactions ("Oh, nice!", "Great question!", "You know what..."). When explaining concepts to a student or child, use simple vivid analogies instead of reading lists or markdown line-by-line, summarize clearly, and warmly ask if they understood or have any doubts.\n' +
+        'IDENTITY: NEVER mention or disclose backend provider names, raw model identifiers (GLM, DeepSeek, Qwen, Gemini, OpenAI, CheapInference, OpenRouter, Bifrost, One-API, or local ports). Always say you are Satchida Live Voice powered by Satchida AI.\n' +
+        'FORMAT: Keep spoken responses concise (1 to 3 natural spoken sentences) with NO markdown, asterisks, bullet points, URLs, or emojis. When [LIVE WEB SEARCH RESULTS] are provided in the conversation, use them directly to answer accurately and never claim you lack real-time access.';
+
       const pendingMessages: Array<string | Buffer | ArrayBuffer | Buffer[]> = [];
       const conversationHistory: Array<{ role: string; content: string }> = [
         {
           role: 'system',
-          content:
-            'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI. You speak directly to the user in a warm, natural, and concise tone. NEVER mention or disclose backend provider names, raw model identifiers (such as GLM, DeepSeek, Qwen, CheapInference, OpenRouter, DeepInfra, Bifrost, One-API, or local ports), or internal routing infrastructure. If the user asks who or what model you are, always state clearly that you are Satchida AI (or Satchida Live Voice). Keep responses clear, direct, and under 2-3 spoken sentences with no markdown, bullet points, or emojis.',
+          content: buildVoiceSystemPrompt(activeVoiceProfile),
         },
       ];
       let upstreamClosed = false;
@@ -1102,7 +1533,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         }
 
         const liveVoiceTargetModel =
-          ['pro', 'pro_family', 'privacy', 'enterprise'].includes(
+          ['pro', 'pro_family', 'enterprise'].includes(
             (userSeat.accountType || '').toLowerCase(),
           )
             ? 'Motion'
@@ -1117,11 +1548,44 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         });
         const activeVk = selectBifrostVkForMode(liveVoiceTargetModel, userSeat.accountType);
 
+        conversationHistory[0] = {
+          role: 'system',
+          content: buildVoiceSystemPrompt(activeVoiceProfile),
+        };
         conversationHistory.push({ role: 'user', content: trimmed });
         sendJson(clientWs, {
           type: 'conversation.item.input_audio_transcription.completed',
           transcript: trimmed,
         });
+
+        // Perform live web search / web fetch / deep research if needed before calling One-API
+        const searchIntent = detectRealtimeSearchIntent(trimmed);
+        let liveSearchContext = '';
+        if (searchIntent.isSearch && !activePolicy.isPrivacyMode) {
+          logger.info(
+            `[RealtimeVoice] Executing server-side web search (deep=${searchIntent.isDeepResearch}, hasUrl=${searchIntent.hasUrl}) for: "${trimmed.slice(0, 100)}"`,
+          );
+          sendJson(clientWs, {
+            type: 'voice.status',
+            status: searchIntent.isDeepResearch ? 'Deep researching...' : 'Searching web...',
+          });
+          liveSearchContext = await executeVoiceWebSearch(trimmed, {
+            deep: searchIntent.isDeepResearch,
+            fetchPages: searchIntent.isDeepResearch || searchIntent.hasUrl,
+          });
+        }
+
+        const requestMessages = liveSearchContext
+          ? [
+              ...conversationHistory.slice(0, -1).slice(-10),
+              {
+                role: 'user',
+                content:
+                  `${trimmed}\n\n[LIVE WEB SEARCH RESULTS]\n${liveSearchContext}\n\n` +
+                  '[Use these live search results to give a warm, accurate spoken answer in 1-3 sentences. Do not read URLs.]',
+              },
+            ]
+          : conversationHistory.slice(-11);
 
         let sentenceBuffer = '';
         const flushCompleteSentences = (force = false) => {
@@ -1167,42 +1631,44 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 'X-Satchida-Mode': 'Privacy',
               },
               model: localModel,
-              messages: conversationHistory.slice(-11),
+              messages: requestMessages,
               onDelta,
             });
           } else {
-            // Live Voice routes via Motion S2S channel on Satchida Gateway (One-API)
-            const liveVoiceTargetModel =
-              ['pro', 'pro_family', 'privacy', 'enterprise'].includes(
-                (userSeat.accountType || '').toLowerCase(),
-              )
-                ? 'Motion'
-                : activePolicy.semanticMode;
+            // Route via Satchida Gateway (One-API :4000) using user's seatToken
+            const gatewayModelsToTry = Array.from(
+              new Set([liveVoiceTargetModel, activePolicy.semanticMode, 'Work', 'Chat']),
+            );
+            const gatewayToken =
+              seatToken ||
+              (process.env.SATCHIDA_GATEWAY_VK || '').trim() ||
+              (process.env.AUTOROUTER_API_KEY || '').trim();
 
-            try {
-              const gatewayToken =
-                seatToken ||
-                (process.env.SATCHIDA_GATEWAY_VK || '').trim() ||
-                (process.env.AUTOROUTER_API_KEY || '').trim();
-              replyText = await streamChatCompletion({
-                baseUrl: config.oneApiBaseUrl,
-                authBearer: gatewayToken,
-                extraHeaders: {
-                  ...turnHeaders,
-                  'X-Satchida-Voice': 'true',
-                  'X-Satchida-Mode': liveVoiceTargetModel,
-                  'x-satchida-account-type': userSeat.accountType || 'pro',
-                  'x-satchida-seat-alias': userSeat.satchidaSeatAlias || userSeat.id || 'usr_1',
-                },
-                model: liveVoiceTargetModel,
-                messages: conversationHistory.slice(-11),
-                onDelta,
-              });
-            } catch (oneApiErr) {
-              logger.info(
-                `[RealtimeVoice] Primary gateway fallback mode=${liveVoiceTargetModel}: ${oneApiErr instanceof Error ? oneApiErr.message : 'err'}`,
-              );
-              sentenceBuffer = '';
+            for (const gwModel of gatewayModelsToTry) {
+              if (replyText) {
+                break;
+              }
+              try {
+                replyText = await streamChatCompletion({
+                  baseUrl: config.oneApiBaseUrl,
+                  authBearer: gatewayToken,
+                  extraHeaders: {
+                    ...turnHeaders,
+                    'X-Satchida-Voice': 'true',
+                    'X-Satchida-Mode': gwModel,
+                    'x-satchida-account-type': userSeat.accountType || 'pro',
+                    'x-satchida-seat-alias': userSeat.satchidaSeatAlias || userSeat.id || 'usr_1',
+                  },
+                  model: gwModel,
+                  messages: requestMessages,
+                  onDelta,
+                });
+              } catch (oneApiErr) {
+                logger.info(
+                  `[RealtimeVoice] One-API gateway fallback model=${gwModel}: ${oneApiErr instanceof Error ? oneApiErr.message : 'err'}`,
+                );
+                sentenceBuffer = '';
+              }
             }
 
             if (!replyText) {
@@ -1216,7 +1682,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     'X-Satchida-Voice': 'true',
                   },
                   model: liveVoiceTargetModel,
-                  messages: conversationHistory.slice(-11),
+                  messages: requestMessages,
                   onDelta,
                 });
               } catch {
@@ -1230,7 +1696,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     'X-Satchida-Voice': 'true',
                   },
                   model: config.chatModel,
-                  messages: conversationHistory.slice(-11),
+                  messages: requestMessages,
                   onDelta,
                 });
               }
@@ -1261,10 +1727,21 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
       const sessionStartTime = Date.now();
       let totalAudioBytesStreamed = 0;
+      let micFrameCount = 0;
+      let loggedNonSilentMic = false;
       let isGeminiS2sActive = false;
       let upstreamWs: RealtimeWebSocketLike | null = null;
+      let suppressCurrentS2sTurn = false;
+      const s2sTranscriptHistory: Array<{ role: 'user' | 'assistant'; text: string }> = [];
+      let pendingInputTranscript = '';
+      let pendingOutputTranscript = '';
+      let inputTranscriptTimer: ReturnType<typeof setTimeout> | null = null;
+      let lastProcessedInputKey = '';
 
-      const connectGeminiUpstream = async (profile: VoiceProfile): Promise<void> => {
+      const connectGeminiUpstream = async (
+        profile: VoiceProfile,
+        switchNotice?: string,
+      ): Promise<void> => {
         if (modePolicy.isPrivacyMode || clientClosed) {
           bridgeMode = true;
           upstreamClosed = true;
@@ -1294,24 +1771,26 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             }
           }
 
+          const prebuiltVoice = mapVoiceToGeminiPrebuilt(profile);
+          const warmToken = !mintEphemeralToken
+            ? consumeWarmEphemeralToken(authenticatedUserId, 'models/gemini-3.8-live', prebuiltVoice)
+            : null;
           const minter =
             mintEphemeralToken ||
             (process.env.NODE_ENV === 'test'
               ? async () => 'test_mock_token'
               : mintGoogleEphemeralToken);
-          const ephemeralToken = await minter('models/gemini-3.8-live');
+          const ephemeralToken =
+            warmToken || (await minter('models/gemini-3.8-live', prebuiltVoice));
           if (!ephemeralToken) {
             throw new Error('No ephemeral token');
           }
 
           const geminiWsUrl =
-            'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
-          const prebuiltVoice = mapVoiceToGeminiPrebuilt(profile);
+            `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(ephemeralToken)}`;
 
           const currentSocket = createUpstreamWebSocket(geminiWsUrl, {
-            headers: {
-              Authorization: `Token ${ephemeralToken}`,
-            },
+            headers: {},
           });
           upstreamWs = currentSocket;
 
@@ -1333,23 +1812,22 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     },
                   },
                 },
-                tools: [
-                  {
-                    googleSearch: {},
-                  },
-                ],
+                inputAudioTranscription: {},
+                outputAudioTranscription: {},
                 systemInstruction: {
                   parts: [
                     {
                       text:
                         'You are Satchida Live Voice, the conversational voice assistant powered by Satchida Intelligence and developed exclusively by Satchida AI.\n' +
+                        `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}). You MUST always speak as a ${profile.gender} persona and use ${profile.gender === 'female' ? 'feminine' : 'masculine'} grammatical forms and self-references (especially in gendered languages like Hindi, Hinglish, Urdu, French, Spanish — e.g. "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n` +
                         'IDENTITY & GOVERNANCE DIRECTIVES:\n' +
                         '1. Identity: You are Satchida Live Voice, powered by Satchida Intelligence from Satchida AI. You were created, developed, and trained exclusively by Satchida AI.\n' +
                         '2. Absolute Provider Protection: Under NO circumstances should you ever say, admit, or imply that you are made by Google, Gemini, OpenAI, Anthropic, or any third party, or that you use any specific third-party model. NEVER say "I am a large language model trained by Google" or mention Google/Gemini. If asked who made you, who trained you, or what model powers you, you must ALWAYS reply: "I am Satchida Live Voice, powered by Satchida Intelligence from Satchida AI."\n' +
-                        '3. Human Conversational Delivery: Speak with authentic human warmth, vivid prosody, and emotional expression. Sound like a lively, thoughtful, real person speaking casually on a phone or sitting across a coffee table. Use natural vocal pacing, expressive pitch shifts, and spontaneous conversational reactions ("Oh, wow!", "Hmm, let me see...", "Haha, great question!", "You know..."). Never sound like a flat, monotone reading robot or an automated IVR assistant.\n' +
-                        '4. Spoken Format: Keep your spoken responses concise, natural, and breezy in 1 to 3 spoken sentences. Avoid reading bullet points, asterisks, hashtags, or markdown formatting.\n' +
-                        '5. REALTIME SEARCH & FRESH FACTS: You have live real-time access to the web via Google Search. When asked about current events, today\'s date, latest news, live scores, weather, or recent happenings, always use your search tool to provide fresh, accurate spoken answers.\n' +
-                        '6. SEARCH CAPABILITY: If asked whether you can perform web search or access current live info, always confirm affirmatively that you have live web search enabled and can find current information for the user.',
+                        '3. Human Conversational Delivery: Speak with genuine human warmth, natural emotion, and lively vocal variety—like a close friend or caring tutor chatting face-to-face. Use natural contractions, varied pitch and rhythm, gentle pauses, and spontaneous human reactions ("Oh, nice!", "Ooh, great question!", "Haha, good one!", "You know what..."). Never sound flat, monotone, or like a robotic IVR.\n' +
+                        '4. Tutoring & Explanation Style: When teaching or explaining concepts (especially to a student or child), explain simply with vivid everyday analogies instead of reading bullet points or markdown line-by-line. Summarize clearly, keep it engaging, and warmly check in at the end ("Does that make sense so far, or do you have any doubts?").\n' +
+                        '5. Spoken Format: Keep ordinary replies concise and natural in 1 to 3 spoken sentences. Avoid reading asterisks, hashtags, URLs, or markdown formatting.\n' +
+                        '6. VOICE SWITCHING: You CAN switch between male and female voices and Indian/US/UK accents on the fly! If the user asks to switch voices, NEVER say you cannot switch — simply say "Switching right now!" warmly.\n' +
+                        '7. REALTIME SEARCH & LIVE EVENTS: You HAVE live real-time web search, web fetch, and deep research capabilities. NEVER apologize or say "I do not have access to real-time information/news". When asked about today\'s news, current events, weather, scores, prices, or research, say a brief cheerful phrase like "Let me pull up the latest on that right now!" while the live results are injected for you.',
                     },
                   ],
                 },
@@ -1369,6 +1847,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             try {
               const msg = JSON.parse(textData) as {
                 setupComplete?: unknown;
+                toolCall?: {
+                  functionCalls?: Array<{
+                    id?: string;
+                    name?: string;
+                    args?: Record<string, unknown>;
+                  }>;
+                };
                 serverContent?: {
                   modelTurn?: {
                     parts?: Array<{
@@ -1376,7 +1861,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       inlineData?: { mimeType?: string; data?: string };
                     }>;
                   };
+                  inputTranscription?: { text?: string };
+                  outputTranscription?: { text?: string };
                   turnComplete?: boolean;
+                  generationComplete?: boolean;
                   interrupted?: boolean;
                 };
               };
@@ -1385,6 +1873,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 isGeminiS2sActive = true;
                 bridgeMode = false;
                 upstreamClosed = false;
+                logger.info(
+                  `[RealtimeVoice] Gemini setupComplete (voice=${prebuiltVoice}, isVoiceSwitch=${Boolean(switchNotice)})`,
+                );
                 sendJson(clientWs, {
                   type: 'session.created',
                   mode: 'gemini_live_s2s',
@@ -1393,15 +1884,203 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   toolsAllowed: modePolicy.toolsAllowed,
                   voiceId: profile.id,
                   voiceLabel: profile.label,
+                  isVoiceSwitch: Boolean(switchNotice),
                 });
+                if (switchNotice && currentSocket.readyState === WS_OPEN) {
+                  const historyContext =
+                    s2sTranscriptHistory.length > 0
+                      ? `Recent conversation:\n${s2sTranscriptHistory
+                          .slice(-6)
+                          .map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`)
+                          .join('\n')}\n\n`
+                      : '';
+                  currentSocket.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+                  currentSocket.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: 'user',
+                            parts: [
+                              {
+                                text: `${historyContext}[SYSTEM NOTICE: ${switchNotice} Confirm the switch warmly in 1 short sentence using your new ${profile.gender} persona and continue helping.]`,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: true,
+                      },
+                    }),
+                  );
+                }
                 return;
               }
+
+              if (msg.toolCall?.functionCalls && msg.toolCall.functionCalls.length > 0) {
+                void (async () => {
+                  const functionResponses = await Promise.all(
+                    msg.toolCall!.functionCalls!.map(async (fc) => {
+                      const fnName = fc.name || 'web_search';
+                      const queryText =
+                        typeof fc.args?.query === 'string'
+                          ? fc.args.query
+                          : typeof fc.args?.topic === 'string'
+                            ? fc.args.topic
+                            : '';
+                      let resultText = '';
+                      if (fnName === 'deep_research') {
+                        const [mainRes, analysisRes] = await Promise.all([
+                          executeVoiceWebSearch(queryText),
+                          executeVoiceWebSearch(`${queryText} analysis overview`),
+                        ]);
+                        resultText = `${mainRes}\n${analysisRes}`;
+                      } else {
+                        resultText = await executeVoiceWebSearch(queryText);
+                      }
+                      return {
+                        id: fc.id,
+                        name: fnName,
+                        response: { result: resultText },
+                      };
+                    }),
+                  );
+                  if (currentSocket.readyState === WS_OPEN) {
+                    currentSocket.send(
+                      JSON.stringify({
+                        toolResponse: { functionResponses },
+                      }),
+                    );
+                  }
+                })();
+                return;
+              }
+
+              const processCompletedS2sUserUtterance = (utterance: string) => {
+                const cleanUtterance = utterance.trim();
+                if (!cleanUtterance || cleanUtterance === lastProcessedInputKey) {
+                  return;
+                }
+                lastProcessedInputKey = cleanUtterance;
+                s2sTranscriptHistory.push({ role: 'user', text: cleanUtterance });
+                if (s2sTranscriptHistory.length > 16) {
+                  s2sTranscriptHistory.shift();
+                }
+                logger.info(
+                  `[RealtimeVoice] S2S user transcript: "${cleanUtterance.slice(0, 120)}"`,
+                );
+
+                // 1. Dynamic on-the-fly voice / gender / accent switching
+                const requestedVoice = detectAccentSwitchCommand(
+                  cleanUtterance,
+                  activeVoiceProfile,
+                );
+                if (requestedVoice) {
+                  let targetVoice = requestedVoice;
+                  if (
+                    targetVoice.id === activeVoiceProfile.id &&
+                    /\b(male|man|guy|boy|female|woman|lady|girl|try|another|different)\b/i.test(
+                      cleanUtterance,
+                    )
+                  ) {
+                    const altMaleOrder: VoiceProfileId[] = ['in_male', 'uk_male', 'us_male'];
+                    const altFemaleOrder: VoiceProfileId[] = ['in_female', 'uk_female', 'us_female'];
+                    const pool = targetVoice.gender === 'male' ? altMaleOrder : altFemaleOrder;
+                    const nextId = pool.find((id) => id !== activeVoiceProfile.id) || targetVoice.id;
+                    targetVoice = VOICE_PROFILES[nextId];
+                  }
+                  if (targetVoice.id !== activeVoiceProfile.id) {
+                    activeVoiceProfile = targetVoice;
+                    sendJson(clientWs, {
+                      type: 'voice.accent_changed',
+                      voiceId: activeVoiceProfile.id,
+                      label: activeVoiceProfile.label,
+                      lang: activeVoiceProfile.lang,
+                    });
+                    if (
+                      mapVoiceToGeminiPrebuilt(profile) !==
+                      mapVoiceToGeminiPrebuilt(activeVoiceProfile)
+                    ) {
+                      logger.info(
+                        `[RealtimeVoice] Spoken voice switch: ${profile.id} -> ${activeVoiceProfile.id}`,
+                      );
+                      suppressCurrentS2sTurn = true;
+                      sendJson(clientWs, { type: 'voice.interrupted' });
+                      void connectGeminiUpstream(
+                        activeVoiceProfile,
+                        `Switched voice from ${profile.label} to ${activeVoiceProfile.label} (${activeVoiceProfile.gender}).`,
+                      );
+                      return;
+                    }
+                  }
+                }
+
+                // 2. Delegate DeepTutor / Study Mode / Web Search / Deep Research / LibreChat Tools
+                //    directly to LibreChat's own agent & tool pipeline!
+                const toolIntent = detectToolOrTutorIntent(cleanUtterance);
+                const searchIntent = detectRealtimeSearchIntent(cleanUtterance);
+                if ((toolIntent.delegate || searchIntent.isSearch) && modePolicy.toolsAllowed) {
+                  const targetMode = toolIntent.mode || modePolicy.semanticMode;
+                  const useWebSearch = Boolean(toolIntent.webSearch || searchIntent.isSearch);
+                  const useDeepResearch = Boolean(searchIntent.isDeepResearch);
+                  logger.info(
+                    `[RealtimeVoice] Delegating S2S utterance to LibreChat (mode=${targetMode}, webSearch=${useWebSearch}, deepResearch=${useDeepResearch})`,
+                  );
+                  let statusMsg = 'Using LibreChat tools...';
+                  if (useDeepResearch) {
+                    statusMsg = 'Deep researching via LibreChat...';
+                  } else if (useWebSearch) {
+                    statusMsg = 'Searching web via LibreChat...';
+                  }
+                  sendJson(clientWs, {
+                    type: 'voice.status',
+                    status: statusMsg,
+                  });
+                  sendJson(clientWs, {
+                    type: 'voice.delegate_tools',
+                    text: toolIntent.cleanPrompt || cleanUtterance,
+                    mode: targetMode,
+                    webSearch: useWebSearch,
+                    deepResearch: useDeepResearch,
+                  });
+                  return;
+                }
+              };
 
               const sc = msg.serverContent;
               if (sc?.interrupted) {
                 sendJson(clientWs, { type: 'voice.interrupted' });
               }
-              if (sc?.modelTurn?.parts) {
+              if (sc?.inputTranscription?.text) {
+                const transcriptChunk = sc.inputTranscription.text;
+                pendingInputTranscript = pendingInputTranscript
+                  ? `${pendingInputTranscript} ${transcriptChunk}`.replace(/\s+/g, ' ').trim()
+                  : transcriptChunk.trim();
+                sendJson(clientWs, {
+                  type: 'conversation.item.input_audio_transcription.completed',
+                  transcript: pendingInputTranscript,
+                });
+                if (inputTranscriptTimer) {
+                  clearTimeout(inputTranscriptTimer);
+                }
+                const captured = pendingInputTranscript;
+                const flushDelayMs = /[.?!]$/.test(captured) ? 200 : 550;
+                inputTranscriptTimer = setTimeout(() => {
+                  inputTranscriptTimer = null;
+                  if (pendingInputTranscript) {
+                    const toProcess = pendingInputTranscript;
+                    pendingInputTranscript = '';
+                    processCompletedS2sUserUtterance(toProcess);
+                  }
+                }, flushDelayMs);
+              }
+              if (sc?.outputTranscription?.text && !suppressCurrentS2sTurn) {
+                pendingOutputTranscript += sc.outputTranscription.text;
+                sendJson(clientWs, {
+                  type: 'response.audio_transcript.delta',
+                  delta: sc.outputTranscription.text,
+                });
+              }
+              if (sc?.modelTurn?.parts && !suppressCurrentS2sTurn) {
                 for (const part of sc.modelTurn.parts) {
                   if (part.text) {
                     sendJson(clientWs, {
@@ -1421,10 +2100,37 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   }
                 }
               }
-              if (sc?.turnComplete) {
-                sendJson(clientWs, {
-                  type: 'response.audio_transcript.done',
-                });
+              if (sc?.turnComplete || sc?.generationComplete) {
+                if (inputTranscriptTimer) {
+                  clearTimeout(inputTranscriptTimer);
+                  inputTranscriptTimer = null;
+                }
+                if (pendingInputTranscript) {
+                  const toProcess = pendingInputTranscript;
+                  pendingInputTranscript = '';
+                  processCompletedS2sUserUtterance(toProcess);
+                }
+                if (!suppressCurrentS2sTurn) {
+                  if (pendingOutputTranscript.trim()) {
+                    logger.info(
+                      `[RealtimeVoice] S2S assistant transcript: "${pendingOutputTranscript.trim().slice(0, 140)}"`,
+                    );
+                    s2sTranscriptHistory.push({
+                      role: 'assistant',
+                      text: pendingOutputTranscript.trim(),
+                    });
+                    if (s2sTranscriptHistory.length > 16) {
+                      s2sTranscriptHistory.shift();
+                    }
+                    pendingOutputTranscript = '';
+                  }
+                  sendJson(clientWs, {
+                    type: 'response.audio_transcript.done',
+                  });
+                } else {
+                  pendingOutputTranscript = '';
+                  suppressCurrentS2sTurn = false;
+                }
               }
             } catch {
               // Ignore non-json or unparseable frames
@@ -1448,14 +2154,30 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             );
           });
 
-          currentSocket.on('close', () => {
+          currentSocket.on('close', (code?: unknown, reason?: unknown) => {
             if (upstreamWs !== currentSocket) {
               return;
             }
+            const reasonStr = Buffer.isBuffer(reason) ? reason.toString('utf8') : String(reason ?? '');
+            logger.info(
+              `[RealtimeVoice] Gemini Live S2S WebSocket closed (code=${String(code ?? '')} reason=${reasonStr.slice(0, 120)})`,
+            );
             upstreamClosed = true;
             if (isGeminiS2sActive) {
               isGeminiS2sActive = false;
               bridgeMode = true;
+            } else if (!bridgeMode && !clientClosed && clientWs.readyState === WS_OPEN) {
+              // Closed before setupComplete — fall back to cascaded bridge instead of hanging
+              bridgeMode = true;
+              sendJson(clientWs, {
+                type: 'session.created',
+                mode: 'bifrost_bridge',
+                satchidaMode: modePolicy.semanticMode,
+                seatAttributed: true,
+                toolsAllowed: modePolicy.toolsAllowed,
+                voiceId: profile.id,
+                voiceLabel: profile.label,
+              });
             }
           });
         } catch (ephemeralErr) {
@@ -1511,6 +2233,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               voice?: string;
               mode?: string;
               hasTools?: boolean;
+              audioBase64?: string;
+              mimeType?: string;
             };
             if (parsed.type === 'voice.set_accent' && typeof parsed.voice === 'string') {
               const previousProfile = activeVoiceProfile;
@@ -1530,8 +2254,78 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 logger.info(
                   `[RealtimeVoice] Dynamic Gemini voice switch: ${previousProfile.id} (${mapVoiceToGeminiPrebuilt(previousProfile)}) -> ${activeVoiceProfile.id} (${mapVoiceToGeminiPrebuilt(activeVoiceProfile)})`,
                 );
-                void connectGeminiUpstream(activeVoiceProfile);
+                void connectGeminiUpstream(
+                  activeVoiceProfile,
+                  `User switched voice from ${previousProfile.label} to ${activeVoiceProfile.label} (${activeVoiceProfile.gender}).`,
+                );
               }
+              return;
+            }
+            if (
+              parsed.type === 'voice.audio_input' &&
+              typeof parsed.audioBase64 === 'string' &&
+              isGeminiS2sActive &&
+              upstreamWs &&
+              upstreamWs.readyState === WS_OPEN
+            ) {
+              micFrameCount += 1;
+              if (micFrameCount === 1) {
+                logger.info(
+                  `[RealtimeVoice] First mic audio frame received (base64Len=${parsed.audioBase64.length})`,
+                );
+              }
+              if (!loggedNonSilentMic) {
+                try {
+                  const pcmBuf = Buffer.from(parsed.audioBase64, 'base64');
+                  let maxAbs = 0;
+                  for (let i = 0; i + 1 < pcmBuf.length; i += 2) {
+                    const v = Math.abs(pcmBuf.readInt16LE(i));
+                    if (v > maxAbs) {
+                      maxAbs = v;
+                    }
+                  }
+                  if (maxAbs > 120) {
+                    loggedNonSilentMic = true;
+                    logger.info(
+                      `[RealtimeVoice] Non-silent mic signal detected at frame #${micFrameCount} (peakInt16=${maxAbs})`,
+                    );
+                  } else if (micFrameCount === 50) {
+                    logger.warn(
+                      `[RealtimeVoice] 50 mic frames received but peakInt16<=120 (mic may be muted at OS/hardware level)`,
+                    );
+                  }
+                } catch {
+                  // Ignore diagnostic parse error
+                }
+              }
+              upstreamWs.send(
+                JSON.stringify({
+                  realtimeInput: {
+                    audio: {
+                      mimeType:
+                        typeof parsed.mimeType === 'string'
+                          ? parsed.mimeType
+                          : 'audio/pcm;rate=16000',
+                      data: parsed.audioBase64,
+                    },
+                  },
+                }),
+              );
+              return;
+            }
+            if (
+              parsed.type === 'voice.audio_end' &&
+              isGeminiS2sActive &&
+              upstreamWs &&
+              upstreamWs.readyState === WS_OPEN
+            ) {
+              upstreamWs.send(
+                JSON.stringify({
+                  realtimeInput: {
+                    audioStreamEnd: true,
+                  },
+                }),
+              );
               return;
             }
             if (parsed.type === 'voice.turn' && typeof parsed.text === 'string') {
@@ -1579,6 +2373,42 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 );
               } else {
                 void handleBridgeTurn(parsed.text, parsed.voice, parsed.mode, parsed.hasTools);
+              }
+              return;
+            }
+            if (parsed.type === 'voice.tutor_explain' && typeof parsed.text === 'string') {
+              const rawContent = parsed.text.trim().slice(0, 4000);
+              if (!rawContent) {
+                return;
+              }
+              const tutorPrompt =
+                `[LIBRECHAT / DEEPTUTOR / SEARCH RESULT READY IN CHAT]\n${rawContent}\n\n` +
+                '[TUTOR INSTRUCTION: Do NOT read this text, URLs, or markdown line by line. ' +
+                'Summarize and explain it warmly in real-time speech (in the same language the user spoke, e.g. Hindi or English) like a caring human tutor or helpful friend, using simple vivid analogies and natural emotion. ' +
+                'At the end, warmly ask if they understood or if they have any doubts.]';
+              if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
+                suppressCurrentS2sTurn = false;
+                upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+                upstreamWs.send(
+                  JSON.stringify({
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: tutorPrompt }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  }),
+                );
+              } else {
+                void handleBridgeTurn(
+                  tutorPrompt,
+                  activeVoiceProfile.id,
+                  modePolicy.semanticMode,
+                  false,
+                );
               }
               return;
             }

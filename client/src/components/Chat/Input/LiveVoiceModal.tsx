@@ -22,6 +22,7 @@ import {
   satchiThinkAtom,
 } from '~/store/satchiStore';
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
+import { getSharedVoiceAudioContext } from '~/utils/voiceAudioContext';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import { useAuthContext } from '~/hooks';
 
@@ -141,6 +142,7 @@ export default function LiveVoiceModal({
   const [spokenTranscript, setSpokenTranscript] = useState('');
   const [assistantTranscript, setAssistantTranscript] = useState('');
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
+  const [micStreaming, setMicStreaming] = useState(false);
   const [activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
   const [awaitingToolResponse, setAwaitingToolResponse] = useState(false);
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<string | null>(null);
@@ -163,12 +165,17 @@ export default function LiveVoiceModal({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const captureCleanupRef = useRef<(() => void) | null>(null);
+  const captureNodeRef = useRef<AudioNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
+  const playbackDeadlineRef = useRef<number>(0);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioQueueRef = useRef<Array<{ audioBase64: string; mimeType: string }>>([]);
   const isPlayingQueueRef = useRef<boolean>(false);
   const isAssistantSpeakingRef = useRef<boolean>(false);
+  const sessionModeRef = useRef<'gemini_live_s2s' | 'bifrost_bridge'>('gemini_live_s2s');
+  const hasGreetedRef = useRef<boolean>(false);
   const ignoreSpeechUntilRef = useRef<number>(0);
   const isMutedRef = useRef(isMuted);
   isMutedRef.current = isMuted;
@@ -182,22 +189,11 @@ export default function LiveVoiceModal({
   askRef.current = ask;
 
   const getAudioContext = useCallback((): AudioContext | null => {
-    if (typeof window === 'undefined') {
-      return null;
+    const ctx = getSharedVoiceAudioContext();
+    if (ctx) {
+      audioContextRef.current = ctx;
     }
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) {
-      return null;
-    }
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      void audioContextRef.current.resume();
-    }
-    return audioContextRef.current;
+    return ctx;
   }, []);
 
   const pauseRecognitionForEchoGuard = useCallback(() => {
@@ -272,11 +268,28 @@ export default function LiveVoiceModal({
     [resumeRecognitionAfterEchoGuard],
   );
 
+  const markPlaybackIdle = useCallback(() => {
+    if (finishTimerRef.current) {
+      clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = null;
+    }
+    isAssistantSpeakingRef.current = false;
+    ignoreSpeechUntilRef.current = Date.now() + ECHO_COOLDOWN_MS;
+    setIsAssistantSpeaking(false);
+    setStatusText(isMutedRef.current ? 'Muted' : 'Listening...');
+    setTimeout(() => {
+      resumeRecognitionAfterEchoGuard();
+    }, ECHO_COOLDOWN_MS);
+  }, [resumeRecognitionAfterEchoGuard]);
+
   const schedulePcmChunk = useCallback(
     (base64: string) => {
       const ctx = getAudioContext();
       if (!ctx) {
         return;
+      }
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
       }
 
       // Convert base64 to Float32Array (16-bit little-endian PCM at 24000Hz)
@@ -313,6 +326,9 @@ export default function LiveVoiceModal({
         if (idx !== -1) {
           activeSourcesRef.current.splice(idx, 1);
         }
+        if (activeSourcesRef.current.length === 0) {
+          markPlaybackIdle();
+        }
       };
 
       // Continuous speaking state
@@ -325,19 +341,25 @@ export default function LiveVoiceModal({
         clearTimeout(finishTimerRef.current);
       }
       const remainingMs = Math.max(50, Math.round((nextPlayTimeRef.current - ctx.currentTime) * 1000));
-      finishTimerRef.current = setTimeout(() => {
-        if (activeSourcesRef.current.length === 0) {
-          isAssistantSpeakingRef.current = false;
-          ignoreSpeechUntilRef.current = Date.now() + ECHO_COOLDOWN_MS;
-          setIsAssistantSpeaking(false);
-          setStatusText(isMutedRef.current ? 'Muted' : 'Listening...');
-          setTimeout(() => {
-            resumeRecognitionAfterEchoGuard();
-          }, ECHO_COOLDOWN_MS);
-        }
-      }, remainingMs + 50);
+      playbackDeadlineRef.current = Date.now() + remainingMs + 600;
+      const scheduleCheck = (delayMs: number) => {
+        finishTimerRef.current = setTimeout(() => {
+          if (
+            activeSourcesRef.current.length === 0 ||
+            ctx.state !== 'running' ||
+            Date.now() > playbackDeadlineRef.current
+          ) {
+            activeSourcesRef.current = [];
+            markPlaybackIdle();
+          } else {
+            // Timer fired slightly before onended — poll shortly so speaking state never gets stuck
+            scheduleCheck(100);
+          }
+        }, delayMs);
+      };
+      scheduleCheck(remainingMs + 80);
     },
-    [getAudioContext, pauseRecognitionForEchoGuard, resumeRecognitionAfterEchoGuard],
+    [getAudioContext, markPlaybackIdle, pauseRecognitionForEchoGuard],
   );
 
   const playNextQueuedAudio = useCallback(() => {
@@ -392,15 +414,19 @@ export default function LiveVoiceModal({
   const cleanupSession = useCallback(() => {
     stopAssistantAudio(false);
 
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+    if (captureCleanupRef.current) {
       try {
-        void audioContextRef.current.close();
+        captureCleanupRef.current();
       } catch {
         // ignore
       }
-      audioContextRef.current = null;
+      captureCleanupRef.current = null;
     }
+    captureNodeRef.current = null;
+    audioContextRef.current = null;
     nextPlayTimeRef.current = 0;
+    playbackDeadlineRef.current = 0;
+    setMicStreaming(false);
 
     if (recognitionRef.current) {
       recognitionRef.current.onend = null;
@@ -457,15 +483,24 @@ export default function LiveVoiceModal({
         setLastSpokenMessageId(activeTailMessage.messageId);
         setAwaitingToolResponse(false);
         setAssistantTranscript(cleaned);
-        setStatusText('Speaking...');
+        setStatusText('Explaining...');
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(
-            JSON.stringify({
-              type: 'voice.synthesize',
-              text: cleaned,
-              voice: voiceIdRef.current,
-            }),
-          );
+          if (sessionModeRef.current === 'gemini_live_s2s') {
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'voice.tutor_explain',
+                text: rawText.slice(0, 4000),
+              }),
+            );
+          } else {
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'voice.synthesize',
+                text: cleaned,
+                voice: voiceIdRef.current,
+              }),
+            );
+          }
         }
       }
     }
@@ -489,6 +524,249 @@ export default function LiveVoiceModal({
     }
   }, []);
 
+  const startCloudAudioStream = useCallback((ws: WebSocket) => {
+    const stream = mediaStreamRef.current;
+    if (!stream || ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // Clean up any existing capture pipeline (e.g. on dynamic voice switch)
+    if (captureCleanupRef.current) {
+      try {
+        captureCleanupRef.current();
+      } catch {
+        // ignore
+      }
+      captureCleanupRef.current = null;
+      captureNodeRef.current = null;
+    }
+
+    let hasProducedChunk = false;
+    let workletWatchdog: ReturnType<typeof setTimeout> | null = null;
+    let zeroOnlyWorkletFrames = 0;
+    let usingWorklet = false;
+    let fallbackToScriptProcessor: (() => void) | null = null;
+
+    const sendPcmChunk = (input: Float32Array, nativeSampleRate: number) => {
+      if (!hasProducedChunk) {
+        hasProducedChunk = true;
+        if (workletWatchdog) {
+          clearTimeout(workletWatchdog);
+          workletWatchdog = null;
+        }
+        setMicStreaming(true);
+      }
+      if (
+        isMutedRef.current ||
+        isAssistantSpeakingRef.current ||
+        Date.now() < ignoreSpeechUntilRef.current ||
+        ws.readyState !== WebSocket.OPEN
+      ) {
+        return;
+      }
+      if (usingWorklet && fallbackToScriptProcessor) {
+        let maxAbs = 0;
+        for (let i = 0; i < input.length; i += 8) {
+          const v = Math.abs(input[i]);
+          if (v > maxAbs) {
+            maxAbs = v;
+          }
+        }
+        if (maxAbs === 0) {
+          zeroOnlyWorkletFrames += 1;
+          if (zeroOnlyWorkletFrames === 35) {
+            usingWorklet = false;
+            fallbackToScriptProcessor();
+            return;
+          }
+        } else {
+          zeroOnlyWorkletFrames = 0;
+        }
+      }
+      const TARGET_RATE = 16000;
+      const ratio = nativeSampleRate / TARGET_RATE;
+      const outLen = ratio > 1 ? Math.floor(input.length / ratio) : input.length;
+      const pcm16 = new Int16Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        let sample: number;
+        if (ratio > 1) {
+          const pos = i * ratio;
+          const idx = Math.floor(pos);
+          const frac = pos - idx;
+          const s0 = input[idx] ?? 0;
+          const s1 = input[Math.min(idx + 1, input.length - 1)] ?? s0;
+          sample = s0 + (s1 - s0) * frac;
+        } else {
+          sample = input[i];
+        }
+        const s = Math.max(-1, Math.min(1, sample));
+        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      const bytes = new Uint8Array(pcm16.buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      ws.send(
+        JSON.stringify({
+          type: 'voice.audio_input',
+          audioBase64: btoa(binary),
+          mimeType: 'audio/pcm;rate=16000',
+        }),
+      );
+    };
+
+    try {
+      // Reuse the already-unlocked AudioContext so Android Chrome never leaves capture suspended
+      const captureCtx = getAudioContext();
+      if (!captureCtx) {
+        return;
+      }
+      if (captureCtx.state === 'suspended') {
+        void captureCtx.resume();
+      }
+      const nativeSampleRate = captureCtx.sampleRate;
+      const source = captureCtx.createMediaStreamSource(stream);
+      const silentGain = captureCtx.createGain();
+      // Keep gain tiny but non-zero (-100 dB) so Chromium never optimizes away the capture node
+      silentGain.gain.value = 0.00001;
+      silentGain.connect(captureCtx.destination);
+
+      let aborted = false;
+      const teardown = () => {
+        aborted = true;
+        if (workletWatchdog) {
+          clearTimeout(workletWatchdog);
+          workletWatchdog = null;
+        }
+        try {
+          if (captureNodeRef.current) {
+            captureNodeRef.current.disconnect();
+            captureNodeRef.current = null;
+          }
+          source.disconnect();
+          silentGain.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+      captureCleanupRef.current = teardown;
+
+      const startScriptProcessor = () => {
+        if (aborted || ws.readyState !== WebSocket.OPEN) {
+          teardown();
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        const processor = captureCtx.createScriptProcessor(4096, 1, 1);
+        captureNodeRef.current = processor;
+        processor.onaudioprocess = (e) => {
+          sendPcmChunk(e.inputBuffer.getChannelData(0), nativeSampleRate);
+        };
+        source.connect(processor);
+        processor.connect(silentGain);
+      };
+
+      // Prefer AudioWorklet (Chrome 66+, Safari 14.1+, Firefox 76+)
+      // Buffer 2048 samples (~85ms at 24kHz) and connect through silentGain so Chrome always pulls process()
+      const tryWorklet = async () => {
+        const workletCode = `
+          class PcmCapture extends AudioWorkletProcessor {
+            constructor() {
+              super();
+              this._buf = new Float32Array(2048);
+              this._offset = 0;
+            }
+            process(inputs) {
+              const ch = inputs[0]?.[0];
+              if (!ch) return true;
+              let i = 0;
+              while (i < ch.length) {
+                const take = Math.min(ch.length - i, this._buf.length - this._offset);
+                this._buf.set(ch.subarray(i, i + take), this._offset);
+                this._offset += take;
+                i += take;
+                if (this._offset >= this._buf.length) {
+                  this.port.postMessage(this._buf.slice());
+                  this._offset = 0;
+                }
+              }
+              return true;
+            }
+          }
+          if (!globalThis.__satchidaPcmRegistered) {
+            globalThis.__satchidaPcmRegistered = true;
+            registerProcessor('pcm-capture', PcmCapture);
+          }
+        `;
+        const blob = new Blob([workletCode], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        try {
+          await captureCtx.audioWorklet.addModule(url);
+          URL.revokeObjectURL(url);
+          if (aborted || ws.readyState !== WebSocket.OPEN) {
+            teardown();
+            return;
+          }
+          const workletNode = new AudioWorkletNode(captureCtx, 'pcm-capture');
+          captureNodeRef.current = workletNode;
+          usingWorklet = true;
+          fallbackToScriptProcessor = () => {
+            try {
+              workletNode.port.onmessage = null;
+              workletNode.disconnect();
+            } catch {
+              // ignore
+            }
+            captureNodeRef.current = null;
+            startScriptProcessor();
+          };
+          workletNode.port.onmessage = (ev: MessageEvent<Float32Array>) => {
+            sendPcmChunk(ev.data, nativeSampleRate);
+          };
+          source.connect(workletNode);
+          workletNode.connect(silentGain);
+          captureCleanupRef.current = () => {
+            usingWorklet = false;
+            workletNode.port.onmessage = null;
+            teardown();
+          };
+          // Some Android Chrome / WebView builds load AudioWorklet without throwing,
+          // yet never invoke process(). Fall back to ScriptProcessor if silent after 1.2s.
+          workletWatchdog = setTimeout(() => {
+            if (!aborted && !hasProducedChunk && ws.readyState === WebSocket.OPEN) {
+              usingWorklet = false;
+              fallbackToScriptProcessor?.();
+            }
+          }, 1200);
+        } catch {
+          URL.revokeObjectURL(url);
+          startScriptProcessor();
+        }
+      };
+
+      if (typeof captureCtx.audioWorklet?.addModule === 'function') {
+        void tryWorklet();
+      } else {
+        useScriptProcessor();
+      }
+
+      ws.addEventListener(
+        'close',
+        () => {
+          if (captureCleanupRef.current === teardown) {
+            captureCleanupRef.current = null;
+          }
+          teardown();
+        },
+        { once: true },
+      );
+      setStatusText('Listening (Realtime)...');
+    } catch {
+      // Ignore capture setup errors
+    }
+  }, [getAudioContext]);
+
   const startSpeechRecognition = useCallback((ws: WebSocket) => {
     if (recognitionRef.current) {
       return;
@@ -500,6 +778,7 @@ export default function LiveVoiceModal({
         .webkitSpeechRecognition;
 
     if (!SpeechRecCtor) {
+      startCloudAudioStream(ws);
       return;
     }
 
@@ -744,10 +1023,22 @@ export default function LiveVoiceModal({
       }
     };
 
+    recognition.onerror = () => {
+      // Browser STT unavailable or blocked (e.g. Brave/Firefox/iOS Safari): fall back seamlessly to Cloud Realtime PCM
+      try {
+        recognition.stop();
+      } catch {
+        // Ignore
+      }
+      recognitionRef.current = null;
+      startCloudAudioStream(ws);
+    };
+
     try {
       recognition.start();
     } catch {
-      // Ignore start failure
+      recognitionRef.current = null;
+      startCloudAudioStream(ws);
     }
   }, [
     handleAccentChange,
@@ -757,6 +1048,7 @@ export default function LiveVoiceModal({
     setThinkLevel,
     setWebSearchEnabled,
     showToast,
+    startCloudAudioStream,
   ]);
 
   useEffect(() => {
@@ -766,6 +1058,7 @@ export default function LiveVoiceModal({
     }
 
     let cancelled = false;
+    hasGreetedRef.current = false;
     setIsMuted(false);
     setErrorMessage(null);
     setSpokenTranscript('');
@@ -773,6 +1066,8 @@ export default function LiveVoiceModal({
     setAwaitingToolResponse(false);
     setConnectionState('connecting');
     setStatusText('Checking mic...');
+    // Unlock AudioContext immediately on modal open (closer to user gesture for Android Chrome)
+    getAudioContext();
 
     const startRealtimeSession = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -835,6 +1130,10 @@ export default function LiveVoiceModal({
             voiceId?: VoiceProfileId;
             label?: string;
             lang?: string;
+            status?: string;
+            isVoiceSwitch?: boolean;
+            webSearch?: boolean;
+            deepResearch?: boolean;
             text?: string;
             delta?: string;
             transcript?: string;
@@ -844,6 +1143,8 @@ export default function LiveVoiceModal({
           };
 
           if (msg.type === 'session.created') {
+            sessionModeRef.current =
+              msg.mode === 'bifrost_bridge' ? 'bifrost_bridge' : 'gemini_live_s2s';
             if (msg.satchidaMode) {
               setActiveRoutingMode(msg.satchidaMode);
             }
@@ -852,8 +1153,47 @@ export default function LiveVoiceModal({
               localStorage.setItem('satchida_voice_profile', msg.voiceId);
             }
             setConnectionState('connected');
-            setStatusText('Listening...');
-            startSpeechRecognition(ws);
+            const ctx = getAudioContext();
+            if (ctx && ctx.state === 'suspended') {
+              void ctx.resume();
+            }
+
+            if (msg.isVoiceSwitch || hasGreetedRef.current) {
+              setStatusText(isMutedRef.current ? 'Muted' : 'Listening...');
+              return;
+            }
+
+            hasGreetedRef.current = true;
+            setStatusText('Greeting...');
+            // S2S mode: stream raw PCM audio directly to backend → Google Gemini Live
+            // Bridge mode: use browser SpeechRecognition (text-based turns)
+            if (msg.mode === 'gemini_live_s2s') {
+              startCloudAudioStream(ws);
+            } else {
+              // bifrost_bridge: speech-to-text + bridge turn pipeline
+              startSpeechRecognition(ws);
+            }
+            const greetings = [
+              'Say only: "Hi, how may I be of assistance?"',
+              'Say only: "Hello! How can I help you today?"',
+              'Say only: "Hi there, what can I help you with?"',
+              'Say only: "Hello, how may I help?"',
+            ];
+            const greetingPrompt = greetings[Math.floor(Math.random() * greetings.length)];
+            ws.send(
+              JSON.stringify({
+                type: 'voice.turn',
+                text: greetingPrompt,
+                voice: voiceIdRef.current,
+                mode: 'discussion',
+                hasTools: false,
+              }),
+            );
+            return;
+          }
+
+          if (msg.type === 'voice.status' && msg.status) {
+            setStatusText(msg.status);
             return;
           }
 
@@ -867,8 +1207,17 @@ export default function LiveVoiceModal({
           }
 
           if (msg.type === 'voice.delegate_tools' && msg.text) {
+            if (msg.mode && ['Chat', 'Study', 'Work', 'Pro', 'Privacy', 'Vibecoding'].includes(msg.mode)) {
+              setCurrentMode(msg.mode as 'Chat' | 'Study' | 'Work' | 'Pro' | 'Privacy' | 'Vibecoding');
+            }
+            if (msg.webSearch) {
+              setWebSearchEnabled(true);
+            }
+            if (msg.deepResearch) {
+              setResearchEnabled(true);
+            }
             setAwaitingToolResponse(true);
-            setStatusText('Executing tools...');
+            setStatusText('Using LibreChat tools...');
             askRef.current({ text: msg.text });
             return;
           }
@@ -899,8 +1248,13 @@ export default function LiveVoiceModal({
             return;
           }
 
-          if (msg.type === 'response.audio_transcript.done' && msg.transcript) {
-            setAssistantTranscript(msg.transcript);
+          if (msg.type === 'response.audio_transcript.done') {
+            if (msg.transcript) {
+              setAssistantTranscript(msg.transcript);
+            }
+            if (activeSourcesRef.current.length === 0 && isAssistantSpeakingRef.current) {
+              markPlaybackIdle();
+            }
             return;
           }
 
@@ -967,6 +1321,7 @@ export default function LiveVoiceModal({
     pauseRecognitionForEchoGuard,
     reportError,
     resumeRecognitionAfterEchoGuard,
+    startCloudAudioStream,
     startSpeechRecognition,
   ]);
 
@@ -1012,7 +1367,7 @@ export default function LiveVoiceModal({
           />
         </span>
         <span className="whitespace-nowrap text-xs font-semibold">
-          {statusText} · {currentVoiceOpt.shortLabel} · {liveVoiceMode === 'work' ? 'Work' : 'Discussion'}
+          {statusText} · {currentVoiceOpt.shortLabel} · {liveVoiceMode === 'work' ? 'Work' : 'Realtime'}
         </span>
         {isAssistantSpeaking && (
           <button
@@ -1050,12 +1405,17 @@ export default function LiveVoiceModal({
     <div
       role="region"
       aria-label="Satchida Live Voice"
-      className="pointer-events-auto fixed bottom-24 right-6 z-50 w-[350px] max-w-[calc(100vw-2rem)] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-4 text-text-primary shadow-2xl backdrop-blur-xl"
+      onPointerDown={() => {
+        if (audioContextRef.current?.state === 'suspended') {
+          void audioContextRef.current.resume();
+        }
+      }}
+      className="pointer-events-auto fixed left-2 right-2 top-14 z-[60] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-3 text-text-primary shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:top-16 sm:w-[320px]"
     >
-      {/* Header */}
+      {/* Compact Header */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span
               className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
                 connectionState === 'error'
@@ -1070,7 +1430,7 @@ export default function LiveVoiceModal({
               } opacity-75`}
             />
             <span
-              className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+              className={`relative inline-flex h-2 w-2 rounded-full ${
                 connectionState === 'error'
                   ? 'bg-red-500'
                   : isAssistantSpeaking
@@ -1083,47 +1443,24 @@ export default function LiveVoiceModal({
               }`}
             />
           </span>
-          <span className="text-xs font-bold tracking-wide text-text-primary">
+          <span className="truncate text-xs font-bold tracking-wide text-text-primary">
             Live Voice
           </span>
-          {/* Dual Mode Switcher: Discussion vs Work */}
-          <div className="flex items-center rounded-lg border border-violet-500/30 bg-surface-secondary/80 p-0.5 text-[10px] font-semibold">
-            <button
-              type="button"
-              onClick={() => {
-                setLiveVoiceMode('discussion');
-                localStorage.setItem('satchida_voice_mode', 'discussion');
-                setStatusText('Discussion mode');
-              }}
-              className={`rounded-md px-2 py-0.5 transition-all ${
-                liveVoiceMode === 'discussion'
-                  ? 'bg-violet-600 text-white shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-              title="Discussion Mode (Direct low-latency S2S with live Google Search grounding)"
-            >
-              Discussion
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLiveVoiceMode('work');
-                localStorage.setItem('satchida_voice_mode', 'work');
-                setStatusText('Work mode');
-              }}
-              className={`rounded-md px-2 py-0.5 transition-all ${
-                liveVoiceMode === 'work'
-                  ? 'bg-violet-600 text-white shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-              title="Work Mode (Insert spoken prompts into chat, execute tools/models, and speak back)"
-            >
-              Work
-            </button>
-          </div>
+          <select
+            aria-label="Select Voice Accent"
+            value={voiceId}
+            onChange={(e) => handleAccentChange(e.target.value as VoiceProfileId)}
+            className="max-w-[115px] truncate rounded-md border border-border-light bg-surface-secondary px-1.5 py-0.5 text-[11px] font-medium text-text-primary outline-none focus:border-violet-400"
+          >
+            {VOICE_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.shortLabel}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => setIsMinimized(true)}
@@ -1145,8 +1482,8 @@ export default function LiveVoiceModal({
         </div>
       </div>
 
-      {/* Interactive Orb + Status */}
-      <div className="my-4 flex items-center gap-3">
+      {/* Compact Orb + Status */}
+      <div className="my-2.5 flex items-center gap-2.5">
         <button
           type="button"
           onClick={() => {
@@ -1157,7 +1494,7 @@ export default function LiveVoiceModal({
             }
           }}
           title={isAssistantSpeaking ? 'Tap to interrupt and speak' : isMuted ? 'Unmute' : 'Mute'}
-          className={`bg-linear-to-br relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-violet-400/40 from-violet-600/85 via-purple-700/85 to-indigo-900/90 shadow-lg shadow-violet-500/20 transition-transform active:scale-95 ${
+          className={`bg-linear-to-br relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-400/40 from-violet-600/85 via-purple-700/85 to-indigo-900/90 shadow-md shadow-violet-500/20 transition-transform active:scale-95 ${
             isAssistantSpeaking
               ? 'scale-105 ring-4 ring-fuchsia-400/40'
               : isListening
@@ -1166,56 +1503,45 @@ export default function LiveVoiceModal({
           }`}
         >
           {connectionState === 'error' ? (
-            <AlertCircle className="h-6 w-6 text-red-400" />
+            <AlertCircle className="h-4 w-4 text-red-400" />
           ) : isAssistantSpeaking ? (
-            <Volume2 className="h-6 w-6 animate-pulse text-white" />
+            <Volume2 className="h-4 w-4 animate-pulse text-white" />
           ) : isMuted ? (
-            <MicOff className="h-6 w-6 text-red-400" />
+            <MicOff className="h-4 w-4 text-red-400" />
           ) : (
-            <Mic className="h-6 w-6 text-violet-100" />
+            <Mic className="h-4 w-4 text-violet-100" />
           )}
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-            {statusText}
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+            <span>{statusText}</span>
+            {micStreaming && !isMuted && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Mic live
+              </span>
+            )}
           </div>
           {errorMessage ? (
             <div
               role="alert"
-              className="mt-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs leading-snug text-red-300"
+              className="mt-0.5 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] leading-snug text-red-300"
             >
               {errorMessage}
             </div>
           ) : (
-            <div className="mt-1 max-h-20 overflow-y-auto text-xs leading-relaxed text-text-secondary">
+            <div className="mt-0.5 max-h-12 overflow-y-auto text-xs leading-snug text-text-secondary">
               {assistantTranscript ? (
                 <span className="text-text-primary">{assistantTranscript}</span>
               ) : spokenTranscript ? (
                 <span className="italic text-text-primary">&ldquo;{spokenTranscript}&rdquo;</span>
               ) : (
-                <span>Speak naturally, or say &ldquo;switch to US male accent&rdquo;.</span>
+                <span>Speak naturally — live cloud voice active.</span>
               )}
             </div>
           )}
         </div>
-      </div>
-
-      {/* Accent Selector */}
-      <div className="mb-3 flex items-center gap-2">
-        <Globe className="h-3.5 w-3.5 shrink-0 text-violet-400" />
-        <select
-          aria-label="Select Voice Accent"
-          value={voiceId}
-          onChange={(e) => handleAccentChange(e.target.value as VoiceProfileId)}
-          className="w-full rounded-lg border border-border-light bg-surface-secondary px-2.5 py-1.5 text-xs font-medium text-text-primary outline-none focus:border-violet-400"
-        >
-          {VOICE_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* Controls Bar */}

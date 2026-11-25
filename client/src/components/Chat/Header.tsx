@@ -1,4 +1,5 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import { useParams } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
@@ -12,16 +13,20 @@ import { OpenSidebar, PresetsMenu, NewChat, HeaderMenu } from './Menus';
 import { TemporaryChat, TemporaryChatIndicator } from './TemporaryChat';
 import ModelSelector from './Menus/Endpoints/ModelSelector';
 import { BackgroundTasksButton } from './BackgroundTasks';
+import SatchiUpgradeModal from './Input/SatchiUpgradeModal';
 import { TraceButton, useTraceControl } from './Trace';
 import { useGetStartupConfig } from '~/data-provider';
 import ExportAndShareMenu from './ExportAndShareMenu';
+import LiveVoiceModal from './Input/LiveVoiceModal';
 import HeaderAudioSpeaker from './HeaderAudioSpeaker';
 import SubagentThreadLink from './SubagentThreadLink';
+import { useAuthContext, useHasAccess } from '~/hooks';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import AddMultiConvo from './AddMultiConvo';
 import AccountTierBadge from './AccountTierBadge';
-import { useHasAccess } from '~/hooks';
 import { useChatContext } from '~/Providers';
+import { liveVoiceWarmAtom } from '~/hooks/useLiveVoiceWarmup';
+import { unlockVoiceAudioContext } from '~/utils/voiceAudioContext';
 import HeaderBillingGauge from './HeaderBillingGauge';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -42,9 +47,31 @@ function Header({
   readOnly?: boolean;
 }) {
   const { data: startupConfig } = useGetStartupConfig();
+  const { user } = useAuthContext();
   const navVisible = useRecoilValue(store.sidebarExpanded);
   const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
-  const { conversation, index = 0 } = useChatContext() ?? {};
+  const { conversation, ask, index = 0 } = useChatContext() ?? {};
+  const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
+  const [showVoiceUpgradeModal, setShowVoiceUpgradeModal] = useState(false);
+  const voiceWarm = useAtomValue(liveVoiceWarmAtom);
+
+  const userAccountType = (user?.accountType || '').toLowerCase();
+  const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
+
+  const openLiveVoice = useCallback(() => {
+    // Synchronously unlock AudioContext inside user tap/click gesture for Android Chrome
+    unlockVoiceAudioContext();
+    if (isProVoice) {
+      setShowLiveVoiceModal(true);
+    } else {
+      setShowVoiceUpgradeModal(true);
+    }
+  }, [isProVoice]);
+
+  useEffect(() => {
+    window.addEventListener('satchida:open-live-voice', openLiveVoice);
+    return () => window.removeEventListener('satchida:open-live-voice', openLiveVoice);
+  }, [openLiveVoice]);
 
   /** The mobile row only offers a new chat when there is one to leave. Read
    *  from the route rather than the context conversation, which still holds the
@@ -120,6 +147,31 @@ function Header({
         </div>
       </div>
 
+      {/* Live Voice button: always visible on all screen sizes, never hidden behind nav */}
+      <button
+        type="button"
+        onClick={openLiveVoice}
+        className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-[11px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
+        aria-label="Satchida Live Voice"
+        title="Satchida Live Voice"
+      >
+        <span className="relative flex h-1.5 w-1.5">
+          <span
+            className={cn(
+              'absolute inline-flex h-full w-full animate-ping rounded-full opacity-75',
+              voiceWarm.ready ? 'bg-emerald-400' : 'bg-violet-400',
+            )}
+          />
+          <span
+            className={cn(
+              'relative inline-flex h-1.5 w-1.5 rounded-full',
+              voiceWarm.ready ? 'bg-emerald-400' : 'bg-violet-500',
+            )}
+          />
+        </span>
+        <Sparkles className="h-3 w-3 text-violet-300" />
+        <span className="hidden xs:inline sm:inline">Live Voice</span>
+      </button>
       <div className={cn('flex flex-shrink-0 items-center gap-1.5 sm:gap-2', hiddenBehindNav)}>
         {hasAccessToTemporaryChat === true && <TemporaryChatIndicator />}
         {!isNewChat && <NewChat className="md:hidden" />}
@@ -131,20 +183,6 @@ function Header({
           />
         )}
         <HeaderBillingGauge />
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('satchida:open-live-voice'))}
-          className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-[11px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
-          aria-label="Satchida Live Voice"
-          title="Satchida Live Voice"
-        >
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-500" />
-          </span>
-          <Sparkles className="h-3 w-3 text-violet-300" />
-          <span className="hidden xs:inline sm:inline">Live Voice</span>
-        </button>
         <HeaderMenu startupConfig={startupConfig} trace={trace} className="md:hidden" />
         <div className="hidden items-center gap-2 md:flex">
           {trace.show && <TraceButton onClick={trace.open} />}
@@ -153,6 +191,23 @@ function Header({
           {hasAccessToTemporaryChat === true && <TemporaryChat />}
         </div>
       </div>
+
+      {showVoiceUpgradeModal && (
+        <SatchiUpgradeModal
+          open={showVoiceUpgradeModal}
+          onOpenChange={setShowVoiceUpgradeModal}
+          featureName="voice"
+        />
+      )}
+
+      {showLiveVoiceModal && ask && (
+        <LiveVoiceModal
+          open={showLiveVoiceModal}
+          onOpenChange={setShowLiveVoiceModal}
+          ask={ask}
+          isSubmitting={Boolean(isSubmitting)}
+        />
+      )}
     </div>
   );
 }

@@ -40,6 +40,7 @@ import useSidebarState from '~/hooks/Nav/useSidebarState';
 import { TermsAndConditionsModal } from '~/components/ui';
 import FirstLoginClaimModal from '~/components/Auth/FirstLoginClaimModal';
 import useDrawerSwipe from '~/hooks/Nav/useDrawerSwipe';
+import { useLiveVoiceWarmup } from '~/hooks/useLiveVoiceWarmup';
 import { useHealthCheck } from '~/data-provider';
 import { Banner } from '~/components/Banners';
 import store from '~/store';
@@ -95,10 +96,12 @@ export default function Root() {
     },
     [setSidebarExpanded],
   );
-  const { isAuthenticated, logout, user } = useAuthContext();
+  const { isAuthenticated, logout, user, token } = useAuthContext();
   const [showFirstLoginClaim, setShowFirstLoginClaim] = useState(false);
   /** Releases feature-catalog queries after first paint on browser idle. */
   useCatalogWarmup(isAuthenticated);
+  /** Pre-tests Live Voice readiness and keeps a fresh backend session warm on login. */
+  useLiveVoiceWarmup(isAuthenticated, user?.accountType, token);
 
   useEffect(() => {
     if (isAuthenticated && (user as any)?.mustChangePassword === true) {
@@ -117,6 +120,77 @@ export default function Root() {
     open: sidebarExpanded,
     onOpenChange: handleDrawerOpenChange,
   });
+
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullDistanceRef = useRef(0);
+  const pullStartYRef = useRef<number | null>(null);
+  const pullStartXRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const el = paneRef.current;
+    if (!el || !isSmallScreen || !isAuthenticated) {
+      return;
+    }
+    const isAtTop = (target: EventTarget | null): boolean => {
+      let node = target as HTMLElement | null;
+      while (node && node !== el) {
+        if (node.scrollTop > 2) {
+          return false;
+        }
+        node = node.parentElement;
+      }
+      return (document.scrollingElement?.scrollTop ?? 0) <= 2;
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !isAtTop(e.target)) {
+        pullStartYRef.current = null;
+        return;
+      }
+      pullStartYRef.current = e.touches[0].clientY;
+      pullStartXRef.current = e.touches[0].clientX;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (pullStartYRef.current === null || pullStartXRef.current === null || e.touches.length !== 1) {
+        return;
+      }
+      const dy = e.touches[0].clientY - pullStartYRef.current;
+      const dx = Math.abs(e.touches[0].clientX - pullStartXRef.current);
+      if (dx > 30 && dy < 40) {
+        pullStartYRef.current = null;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+        return;
+      }
+      if (dy > 8 && isAtTop(e.target)) {
+        const nextDist = Math.min(95, dy * 0.65);
+        pullDistanceRef.current = nextDist;
+        setPullDistance(nextDist);
+      } else {
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+    const onTouchEnd = () => {
+      const shouldReload = pullDistanceRef.current >= 55;
+      pullDistanceRef.current = 0;
+      pullStartYRef.current = null;
+      pullStartXRef.current = null;
+      setPullDistance(0);
+      if (shouldReload) {
+        window.location.reload();
+      }
+    };
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [isSmallScreen, isAuthenticated]);
 
   useHealthCheck(isAuthenticated);
 
@@ -203,6 +277,13 @@ export default function Root() {
                        *  too late and drops too early. */
                       inert={isSmallScreen && (sidebarExpanded || isSliding) ? '' : undefined}
                     >
+                      {pullDistance > 14 && (
+                        <div
+                          className="pointer-events-none fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded-full border border-border-medium bg-surface-primary/95 px-3 py-1 text-xs font-medium text-text-primary shadow-md backdrop-blur"
+                        >
+                          {pullDistance >= 55 ? 'Release to refresh' : 'Pull to refresh'}
+                        </div>
+                      )}
                       <Outlet />
                     </div>
                     {/* Without the strip the scrim exists only for the travel:

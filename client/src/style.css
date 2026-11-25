@@ -1500,7 +1500,8 @@ html {
 @media (max-width: 768px) {
   body,
   html {
-    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
   }
 }
 

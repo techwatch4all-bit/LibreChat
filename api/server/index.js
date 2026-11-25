@@ -64,6 +64,7 @@ const {
   createCodeApiUploadRegistry,
   createOpenCodePtyUpgradeHandler,
   createRealtimeVoiceUpgradeHandler,
+  createVoiceWarmHandler,
   deadManLeaseGuard,
   createStaticPreviewRelayMiddleware,
 } = require('@librechat/api');
@@ -927,6 +928,22 @@ const startServer = async () => {
     app.use('/generated', express.static(adminGeneratedDir, generatedStaticOpts));
   }
   app.use('/generated', express.static(studioGeneratedDir, generatedStaticOpts));
+
+  const handleVoiceWarm = createVoiceWarmHandler({
+    getUserSeatCredential: (userId) =>
+      runAsSystem(async () => {
+        const User = mongoose.models.User;
+        if (!User) {
+          return null;
+        }
+        return User.findById(userId)
+          .select(
+            '+seatToken +satchidaSeatAlias name username email accountType tenantId role familyRole',
+          )
+          .lean();
+      }),
+  });
+  app.get('/api/voice/warm', optionalJwtAuth, handleVoiceWarm);
 
   // Per-user Studio Library manifest (operator request, 2026-11-17).
   // Requires a signed-in session: media delivered in chat must be findable

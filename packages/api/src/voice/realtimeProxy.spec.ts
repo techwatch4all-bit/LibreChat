@@ -490,7 +490,7 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
       'Fenrir',
     );
     expect(setupFrame.setup.generationConfig.temperature).toBe(0.85);
-    expect(setupFrame.setup.tools).toEqual([{ googleSearch: {} }]);
+    expect(setupFrame.setup.tools).toBeUndefined();
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Live Voice');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Intelligence');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('developed exclusively by Satchida AI');
@@ -503,20 +503,19 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
     expect(sessionEvent.mode).toBe('gemini_live_s2s');
     expect(sessionEvent.voiceId).toBe('us_male');
 
-    // Now test dynamic voice switch to IN Male (Puck)
+    // Now test dynamic voice switch to IN Male (Charon)
     clientWs.emit(
       'message',
       Buffer.from(JSON.stringify({ type: 'voice.set_accent', voice: 'in_male' })),
     );
     await new Promise((r) => setImmediate(r));
 
-    // A second upstream connection should have been created with Puck
     expect(createdUpstreamSockets.length).toBe(2);
     const secondUpstream = createdUpstreamSockets[1];
     secondUpstream.emit('open');
     const secondSetup = JSON.parse(secondUpstream.sent[0]);
     expect(secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
-      'Puck',
+      'Charon',
     );
   });
 });

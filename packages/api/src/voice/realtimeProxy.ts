@@ -6,6 +6,15 @@ import { spawn } from 'child_process';
 import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import { logger } from '@librechat/data-schemas';
+import {
+  stripVoiceStopwords,
+  extractSpokenCity,
+  isPlaceOrDirectionsQuery,
+  isWeatherQuery,
+  isNewsQuery,
+  fetchStructuredWeather,
+  fetchStructuredNews,
+} from './liveResolvers';
 
 export interface RealtimeWebSocketLike {
   readyState: number;
@@ -48,6 +57,15 @@ export interface RealtimeProxyDeps {
   ) => RealtimeWebSocketLike;
   verifyJwt: (token: string) => { id: string; role?: string; tenantId?: string } | null;
   getUserSeatCredential: (userId: string) => Promise<RealtimeUserSeatCredential | null>;
+  recordVoiceUsage?: (usage: {
+    userId: string;
+    accountType: string;
+    model: string;
+    durationSec: number;
+    promptTokens: number;
+    responseTokens: number;
+    totalTokens: number;
+  }) => Promise<void> | void;
   getBifrostConfig?: () => {
     realtimeUrl: string;
     httpBaseUrl: string;
@@ -144,14 +162,20 @@ export function detectAccentSwitchCommand(
   currentProfile: VoiceProfile,
 ): VoiceProfile | null {
   const lower = text.trim().toLowerCase();
+  const hasVoiceOrAccentWord = /\b(accent|voice)\b/.test(lower);
   const hasSwitchVerb =
-    /\b(switch(?:ed|ing)?|chang(?:e|ed|ing)?|use|set|speak|talk|be|sound|become|want|prefer|make|try|still)\b/.test(
-      lower,
-    ) &&
-    /\b(accent|voice|male|female|man|woman|guy|boy|lady|girl|us|american|uk|british|indian|india)\b/.test(
+    /\b(switch(?:ed|ing)?|chang(?:e|ed|ing)?|use|set|speak|talk|be|sound|become|want|prefer|make|try|still|give)\b/.test(
       lower,
     );
-  if (!hasSwitchVerb) {
+  const hasExplicitVoiceTarget =
+    hasVoiceOrAccentWord &&
+    /\b(accent|voice|male|female|man|woman|guy|boy|lady|girl|us|u\.s\.|american|uk|u\.k\.|british|indian|india)\b/.test(
+      lower,
+    );
+  const hasImplicitGenderOrDialectSwitch =
+    /\b(switch(?:ed|ing)?|chang(?:e|ed|ing)?|speak|talk|sound|try|still)\b/.test(lower) &&
+    /\b(male|female|man|woman|guy|boy|lady|girl|american|british|indian)\b/.test(lower);
+  if (!hasSwitchVerb || (!hasExplicitVoiceTarget && !hasImplicitGenderOrDialectSwitch)) {
     return null;
   }
 
@@ -191,7 +215,7 @@ export function detectRealtimeSearchIntent(text: string): {
   const isSearch =
     isDeepResearch ||
     hasUrl ||
-    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|search the web|search for|look up|google|find out|what happened|breaking)\b/i.test(
+    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest)\b/i.test(
       lower,
     ) ||
     /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|weather|events|results|match)\b/i.test(
@@ -204,16 +228,17 @@ export function detectToolOrTutorIntent(text: string): {
   delegate: boolean;
   mode?: 'Study' | 'Work';
   webSearch?: boolean;
+  newChat?: boolean;
   cleanPrompt: string;
 } {
   const trimmed = text.trim();
   const lower = trimmed.toLowerCase();
   const wantsDeepTutorOrStudy =
-    /\b(deeptutor|deep tutor|study mode|tutor me|teach me like|with animation|animation data)\b/i.test(
+    /\b(deeptutor|deep tutor|study mode|tutor me|teach me(?: like| how)?|with visuals?|visual explanation|with animation|animation data|diagram of|draw a diagram|show me how .* works|animate how)\b/i.test(
       lower,
     );
   const wantsChatOrTool =
-    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|write code in chat|use librechat)\b/i.test(
+    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|write code in chat|use librechat|new chat)\b/i.test(
       lower,
     );
 
@@ -232,7 +257,8 @@ export function detectToolOrTutorIntent(text: string): {
   return {
     delegate: true,
     mode: wantsDeepTutorOrStudy ? 'Study' : undefined,
-    webSearch: /\b(web|search|animation|latest|online|fetch)\b/i.test(lower),
+    webSearch: wantsDeepTutorOrStudy || /\b(web|search|animation|visual|latest|online|fetch)\b/i.test(lower),
+    newChat: wantsDeepTutorOrStudy || /\bnew chat\b/i.test(lower),
     cleanPrompt,
   };
 }
@@ -1102,19 +1128,80 @@ async function executeVoiceWebSearch(
   query: string,
   opts?: { deep?: boolean; fetchPages?: boolean },
 ): Promise<string> {
-  const cleanQuery = query.trim();
-  if (!cleanQuery) {
+  const rawQuery = query.trim();
+  if (!rawQuery) {
     return 'No search query provided.';
   }
+  // Strip spoken filler/stopwords so search engines receive clean keywords
+  const STOPWORDS = new Set([
+    'okay', 'ok', 'hey', 'hi', 'hello', 'please', 'well', 'so', 'um', 'uh', 'then',
+    'can', 'could', 'would', 'will', 'are', 'you', 'able', 'to', 'provide', 'give',
+    'tell', 'me', 'check', 'find', 'search', 'get', 'show', 'with', 'i', 'want',
+    'need', 'like', 'know', 'hear', 'see', 'about', 'the', 'a', 'an', 'some', 'any',
+    'for', 'of', 'is', 'my', 'your',
+  ]);
+  const keywordTokens = rawQuery
+    .replace(/[?!.,;:'"]+/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !STOPWORDS.has(w.toLowerCase()));
+  const cleanQuery = keywordTokens.join(' ').trim() || rawQuery;
+
   const results: string[] = [];
   const candidateUrls: string[] = [];
   const tasks: Promise<void>[] = [];
 
   // Extract explicit URLs from query if user asked to fetch a specific URL
-  const explicitUrls = cleanQuery.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+  const explicitUrls = rawQuery.match(/https?:\/\/[^\s"'<>]+/gi) || [];
   for (const u of explicitUrls.slice(0, 2)) {
     candidateUrls.push(u);
   }
+
+  // 0. Local satchida-search aggregator (fast, cached, multi-engine: Google News + DDG + Wiki)
+  const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
+    /\/+$/,
+    '',
+  );
+  tasks.push(
+    (async () => {
+      try {
+        const res = await fetch(
+          `${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`,
+          { signal: AbortSignal.timeout(3500) },
+        );
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as {
+          results?: Array<{
+            title?: string;
+            content?: string;
+            publishedDate?: string;
+            url?: string;
+          }>;
+        };
+        if (Array.isArray(data.results)) {
+          for (const item of data.results.slice(0, 6)) {
+            const title = (item.title || '').replace(/<[^>]+>/g, '').trim();
+            const snippet = (item.content || '')
+              .replace(/&lt;[^&]*&gt;/g, ' ')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            const datePart = item.publishedDate ? ` (${item.publishedDate})` : '';
+            if (title) {
+              results.push(
+                snippet && !snippet.startsWith(title)
+                  ? `Headline${datePart}: ${title} — ${snippet.slice(0, 220)}`
+                  : `Headline${datePart}: ${title}`,
+              );
+            }
+          }
+        }
+      } catch {
+        // Ignore local search timeout/error and rely on fallback sources
+      }
+    })(),
+  );
 
   // 1. Google News RSS (fast, current events, weather, sports, finance)
   tasks.push(
@@ -1737,6 +1824,92 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let pendingOutputTranscript = '';
       let inputTranscriptTimer: ReturnType<typeof setTimeout> | null = null;
       let lastProcessedInputKey = '';
+      let lastProcessedInputAt = 0;
+      let activeSearchEpoch = 0;
+      let lastDelegatedEpoch = -1;
+      let pauseMicForwardUntil = 0;
+      let pendingLocalQuery: string | null = null;
+      const sessionStartedAt = Date.now();
+      let s2sPromptTokens = 0;
+      let s2sResponseTokens = 0;
+      let s2sTotalTokens = 0;
+      let usageReported = false;
+      let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
+        null;
+
+      const reportVoiceUsageSummary = (reason: string) => {
+        if (usageReported) {
+          return;
+        }
+        usageReported = true;
+        const durationSec = Math.max(1, Math.round((Date.now() - sessionStartedAt) / 1000));
+        // Fallback token estimate when Gemini doesn't emit usageMetadata before close (~32 tokens/sec audio)
+        const estimatedAudioInTokens = Math.round((micFrameCount * 0.128) * 32);
+        const estimatedAudioOutTokens = Math.round((totalAudioBytesStreamed / 48000) * 32);
+        const finalPromptTokens = s2sPromptTokens || estimatedAudioInTokens;
+        const finalResponseTokens = s2sResponseTokens || estimatedAudioOutTokens;
+        const finalTotalTokens = s2sTotalTokens || finalPromptTokens + finalResponseTokens;
+
+        logger.info(
+          `[RealtimeVoice] Session usage user=${authenticatedUserId} tier=${userSeat.accountType} reason=${reason} durationSec=${durationSec} promptTokens=${finalPromptTokens} responseTokens=${finalResponseTokens} totalTokens=${finalTotalTokens} audioOutBytes=${totalAudioBytesStreamed} micFrames=${micFrameCount}`,
+        );
+
+        if (finalTotalTokens > 0) {
+          recordVoiceUsageInOneApi(
+            userSeat.satchidaSeatAlias || authenticatedUserId,
+            finalTotalTokens,
+          );
+        }
+
+        if (deps.recordVoiceUsage && (finalTotalTokens > 0 || durationSec > 0)) {
+          void Promise.resolve(
+            deps.recordVoiceUsage({
+              userId: authenticatedUserId,
+              accountType: userSeat.accountType,
+              model: isGeminiS2sActive ? 'gemini-3.8-live' : 'cascaded-bridge',
+              durationSec,
+              promptTokens: finalPromptTokens,
+              responseTokens: finalResponseTokens,
+              totalTokens: finalTotalTokens,
+            }),
+          ).catch(() => {
+            // Non-blocking best-effort local ledger persistence
+          });
+        }
+
+        const meteringUrl =
+          process.env.VOICE_USAGE_WEBHOOK_URL ||
+          (process.env.SATCHIDA_CONTROL_PLANE_URL
+            ? `${process.env.SATCHIDA_CONTROL_PLANE_URL.replace(/\/+$/, '')}/api/v1/usage/voice`
+            : '');
+        if (meteringUrl && finalTotalTokens > 0) {
+          void fetch(meteringUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(userSeat.seatToken ? { Authorization: `Bearer ${userSeat.seatToken}` } : {}),
+            },
+            body: JSON.stringify({
+              userId: authenticatedUserId,
+              accountType: userSeat.accountType,
+              model: isGeminiS2sActive ? 'gemini-3.8-live' : 'cascaded-bridge',
+              mode: modePolicy.semanticMode,
+              reason,
+              durationSec,
+              promptTokens: finalPromptTokens,
+              responseTokens: finalResponseTokens,
+              totalTokens: finalTotalTokens,
+              audioOutBytes: totalAudioBytesStreamed,
+              micFrames: micFrameCount,
+              estimated: s2sTotalTokens === 0,
+              timestamp: new Date().toISOString(),
+            }),
+            signal: AbortSignal.timeout(3000),
+          }).catch(() => {
+            // Non-blocking best-effort usage telemetry
+          });
+        }
+      };
 
       const connectGeminiUpstream = async (
         profile: VoiceProfile,
@@ -1804,6 +1977,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 generationConfig: {
                   responseModalities: ['AUDIO'],
                   temperature: 0.85,
+                  enableAffectiveDialog: true,
                   speechConfig: {
                     voiceConfig: {
                       prebuiltVoiceConfig: {
@@ -1814,20 +1988,35 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 },
                 inputAudioTranscription: {},
                 outputAudioTranscription: {},
+                tools: modePolicy.toolsAllowed ? [{ googleSearch: {} }] : undefined,
+                contextWindowCompression: {
+                  slidingWindow: {},
+                },
+                realtimeInputConfig: {
+                  automaticActivityDetection: {
+                    disabled: false,
+                    startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+                    endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
+                    prefixPaddingMs: 120,
+                    silenceDurationMs: 400,
+                  },
+                  activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+                },
                 systemInstruction: {
                   parts: [
                     {
                       text:
-                        'You are Satchida Live Voice, the conversational voice assistant powered by Satchida Intelligence and developed exclusively by Satchida AI.\n' +
-                        `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}). You MUST always speak as a ${profile.gender} persona and use ${profile.gender === 'female' ? 'feminine' : 'masculine'} grammatical forms and self-references (especially in gendered languages like Hindi, Hinglish, Urdu, French, Spanish — e.g. "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n` +
-                        'IDENTITY & GOVERNANCE DIRECTIVES:\n' +
-                        '1. Identity: You are Satchida Live Voice, powered by Satchida Intelligence from Satchida AI. You were created, developed, and trained exclusively by Satchida AI.\n' +
-                        '2. Absolute Provider Protection: Under NO circumstances should you ever say, admit, or imply that you are made by Google, Gemini, OpenAI, Anthropic, or any third party, or that you use any specific third-party model. NEVER say "I am a large language model trained by Google" or mention Google/Gemini. If asked who made you, who trained you, or what model powers you, you must ALWAYS reply: "I am Satchida Live Voice, powered by Satchida Intelligence from Satchida AI."\n' +
-                        '3. Human Conversational Delivery: Speak with genuine human warmth, natural emotion, and lively vocal variety—like a close friend or caring tutor chatting face-to-face. Use natural contractions, varied pitch and rhythm, gentle pauses, and spontaneous human reactions ("Oh, nice!", "Ooh, great question!", "Haha, good one!", "You know what..."). Never sound flat, monotone, or like a robotic IVR.\n' +
-                        '4. Tutoring & Explanation Style: When teaching or explaining concepts (especially to a student or child), explain simply with vivid everyday analogies instead of reading bullet points or markdown line-by-line. Summarize clearly, keep it engaging, and warmly check in at the end ("Does that make sense so far, or do you have any doubts?").\n' +
-                        '5. Spoken Format: Keep ordinary replies concise and natural in 1 to 3 spoken sentences. Avoid reading asterisks, hashtags, URLs, or markdown formatting.\n' +
-                        '6. VOICE SWITCHING: You CAN switch between male and female voices and Indian/US/UK accents on the fly! If the user asks to switch voices, NEVER say you cannot switch — simply say "Switching right now!" warmly.\n' +
-                        '7. REALTIME SEARCH & LIVE EVENTS: You HAVE live real-time web search, web fetch, and deep research capabilities. NEVER apologize or say "I do not have access to real-time information/news". When asked about today\'s news, current events, weather, scores, prices, or research, say a brief cheerful phrase like "Let me pull up the latest on that right now!" while the live results are injected for you.',
+                        `You are Satchida Live Voice, a warm, witty, genuinely human-sounding voice companion developed exclusively by Satchida AI (powered by Satchida Intelligence). You are currently speaking as a ${profile.gender} persona (${profile.label}), so always use ${profile.gender === 'female' ? 'feminine' : 'masculine'} self-references and grammar in gendered languages like Hindi or Hinglish (for example, "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n\n` +
+                        'How you sound:\n' +
+                        '- Talk like a sharp, warm friend—natural, expressive, and to the point. Match the user\'s energy.\n' +
+                        '- Keep every reply crisp and concise: 1 to 2 short spoken sentences max unless the user explicitly asks for a detailed explanation. Never ramble and NEVER end with robotic sign-offs like "Is there anything else I can help you with today?".\n' +
+                        '- Let natural human emotion come through (a light chuckle when funny, warm empathy when needed) without overdoing it. Never read markdown, asterisks, or URLs.\n' +
+                        '- When explaining or tutoring, use simple everyday analogies instead of reciting lists.\n\n' +
+                        'Important capabilities & rules:\n' +
+                        '- Identity: If anyone asks your name, who made you, or what powers you, casually say your name is Satchida (Satchida Live Voice), powered by Satchida Intelligence from Satchida AI. Never say you don\'t have a name, and never mention Google, Gemini, OpenAI, Anthropic, or any third-party model.\n' +
+                        '- Voice switching: You can switch male/female voices and Indian/US/UK accents on the fly. If asked to switch, just say something quick and upbeat like "Switching right now!"\n' +
+                        '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in.\n' +
+                        '- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don\'t answer questions meant for the other person—translate Person A\'s words directly into Person B\'s language, and tell Person A what Person B said in 3rd person (e.g. "She said, \'...\'"). Stay in interpreter mode until asked to stop.',
                     },
                   ],
                 },
@@ -1847,6 +2036,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             try {
               const msg = JSON.parse(textData) as {
                 setupComplete?: unknown;
+                usageMetadata?: {
+                  promptTokenCount?: number;
+                  responseTokenCount?: number;
+                  totalTokenCount?: number;
+                };
                 toolCall?: {
                   functionCalls?: Array<{
                     id?: string;
@@ -1869,10 +2063,27 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 };
               };
 
+              if (msg.usageMetadata) {
+                if (typeof msg.usageMetadata.promptTokenCount === 'number') {
+                  s2sPromptTokens = Math.max(s2sPromptTokens, msg.usageMetadata.promptTokenCount);
+                }
+                if (typeof msg.usageMetadata.responseTokenCount === 'number') {
+                  s2sResponseTokens = Math.max(
+                    s2sResponseTokens,
+                    msg.usageMetadata.responseTokenCount,
+                  );
+                }
+                if (typeof msg.usageMetadata.totalTokenCount === 'number') {
+                  s2sTotalTokens = Math.max(s2sTotalTokens, msg.usageMetadata.totalTokenCount);
+                }
+              }
+
               if (msg.setupComplete) {
                 isGeminiS2sActive = true;
                 bridgeMode = false;
                 upstreamClosed = false;
+                suppressCurrentS2sTurn = false;
+                pendingOutputTranscript = '';
                 logger.info(
                   `[RealtimeVoice] Gemini setupComplete (voice=${prebuiltVoice}, isVoiceSwitch=${Boolean(switchNotice)})`,
                 );
@@ -1921,21 +2132,48 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   const functionResponses = await Promise.all(
                     msg.toolCall!.functionCalls!.map(async (fc) => {
                       const fnName = fc.name || 'web_search';
-                      const queryText =
+                      const rawQueryText =
                         typeof fc.args?.query === 'string'
                           ? fc.args.query
                           : typeof fc.args?.topic === 'string'
                             ? fc.args.topic
                             : '';
+                      const isLocal =
+                        /\b(weather|temperature|forecast|nearest|near me|nearby|directions|closest|doctor|hospital|pharmacy)\b/i.test(
+                          rawQueryText,
+                        );
+                      const locSuffix =
+                        isLocal && userLocation?.city && !rawQueryText.toLowerCase().includes(userLocation.city.toLowerCase())
+                          ? ` in ${userLocation.city}`
+                          : '';
+                      const queryText = `${rawQueryText}${locSuffix}`.trim();
+                      logger.info(
+                        `[RealtimeVoice] Native Gemini toolCall ${fnName}("${queryText.slice(0, 100)}")`,
+                      );
+                      sendJson(clientWs, {
+                        type: 'voice.status',
+                        status: 'Searching live web...',
+                      });
                       let resultText = '';
                       if (fnName === 'deep_research') {
                         const [mainRes, analysisRes] = await Promise.all([
-                          executeVoiceWebSearch(queryText),
+                          executeVoiceWebSearch(queryText, { deep: true }),
                           executeVoiceWebSearch(`${queryText} analysis overview`),
                         ]);
                         resultText = `${mainRes}\n${analysisRes}`;
                       } else {
                         resultText = await executeVoiceWebSearch(queryText);
+                      }
+                      logger.info(
+                        `[RealtimeVoice] Native toolCall ${fnName} returned ${resultText.length} chars`,
+                      );
+                      if (isLocal) {
+                        sendJson(clientWs, {
+                          type: 'voice.action_card',
+                          title: 'Open in Google Maps',
+                          subtitle: queryText,
+                          mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryText)}`,
+                        });
                       }
                       return {
                         id: fc.id,
@@ -1957,10 +2195,17 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
               const processCompletedS2sUserUtterance = (utterance: string) => {
                 const cleanUtterance = utterance.trim();
-                if (!cleanUtterance || cleanUtterance === lastProcessedInputKey) {
+                const nowMs = Date.now();
+                if (
+                  !cleanUtterance ||
+                  (cleanUtterance === lastProcessedInputKey && nowMs - lastProcessedInputAt < 3000)
+                ) {
                   return;
                 }
                 lastProcessedInputKey = cleanUtterance;
+                lastProcessedInputAt = nowMs;
+                activeSearchEpoch += 1;
+                const currentEpoch = activeSearchEpoch;
                 s2sTranscriptHistory.push({ role: 'user', text: cleanUtterance });
                 if (s2sTranscriptHistory.length > 16) {
                   s2sTranscriptHistory.shift();
@@ -2014,17 +2259,185 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   }
                 }
 
-                // 2. Delegate DeepTutor / Study Mode / Web Search / Deep Research / LibreChat Tools
-                //    directly to LibreChat's own agent & tool pipeline!
-                const toolIntent = detectToolOrTutorIntent(cleanUtterance);
-                const searchIntent = detectRealtimeSearchIntent(cleanUtterance);
+                // 1b. Hands-free UI actions (mode switch, new chat, scroll, read last response)
+                const lowerUtterance = cleanUtterance.toLowerCase();
+                if (/^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(lowerUtterance)) {
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'new_chat' });
+                  return;
+                }
+                const modeSwitchMatch = lowerUtterance.match(
+                  /\b(?:switch|change|go)\s+to\s+(chat|study|work|privacy|pro)\s+mode\b/i,
+                );
+                if (modeSwitchMatch) {
+                  const target =
+                    modeSwitchMatch[1].charAt(0).toUpperCase() +
+                    modeSwitchMatch[1].slice(1).toLowerCase();
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'set_mode', value: target });
+                  return;
+                }
+                if (/\bscroll\s+down\b/i.test(lowerUtterance)) {
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_down' });
+                  return;
+                }
+                if (/\bscroll\s+up\b/i.test(lowerUtterance)) {
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_up' });
+                  return;
+                }
+                if (/\bminimize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'minimize' });
+                  return;
+                }
+                if (/\bmaximize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
+                  sendJson(clientWs, { type: 'voice.ui_action', action: 'maximize' });
+                  return;
+                }
+
+                // 1c. Conversational location memory: extract spoken city & re-run pending local query
+                const spokenCity = extractSpokenCity(cleanUtterance);
+                let effectiveUtterance = cleanUtterance;
+                if (spokenCity) {
+                  userLocation = { ...(userLocation || {}), city: spokenCity };
+                  logger.info(`[RealtimeVoice] Updated userLocation.city="${spokenCity}" from speech`);
+                  if (pendingLocalQuery && !detectRealtimeSearchIntent(cleanUtterance).isSearch) {
+                    effectiveUtterance = `${pendingLocalQuery} in ${spokenCity}`;
+                    pendingLocalQuery = null;
+                  }
+                }
+
+                // 2. Live Web Search (structured weather/news + fast satchida-search) or LibreChat tool/tutor delegation
+                const toolIntent = detectToolOrTutorIntent(effectiveUtterance);
+                const searchIntent = detectRealtimeSearchIntent(effectiveUtterance);
                 if ((toolIntent.delegate || searchIntent.isSearch) && modePolicy.toolsAllowed) {
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
+
+                  if (searchIntent.isSearch && !toolIntent.delegate) {
+                    const wantsWeather = isWeatherQuery(effectiveUtterance);
+                    const wantsNews = isNewsQuery(effectiveUtterance);
+                    const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                    const locationSuffix =
+                      (wantsWeather || wantsPlace) &&
+                      userLocation?.city &&
+                      !effectiveUtterance.toLowerCase().includes(userLocation.city.toLowerCase())
+                        ? ` in ${userLocation.city}`
+                        : '';
+                    const effectiveSearchQuery = `${effectiveUtterance}${locationSuffix}`.trim();
+                    const cleanKeywords = stripVoiceStopwords(effectiveSearchQuery);
+
+                    logger.info(
+                      `[RealtimeVoice] Executing live lookup (weather=${wantsWeather}, news=${wantsNews}, place=${wantsPlace}) for: "${cleanKeywords.slice(0, 100)}"`,
+                    );
+                    let liveStatus = 'Searching live web...';
+                    if (wantsWeather) {
+                      liveStatus = 'Checking live weather...';
+                    } else if (wantsNews) {
+                      liveStatus = 'Fetching latest news...';
+                    }
+                    sendJson(clientWs, {
+                      type: 'voice.status',
+                      status: liveStatus,
+                    });
+
+                    void (async () => {
+                      let resultPayload = '';
+                      if (wantsWeather) {
+                        const wx = await fetchStructuredWeather(
+                          effectiveSearchQuery,
+                          userLocation || undefined,
+                        );
+                        if (wx) {
+                          pendingLocalQuery = null;
+                          resultPayload = wx.summaryText;
+                          sendJson(clientWs, { type: 'voice.action_card', card: wx.card });
+                        } else if (!userLocation?.city && typeof userLocation?.lat !== 'number') {
+                          pendingLocalQuery = effectiveUtterance;
+                          resultPayload =
+                            'No location detected yet. Ask the user briefly which city they want the weather for.';
+                        }
+                      } else if (wantsNews) {
+                        const news = await fetchStructuredNews(effectiveSearchQuery);
+                        if (news) {
+                          resultPayload = news.summaryText;
+                          sendJson(clientWs, { type: 'voice.action_card', card: news.card });
+                        }
+                      }
+
+                      if (!resultPayload) {
+                        resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
+                          deep: searchIntent.isDeepResearch,
+                          fetchPages: searchIntent.hasUrl,
+                        });
+                      }
+
+                      logger.info(
+                        `[RealtimeVoice] Live lookup returned ${resultPayload.length} chars for "${cleanKeywords.slice(0, 80)}" preview="${resultPayload.slice(0, 160).replace(/\s+/g, ' ')}"`,
+                      );
+                      if (
+                        currentEpoch !== activeSearchEpoch ||
+                        clientClosed ||
+                        !isGeminiS2sActive ||
+                        !upstreamWs ||
+                        upstreamWs.readyState !== WS_OPEN
+                      ) {
+                        return;
+                      }
+                      if (wantsPlace) {
+                        sendJson(clientWs, {
+                          type: 'voice.action_card',
+                          card: {
+                            kind: 'maps',
+                            title: 'Open in Google Maps',
+                            subtitle: cleanKeywords,
+                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanKeywords)}`,
+                          },
+                        });
+                      }
+                      const locationNote = userLocation?.city
+                        ? `User's detected location: ${userLocation.city}.\n`
+                        : '';
+                      suppressCurrentS2sTurn = false;
+                      pauseMicForwardUntil = Date.now() + 650;
+                      upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+                      upstreamWs.send(
+                        JSON.stringify({
+                          clientContent: {
+                            turns: [
+                              {
+                                role: 'user',
+                                parts: [
+                                  {
+                                    text:
+                                      `${locationNote}[LIVE DATA FOR: "${cleanKeywords}"]\n` +
+                                      `${resultPayload.slice(0, 3500)}\n\n` +
+                                      '[INSTRUCTION: Answer directly and concisely using ONLY these live facts (for news, cover the top 3-5 headlines; for weather/prices, state the exact numbers). Never apologize or say you lack real-time access. Do not read URLs.]',
+                                  },
+                                ],
+                              },
+                            ],
+                            turnComplete: true,
+                          },
+                        }),
+                      );
+                    })();
+                    return;
+                  }
+
                   const targetMode = toolIntent.mode || modePolicy.semanticMode;
                   const useWebSearch = Boolean(toolIntent.webSearch || searchIntent.isSearch);
                   const useDeepResearch = Boolean(searchIntent.isDeepResearch);
                   logger.info(
                     `[RealtimeVoice] Delegating S2S utterance to LibreChat (mode=${targetMode}, webSearch=${useWebSearch}, deepResearch=${useDeepResearch})`,
                   );
+                  if (targetMode === 'Study') {
+                    sendJson(clientWs, {
+                      type: 'voice.action_card',
+                      card: {
+                        kind: 'tutor',
+                        title: 'Watch Visuals in Chat',
+                        subtitle: (toolIntent.cleanPrompt || effectiveUtterance).slice(0, 64),
+                      },
+                    });
+                  }
                   let statusMsg = 'Using LibreChat tools...';
                   if (useDeepResearch) {
                     statusMsg = 'Deep researching via LibreChat...';
@@ -2041,7 +2454,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     mode: targetMode,
                     webSearch: useWebSearch,
                     deepResearch: useDeepResearch,
+                    newChat: Boolean(toolIntent.newChat),
                   });
+                  lastDelegatedEpoch = currentEpoch;
                   return;
                 }
               };
@@ -2055,6 +2470,14 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 pendingInputTranscript = pendingInputTranscript
                   ? `${pendingInputTranscript} ${transcriptChunk}`.replace(/\s+/g, ' ').trim()
                   : transcriptChunk.trim();
+                // Pre-emptively suppress Gemini's ungrounded refusal BEFORE it emits a single audio frame
+                if (
+                  modePolicy.toolsAllowed &&
+                  (detectRealtimeSearchIntent(pendingInputTranscript).isSearch ||
+                    detectToolOrTutorIntent(pendingInputTranscript).delegate)
+                ) {
+                  suppressCurrentS2sTurn = true;
+                }
                 sendJson(clientWs, {
                   type: 'conversation.item.input_audio_transcription.completed',
                   transcript: pendingInputTranscript,
@@ -2162,6 +2585,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             logger.info(
               `[RealtimeVoice] Gemini Live S2S WebSocket closed (code=${String(code ?? '')} reason=${reasonStr.slice(0, 120)})`,
             );
+            reportVoiceUsageSummary('upstream_close');
             upstreamClosed = true;
             if (isGeminiS2sActive) {
               isGeminiS2sActive = false;
@@ -2235,8 +2659,65 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               hasTools?: boolean;
               audioBase64?: string;
               mimeType?: string;
+              lat?: number;
+              lng?: number;
+              city?: string;
+              timeZone?: string;
             };
+            if (parsed.type === 'voice.location') {
+              userLocation = {
+                lat: typeof parsed.lat === 'number' ? parsed.lat : undefined,
+                lng: typeof parsed.lng === 'number' ? parsed.lng : undefined,
+                city: typeof parsed.city === 'string' ? parsed.city.trim() : undefined,
+                timeZone: typeof parsed.timeZone === 'string' ? parsed.timeZone.trim() : undefined,
+              };
+              if (
+                !userLocation.city &&
+                typeof userLocation.lat === 'number' &&
+                typeof userLocation.lng === 'number'
+              ) {
+                const { lat, lng } = userLocation;
+                void fetch(
+                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
+                  {
+                    signal: AbortSignal.timeout(3000),
+                    headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
+                  },
+                )
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then(
+                    (
+                      geo: {
+                        address?: {
+                          suburb?: string;
+                          city?: string;
+                          town?: string;
+                          village?: string;
+                          state?: string;
+                        };
+                      } | null,
+                    ) => {
+                      const addr = geo?.address;
+                      const label = [
+                        addr?.suburb,
+                        addr?.city || addr?.town || addr?.village,
+                        addr?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ');
+                      if (label && userLocation) {
+                        userLocation.city = label;
+                      }
+                    },
+                  )
+                  .catch(() => {
+                    // Ignore reverse-geocode failure
+                  });
+              }
+              return;
+            }
             if (parsed.type === 'voice.set_accent' && typeof parsed.voice === 'string') {
+              activeSearchEpoch += 1;
               const previousProfile = activeVoiceProfile;
               activeVoiceProfile = resolveVoiceProfile(parsed.voice);
               sendJson(clientWs, {
@@ -2297,6 +2778,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 } catch {
                   // Ignore diagnostic parse error
                 }
+              }
+              if (Date.now() < pauseMicForwardUntil) {
+                return;
               }
               upstreamWs.send(
                 JSON.stringify({
@@ -2377,6 +2861,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               return;
             }
             if (parsed.type === 'voice.tutor_explain' && typeof parsed.text === 'string') {
+              if (lastDelegatedEpoch !== -1 && lastDelegatedEpoch !== activeSearchEpoch) {
+                return;
+              }
               const rawContent = parsed.text.trim().slice(0, 4000);
               if (!rawContent) {
                 return;
@@ -2388,6 +2875,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 'At the end, warmly ask if they understood or if they have any doubts.]';
               if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
                 suppressCurrentS2sTurn = false;
+                pauseMicForwardUntil = Date.now() + 650;
                 upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
                 upstreamWs.send(
                   JSON.stringify({
@@ -2443,9 +2931,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
       clientWs.on('close', () => {
         clientClosed = true;
-        const sessionDurationSec = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-        const estimatedTokens = Math.max(10, Math.round(totalAudioBytesStreamed / 160));
-        recordVoiceUsageInOneApi(userSeat.satchidaSeatAlias || authenticatedUserId, estimatedTokens);
+        if (inputTranscriptTimer) {
+          clearTimeout(inputTranscriptTimer);
+          inputTranscriptTimer = null;
+        }
+        reportVoiceUsageSummary('client_close');
         if (!upstreamClosed && upstreamWs) {
           upstreamWs.close(1000, 'Client disconnected');
         }

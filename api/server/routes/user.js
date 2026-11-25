@@ -169,15 +169,48 @@ router.get('/seat-balance', requireJwtAuth, async (req, res) => {
   try {
     const { userId, username, tenantId, seatAlias, tier } = await resolveOfferUserContext(req);
     const storage = computeUserStorage(username, userId, tier);
+    let voice = { usedMinutes: 0, usedTokens: 0, sessions: 0 };
+    try {
+      const mongoose = require('mongoose');
+      const Transaction = mongoose.models.Transaction;
+      if (Transaction && userId) {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const voiceTxns = await Transaction.find({
+          user: userId,
+          context: 'live_voice',
+          createdAt: { $gte: monthStart },
+        })
+          .select('rawAmount conversationId')
+          .lean();
+        let totalSec = 0;
+        let totalTok = 0;
+        for (const t of voiceTxns) {
+          totalTok += Math.abs(Number(t.rawAmount || 0));
+          const m = String(t.conversationId || '').match(/^voice:(\d+)s$/);
+          if (m) {
+            totalSec += Number(m[1] || 0);
+          }
+        }
+        voice = {
+          usedMinutes: Number((totalSec / 60).toFixed(1)),
+          usedTokens: totalTok,
+          sessions: voiceTxns.length,
+        };
+      }
+    } catch {
+      // Non-blocking voice usage aggregation
+    }
     if (!ONEAPI_ADMIN_TOKEN || !seatAlias) {
-      return res.json({ available: false, tier, storage });
+      return res.json({ available: false, tier, storage, voice });
     }
     const url = `${ONEAPI_BASE_URL}/api/analytics/seat-limits?tenant_id=${encodeURIComponent(tenantId)}`;
     const resp = await fetch(url, {
       headers: { Authorization: ONEAPI_ADMIN_TOKEN },
     });
     if (!resp.ok) {
-      return res.json({ available: false, tier, storage });
+      return res.json({ available: false, tier, storage, voice });
     }
     const payload = await resp.json().catch(() => ({}));
     const seats = Array.isArray(payload?.data?.seats) ? payload.data.seats : [];
@@ -185,7 +218,7 @@ router.get('/seat-balance', requireJwtAuth, async (req, res) => {
       (s) => String(s?.alias_id || '').toLowerCase() === seatAlias.toLowerCase(),
     );
     if (!match) {
-      return res.json({ available: false, tier, storage });
+      return res.json({ available: false, tier, storage, voice });
     }
     const resolvedTier = match.tier || tier;
     const resolvedStorage = computeUserStorage(username, userId, resolvedTier);
@@ -206,6 +239,7 @@ router.get('/seat-balance', requireJwtAuth, async (req, res) => {
       inputRemaining,
       outputRemaining,
       storage: resolvedStorage,
+      voice,
     });
   } catch {
     return res.json({ available: false });

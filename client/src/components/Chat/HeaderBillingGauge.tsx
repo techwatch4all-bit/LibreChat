@@ -173,6 +173,11 @@ export default function HeaderBillingGauge() {
       availableBytes: number;
       quotaMb: number;
     };
+    voice?: {
+      usedMinutes: number;
+      usedTokens: number;
+      sessions: number;
+    };
   } | null>(null);
 
   const fetchSeatBalance = useCallback(async () => {
@@ -190,8 +195,13 @@ export default function HeaderBillingGauge() {
           availableBytes: number;
           quotaMb: number;
         };
+        voice?: {
+          usedMinutes: number;
+          usedTokens: number;
+          sessions: number;
+        };
       }>('/api/user/seat-balance');
-      if (res?.available || res?.storage) {
+      if (res?.available || res?.storage || res?.voice) {
         setSeatBalance({
           available: !!res.available,
           tier: res.tier,
@@ -199,6 +209,7 @@ export default function HeaderBillingGauge() {
           ceilingTokens: res.ceilingTokens ?? 0,
           usedTokens: res.usedTokens ?? 0,
           storage: res.storage,
+          voice: res.voice,
         });
       }
     } catch {
@@ -209,7 +220,16 @@ export default function HeaderBillingGauge() {
   useEffect(() => {
     fetchSeatBalance();
     const timer = setInterval(fetchSeatBalance, 30000);
-    return () => clearInterval(timer);
+    const onVoiceEnded = () => {
+      setTimeout(() => {
+        void fetchSeatBalance();
+      }, 600);
+    };
+    window.addEventListener('satchida:voice-session-ended', onVoiceEnded);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('satchida:voice-session-ended', onVoiceEnded);
+    };
   }, [fetchSeatBalance]);
 
   // Active tab selection data
@@ -458,6 +478,20 @@ export default function HeaderBillingGauge() {
                   </div>
                 );
               })()}
+              {seatBalance.voice && (
+                <div className="mt-2 pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[11px]">
+                  <span className="font-semibold uppercase tracking-wider text-text-tertiary">
+                    Live Voice (Month)
+                  </span>
+                  <span className="font-medium text-text-primary tabular-nums">
+                    {seatBalance.voice.usedMinutes.toFixed(1)} min ·{' '}
+                    {seatBalance.voice.usedTokens >= 1000
+                      ? `${(seatBalance.voice.usedTokens / 1000).toFixed(1)}K`
+                      : seatBalance.voice.usedTokens}{' '}
+                    tok ({seatBalance.voice.sessions})
+                  </span>
+                </div>
+              )}
             </div>
           ) : hasCredits ? (
             <div className="rounded-lg border border-border-light bg-surface-secondary/50 p-3 space-y-1.5">

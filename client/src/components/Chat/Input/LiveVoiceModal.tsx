@@ -24,7 +24,7 @@ import {
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { getSharedVoiceAudioContext } from '~/utils/voiceAudioContext';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
-import { useAuthContext } from '~/hooks';
+import { useAuthContext, useNewConvo } from '~/hooks';
 
 interface LiveVoiceModalProps {
   open: boolean;
@@ -32,6 +32,12 @@ interface LiveVoiceModalProps {
   ask: TAskFunction;
   isSubmitting: boolean;
 }
+
+type VoiceActionCard =
+  | { kind: 'maps'; title: string; subtitle?: string; mapUrl: string }
+  | { kind: 'weather'; city: string; tempC: number; condition: string; highC?: number; lowC?: number }
+  | { kind: 'news'; query: string; items: Array<{ title: string; url: string; source?: string }> }
+  | { kind: 'tutor'; title: string; subtitle?: string };
 
 type ConnectionState = 'connecting' | 'connected' | 'error' | 'closed';
 
@@ -141,6 +147,7 @@ export default function LiveVoiceModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [spokenTranscript, setSpokenTranscript] = useState('');
   const [assistantTranscript, setAssistantTranscript] = useState('');
+  const [actionCard, setActionCard] = useState<VoiceActionCard | null>(null);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [micStreaming, setMicStreaming] = useState(false);
   const [activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
@@ -165,6 +172,7 @@ export default function LiveVoiceModal({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackGainRef = useRef<GainNode | null>(null);
   const captureCleanupRef = useRef<(() => void) | null>(null);
   const captureNodeRef = useRef<AudioNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
@@ -187,6 +195,9 @@ export default function LiveVoiceModal({
   hasToolsRef.current = hasActiveComposerTools;
   const askRef = useRef(ask);
   askRef.current = ask;
+  const { newConversation } = useNewConvo();
+  const newConvoRef = useRef(newConversation);
+  newConvoRef.current = newConversation;
 
   const getAudioContext = useCallback((): AudioContext | null => {
     const ctx = getSharedVoiceAudioContext();
@@ -235,9 +246,21 @@ export default function LiveVoiceModal({
         clearTimeout(finishTimerRef.current);
         finishTimerRef.current = null;
       }
+      const ctx = audioContextRef.current;
+      const gainNode = playbackGainRef.current;
+      if (ctx && gainNode) {
+        try {
+          const t = ctx.currentTime;
+          gainNode.gain.cancelScheduledValues(t);
+          gainNode.gain.setValueAtTime(gainNode.gain.value, t);
+          gainNode.gain.linearRampToValueAtTime(0.0001, t + 0.006);
+        } catch {
+          // ignore
+        }
+      }
       for (const src of activeSourcesRef.current) {
         try {
-          src.stop();
+          src.stop(ctx ? ctx.currentTime + 0.008 : 0);
           src.disconnect();
         } catch {
           // ignore
@@ -245,6 +268,13 @@ export default function LiveVoiceModal({
       }
       activeSourcesRef.current = [];
       nextPlayTimeRef.current = 0;
+      if (ctx && gainNode) {
+        try {
+          gainNode.gain.setValueAtTime(1, ctx.currentTime + 0.01);
+        } catch {
+          // ignore
+        }
+      }
 
       if (htmlAudioRef.current) {
         htmlAudioRef.current.onended = null;
@@ -313,10 +343,16 @@ export default function LiveVoiceModal({
 
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(ctx.destination);
+      if (!playbackGainRef.current) {
+        const g = ctx.createGain();
+        g.gain.value = 1;
+        g.connect(ctx.destination);
+        playbackGainRef.current = g;
+      }
+      source.connect(playbackGainRef.current);
 
       const now = ctx.currentTime;
-      const startTime = Math.max(now + 0.02, nextPlayTimeRef.current);
+      const startTime = Math.max(now + 0.04, nextPlayTimeRef.current);
       source.start(startTime);
       nextPlayTimeRef.current = startTime + audioBuffer.duration;
 
@@ -423,10 +459,20 @@ export default function LiveVoiceModal({
       captureCleanupRef.current = null;
     }
     captureNodeRef.current = null;
+    if (playbackGainRef.current) {
+      try {
+        playbackGainRef.current.disconnect();
+      } catch {
+        // ignore
+      }
+      playbackGainRef.current = null;
+    }
     audioContextRef.current = null;
     nextPlayTimeRef.current = 0;
     playbackDeadlineRef.current = 0;
     setMicStreaming(false);
+    setActionCard(null);
+    window.dispatchEvent(new CustomEvent('satchida:voice-session-ended'));
 
     if (recognitionRef.current) {
       recognitionRef.current.onend = null;
@@ -556,12 +602,7 @@ export default function LiveVoiceModal({
         }
         setMicStreaming(true);
       }
-      if (
-        isMutedRef.current ||
-        isAssistantSpeakingRef.current ||
-        Date.now() < ignoreSpeechUntilRef.current ||
-        ws.readyState !== WebSocket.OPEN
-      ) {
+      if (isMutedRef.current || ws.readyState !== WebSocket.OPEN) {
         return;
       }
       if (usingWorklet && fallbackToScriptProcessor) {
@@ -1134,6 +1175,13 @@ export default function LiveVoiceModal({
             isVoiceSwitch?: boolean;
             webSearch?: boolean;
             deepResearch?: boolean;
+            newChat?: boolean;
+            action?: string;
+            value?: string;
+            title?: string;
+            subtitle?: string;
+            mapUrl?: string;
+            card?: VoiceActionCard;
             text?: string;
             delta?: string;
             transcript?: string;
@@ -1165,6 +1213,32 @@ export default function LiveVoiceModal({
 
             hasGreetedRef.current = true;
             setStatusText('Greeting...');
+            // Share optional device location (non-blocking) for local help (nearest doctor, weather, directions)
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (navigator.geolocation?.getCurrentPosition) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(
+                      JSON.stringify({
+                        type: 'voice.location',
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        timeZone,
+                      }),
+                    );
+                  }
+                },
+                () => {
+                  if (ws.readyState === WebSocket.OPEN && timeZone) {
+                    ws.send(JSON.stringify({ type: 'voice.location', timeZone }));
+                  }
+                },
+                { timeout: 5000, maximumAge: 300000 },
+              );
+            } else if (timeZone) {
+              ws.send(JSON.stringify({ type: 'voice.location', timeZone }));
+            }
             // S2S mode: stream raw PCM audio directly to backend → Google Gemini Live
             // Bridge mode: use browser SpeechRecognition (text-based turns)
             if (msg.mode === 'gemini_live_s2s') {
@@ -1206,7 +1280,47 @@ export default function LiveVoiceModal({
             return;
           }
 
+          if (msg.type === 'voice.ui_action' && msg.action) {
+            if (msg.action === 'new_chat') {
+              newConvoRef.current();
+              setStatusText('Started new chat');
+            } else if (
+              msg.action === 'set_mode' &&
+              msg.value &&
+              ['Chat', 'Study', 'Work', 'Pro', 'Privacy', 'Vibecoding'].includes(msg.value)
+            ) {
+              setCurrentMode(msg.value as 'Chat' | 'Study' | 'Work' | 'Pro' | 'Privacy' | 'Vibecoding');
+              setStatusText(`Switched to ${msg.value} mode`);
+            } else if (msg.action === 'scroll_down') {
+              window.scrollBy({ top: 400, behavior: 'smooth' });
+            } else if (msg.action === 'scroll_up') {
+              window.scrollBy({ top: -400, behavior: 'smooth' });
+            } else if (msg.action === 'minimize') {
+              setIsMinimized(true);
+            } else if (msg.action === 'maximize') {
+              setIsMinimized(false);
+            }
+            return;
+          }
+
+          if (msg.type === 'voice.action_card') {
+            if (msg.card) {
+              setActionCard(msg.card);
+            } else if (msg.title && msg.mapUrl) {
+              setActionCard({
+                kind: 'maps',
+                title: msg.title,
+                subtitle: msg.subtitle,
+                mapUrl: msg.mapUrl,
+              });
+            }
+            return;
+          }
+
           if (msg.type === 'voice.delegate_tools' && msg.text) {
+            if (msg.newChat) {
+              newConvoRef.current();
+            }
             if (msg.mode && ['Chat', 'Study', 'Work', 'Pro', 'Privacy', 'Vibecoding'].includes(msg.mode)) {
               setCurrentMode(msg.mode as 'Chat' | 'Study' | 'Work' | 'Pro' | 'Privacy' | 'Vibecoding');
             }
@@ -1217,8 +1331,15 @@ export default function LiveVoiceModal({
               setResearchEnabled(true);
             }
             setAwaitingToolResponse(true);
-            setStatusText('Using LibreChat tools...');
-            askRef.current({ text: msg.text });
+            setStatusText(
+              msg.mode === 'Study' ? 'Opening Study Mode & DeepTutor...' : 'Using LibreChat tools...',
+            );
+            const promptText = msg.text;
+            if (msg.newChat) {
+              setTimeout(() => askRef.current({ text: promptText }), 150);
+            } else {
+              askRef.current({ text: promptText });
+            }
             return;
           }
 
@@ -1230,6 +1351,7 @@ export default function LiveVoiceModal({
 
           if (msg.type === 'voice.interrupted') {
             stopAssistantAudio(true);
+            setAssistantTranscript('');
             return;
           }
 
@@ -1482,7 +1604,138 @@ export default function LiveVoiceModal({
         </div>
       </div>
 
-      {/* Compact Orb + Status */}
+      {/* Rich Action Cards (Maps, Weather, News, DeepTutor) */}
+      {actionCard && (
+        <div className="mb-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs">
+          <div className="flex items-start justify-between gap-2">
+            {actionCard.kind === 'maps' && (
+              <>
+                <div className="min-w-0 truncate text-text-primary">
+                  <span className="font-medium">{actionCard.title}</span>
+                  {actionCard.subtitle ? (
+                    <span className="ml-1 text-text-secondary">· {actionCard.subtitle}</span>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <a
+                    href={actionCard.mapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-emerald-600 px-2.5 py-1 font-medium text-white hover:bg-emerald-500"
+                  >
+                    Open Maps
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setActionCard(null)}
+                    aria-label="Dismiss card"
+                    className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </>
+            )}
+            {actionCard.kind === 'weather' && (
+              <>
+                <div className="min-w-0 text-text-primary">
+                  <div className="font-semibold">
+                    {actionCard.city} · {actionCard.tempC}°C ({actionCard.condition})
+                  </div>
+                  {typeof actionCard.highC === 'number' && typeof actionCard.lowC === 'number' && (
+                    <div className="text-[11px] text-text-secondary">
+                      High {actionCard.highC}°C · Low {actionCard.lowC}°C
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActionCard(null)}
+                  aria-label="Dismiss card"
+                  className="shrink-0 rounded p-0.5 text-text-secondary hover:text-text-primary"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+            {actionCard.kind === 'tutor' && (
+              <>
+                <div className="min-w-0 truncate text-text-primary">
+                  <span className="font-medium">{actionCard.title}</span>
+                  {actionCard.subtitle ? (
+                    <span className="ml-1 text-text-secondary">· {actionCard.subtitle}</span>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsMinimized(true)}
+                    className="rounded-lg bg-violet-600 px-2.5 py-1 font-medium text-white hover:bg-violet-500"
+                  >
+                    View Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActionCard(null)}
+                    aria-label="Dismiss card"
+                    className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </>
+            )}
+            {actionCard.kind === 'news' && (
+              <div className="w-full space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-text-primary">
+                    Live Headlines · {actionCard.query}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const summary = actionCard.items
+                          .map((it, idx) => `${idx + 1}. [${it.title}](${it.url})`)
+                          .join('\n');
+                        askRef.current({
+                          text: `Summarize these live headlines for "${actionCard.query}":\n${summary}`,
+                        });
+                        setIsMinimized(true);
+                      }}
+                      className="rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-sky-500"
+                    >
+                      Send to Chat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActionCard(null)}
+                      aria-label="Dismiss card"
+                      className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <ul className="max-h-24 space-y-1 overflow-y-auto pr-1 text-[11px]">
+                  {actionCard.items.slice(0, 4).map((item, idx) => (
+                    <li key={idx} className="truncate">
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-300 hover:underline"
+                      >
+                        • {item.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="my-2.5 flex items-center gap-2.5">
         <button
           type="button"

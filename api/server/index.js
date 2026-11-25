@@ -1313,6 +1313,23 @@ RULES FOR YOUR SPOKEN EXPLANATION:
       }),
     createUpstreamWebSocket: (wsUrl, opts) =>
       new WebSocket(wsUrl, { ...opts, perMessageDeflate: false }),
+    recordVoiceUsage: (usage) =>
+      runAsSystem(async () => {
+        const Transaction = mongoose.models.Transaction;
+        if (!Transaction || !usage?.userId) {
+          return;
+        }
+        await Transaction.create({
+          user: usage.userId,
+          conversationId: `voice:${usage.durationSec}s`,
+          tokenType: 'completion',
+          model: usage.model || 'gemini-3.8-live',
+          context: 'live_voice',
+          rawAmount: -Math.abs(usage.totalTokens || 0),
+          tokenValue: 0,
+          rate: 0,
+        });
+      }),
   });
 
   server.on('upgrade', (req, socket, head) => {

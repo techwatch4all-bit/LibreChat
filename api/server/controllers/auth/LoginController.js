@@ -13,7 +13,7 @@ const loginController = async (req, res) => {
       return res.status(200).json({ twoFAPending: true, tempToken });
     }
 
-    const { password: _p, totpSecret: _t, __v, ...user } = req.user;
+    const { password: _p, passwordSig: _ps, totpSecret: _t, __v, ...user } = req.user;
     user.id = user._id.toString();
 
     const token = await setAuthTokens(req.user._id, res, null, req);

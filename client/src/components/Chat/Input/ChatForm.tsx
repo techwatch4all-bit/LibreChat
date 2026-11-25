@@ -1,4 +1,5 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useAtomValue } from 'jotai';
 import { useWatch } from 'react-hook-form';
 import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
 import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
@@ -39,6 +40,7 @@ import {
   PendingToolApprovalButton,
   PendingToolApprovalPanel,
 } from '~/components/Chat/approval/Review';
+import ComposerToolbarMobile from './ComposerToolbarMobile';
 import PendingManualSkillsChips from './PendingManualSkillsChips';
 import usePastedTextEdit from '~/hooks/Files/usePastedTextEdit';
 import useAskAnswerMode from '~/hooks/Input/useAskAnswerMode';
@@ -58,6 +60,7 @@ import AttachFileChat from './Files/AttachFileChat';
 import CodeWorkspaceMenu from './CodeWorkspaceMenu';
 import useSteering from '~/hooks/Chat/useSteering';
 import CodeApprovalMenu from './CodeApprovalMenu';
+import { deviceLayoutAtom } from '~/store/layout';
 import FileFormChat from './Files/FileFormChat';
 import InFlightSteers from './InFlightSteers';
 import TextareaHeader from './TextareaHeader';
@@ -163,6 +166,7 @@ const ChatForm = memo(function ChatForm({
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   useFocusChatEffect(textAreaRef);
   const localize = useLocalize();
+  const { isPhone } = useAtomValue(deviceLayoutAtom);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [, setIsScrollable] = useState(false);
@@ -874,107 +878,188 @@ const ChatForm = memo(function ChatForm({
                   </div>
                 </div>
               )}
-              <div
-                className={cn(
-                  'flex flex-nowrap items-center gap-1 overflow-x-auto px-2 pb-2 sm:flex-wrap sm:gap-1.5 sm:overflow-visible',
-                  isRTL ? 'flex-row-reverse' : 'flex-row',
-                )}
-              >
-                <BadgeRow
-                  showEphemeralBadges={
-                    !!endpoint &&
-                    !hideBadgeRow &&
-                    !isAgentsEndpoint(endpoint) &&
-                    !isAssistantsEndpoint(endpoint)
-                  }
-                  isSubmitting={isSubmitting}
-                  conversationId={conversationId}
-                  specName={conversation?.spec}
-                  onChange={setBadges}
-                  isInChat={
-                    Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                  }
-                />
-                <div className="shrink-0">
-                  <AttachFileChat
-                    conversation={conversation}
-                    disableInputs={disableInputs}
-                    files={files}
-                    setFiles={setFiles}
-                    setFilesLoading={setFilesLoading}
-                  />
-                </div>
-                <SatchiStyleSelector disabled={disableInputs || isSubmitting} />
-                <SatchiToolbar
-                  getText={() => methods.getValues('text')}
-                  setText={(text) => {
-                    methods.setValue('text', text);
-                    const textarea = document.getElementById(
-                      mainTextareaId,
-                    ) as HTMLTextAreaElement | null;
-                    textarea?.focus();
-                  }}
-                  disabled={disableInputs || isSubmitting}
-                />
-                <CodeApprovalMenu
-                  conversation={conversation}
-                  addedConversation={addedConvo}
-                  setConversation={setConversation}
-                  disabled={disableInputs}
-                />
-                {index === 0 && conversationId != null && (
-                  <PendingToolApprovalButton conversationId={conversationId} />
-                )}
-                <div className="grow" />
-                <SatchiModeSelector
-                  conversation={conversation}
-                  setConversation={setConversation}
-                  disabled={disableInputs || isSubmitting}
-                />
-                <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
-                {SpeechToText && (
-                  <AudioRecorder
-                    methods={methods}
-                    ask={submitComposerText}
-                    disabled={disableInputs || isNotAppendable}
-                    isSubmitting={isSubmitting}
-                  />
-                )}
-                {steering.duringRunActive &&
-                  steering.canControlGeneration &&
-                  (textValue?.trim() ?? '') !== '' && (
+              {isPhone ? (
+                <ComposerToolbarMobile
+                  isRTL={isRTL}
+                  attachSlot={
                     <div className="shrink-0">
-                      <InterruptSteerButton
-                        steering={steering}
-                        isNewConversation={isNewConversation}
-                        getText={() => methods.getValues('text')}
-                        onConsumed={consumeComposer}
-                        disabled={filesLoading}
+                      <AttachFileChat
+                        conversation={conversation}
+                        disableInputs={disableInputs}
+                        files={files}
+                        setFiles={setFiles}
+                        setFilesLoading={setFilesLoading}
                       />
                     </div>
-                  )}
-                <div className={cn('shrink-0', isRTL ? 'mr-auto' : 'ml-auto')}>
-                  {isSubmitting &&
-                  (showStopButton || steering.duringRunActive) &&
-                  !answerMode.composerAnswers
-                    ? duringRunSlot
-                    : endpoint && (
-                        <SendButton
-                          ref={submitButtonRef}
-                          control={methods.control}
-                          fileCount={submittableFileCount}
-                          disabled={
-                            filesLoading ||
-                            disableInputs ||
-                            !codeWorkspace.canSubmit ||
-                            isNotAppendable ||
-                            answerMode.composerLocked ||
-                            (isSubmitting && !answerMode.composerAnswers)
-                          }
+                  }
+                  badgeRowSlot={
+                    <BadgeRow
+                      showEphemeralBadges={
+                        !!endpoint &&
+                        !hideBadgeRow &&
+                        !isAgentsEndpoint(endpoint) &&
+                        !isAssistantsEndpoint(endpoint)
+                      }
+                      isSubmitting={isSubmitting}
+                      conversationId={conversationId}
+                      specName={conversation?.spec}
+                      onChange={setBadges}
+                      isInChat={
+                        Array.isArray(conversation?.messages) && conversation.messages.length >= 1
+                      }
+                    />
+                  }
+                  modeSelectorSlot={
+                    <SatchiModeSelector
+                      conversation={conversation}
+                      setConversation={setConversation}
+                      disabled={disableInputs || isSubmitting}
+                    />
+                  }
+                  steerSlot={
+                    steering.duringRunActive &&
+                    steering.canControlGeneration &&
+                    (textValue?.trim() ?? '') !== '' ? (
+                      <div className="shrink-0">
+                        <InterruptSteerButton
+                          steering={steering}
+                          isNewConversation={isNewConversation}
+                          getText={() => methods.getValues('text')}
+                          onConsumed={consumeComposer}
+                          disabled={filesLoading}
                         />
-                      )}
+                      </div>
+                    ) : undefined
+                  }
+                  sendSlot={
+                    isSubmitting &&
+                    (showStopButton || steering.duringRunActive) &&
+                    !answerMode.composerAnswers
+                      ? duringRunSlot
+                      : endpoint && (
+                          <SendButton
+                            ref={submitButtonRef}
+                            control={methods.control}
+                            fileCount={submittableFileCount}
+                            disabled={
+                              filesLoading ||
+                              disableInputs ||
+                              !codeWorkspace.canSubmit ||
+                              isNotAppendable ||
+                              answerMode.composerLocked ||
+                              (isSubmitting && !answerMode.composerAnswers)
+                            }
+                          />
+                        )
+                  }
+                />
+              ) : (
+                <div
+                  className={cn(
+                    'items-between flex gap-2 pb-2',
+                    isRTL ? 'flex-row-reverse' : 'flex-row',
+                  )}
+                >
+                  <div className={`${isRTL ? 'mr-2' : 'ml-2'} flex items-center`}>
+                    <AttachFileChat
+                      conversation={conversation}
+                      disableInputs={disableInputs}
+                      files={files}
+                      setFiles={setFiles}
+                      setFilesLoading={setFilesLoading}
+                    />
+                  </div>
+                  <BadgeRow
+                    showEphemeralBadges={
+                      !!endpoint &&
+                      !hideBadgeRow &&
+                      !isAgentsEndpoint(endpoint) &&
+                      !isAssistantsEndpoint(endpoint)
+                    }
+                    isSubmitting={isSubmitting}
+                    conversationId={conversationId}
+                    specName={conversation?.spec}
+                    onChange={setBadges}
+                    isInChat={
+                      Array.isArray(conversation?.messages) && conversation.messages.length >= 1
+                    }
+                  />
+                  <SatchiStyleSelector disabled={disableInputs || isSubmitting} />
+                  <SatchiToolbar
+                    getText={() => methods.getValues('text')}
+                    setText={(text) => {
+                      methods.setValue('text', text);
+                      const textarea = document.getElementById(
+                        mainTextareaId,
+                      ) as HTMLTextAreaElement | null;
+                      textarea?.focus();
+                    }}
+                    disabled={disableInputs || isSubmitting}
+                  />
+                  <CodeApprovalMenu
+                    conversation={conversation}
+                    addedConversation={addedConvo}
+                    setConversation={setConversation}
+                    disabled={disableInputs}
+                  />
+                  {index === 0 && conversationId != null && (
+                    <PendingToolApprovalButton conversationId={conversationId} />
+                  )}
+                  <div className="grow" />
+                  <SatchiModeSelector
+                    conversation={conversation}
+                    setConversation={setConversation}
+                    disabled={disableInputs || isSubmitting}
+                  />
+                  <TokenUsage
+                    index={index}
+                    conversation={conversation}
+                    isSubmitting={isSubmitting}
+                  />
+                  {SpeechToText && (
+                    <AudioRecorder
+                      methods={methods}
+                      ask={submitComposerText}
+                      disabled={disableInputs || isNotAppendable}
+                      isSubmitting={isSubmitting}
+                    />
+                  )}
+                  {steering.duringRunActive &&
+                    steering.canControlGeneration &&
+                    (textValue?.trim() ?? '') !== '' && (
+                      <div className="shrink-0">
+                        <InterruptSteerButton
+                          steering={steering}
+                          isNewConversation={isNewConversation}
+                          getText={() => methods.getValues('text')}
+                          onConsumed={consumeComposer}
+                          disabled={filesLoading}
+                        />
+                      </div>
+                    )}
+                  <div className={cn('shrink-0', isRTL ? 'mr-auto' : 'ml-auto')}>
+                    {isSubmitting &&
+                    (showStopButton || steering.duringRunActive) &&
+                    !answerMode.composerAnswers
+                      ? duringRunSlot
+                      : endpoint && (
+                          <SendButton
+                            ref={submitButtonRef}
+                            control={methods.control}
+                            fileCount={submittableFileCount}
+                            disabled={
+                              filesLoading ||
+                              disableInputs ||
+                              !codeWorkspace.canSubmit ||
+                              isNotAppendable ||
+                              answerMode.composerLocked ||
+                              (isSubmitting && !answerMode.composerAnswers)
+                            }
+                          />
+                        )}
+                  </div>
                 </div>
-              </div>
+              )}
               {TextToSpeech && automaticPlayback && <AutoPlayAudio index={index} />}
             </div>
           </div>

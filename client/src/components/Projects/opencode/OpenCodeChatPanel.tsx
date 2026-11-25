@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Copy,
   Edit2,
   FileCode2,
   FileText,
@@ -19,6 +20,7 @@ import {
   Loader2,
   Paperclip,
   Plus,
+  RotateCcw,
   Send,
   ShieldAlert,
   Sparkles,
@@ -372,7 +374,21 @@ export default function OpenCodeChatPanel({
   const [attachedFiles, setAttachedFiles] = useState<
     Array<{ name: string; size: number; content: string }>
   >([]);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const localPrivacyActive = useAtomValue(openCodeLocalPrivacyAtom);
+
+  const handleCopyText = (id: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || typeof navigator === 'undefined' || !navigator.clipboard) {
+      return;
+    }
+    void navigator.clipboard.writeText(trimmed).then(() => {
+      setCopiedMessageId(id);
+      window.setTimeout(() => {
+        setCopiedMessageId((prev) => (prev === id ? null : prev));
+      }, 1500);
+    });
+  };
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -1278,20 +1294,98 @@ export default function OpenCodeChatPanel({
               if (group.type === 'single') {
                 const envelope = group.envelope;
                 const envelopeError = extractOpenCodeErrorMessage(envelope.info.error);
+                const messageText = envelope.parts
+                  .filter((p) => p.type === 'text' && typeof p.text === 'string')
+                  .map((p) => p.text ?? '')
+                  .join('\n')
+                  .trim();
+                const isUserMsg = envelope.info.role === 'user';
+                const copyPayload = messageText || envelopeError || '';
+                const precedingUserText = !isUserMsg
+                  ? (() => {
+                      for (let i = groupIdx - 1; i >= 0; i--) {
+                        const prev = groupedMessages[i];
+                        if (prev.type === 'single' && prev.envelope.info.role === 'user') {
+                          const txt = prev.envelope.parts
+                            .filter((p) => p.type === 'text' && typeof p.text === 'string')
+                            .map((p) => p.text ?? '')
+                            .join('\n')
+                            .trim();
+                          if (txt) {
+                            return txt;
+                          }
+                        }
+                      }
+                      return null;
+                    })()
+                  : null;
                 return (
                   <article
                     key={envelope.info.id}
-                    className={`rounded-lg border p-3 ${
-                      envelope.info.role === 'user'
+                    className={`group/msg rounded-lg border p-3 ${
+                      isUserMsg
                         ? 'ml-6 border-border-medium bg-surface-tertiary'
                         : 'mr-2 border-border-light bg-surface-primary'
                     }`}
                   >
-                    <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-wide text-text-secondary">
-                      <span>{envelope.info.role}</span>
-                      {!simpleMode && envelope.info.modelID ? (
-                        <span className="font-mono normal-case">{envelope.info.modelID}</span>
-                      ) : null}
+                    <div className="mb-1 flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-text-secondary">
+                      <div className="flex items-center gap-2">
+                        <span>{envelope.info.role}</span>
+                        {!simpleMode && envelope.info.modelID ? (
+                          <span className="font-mono normal-case">{envelope.info.modelID}</span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-70 transition-opacity group-hover/msg:opacity-100">
+                        {copyPayload ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(envelope.info.id, copyPayload)}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            title="Copy message"
+                          >
+                            {copiedMessageId === envelope.info.id ? (
+                              <Check className="size-3 text-emerald-500" aria-hidden="true" />
+                            ) : (
+                              <Copy className="size-3" aria-hidden="true" />
+                            )}
+                          </button>
+                        ) : null}
+                        {isUserMsg && messageText ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPromptInput(messageText);
+                                textareaRef.current?.focus();
+                              }}
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                              title="Edit in prompt box"
+                            >
+                              <Edit2 className="size-3" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!reachable || sendPromptMutation.isLoading}
+                              onClick={() => sendPromptMutation.mutate({ text: messageText })}
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-40"
+                              title="Resend message"
+                            >
+                              <RotateCcw className="size-3" aria-hidden="true" />
+                            </button>
+                          </>
+                        ) : null}
+                        {!isUserMsg && precedingUserText ? (
+                          <button
+                            type="button"
+                            disabled={!reachable || sendPromptMutation.isLoading}
+                            onClick={() => sendPromptMutation.mutate({ text: precedingUserText })}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-40"
+                            title="Retry prompt"
+                          >
+                            <RotateCcw className="size-3" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="space-y-1">
                       {envelope.parts.map((part) => (
@@ -1301,10 +1395,24 @@ export default function OpenCodeChatPanel({
                     {envelopeError ? (
                       <div
                         role="alert"
-                        className="mt-2 flex items-start gap-1.5 rounded-md border border-border-medium bg-surface-destructive/10 px-2.5 py-1.5 text-xs text-text-destructive"
+                        className="mt-2 flex items-start justify-between gap-2 rounded-md border border-border-medium bg-surface-destructive/10 px-2.5 py-1.5 text-xs text-text-destructive"
                       >
-                        <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                        <span className="break-words">{envelopeError}</span>
+                        <div className="flex items-start gap-1.5">
+                          <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                          <span className="break-words">{envelopeError}</span>
+                        </div>
+                        {precedingUserText ? (
+                          <button
+                            type="button"
+                            disabled={!reachable || sendPromptMutation.isLoading}
+                            onClick={() => sendPromptMutation.mutate({ text: precedingUserText })}
+                            className="inline-flex shrink-0 items-center gap-1 rounded border border-border-medium bg-surface-primary px-2 py-0.5 text-[11px] font-medium text-text-primary hover:bg-surface-hover disabled:opacity-40"
+                            title="Retry failed prompt"
+                          >
+                            <RotateCcw className="size-3" aria-hidden="true" />
+                            <span>{localize('com_ui_retry')}</span>
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>
@@ -1354,16 +1462,62 @@ export default function OpenCodeChatPanel({
                 summaryLabel = `Thinking & intermediate steps (${technicalParts.length}) — View technical details`;
               }
 
+              const groupId = group.envelopes[0].info.id;
+              const groupCopyPayload = (finalTextPart?.text ?? '').trim() || groupError || '';
+              const groupPrecedingUserText = (() => {
+                for (let i = groupIdx - 1; i >= 0; i--) {
+                  const prev = groupedMessages[i];
+                  if (prev.type === 'single' && prev.envelope.info.role === 'user') {
+                    const txt = prev.envelope.parts
+                      .filter((p) => p.type === 'text' && typeof p.text === 'string')
+                      .map((p) => p.text ?? '')
+                      .join('\n')
+                      .trim();
+                    if (txt) {
+                      return txt;
+                    }
+                  }
+                }
+                return null;
+              })();
+
               return (
                 <article
-                  key={group.envelopes[0].info.id}
-                  className="mr-2 space-y-2 rounded-lg border border-border-light bg-surface-primary p-3"
+                  key={groupId}
+                  className="group/msg mr-2 space-y-2 rounded-lg border border-border-light bg-surface-primary p-3"
                 >
-                  <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-text-secondary">
+                  <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-text-secondary">
                     <span className="flex items-center gap-1 font-medium">
                       <Sparkles className="size-3 text-text-secondary" aria-hidden="true" />
                       {localize('com_opencode_brand_name')}
                     </span>
+                    <div className="flex items-center gap-1 opacity-70 transition-opacity group-hover/msg:opacity-100">
+                      {groupCopyPayload ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(groupId, groupCopyPayload)}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                          title="Copy response"
+                        >
+                          {copiedMessageId === groupId ? (
+                            <Check className="size-3 text-emerald-500" aria-hidden="true" />
+                          ) : (
+                            <Copy className="size-3" aria-hidden="true" />
+                          )}
+                        </button>
+                      ) : null}
+                      {groupPrecedingUserText ? (
+                        <button
+                          type="button"
+                          disabled={!reachable || sendPromptMutation.isLoading}
+                          onClick={() => sendPromptMutation.mutate({ text: groupPrecedingUserText })}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-40"
+                          title="Retry prompt"
+                        >
+                          <RotateCcw className="size-3" aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   {technicalParts.length > 0 ? (
@@ -1382,10 +1536,24 @@ export default function OpenCodeChatPanel({
                   {groupError ? (
                     <div
                       role="alert"
-                      className="flex items-start gap-1.5 rounded-md border border-border-medium bg-surface-destructive/10 px-2.5 py-1.5 text-xs text-text-destructive"
+                      className="flex items-start justify-between gap-2 rounded-md border border-border-medium bg-surface-destructive/10 px-2.5 py-1.5 text-xs text-text-destructive"
                     >
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                      <span className="break-words">{groupError}</span>
+                      <div className="flex items-start gap-1.5">
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                        <span className="break-words">{groupError}</span>
+                      </div>
+                      {groupPrecedingUserText ? (
+                        <button
+                          type="button"
+                          disabled={!reachable || sendPromptMutation.isLoading}
+                          onClick={() => sendPromptMutation.mutate({ text: groupPrecedingUserText })}
+                          className="inline-flex shrink-0 items-center gap-1 rounded border border-border-medium bg-surface-primary px-2 py-0.5 text-[11px] font-medium text-text-primary hover:bg-surface-hover disabled:opacity-40"
+                          title="Retry failed prompt"
+                        >
+                          <RotateCcw className="size-3" aria-hidden="true" />
+                          <span>{localize('com_ui_retry')}</span>
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 

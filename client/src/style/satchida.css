@@ -792,22 +792,19 @@ html[data-theme='satchida'] .satchida-chat-surface {
   transition: height 0.25s ease, max-width 0.25s ease;
 }
 
-/* Phone Portrait: compact mandala so content fits comfortably without pushing composer off-screen */
+/* Phone Portrait: compact mandala fallback for base .satchida-mandala-img */
 @media (max-width: 640px) {
   .satchida-mandala-img {
-    height: clamp(72px, 12vh, 110px);
-    max-width: min(60vw, 140px);
+    height: clamp(44px, 7vh, 68px);
+    max-width: min(44vw, 110px);
   }
 }
 
 /* Landscape Mode on Phones/Small Screens: shrink mandala to prevent vertical overflow */
 @media (orientation: landscape) and (max-height: 560px) {
   .satchida-mandala-img {
-    height: clamp(90px, 20vh, 140px);
-    max-width: 180px;
-  }
-  .satchida-mandala-wrapper {
-    margin-bottom: 0.25rem !important;
+    height: clamp(36px, 12vh, 80px);
+    max-width: 140px;
   }
 }
 

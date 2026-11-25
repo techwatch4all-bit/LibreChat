@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { MicOff, Zap, Sparkles } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef } from 'react';
+import { MicOff } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
 import {
   IconButton,
@@ -8,12 +8,10 @@ import {
   ListeningIcon,
   Spinner,
 } from '@librechat/client';
-import { useLocalize, useSpeechToText, useGetAudioSettings, useAuthContext } from '~/hooks';
+import { useLocalize, useSpeechToText, useGetAudioSettings } from '~/hooks';
 import { globalAudioId, type TAskFunction } from '~/common';
 import { useChatFormContext } from '~/Providers';
 import store from '~/store';
-import SatchiUpgradeModal from './SatchiUpgradeModal';
-import LiveVoiceModal from './LiveVoiceModal';
 
 const isExternalSTT = (speechToTextEndpoint: string) => speechToTextEndpoint === 'external';
 export default memo(function AudioRecorder({
@@ -29,28 +27,10 @@ export default memo(function AudioRecorder({
 }) {
   const { setValue, reset, getValues } = methods;
   const localize = useLocalize();
-  const { user } = useAuthContext();
   const { showToast } = useToastContext();
   const { speechToTextEndpoint } = useGetAudioSettings();
   const speechSettingsInitialized = useRecoilValue(store.speechSettingsInitialized);
   const recorderDisabled = disabled || !speechSettingsInitialized;
-  const [showVoiceUpgradeModal, setShowVoiceUpgradeModal] = useState(false);
-  const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
-
-  useEffect(() => {
-    const handleOpenLiveVoice = () => {
-      if (isProVoice) {
-        setShowLiveVoiceModal(true);
-      } else {
-        setShowVoiceUpgradeModal(true);
-      }
-    };
-    window.addEventListener('satchida:open-live-voice', handleOpenLiveVoice);
-    return () => window.removeEventListener('satchida:open-live-voice', handleOpenLiveVoice);
-  }, [isProVoice]);
-
-  const userAccountType = (user?.accountType || '').toLowerCase();
-  const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
 
   const existingTextRef = useRef<string>('');
   const isSubmittingRef = useRef(isSubmitting);
@@ -181,24 +161,7 @@ export default memo(function AudioRecorder({
         </span>
       </div>
 
-      {/* Live Voice trigger moved to top-right Header beside HeaderMenu */}
-
-      {showVoiceUpgradeModal && (
-        <SatchiUpgradeModal
-          open={showVoiceUpgradeModal}
-          onOpenChange={setShowVoiceUpgradeModal}
-          featureName="voice"
-        />
-      )}
-
-      {showLiveVoiceModal && (
-        <LiveVoiceModal
-          open={showLiveVoiceModal}
-          onOpenChange={setShowLiveVoiceModal}
-          ask={ask}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      {/* Live Voice trigger and modal are hosted in Header.tsx so they work on all viewports */}
     </div>
   );
 });

@@ -7,7 +7,7 @@ let handlers;
 
 function getHandlers() {
   if (handlers == null) {
-    handlers = createCloudDriveHttpHandlers();
+    handlers = createCloudDriveHttpHandlers({});
   }
   return handlers;
 }

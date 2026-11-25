@@ -20,18 +20,23 @@ import {
 import { ChatContext, AddedChatContext, ChatFormProvider, useFileMapContext } from '~/Providers';
 import { QueuedTurnPortalProvider } from './Steering/QueuedTurnPortal';
 import ApprovalProvider from './Messages/Content/ApprovalContext';
+import ConversationStartersMobile from './Input/ConversationStartersMobile';
 import ConversationStarters from './Input/ConversationStarters';
 import { pendingApprovalActionFamily } from './approval/state';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import Footer, { useConfiguredFooter } from './Footer';
 import { AskAnswerHostProvider } from './ask/state';
+import DeviceLayoutSync from './DeviceLayoutSync';
 import MessagesView from './Messages/MessagesView';
+import MobileLanding from './MobileLanding';
+import TabletLanding from './TabletLanding';
 import Presentation from './Presentation';
 import TokenOfferBanner from './TokenOfferBanner';
 import ChatForm from './Input/ChatForm';
 import { TraceSurface } from './Trace';
 import Landing from './Landing';
 import Header from './Header';
+import { deviceLayoutAtom } from '~/store/layout';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -52,6 +57,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
   const isSubmitting = useRecoilValue(store.isSubmittingFamily(index));
   const saveDrafts = useRecoilValue(store.saveDrafts);
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
+  const { isPhone, isTablet, isLandscape } = useAtomValue(deviceLayoutAtom);
   const pendingAction = useAtomValue(
     pendingApprovalActionFamily(conversationId ?? Constants.NEW_CONVO),
   );
@@ -134,6 +140,10 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
     content = <LoadingSpinner />;
   } else if (!isLandingPage) {
     content = <MessagesView messagesTree={messagesTree} messages={messages} />;
+  } else if (isPhone) {
+    content = <MobileLanding />;
+  } else if (isTablet) {
+    content = <TabletLanding />;
   } else {
     content = <Landing centerFormOnLanding={centerFormOnLanding} />;
   }
@@ -164,7 +174,8 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
           <AddedChatContext.Provider value={addedChatHelpers}>
             <ApprovalProvider pendingAction={pendingAction}>
               <QueuedTurnPortalProvider>
-                <Presentation isLandingPage={isLandingPage}>
+                <DeviceLayoutSync>
+                  <Presentation isLandingPage={isLandingPage}>
                   <TraceSurface conversationId={conversationId}>
                     <h1 className="sr-only">{pageHeading}</h1>
                     <Header
@@ -184,7 +195,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                                together, so it holds the same band back here. Without
                                it the composer lands 4px right of where a conversation
                                puts it and slides sideways on the way in. */
-                              'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-start overflow-y-auto px-2 pb-4 pt-14 sm:justify-center sm:py-4'
+                              'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 pb-3 pt-12 sm:py-4'
                             : 'h-full overflow-y-auto',
                         )}
                       >
@@ -204,7 +215,12 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                               'mx-auto w-full max-w-3xl transition-all duration-200 sm:max-w-4xl lg:max-w-5xl',
                           )}
                         >
-                          {isLandingPage && <ConversationStarters />}
+                          {isLandingPage &&
+                          (isPhone || isTablet ? (
+                            <ConversationStartersMobile />
+                          ) : (
+                            <ConversationStarters />
+                          ))}
                           {isSubagentThreadReadOnly ? (
                             <div
                               className="mx-auto w-full max-w-3xl px-4 py-3 text-center text-sm text-text-secondary xl:max-w-4xl"
@@ -227,12 +243,13 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                             stay with the conversation that always showed them. */}
                           {!isLandingPage && configuredFooter && <Footer configuredOnly />}
                         </div>
-                        {isLandingPage && <Footer />}
+                        {isLandingPage && !(isPhone && isLandscape) && <Footer />}
                         <TokenOfferBanner />
                       </div>
                     </>
                   </TraceSurface>
                 </Presentation>
+              </DeviceLayoutSync>
               </QueuedTurnPortalProvider>
             </ApprovalProvider>
           </AddedChatContext.Provider>

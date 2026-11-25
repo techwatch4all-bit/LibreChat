@@ -499,7 +499,7 @@ const ConversationStarters = () => {
         </>
       ) : (
         /* Category Tabs (Non-grouped standard modes) */
-        <div className="mb-0.5 flex w-full flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:justify-center sm:overflow-visible sm:pb-0">
+        <div className="mb-0.5 flex w-full flex-wrap items-center justify-center gap-1.5">
           <button
             type="button"
             onClick={() => setSelectedCategory('all')}
@@ -538,10 +538,8 @@ const ConversationStarters = () => {
       ) : (
         <div
           className={cn(
-            'flex w-full flex-wrap items-center justify-center gap-1.5 sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-3',
-            isScrollableGrid
-              ? 'max-h-[160px] overflow-y-auto pr-0.5 sm:max-h-[320px]'
-              : 'max-h-[160px] overflow-y-auto pr-0.5 sm:max-h-none sm:overflow-visible',
+            'grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3',
+            isScrollableGrid && 'max-h-[320px] overflow-y-auto pr-0.5',
           )}
         >
           {displayedStarters.map((item: StarterItem, index: number) => {
@@ -583,7 +581,7 @@ const ConversationStarters = () => {
                 aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
                 onClick={() => handleStarterClick(item, isAgentEndpoint)}
                 style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
-                className="group flex cursor-pointer flex-col items-start justify-between rounded-full border border-border-light/70 bg-surface-secondary/70 px-2.5 py-1.5 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm sm:rounded-xl sm:px-3.5 sm:py-3"
+                className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3.5 py-3 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
               >
                 <div className="flex w-full items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 overflow-hidden sm:gap-2.5">

@@ -52,3 +52,5 @@ export {
 export type { CatalogId } from './useCatalogWarmup';
 export { default as useClockFormat } from './useClockFormat';
 export { default as useWeekStart } from './useWeekStart';
+export { default as useDeviceLayout } from './useDeviceLayout';
+export type { DeviceClass, Orientation, DeviceLayout } from './useDeviceLayout';

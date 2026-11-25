@@ -5,6 +5,7 @@ const { logger, runAsSystem } = require('@librechat/data-schemas');
 const {
   limiterCache,
   createSetBalanceConfig,
+  calculatePasswordSignature,
   createTwoFactorManagementLimiter,
   forceRefreshCloudFrontAuthCookies,
 } = require('@librechat/api');
@@ -227,6 +228,7 @@ router.post('/first-login-claim', claimAuthMiddleware, async (req, res) => {
 
     const salt = bcrypt.genSaltSync(10);
     const newHash = bcrypt.hashSync(newPassword, salt);
+    const newPasswordSig = calculatePasswordSignature(newHash);
     const answerHash = bcrypt.hashSync(challengeAnswer.trim().toLowerCase(), salt);
 
     // Use direct Mongoose update with runValidators: false to avoid schema validators
@@ -237,6 +239,7 @@ router.post('/first-login-claim', claimAuthMiddleware, async (req, res) => {
         {
           $set: {
             password: newHash,
+            passwordSig: newPasswordSig,
             mustChangePassword: false,
             challengeQuestion: challengeQuestion.trim(),
             challengeAnswerHash: answerHash,

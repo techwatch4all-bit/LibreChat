@@ -499,12 +499,12 @@ const ConversationStarters = () => {
         </>
       ) : (
         /* Category Tabs (Non-grouped standard modes) */
-        <div className="mb-0.5 flex flex-wrap items-center justify-center gap-1.5">
+        <div className="mb-0.5 flex w-full flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:justify-center sm:overflow-visible sm:pb-0">
           <button
             type="button"
             onClick={() => setSelectedCategory('all')}
             className={cn(
-              'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
+              'shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-all',
               selectedCategory === 'all'
                 ? 'shadow-xs bg-surface-inverted text-text-inverted'
                 : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
@@ -518,7 +518,7 @@ const ConversationStarters = () => {
               type="button"
               onClick={() => setSelectedCategory(cat.id)}
               className={cn(
-                'cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all',
+                'shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-all',
                 selectedCategory === cat.id
                   ? 'shadow-xs bg-surface-inverted text-text-inverted'
                   : 'border border-border-light bg-surface-secondary/80 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary',
@@ -538,8 +538,10 @@ const ConversationStarters = () => {
       ) : (
         <div
           className={cn(
-            'grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3',
-            isScrollableGrid && 'max-h-[320px] overflow-y-auto pr-0.5',
+            'flex w-full flex-wrap items-center justify-center gap-1.5 sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-3',
+            isScrollableGrid
+              ? 'max-h-[160px] overflow-y-auto pr-0.5 sm:max-h-[320px]'
+              : 'max-h-[160px] overflow-y-auto pr-0.5 sm:max-h-none sm:overflow-visible',
           )}
         >
           {displayedStarters.map((item: StarterItem, index: number) => {
@@ -581,37 +583,37 @@ const ConversationStarters = () => {
                 aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
                 onClick={() => handleStarterClick(item, isAgentEndpoint)}
                 style={{ animationDelay: `${index * 20}ms`, animationFillMode: 'backwards' }}
-                className="group flex cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/70 bg-surface-secondary/70 px-3.5 py-2.5 sm:py-3 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm"
+                className="group flex cursor-pointer flex-col items-start justify-between rounded-full border border-border-light/70 bg-surface-secondary/70 px-2.5 py-1.5 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90 hover:shadow-sm sm:rounded-xl sm:px-3.5 sm:py-3"
               >
                 <div className="flex w-full items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="flex items-center gap-1.5 overflow-hidden sm:gap-2.5">
                     <span
                       className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-lg border transition-transform duration-150 group-hover:scale-105',
+                        'flex size-5 shrink-0 items-center justify-center rounded-full border transition-transform duration-150 group-hover:scale-105 sm:size-6 sm:rounded-lg',
                         visual.bg,
                         visual.color,
                       )}
                       aria-hidden="true"
                     >
-                      <PersonaIcon className="size-3.5" />
+                      <PersonaIcon className="size-3 sm:size-3.5" />
                     </span>
-                    <span className="truncate text-[13px] font-semibold text-text-primary group-hover:text-text-primary">
+                    <span className="truncate text-xs font-semibold text-text-primary group-hover:text-text-primary sm:text-[13px]">
                       {cleanTitle}
                     </span>
                   </div>
                   {item.badge && (
-                    <span className="shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted">
+                    <span className="hidden shrink-0 rounded bg-surface-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary transition-colors group-hover:bg-surface-inverted group-hover:text-text-inverted sm:inline-block">
                       {item.badgeKey
                         ? localize(item.badgeKey, { defaultValue: item.badge })
                         : item.badge}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-secondary group-hover:text-text-primary/90">
+                <p className="mt-1 hidden line-clamp-2 text-xs leading-relaxed text-text-secondary group-hover:text-text-primary/90 sm:block">
                   {description}
                 </p>
                 {item.engineTag && (
-                  <div className="mt-2.5 flex w-full items-center justify-between border-t border-border-light/50 pt-1.5 text-[10px] text-text-tertiary">
+                  <div className="mt-2.5 hidden w-full items-center justify-between border-t border-border-light/50 pt-1.5 text-[10px] text-text-tertiary sm:flex">
                     <span className="flex items-center gap-1 font-mono font-medium tracking-tight text-text-secondary group-hover:text-text-primary">
                       <span className="inline-block size-1.5 rounded-full bg-emerald-500/80"></span>
                       {item.engineTag}

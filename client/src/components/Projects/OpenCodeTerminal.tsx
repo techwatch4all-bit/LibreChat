@@ -221,7 +221,7 @@ export default function OpenCodeTerminal({
           </div>
           {projectPath ? (
             <span className="truncate font-mono text-[11px] text-text-secondary">
-              {projectPath}
+              {`/${projectPath.split(/[\\/]/).filter(Boolean).pop() ?? 'workspace'}`}
             </span>
           ) : null}
         </div>

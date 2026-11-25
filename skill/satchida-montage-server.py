@@ -27,6 +27,7 @@ from __future__ import annotations
 import ctypes
 import datetime
 import os
+import re
 import sys
 import json
 import time
@@ -150,13 +151,24 @@ def _resolve_media_attribution(
     """Resolve full non-empty tenant/customer/user/mode attribution for Bifrost logs & One-API billing."""
     with _ACTIVE_MEDIA_CTX_LOCK:
         ctx = dict(_ACTIVE_MEDIA_CTX)
-    t_id = tenant_id or ctx.get("tenant_id") or os.environ.get("SATCHIDA_TENANT_ID", "satchida-master")
-    t_name = tenant_name or ctx.get("tenant_name") or os.environ.get("SATCHIDA_TENANT_NAME", "Satchida HQ")
-    c_id = os.environ.get("SATCHIDA_CUSTOMER_ID", t_id)
-    c_name = os.environ.get("SATCHIDA_CUSTOMER_NAME", t_name)
-    u_id = user_id or ctx.get("user_id") or os.environ.get("SATCHIDA_USER_ID", "")
-    u_name = user_name or ctx.get("user_name") or os.environ.get("SATCHIDA_USER_NAME", "")
-    a_type = account_type or ctx.get("account_type") or os.environ.get("SATCHIDA_ACCOUNT_TYPE", "")
+    def _clean_env(name: str, default: str = "") -> str:
+        val = (os.environ.get(name, default) or "").strip()
+        if "{{" in val or "}}" in val:
+            return default
+        return val
+
+    t_id = tenant_id or ctx.get("tenant_id") or _clean_env("SATCHIDA_TENANT_ID", "satchida-master")
+    t_name = tenant_name or ctx.get("tenant_name") or _clean_env("SATCHIDA_TENANT_NAME", "Satchida HQ")
+    c_id = _clean_env("SATCHIDA_CUSTOMER_ID", t_id)
+    c_name = _clean_env("SATCHIDA_CUSTOMER_NAME", t_name)
+    u_id = user_id or ctx.get("user_id") or _clean_env("SATCHIDA_USER_ID", "")
+    u_name = (
+        user_name
+        or ctx.get("user_name")
+        or _clean_env("SATCHIDA_USER_NAME", "")
+        or _clean_env("SATCHIDA_USER_USERNAME", "")
+    )
+    a_type = account_type or ctx.get("account_type") or _clean_env("SATCHIDA_ACCOUNT_TYPE", "")
     m_val = mode or ctx.get("mode") or "Motion"
 
     if not u_id or not u_name or not a_type:
@@ -285,8 +297,9 @@ DEEPINFRA_VIDEO_MODELS = [
 # audio, clips up to 20s. Seedance-1.5-Pro: ByteDance V2A (price token-based,
 # unverified per clip) — backup only.
 DEEPINFRA_VIDEO_AV_MODELS = [
-    "Lightricks/LTX-2.3-Fast",
     "ByteDance/Seedance-1.5-Pro",
+    "Lightricks/LTX-2.5-Pro",
+    "Lightricks/LTX-2.3-Fast",
 ]
 
 # Photoreal image models (DeepInfra catalog, verified 2026-11-16):
@@ -312,15 +325,19 @@ _CI_MODEL_PRICES = {
     "seedream-4.5": 0.026,
     # videos, USD per second of output
     "veo-3.1-lite-generate-001": 0.0325,
+    "veo-3.1-fast-generate-001": 0.06,
     "grok-imagine-video": 0.0371,
+    "grok-imagine-video-1.5": 0.042,
     "kling-v2.6-t2v": 0.046,
+    "kling-v3.0-t2v": 0.055,
     "kling-v2.6-i2v": 0.0595,
+    "kling-v3.0-i2v": 0.065,
 }
 
 
 def _supported_durations(model: str) -> list:
     # DeepInfra T2V models generate fixed 5s clips; Veo-style providers accept
-    # 4/6/8; everything else clamps to 5/10.
+    # 4/6/8; Kling and Grok support 5/10.
     if "veo" in model:
         return [4, 6, 8]
     return [5, 10]
@@ -328,7 +345,8 @@ def _supported_durations(model: str) -> list:
 
 def _nearest_duration(model: str, want: float) -> str:
     opts = _supported_durations(model)
-    return str(min(opts, key=lambda d: abs(d - want)))
+    # Break ties upward so 5s on Veo chooses 6s (never 4s) and 10s stays 10s.
+    return str(min(opts, key=lambda d: (abs(d - want), -d)))
 
 
 _SIZE_BY_RATIO = {
@@ -534,14 +552,27 @@ def _ci_video_direct(
     if not key:
         return False
     if image_url:
-        models = ["kling-v2.6-i2v"]
+        models = ["kling-v2.6-i2v", "kling-v3.0-i2v"]
+    elif duration_seconds >= 9:
+        # True single-shot 10-second cinematic clip (never split into two 4s clips).
+        # Kling v2.6 / v3.0 support 10s + native audio + strong action choreography.
+        models = [
+            "kling-v2.6-t2v",
+            "kling-v3.0-t2v",
+            "grok-imagine-video-1.5",
+            "veo-3.1-fast-generate-001",
+            "veo-3.1-lite-generate-001",
+        ]
+    elif native_audio and quality == "hd":
+        models = ["veo-3.1-fast-generate-001", "kling-v2.6-t2v", "veo-3.1-lite-generate-001"]
     elif native_audio:
         models = ["veo-3.1-lite-generate-001", "kling-v2.6-t2v"]
     elif quality == "hd":
-        models = ["kling-v2.6-t2v", "grok-imagine-video"]
+        models = ["kling-v2.6-t2v", "grok-imagine-video-1.5", "grok-imagine-video"]
     else:
         models = ["grok-imagine-video", "kling-v2.6-t2v"]
 
+    use_hd_res = (quality == "hd") or native_audio or (duration_seconds >= 9)
     for m in models:
         seconds = int(_nearest_duration(m, duration_seconds))
         body = {
@@ -549,9 +580,9 @@ def _ci_video_direct(
             "prompt": prompt,
             "duration_seconds": seconds,
             "aspect_ratio": aspect_ratio,
-            # CI requires a priced resolution on some models (grok-imagine-video
-            # rejects without one): 480p on the cheap chain, 720p on hd.
-            "resolution": "720p" if quality == "hd" else "480p",
+            # CI requires a priced resolution on some models: 720p for HD/audio/10s
+            # to preserve photorealism, 480p only on fast budget silent clips.
+            "resolution": "720p" if use_hd_res else "480p",
         }
         if native_audio and not image_url:
             body["audio"] = True
@@ -591,6 +622,8 @@ def _ci_video_direct(
                 error_details=f"HTTP {e.code}: {msg}",
             )
             _media_budget_settle(budget_ref, 0.0, "", m, "CheapInference", f"error: HTTP {e.code}")
+            if e.code == 429 and "monthly budget" in msg.lower():
+                break
             continue
         except Exception as e:
             latency_ms = (time.time() - t0) * 1000.0
@@ -627,17 +660,24 @@ def _ci_video_direct(
             tmp.write_bytes(raw)
             tmp.replace(output_path)
             _LAST_VIDEO_MODEL = f"cheapinference/{m}"
+            actual_cost = (
+                data.get("billed_cost_usd")
+                or data.get("cost_usd")
+                or data.get("cost")
+                or (data.get("usage", {}).get("cost") if isinstance(data.get("usage"), dict) else None)
+            )
+            video_cost = float(actual_cost) if actual_cost is not None else (_CI_MODEL_PRICES.get(m, 0.0) * seconds)
             bf_log_id = log_media_to_bifrost(
                 object_type="video_generation",
                 provider="cheapinference",
                 model=m,
                 status="success",
-                cost=_CI_MODEL_PRICES.get(m, 0.0) * seconds,
+                cost=video_cost,
                 latency_ms=(time.time() - t0) * 1000.0,
             )
             _media_budget_settle(
                 budget_ref,
-                _CI_MODEL_PRICES.get(m, 0.0) * seconds,
+                video_cost,
                 bf_log_id or "",
                 m,
                 "CheapInference",
@@ -1224,32 +1264,319 @@ def _deepinfra_video(
     return False
 
 
+def _extract_last_frame(video_path: Path, frame_out: Path) -> bool:
+    """Extract the final frame of a video clip for seamless last-frame I2V chaining."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-sseof", "-0.1", "-i", str(video_path),
+                "-frames:v", "1", "-q:v", "2", str(frame_out),
+            ],
+            capture_output=True, text=True, timeout=30,
+            stdin=subprocess.DEVNULL, creationflags=flags,
+        )
+        return proc.returncode == 0 and frame_out.exists() and frame_out.stat().st_size > 1024
+    except Exception as e:
+        print(f"[satchida-montage] last-frame extract failed: {e}", file=sys.stderr)
+        return False
+
+
+def _concat_mp4_clips(clip_paths: List[Path], output_path: Path) -> bool:
+    """Seamlessly stitch multiple MP4 clips into one continuous H.264 MP4."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    list_file = output_path.with_suffix(".concat.txt")
+    try:
+        list_file.write_text(
+            "\n".join(f"file '{p.resolve().as_posix()}'" for p in clip_paths),
+            encoding="utf-8",
+        )
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+                "-an", str(output_path),
+            ],
+            capture_output=True, text=True, timeout=120,
+            stdin=subprocess.DEVNULL, creationflags=flags,
+        )
+        return proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024
+    except Exception as e:
+        print(f"[satchida-montage] mp4 concat failed: {e}", file=sys.stderr)
+        return False
+    finally:
+        try:
+            list_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _comfy_add_mmaudio_to_video(
+    video_path: Path,
+    audio_prompt: str,
+    output_path: Path,
+    duration_seconds: float = 10.0,
+) -> bool:
+    """Attach ₹0 local video-synchronized music & SFX via ComfyUI MMAudio (:8188)."""
+    if not (_comfy_up() or _comfy_start()):
+        return False
+    if not (_comfy_has_class("VHS_LoadVideo") and _comfy_has_class("MMAudioSampler") and _comfy_has_class("VHS_VideoCombine")):
+        return False
+    try:
+        # Probe exact video duration & fps
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        probe_out = subprocess.check_output(
+            [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=r_frame_rate,duration", "-of", "json", str(video_path),
+            ],
+            text=True, timeout=15, stdin=subprocess.DEVNULL, creationflags=flags,
+        )
+        st = json.loads(probe_out)["streams"][0]
+        dur = float(st.get("duration") or duration_seconds)
+        fr_raw = str(st.get("r_frame_rate") or "24/1")
+        fps = round(eval(fr_raw), 2) if "/" in fr_raw else float(fr_raw)
+        if fps <= 0 or fps > 60:
+            fps = 24.0
+    except Exception:
+        dur = float(duration_seconds)
+        fps = 24.0
+
+    # Upload silent video to ComfyUI input folder via multipart /upload/image
+    try:
+        boundary = "----SatchidaBoundary" + uuid.uuid4().hex
+        upload_name = f"satchida_in_{uuid.uuid4().hex[:8]}.mp4"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="image"; filename="{upload_name}"\r\n'
+            f"Content-Type: video/mp4\r\n\r\n"
+        ).encode() + video_path.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+        up_req = urllib.request.Request(
+            f"{COMFYUI_URL}/upload/image",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with urllib.request.urlopen(up_req, timeout=60) as r:
+            vid_name = json.loads(r.read().decode())["name"]
+    except Exception as e:
+        print(f"[satchida-montage] local MMAudio upload failed: {e}", file=sys.stderr)
+        return False
+
+    wf = {
+        "1": {
+            "class_type": "VHS_LoadVideo",
+            "inputs": {
+                "video": vid_name, "force_rate": 0, "custom_width": 0, "custom_height": 0,
+                "frame_load_cap": 0, "skip_first_frames": 0, "select_every_nth": 1,
+            },
+        },
+        "2": {
+            "class_type": "MMAudioModelLoader",
+            "inputs": {"mmaudio_model": "mmaudio_large_44k_v2_fp16.safetensors", "base_precision": "fp16"},
+        },
+        "3": {
+            "class_type": "MMAudioFeatureUtilsLoader",
+            "inputs": {
+                "vae_model": "mmaudio_vae_44k_fp16.safetensors",
+                "synchformer_model": "mmaudio_synchformer_fp16.safetensors",
+                "clip_model": "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors",
+                "mode": "44k", "precision": "fp16",
+            },
+        },
+        "4": {
+            "class_type": "MMAudioSampler",
+            "inputs": {
+                "mmaudio_model": ["2", 0], "feature_utils": ["3", 0],
+                "duration": round(dur, 2), "steps": 25, "cfg": 4.5,
+                "seed": random.randint(1, 2**31 - 1),
+                "prompt": audio_prompt[:400],
+                "negative_prompt": "silence, glitch, static, distortion",
+                "mask_away_clip": False, "force_offload": True,
+                "images": ["1", 0],
+            },
+        },
+        "5": {
+            "class_type": "VHS_VideoCombine",
+            "inputs": {
+                "images": ["1", 0], "audio": ["4", 0],
+                "frame_rate": fps, "loop_count": 0,
+                "filename_prefix": "satchida_mmaudio_muxed",
+                "format": "video/h264-mp4", "pingpong": False, "save_output": True,
+            },
+        },
+    }
+    try:
+        resp = _comfy_request("POST", "/prompt", {"prompt": wf}, timeout=20)
+        pid = resp.get("prompt_id")
+        if not pid:
+            return False
+        entry = _comfy_wait(pid, max_seconds=240.0)
+        if not entry:
+            return False
+        # Download the muxed -audio.mp4
+        outputs = entry.get("outputs", {})
+        for node_out in outputs.values():
+            items = node_out.get("gifs") or node_out.get("videos") or []
+            if items:
+                it = items[0]
+                qs = urllib.parse.urlencode({
+                    "filename": it.get("filename", ""),
+                    "subfolder": it.get("subfolder", ""),
+                    "type": it.get("type", "output"),
+                })
+                raw = _comfy_request("GET", f"/view?{qs}", timeout=120, raw=True)
+                if raw and len(raw) > 4096:
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_bytes(raw)
+                    print(f"[satchida-montage] local ₹0 MMAudio muxed OK -> {output_path}", file=sys.stderr)
+                    return True
+    except Exception as e:
+        print(f"[satchida-montage] local MMAudio failed: {e}", file=sys.stderr)
+    return False
+
+
+def _deepinfra_ti2v_shot(prompt: str, image_path: Path, output_path: Path, timeout: int = 300) -> bool:
+    """Single 5s 1280x704 HD Image-to-Video shot via DeepInfra FastWan2.2-TI2V-5B ($0.0125)."""
+    global _LAST_VIDEO_MODEL
+    key = _provider_key("deepinfra")
+    if not key or not image_path.exists():
+        return False
+    m = "FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers"
+    budget_ref = uuid.uuid4().hex
+    budget_est = MODEL_ESTIMATED_COSTS.get(m, 0.0125)
+    if not _media_budget_gate(budget_ref, m, budget_est):
+        return False
+    mime = "image/jpeg" if image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+    b64_uri = f"data:{mime};base64," + base64.b64encode(image_path.read_bytes()).decode()
+    t0 = time.time()
+    try:
+        req = urllib.request.Request(
+            f"{DEEPINFRA_API}/v1/inference/{urllib.parse.quote(m, safe='/')}",
+            data=json.dumps({"prompt": prompt, "image": b64_uri}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode())
+        vurl = data.get("video_url") or ""
+        raw = b""
+        if vurl.startswith("data:") and "," in vurl:
+            raw = base64.b64decode(vurl.split(",", 1)[1])
+        elif vurl.startswith("http"):
+            with urllib.request.urlopen(vurl, timeout=120) as vr:
+                raw = vr.read()
+        if raw and len(raw) > 4096:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(raw)
+            _LAST_VIDEO_MODEL = f"deepinfra/{m}"
+            _media_budget_settle(budget_ref, budget_est, data.get("request_id", ""), m, "DeepInfra", "TI2V ok")
+            log_media_to_bifrost(
+                object_type="video_generation", provider="deepinfra", model=m,
+                status="success", cost=budget_est, latency_ms=(time.time() - t0) * 1000.0,
+            )
+            return True
+    except Exception as e:
+        print(f"[satchida-montage] FastWan TI2V shot failed: {e}", file=sys.stderr)
+        _media_budget_settle(budget_ref, 0.0, "", m, "DeepInfra", f"error: {e}")
+    return False
+
+
+def _deepinfra_fastwan_ti2v_chained(
+    prompt: str,
+    duration_seconds: float,
+    output_path: Path,
+    aspect_ratio: str = "16:9",
+    native_audio: bool = False,
+    image_url: str = "",
+) -> bool:
+    """Ultra-low-cost (~₹2.50 / 10s) character-locked cinema pipeline:
+      1. Photorealistic keyframe (local FLUX-1 ₹0 or cloud FLUX-2 ₹0.75) — locks character face/body.
+      2. Shot 1 (0-5s) via DeepInfra FastWan2.2-TI2V-5B ($0.0125) from keyframe.
+      3. If >= 9s: extract Shot 1's exact last frame -> Shot 2 (5-10s) via FastWan TI2V-5B ($0.0125) -> FFmpeg stitch.
+      4. If native_audio=True: attach ₹0 local ComfyUI MMAudio synchronized music & SFX.
+    """
+    work_dir = output_path.parent
+    stem = output_path.stem
+    kf_path = work_dir / f"{stem}_kf1.png"
+
+    # Step 1: Acquire character-locked photorealistic keyframe
+    have_kf = False
+    if image_url:
+        try:
+            p = Path(image_url)
+            if p.exists():
+                shutil.copy2(p, kf_path)
+                have_kf = True
+            elif image_url.startswith("http"):
+                with urllib.request.urlopen(image_url, timeout=30) as r:
+                    kf_path.write_bytes(r.read())
+                have_kf = kf_path.exists() and kf_path.stat().st_size > 1024
+        except Exception as e:
+            print(f"[satchida-montage] ref image load skipped: {e}", file=sys.stderr)
+
+    if not have_kf:
+        # Try local FLUX-1 Schnell (₹0) first if ComfyUI is idle, else cloud FLUX-2 ($0.008)
+        if _comfy_up() and _comfy_has_class("UnetLoaderGGUF"):
+            wf = _comfy_flux_image_workflow(prompt[:600], (1024, 576), random.randint(1, 2**31 - 1))
+            if wf:
+                try:
+                    pid = _comfy_request("POST", "/prompt", {"prompt": wf}, timeout=15).get("prompt_id")
+                    entry = _comfy_wait(pid, max_seconds=90.0) if pid else None
+                    saved = _comfy_fetch_output(entry, f"{stem}_kf1") if entry else None
+                    if saved and Path(saved).exists():
+                        shutil.copy2(saved, kf_path)
+                        have_kf = True
+                        print(f"[satchida-montage] ₹0 local FLUX-1 keyframe OK -> {kf_path}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[satchida-montage] local FLUX keyframe fallback to cloud: {e}", file=sys.stderr)
+        if not have_kf:
+            have_kf = _generate_image_core(prompt[:600], kf_path, aspect_ratio)
+
+    if not have_kf:
+        return False
+
+    # Step 2: Shot 1 (0-5s) via FastWan2.2-TI2V-5B ($0.0125)
+    shot1 = work_dir / f"{stem}_shot1.mp4"
+    if not _deepinfra_ti2v_shot(prompt, kf_path, shot1):
+        return False
+
+    silent_video = shot1
+    # Step 3: Last-frame chained Shot 2 (5-10s) if >= 9s requested
+    if duration_seconds >= 9.0:
+        kf2 = work_dir / f"{stem}_kf2.png"
+        shot2 = work_dir / f"{stem}_shot2.mp4"
+        stitched = work_dir / f"{stem}_10s_silent.mp4"
+        if _extract_last_frame(shot1, kf2) and _deepinfra_ti2v_shot(prompt, kf2, shot2):
+            if _concat_mp4_clips([shot1, shot2], stitched):
+                silent_video = stitched
+
+    # Step 4: Attach ₹0 local MMAudio synchronized music & SFX if requested
+    if native_audio:
+        if _comfy_add_mmaudio_to_video(silent_video, prompt, output_path, duration_seconds):
+            return True
+
+    shutil.copy2(silent_video, output_path)
+    return output_path.exists() and output_path.stat().st_size > 4096
+
+
 def _generate_video_core(
     prompt: str,
     duration_seconds: float,
     output_path: Path,
     aspect_ratio: str = "16:9",
     native_audio: bool = False,
-    quality: str = "fast",
+    quality: str = "hd",
     image_url: str = "",
 ) -> bool:
-    """Cheapest-first provider chain with enforced daily spend approval gate.
+    """Ultra-cost-effective cinema pipeline (~₹2.50 / 10s with ₹0 local MMAudio):
 
-    - Standard fast clips (no native_audio, no image_url, quality != 'hd'):
-      Tries DeepInfra FastWan ($0.0125/5s — 15x cheaper) BEFORE CheapInference
-      ($0.13-$0.23/clip) to obey the Satchida cheapest-model rule.
-    - native_audio=True selects audio-visual models (CI veo-3.1-lite $0.13/4s first,
-      then DeepInfra LTX $0.15/5s).
-    - quality='hd' tries 720p-class models.
-    - Hard-enforces check_video_approval() — if denied, aborts immediately without calling upstream.
+    1. Primary: Photorealistic keyframe (₹0 local FLUX-1 / ₹0.75 cloud FLUX-2)
+       -> DeepInfra FastWan2.2-TI2V-5B last-frame chained to 10s ($0.025)
+       -> Local ComfyUI MMAudio synchronized music & SFX (₹0).
+    2. Fallback: CheapInference (Kling v2.6/v3.0/Veo) -> DeepInfra Seedance-1.5-Pro.
     """
-    cheapest_fast = (not image_url) and (not native_audio) and (quality != "hd")
-    primary_model = (
-        "kling-v2.6-i2v" if image_url
-        else "veo-3.1-lite-generate-001" if native_audio
-        else "kling-v2.6-t2v" if quality == "hd"
-        else DEEPINFRA_VIDEO_MODELS[0]
-    )
+    primary_model = "FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers"
     if not check_video_approval(primary_model, duration_seconds):
         print(
             f"[satchida-montage] Aborting video generation for {primary_model}: spend approval denied.",
@@ -1257,9 +1584,11 @@ def _generate_video_core(
         )
         return False
 
-    if cheapest_fast:
-        if _deepinfra_video(prompt, output_path, models=[DEEPINFRA_VIDEO_MODELS[0], DEEPINFRA_VIDEO_MODELS[1]]):
-            return True
+    if _deepinfra_fastwan_ti2v_chained(
+        prompt, duration_seconds, output_path, aspect_ratio,
+        native_audio=native_audio, image_url=image_url,
+    ):
+        return True
 
     if _ci_video_direct(
         prompt, duration_seconds, output_path, aspect_ratio,
@@ -2127,10 +2456,16 @@ def _publish_artifact(
     thumbnail next to the media so the library and chat embeds can show one.
     """
     try:
-        owner_dir = (user or os.environ.get("SATCHIDA_DEFAULT_USER", "admin-com")).strip()
-        owner_dir = re.sub(r"[^a-zA-Z0-9._-]", "_", owner_dir) or "admin-com"
+        raw_user = (user or "").strip()
+        if raw_user.lower() in ("", "user", "default", "anonymous", "guest", "none", "null"):
+            raw_user = os.environ.get("SATCHIDA_DEFAULT_USER", "admin-com").strip()
+        owner_dir = re.sub(r"[^a-zA-Z0-9._-]", "_", raw_user) or "admin-com"
         stable_dir = _LIBRECHAT_ROOT / "storage" / "users" / owner_dir / "generated"
         stable_dir.mkdir(parents=True, exist_ok=True)
+        # Always mirror to the shared Express fallback directory so /generated/<name>
+        # NEVER falls through to index.html regardless of which user param the LLM passes.
+        shared_dir = _LIBRECHAT_ROOT / "storage" / "exports" / "generated"
+        shared_dir.mkdir(parents=True, exist_ok=True)
         is_video = path.name.lower().endswith((".mp4", ".webm", ".mkv", ".mov"))
         is_audio = path.name.lower().endswith((".mp3", ".wav", ".aac", ".m4a", ".ogg"))
         if explicit_kind:
@@ -2147,6 +2482,10 @@ def _publish_artifact(
             name = f"{Path(name).stem}_{uuid.uuid4().hex[:8]}{Path(name).suffix}"
             dest = stable_dir / name
         shutil.copyfile(path, dest)
+        try:
+            shutil.copyfile(path, shared_dir / name)
+        except Exception:
+            pass
 
         # Poster thumbnail for videos (images are their own thumbnail).
         web_url = f"/generated/{name}"
@@ -2247,6 +2586,10 @@ def _render_video_job(job_id: str, spec: dict) -> None:
                 audio_note = " (silent requested; model-embedded audio kept)"
 
         web_url = _publish_artifact(out, user=spec.get("user", ""))
+        if not web_url:
+            raise RuntimeError(
+                f"video rendered to {out.name} but failed to publish a playable Web URL (check stderr logs)"
+            )
         with _MEDIA_JOB_LOCK:
             MEDIA_JOBS[job_id].update({
                 "status": "done",
@@ -2267,12 +2610,12 @@ def _render_video_job(job_id: str, spec: dict) -> None:
 @mcp.tool()
 def video_generate(
     prompt: str,
-    duration_seconds: float = 5.0,
+    duration_seconds: float = 10.0,
     aspect_ratio: str = "16:9",
     filename: str = "",
     narration: str = "",
     native_audio: bool = False,
-    quality: str = "fast",
+    quality: str = "hd",
     image_url: str = "",
     audio_mode: str = "",
     user: str = "",
@@ -2366,14 +2709,22 @@ def video_generate(
 def video_job_status(job_id: str) -> str:
     """
     Poll an async video render job started with video_generate.
-    Returns status ('queued' | 'rendering' | 'done' | 'failed'), progress
-    notes, and — when done — the Web URL to embed plus the Download link.
+    Long-polls server-side for up to 25 seconds so the LLM does not rapid-fire
+    status checks and hit provider RPM rate limits. Returns status
+    ('queued' | 'rendering' | 'done' | 'failed'), progress notes, and — when
+    done — the Web URL to embed plus the Download link.
     """
-    with _MEDIA_JOB_LOCK:
-        job = MEDIA_JOBS.get(job_id)
-    if not job:
-        return f"Error: job `{job_id}` not found. Check the job id from video_generate."
-    status = job["status"]
+    deadline = time.monotonic() + 90.0
+    while True:
+        with _MEDIA_JOB_LOCK:
+            job = dict(MEDIA_JOBS[job_id]) if job_id in MEDIA_JOBS else None
+        if not job:
+            return f"Error: job `{job_id}` not found. Check the job id from video_generate."
+        status = job["status"]
+        if status in ("done", "failed") or time.monotonic() >= deadline:
+            break
+        time.sleep(2.0)
+
     if status == "done":
         return (
             f"### ✅ Job {job_id} — render complete\n\n"
@@ -2390,9 +2741,9 @@ def video_job_status(job_id: str) -> str:
     if status == "queued":
         return (
             f"Job {job_id}: queued (awaiting spend approval — if the approval "
-            f"popup is open, the user must click it). Poll again in ~20 s."
+            f"popup is open, the user must click it). Call video_job_status once more to continue waiting."
         )
-    return f"Job {job_id}: rendering… poll again in ~20 s."
+    return f"Job {job_id}: still rendering (waited 25s). Call video_job_status once more to continue waiting."
 
 
 @mcp.tool()
@@ -2810,11 +3161,12 @@ def media_compose(
 # job we REFUSE and ask the user to unload the chat model via the Tauri UI.
 COMFYUI_URL: str = os.environ.get("SATCHIDA_COMFYUI_URL", "http://127.0.0.1:8188")
 COMFYUI_PY = os.environ.get(
-    "SATCHIDA_COMFYUI_PY", r"C:\Users\WinDiesel\Documents\ComfyUI\.venv\Scripts\python.exe"
+    "SATCHIDA_COMFYUI_PY",
+    os.path.expandvars(r"%USERPROFILE%\Documents\ComfyUI\.venv\Scripts\python.exe"),
 )
 COMFYUI_MAIN = os.environ.get(
     "SATCHIDA_COMFYUI_MAIN",
-    r"C:\Users\WinDiesel\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\ComfyUI\resources\ComfyUI\main.py"),
 )
 COMFYUI_MODELS_CFG = os.environ.get(
     "SATCHIDA_COMFYUI_MODELS_CFG",
@@ -3055,21 +3407,21 @@ def _comfy_wan_workflow(
               "class_type": "CLIPLoaderGGUF"},
         "3": {"inputs": {"vae_name": "wan_2.1_vae.safetensors"}, "class_type": "VAELoader"},
         "4": {"inputs": {"model": ["1", 0], "shift": 8.0}, "class_type": "ModelSamplingSD3"},
-        "5": {"inputs": {"vae": ["3", 0], "width": 512, "height": 512,
-                         "length": 49, "batch_size": 1},
-              "class_type": "Wan22ImageToVideoLatent"},
+        "5": {"inputs": {"width": 832, "height": 480,
+                         "length": 81, "batch_size": 1},
+              "class_type": "EmptyHunyuanLatentVideo"},
         "6": {"inputs": {"text": prompt, "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
-        "7": {"inputs": {"text": negative or "blur, distortion, oversaturated, low quality",
+        "7": {"inputs": {"text": negative or "blur, distortion, cartoon, anime, oversaturated, low quality",
                          "clip": ["2", 0]}, "class_type": "CLIPTextEncode"},
-        "8": {"inputs": {"seed": seed, "steps": 15, "cfg": 6.0,
+        "8": {"inputs": {"seed": seed, "steps": 18, "cfg": 6.0,
                          "sampler_name": "uni_pc", "scheduler": "simple",
                          "denoise": 1.0, "model": ["4", 0], "positive": ["6", 0],
                          "negative": ["7", 0], "latent_image": ["5", 0]},
               "class_type": "KSampler"},
         "9": {"inputs": {"samples": ["8", 0], "vae": ["3", 0]}, "class_type": "VAEDecode"},
-        "10": {"inputs": {"images": ["9", 0], "frame_rate": 24, "loop_count": 0,
+        "10": {"inputs": {"images": ["9", 0], "frame_rate": 16, "loop_count": 0,
                           "filename_prefix": "satchida_local_animated",
-                          "format": "image/webp", "pingpong": False,
+                          "format": "video/h264-mp4", "pingpong": False,
                           "save_output": True},
                "class_type": "VHS_VideoCombine"},
     }
@@ -3088,12 +3440,12 @@ def _comfy_wan_workflow(
             "class_type": "MMAudioFeatureUtilsLoader"}
         wf["13"] = {
             "inputs": {"mmaudio_model": ["11", 0], "feature_utils": ["12", 0],
-                       "duration": 2.04, "steps": 25, "cfg": 4.5, "seed": seed,
+                       "duration": 5.06, "steps": 25, "cfg": 4.5, "seed": seed,
                        "prompt": audio_prompt or prompt,
-                       "negative_prompt": "noise, talking, distorted, music",
+                       "negative_prompt": "silence, glitch, static, distortion",
                        "mask_away_clip": False, "force_offload": True,
                        "images": ["9", 0]},
-            "class_type": "MMAudioSampler"},
+            "class_type": "MMAudioSampler"}
     return wf
 
 
@@ -3968,6 +4320,285 @@ def audio_fetch_and_mix(
         narration=narration,
         music_file=music_file,
         user=user,
+    )
+
+
+# ── 4-Stage Character-Locked Movie Director Pipeline ──────────────────────────
+# Stage 1: studio_lock_character   (₹0 local FLUX-1 / ₹0.75 cloud FLUX-2)
+# Stage 2: studio_generate_keyframe (₹0 local FLUX-1 / ₹0.75 cloud FLUX-2)
+# Stage 3 & 4: studio_animate_and_stitch (I2V per approved shot + 5s-safe MMAudio + FFmpeg stitch)
+
+CHARACTERS_DIR = _LIBRECHAT_ROOT / "storage" / "exports" / "characters"
+CHARACTERS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _generate_photoreal_still(prompt: str, out_path: Path, aspect_ratio: str = "16:9") -> bool:
+    """Generate a photorealistic still: tries ₹0 local FLUX-1 Schnell first, falls back to cloud FLUX-2."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    size = (1024, 576) if aspect_ratio == "16:9" else (768, 768) if aspect_ratio == "1:1" else (576, 1024)
+    if _comfy_up() and _comfy_has_class("UnetLoaderGGUF"):
+        wf = _comfy_flux_image_workflow(prompt[:650], size, random.randint(1, 2**31 - 1))
+        if wf:
+            try:
+                pid = _comfy_request("POST", "/prompt", {"prompt": wf}, timeout=15).get("prompt_id")
+                entry = _comfy_wait(pid, max_seconds=90.0) if pid else None
+                saved = _comfy_fetch_output(entry, out_path.stem) if entry else None
+                if saved and Path(saved).exists():
+                    shutil.copy2(saved, out_path)
+                    return True
+            except Exception as e:
+                print(f"[satchida-montage] local FLUX still fallback to cloud: {e}", file=sys.stderr)
+    return _generate_image_core(prompt[:650], out_path, aspect_ratio)
+
+
+def _concat_mp4_with_audio(clip_paths: List[Path], output_path: Path) -> bool:
+    """Stitch multiple MP4 clips (preserving audio streams when present) into one continuous MP4."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    list_file = output_path.with_suffix(".stitch.txt")
+    try:
+        list_file.write_text(
+            "\n".join(f"file '{p.resolve().as_posix()}'" for p in clip_paths),
+            encoding="utf-8",
+        )
+        # Re-encode cleanly so timestamps, audio sample rates, and keyframes align seamlessly.
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+                str(output_path),
+            ],
+            capture_output=True, text=True, timeout=180,
+            stdin=subprocess.DEVNULL, creationflags=flags,
+        )
+        if proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 4096:
+            return True
+        return _concat_mp4_clips(clip_paths, output_path)
+    except Exception as e:
+        print(f"[satchida-montage] stitch with audio failed: {e}", file=sys.stderr)
+        return _concat_mp4_clips(clip_paths, output_path)
+    finally:
+        try:
+            list_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _deepinfra_seedance_i2v(prompt: str, image_path: Path, output_path: Path, duration: int = 5) -> bool:
+    """Cinema-grade Image-to-Video via DeepInfra ByteDance/Seedance-1.5-Pro (~$0.25-$0.35 with native audio)."""
+    global _LAST_VIDEO_MODEL
+    key = _provider_key("deepinfra")
+    if not key or not image_path.exists():
+        return False
+    m = "ByteDance/Seedance-1.5-Pro"
+    budget_ref = uuid.uuid4().hex
+    budget_est = 0.25 if duration <= 5 else 0.35
+    if not _media_budget_gate(budget_ref, m, budget_est):
+        return False
+    mime = "image/jpeg" if image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+    b64_uri = f"data:{mime};base64," + base64.b64encode(image_path.read_bytes()).decode()
+    t0 = time.time()
+    try:
+        req = urllib.request.Request(
+            f"{DEEPINFRA_API}/v1/inference/{urllib.parse.quote(m, safe='/')}",
+            data=json.dumps({
+                "prompt": prompt,
+                "image": b64_uri,
+                "duration": int(duration),
+                "aspect_ratio": "16:9",
+            }).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=360) as r:
+            data = json.loads(r.read().decode())
+        vurl = data.get("video_url") or ""
+        raw = b""
+        if vurl.startswith("data:") and "," in vurl:
+            raw = base64.b64decode(vurl.split(",", 1)[1])
+        elif vurl.startswith("http"):
+            with urllib.request.urlopen(vurl, timeout=120) as vr:
+                raw = vr.read()
+        if raw and len(raw) > 4096:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(raw)
+            _LAST_VIDEO_MODEL = f"deepinfra/{m}"
+            _media_budget_settle(budget_ref, budget_est, data.get("request_id", ""), m, "DeepInfra", "Seedance I2V ok")
+            log_media_to_bifrost(
+                object_type="video_generation", provider="deepinfra", model=m,
+                status="success", cost=budget_est, latency_ms=(time.time() - t0) * 1000.0,
+            )
+            return True
+    except Exception as e:
+        print(f"[satchida-montage] Seedance I2V failed: {e}", file=sys.stderr)
+        _media_budget_settle(budget_ref, 0.0, "", m, "DeepInfra", f"error: {e}")
+    return False
+
+
+@mcp.tool()
+def studio_lock_character(
+    project_name: str,
+    character_name: str,
+    description: str,
+    aspect_ratio: str = "1:1",
+    user: str = "",
+) -> str:
+    """Stage 1 (Character Lock): Generate and save a photorealistic master character reference portrait
+    so the exact same face, age, and costume are preserved across every scene and chat (₹0 local / ₹0.75 cloud)."""
+    proj_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", (project_name or "default").strip()) or "default"
+    char_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", (character_name or "hero").strip()) or "hero"
+    proj_dir = CHARACTERS_DIR / proj_slug
+    proj_dir.mkdir(parents=True, exist_ok=True)
+    out_path = proj_dir / f"{char_slug}.png"
+    full_prompt = (
+        f"Live-action 70mm film character reference portrait, shot on ARRI Alexa 65, "
+        f"ultra-photorealistic skin texture, sharp focus, NOT cartoon, NOT anime, NOT 3D illustration: "
+        f"{description}"
+    )
+    if not _generate_photoreal_still(full_prompt, out_path, aspect_ratio):
+        return f"Error: failed to generate character reference for '{character_name}'."
+    web_url = _publish_artifact(out_path, user=user, tags=["character", proj_slug, char_slug])
+    return (
+        f"### 🎭 Character Locked: {character_name} (`{proj_slug}`)\n\n"
+        f"![{character_name}]({web_url})\n\n"
+        f"- **Reference Path:** `{out_path}`\n"
+        f"- **Web URL:** {web_url}\n"
+        f"Reuse this locked reference across all scenes in `{proj_slug}`."
+    )
+
+
+@mcp.tool()
+def studio_list_characters(project_name: str = "") -> str:
+    """List saved Character Bible reference portraits for a project (or all projects)."""
+    proj_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", project_name.strip()) if project_name.strip() else ""
+    root = (CHARACTERS_DIR / proj_slug) if proj_slug else CHARACTERS_DIR
+    if not root.exists():
+        return "No locked characters found yet. Use `studio_lock_character` to create one."
+    files = sorted(root.rglob("*.png"))
+    if not files:
+        return "No locked characters found yet. Use `studio_lock_character` to create one."
+    lines = ["### 🎭 Locked Character Bible"]
+    for f in files[:40]:
+        rel = f.relative_to(CHARACTERS_DIR).as_posix()
+        lines.append(f"- `{rel}` → `{f}`")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def studio_generate_keyframe(
+    project_name: str,
+    scene_name: str,
+    prompt: str,
+    aspect_ratio: str = "16:9",
+    user: str = "",
+) -> str:
+    """Stage 2 (Storyboard Keyframe): Generate a photorealistic 16:9 Start Keyframe for one story beat
+    (₹0 local / ₹0.75 cloud) so the user can visually verify story accuracy before animating."""
+    proj_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", (project_name or "default").strip()) or "default"
+    scene_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", (scene_name or "shot1").strip()) or "shot1"
+    out_path = VIDEOS_DIR / f"{proj_slug}_{scene_slug}_{uuid.uuid4().hex[:6]}_kf.png"
+    full_prompt = (
+        f"Live-action IMAX 70mm cinema film still, shot on ARRI Alexa 65, dramatic volumetric lighting, "
+        f"ultra-photorealistic textures, NOT cartoon, NOT anime, NOT 3D CGI illustration: {prompt}"
+    )
+    if not _generate_photoreal_still(full_prompt, out_path, aspect_ratio):
+        return f"Error: failed to generate keyframe for '{scene_name}'."
+    web_url = _publish_artifact(out_path, user=user, tags=["keyframe", proj_slug, scene_slug])
+    return (
+        f"### 🖼 Keyframe Ready: {scene_name}\n\n"
+        f"![{scene_name}]({web_url})\n\n"
+        f"- **Keyframe Path:** `{out_path}`\n"
+        f"- **Web URL:** {web_url}\n"
+        f"Approve this keyframe to animate it with `studio_animate_and_stitch`."
+    )
+
+
+@mcp.tool()
+def studio_animate_and_stitch(
+    project_name: str,
+    shots_json: str,
+    audio_prompt: str = "",
+    narration: str = "",
+    quality: str = "hd",
+    user: str = "",
+) -> str:
+    """Stage 3 & 4 (Animate Approved Keyframes + Audio + Stitch):
+    Animates each approved keyframe via Image-to-Video (Seedance-1.5-Pro for quality='hd',
+    FastWan2.2-TI2V-5B for quality='fast'), applies 5s-safe local ₹0 MMAudio if silent,
+    stitches all shots into one continuous MP4, and publishes the playable URL.
+
+    shots_json: JSON array of objects:
+      [{"keyframe_path": "D:\\...\\kf1.png", "motion_prompt": "dynamic action...", "duration": 5}]
+    """
+    try:
+        shots = json.loads(shots_json)
+        if not isinstance(shots, list) or not shots:
+            return "Error: shots_json must be a non-empty JSON array of shot objects."
+    except Exception as e:
+        return f"Error: invalid shots_json: {e}"
+
+    proj_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", (project_name or "movie").strip()) or "movie"
+    run_id = uuid.uuid4().hex[:8]
+    rendered_clips: List[Path] = []
+    prev_clip: Optional[Path] = None
+
+    for idx, shot in enumerate(shots, 1):
+        kf_raw = str(shot.get("keyframe_path") or "").strip()
+        motion_prompt = str(shot.get("motion_prompt") or "").strip()
+        dur = int(shot.get("duration") or 5)
+        kf_path = Path(kf_raw) if kf_raw else None
+
+        # If no keyframe_path provided for shot > 1, chain from previous shot's exact last frame!
+        if (not kf_path or not kf_path.exists()) and prev_clip is not None:
+            kf_path = VIDEOS_DIR / f"{proj_slug}_{run_id}_chain_{idx}.png"
+            _extract_last_frame(prev_clip, kf_path)
+
+        if not kf_path or not kf_path.exists():
+            return f"Error: shot {idx} keyframe_path not found: '{kf_raw}'."
+
+        raw_shot = VIDEOS_DIR / f"{proj_slug}_{run_id}_s{idx}.mp4"
+        ok = False
+        if quality == "hd":
+            ok = _deepinfra_seedance_i2v(motion_prompt, kf_path, raw_shot, duration=dur)
+        if not ok:
+            ok = _deepinfra_ti2v_shot(motion_prompt, kf_path, raw_shot)
+        if not ok:
+            return f"Error: Image-to-Video animation failed on shot {idx}."
+
+        final_shot = raw_shot
+        # If clip has no audio and audio_prompt was given, run 5s-safe local ₹0 MMAudio per shot!
+        if audio_prompt.strip() and not _has_audio_stream(raw_shot):
+            aud_shot = VIDEOS_DIR / f"{proj_slug}_{run_id}_s{idx}_aud.mp4"
+            if _comfy_add_mmaudio_to_video(raw_shot, audio_prompt.strip(), aud_shot, float(dur)):
+                final_shot = aud_shot
+
+        rendered_clips.append(final_shot)
+        prev_clip = raw_shot
+
+    out_path = VIDEOS_DIR / f"{proj_slug}_{run_id}_final.mp4"
+    if len(rendered_clips) == 1:
+        shutil.copy2(rendered_clips[0], out_path)
+    else:
+        if not _concat_mp4_with_audio(rendered_clips, out_path):
+            return "Error: failed to stitch rendered shots into final MP4."
+
+    if narration.strip():
+        vo_path = out_path.with_suffix(".vo.mp3")
+        if _tts_edge(narration.strip(), vo_path):
+            muxed = out_path.with_name(out_path.stem + "_vo.mp4")
+            if _mux_audio(out_path, vo_path, muxed):
+                out_path = muxed
+
+    thumb = _make_video_thumbnail(out_path)
+    web_url = _publish_artifact(out_path, thumb, user=user, tags=["movie", proj_slug])
+    if not web_url:
+        return "Error: movie rendered but failed to publish Web URL."
+    size_mb = round(out_path.stat().st_size / (1024 * 1024), 2)
+    return (
+        f"### 🎬 Movie Complete ({len(rendered_clips)} shots stitched · {size_mb} MB)\n\n"
+        f"**Web URL (embed this so the video plays in chat):** {web_url}\n\n"
+        f"Deliver now: film-artifact `<video src=\"{web_url}\" controls autoplay loop style=\"width:100%\"></video>` "
+        f"inside your :::artifact{{type=\"application/vnd.satchida.film\"}} block, plus `[Download]({web_url})`."
     )
 
 

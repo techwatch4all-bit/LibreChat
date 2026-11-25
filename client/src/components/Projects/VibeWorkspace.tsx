@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Button, Spinner } from '@librechat/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MutationKeys, QueryKeys, dataService } from 'librechat-data-provider';
@@ -17,12 +17,12 @@ import {
   FileDiff,
   FilePlus,
   Folder,
+  FolderUp,
   GitBranch,
   Globe,
+  KeyRound,
   Map as MapIcon,
   MessageSquareCode,
-  PanelBottomClose,
-  PanelBottomOpen,
   PanelLeft,
   Pencil,
   Replace,
@@ -34,12 +34,15 @@ import {
   Sparkles,
   Terminal as TerminalIcon,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import type { OpenCodeDirTreeEntry, OpenCodeSearchMatch } from 'librechat-data-provider';
 import {
   activeOpenCodeSessionIdAtom,
+  cloudDriveSessionsAtom,
   openCodeDiffsAtom,
+  openCodeLocalPrivacyAtom,
   openCodePendingAutoPromptAtom,
 } from './opencode/atoms';
 import OpenCodeChangesPanel from './opencode/OpenCodeChangesPanel';
@@ -47,6 +50,8 @@ import OpenCodePreviewPanel from './opencode/OpenCodePreviewPanel';
 import { useOpenCodeEvents } from './opencode/useOpenCodeEvents';
 import OpenCodeChatPanel from './opencode/OpenCodeChatPanel';
 import OpenCodeDiffPanel from './opencode/OpenCodeDiffPanel';
+import CloudDriveModal from './opencode/CloudDriveModal';
+import EnvSecretsModal from './opencode/EnvSecretsModal';
 import { useAuthContext, useLocalize } from '~/hooks';
 import OpenCodeTerminal from './OpenCodeTerminal';
 
@@ -92,22 +97,6 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const { token, user } = useAuthContext();
   const isPrivacyAccount =
     ((user as { accountType?: string } | undefined)?.accountType ?? '').toLowerCase() === 'privacy';
-  const hasGoogleCloud = Boolean(
-    (user as { googleId?: string; provider?: string } | undefined)?.googleId ||
-      (user as { provider?: string } | undefined)?.provider === 'google',
-  );
-  const hasOneDrive = Boolean(
-    (user as { openidId?: string; provider?: string } | undefined)?.provider === 'openid',
-  );
-  let cloudDriveLabel = 'Cloud Drive';
-  let cloudDriveTitle = 'Connect Google or Microsoft account for Cloud Drive sync';
-  if (hasGoogleCloud) {
-    cloudDriveLabel = 'Google Drive';
-    cloudDriveTitle = 'Google Drive / Docs connected via Google OAuth';
-  } else if (hasOneDrive) {
-    cloudDriveLabel = 'OneDrive';
-    cloudDriveTitle = 'OneDrive connected via Microsoft OAuth';
-  }
   const queryClient = useQueryClient();
 
   const activeSessionId = useAtomValue(activeOpenCodeSessionIdAtom);
@@ -143,11 +132,121 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const autoProvisionedRef = useRef<string | null>(null);
   const [workbenchTab, setWorkbenchTab] = useState<WorkbenchTab>('editor');
   const [uiMode, setUiMode] = useState<'normal' | 'developer'>('normal');
+  const [showEditor, setShowEditor] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('satchida_vibe_show_editor');
+      if (saved !== null) return saved === 'true';
+    }
+    return true;
+  });
+  const [localPrivacyActive, setLocalPrivacyActive] = useAtom(openCodeLocalPrivacyAtom);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('satchida_vibe_local_privacy');
+      if (saved !== null) {
+        setLocalPrivacyActive(saved === 'true');
+      }
+    }
+  }, [setLocalPrivacyActive]);
   const [showFiles, setShowFiles] = useState(true);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const [showMinimap, setShowMinimap] = useState(true);
   const [showProblems, setShowProblems] = useState(false);
+  const [filesSidebarWidth, setFilesSidebarWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('opencode_files_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 160 && parsed <= 600) return parsed;
+      }
+    }
+    return 240;
+  });
+  const [chatPanelWidth, setChatPanelWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('opencode_chat_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 280 && parsed <= 1000) return parsed;
+      }
+    }
+    return 380;
+  });
+
+  const isDraggingFilesRef = useRef(false);
+  const isDraggingChatRef = useRef(false);
+  const filesAsideRef = useRef<HTMLElement | null>(null);
+
+  const startFilesResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingFilesRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const startX = e.clientX;
+    const startWidth = filesAsideRef.current
+      ? filesAsideRef.current.getBoundingClientRect().width
+      : filesSidebarWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingFilesRef.current) return;
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 160), 600);
+      setFilesSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isDraggingFilesRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      setFilesSidebarWidth((w) => {
+        try {
+          localStorage.setItem('opencode_files_sidebar_width', String(w));
+        } catch {
+          // ignore
+        }
+        return w;
+      });
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const startChatResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingChatRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingChatRef.current) return;
+      const newWidth = Math.min(Math.max(window.innerWidth - moveEvent.clientX, 280), 900);
+      setChatPanelWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isDraggingChatRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      setChatPanelWidth((w) => {
+        try {
+          localStorage.setItem('opencode_chat_panel_width', String(w));
+        } catch {
+          // ignore
+        }
+        return w;
+      });
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
   const [diagnostics, setDiagnostics] = useState<
     Array<{ message: string; startLineNumber: number; severity: number }>
   >([]);
@@ -175,6 +274,70 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
   const isEnabled = statusQuery.data?.enabled === true;
   const isReachable = statusQuery.data?.reachable === true;
   const isPlatformAdmin = statusQuery.data?.isPlatformAdmin === true;
+  const localLlama = statusQuery.data?.localLlama;
+  const canUseLocalPrivacy = isPrivacyAccount || isPlatformAdmin;
+  const shortLocalModelName = localLlama?.loadedModel
+    ? localLlama.loadedModel.replace(/\.gguf$/i, '').slice(0, 26)
+    : null;
+
+  const workspaceFileUploadRef = useRef<HTMLInputElement | null>(null);
+  const workspaceFolderUploadRef = useRef<HTMLInputElement | null>(null);
+  const [isDraggingWorkspaceFiles, setIsDraggingWorkspaceFiles] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [showCloudDriveModal, setShowCloudDriveModal] = useState(false);
+  const [showEnvSecretsModal, setShowEnvSecretsModal] = useState(false);
+
+  const cloudDriveSessions = useAtomValue(cloudDriveSessionsAtom);
+  const googleDriveConnected = Boolean(
+    cloudDriveSessions.google_drive && cloudDriveSessions.google_drive.expiresAt > Date.now(),
+  );
+  const oneDriveConnected = Boolean(
+    cloudDriveSessions.onedrive && cloudDriveSessions.onedrive.expiresAt > Date.now(),
+  );
+  const connectedDrivesCount = (googleDriveConnected ? 1 : 0) + (oneDriveConnected ? 1 : 0);
+  const liveCloudDriveLabel =
+    connectedDrivesCount === 2
+      ? 'Google Drive + OneDrive'
+      : googleDriveConnected
+        ? 'Google Drive'
+        : oneDriveConnected
+          ? 'OneDrive'
+          : 'Cloud Drive';
+
+  const handleWorkspaceUpload = async (fileList: FileList | File[]) => {
+    const items = Array.from(fileList);
+    if (items.length === 0 || !projectId) {
+      return;
+    }
+    setIsUploadingFiles(true);
+    try {
+      const payloadFiles: Array<{ path: string; contentBase64: string }> = [];
+      for (const file of items.slice(0, 50)) {
+        if (file.size > 5 * 1024 * 1024) {
+          continue;
+        }
+        const relPath =
+          (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+        const arrayBuf = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuf);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i += 1) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        payloadFiles.push({
+          path: relPath,
+          contentBase64: btoa(binary),
+        });
+      }
+      if (payloadFiles.length > 0) {
+        await dataService.uploadOpenCodeFiles(projectId, { files: payloadFiles });
+        queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
+        queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
+      }
+    } finally {
+      setIsUploadingFiles(false);
+    }
+  };
 
   useOpenCodeEvents({
     projectId,
@@ -716,33 +879,65 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
             </button>
           </div>
 
-          <span
-            className={`hidden items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium md:inline-flex ${
-              isPrivacyAccount
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500'
-                : 'border-border-light bg-surface-primary text-text-secondary'
-            }`}
-            title={
-              isPrivacyAccount
-                ? 'Privacy tier: strictly routed to local llama.cpp fleet (127.0.0.1:8080)'
-                : 'Routed via Satchida AutoRouter Gateway (127.0.0.1:4000)'
-            }
-          >
-            <ShieldCheck className="size-3" aria-hidden="true" />
-            {isPrivacyAccount ? 'Local Privacy · :8080' : 'Gateway · :4000'}
-          </span>
+          {canUseLocalPrivacy ? (
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !localPrivacyActive;
+                setLocalPrivacyActive(nextVal);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('satchida_vibe_local_privacy', String(nextVal));
+                }
+              }}
+              className={`hidden cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all md:inline-flex ${
+                localPrivacyActive
+                  ? localLlama?.loadedModel
+                    ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                    : 'border-amber-500 bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20'
+                  : 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
+              }`}
+              title={
+                localPrivacyActive
+                  ? localLlama?.loadedModel
+                    ? `Local Privacy ON · Active on-device model: ${localLlama.loadedModel}`
+                    : 'Local Privacy ON · No local model currently loaded on this host. Load a model or switch back to Cloud ZDR.'
+                  : localLlama?.loadedModel
+                    ? `Cloud ZDR active (Zero Data Retention). Click to switch to Local Privacy (${localLlama.loadedModel}).`
+                    : 'Cloud ZDR active (Zero Data Retention). Click to toggle Local Privacy.'
+              }
+            >
+              <ShieldCheck className="size-3.5" aria-hidden="true" />
+              <span className="max-w-[180px] truncate">
+                {localPrivacyActive
+                  ? shortLocalModelName
+                    ? `Local Privacy · ${shortLocalModelName}`
+                    : 'Local Privacy (No model)'
+                  : 'Cloud ZDR'}
+              </span>
+            </button>
+          ) : (
+            <span
+              className="hidden items-center gap-1 rounded-full border border-border-light bg-surface-primary px-2.5 py-0.5 text-[11px] font-medium text-text-secondary md:inline-flex"
+              title="Routed via Satchida Gateway"
+            >
+              <ShieldCheck className="size-3" aria-hidden="true" />
+              Gateway
+            </span>
+          )}
 
-          <span
-            className={`hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium xl:inline-flex ${
-              hasGoogleCloud || hasOneDrive
-                ? 'border-border-medium bg-surface-primary text-text-primary'
-                : 'border-border-light bg-surface-primary/60 text-text-secondary'
+          <button
+            type="button"
+            onClick={() => setShowCloudDriveModal(true)}
+            className={`hidden cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors md:inline-flex ${
+              connectedDrivesCount > 0
+                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
+                : 'border-border-light bg-surface-primary text-text-secondary hover:bg-surface-hover hover:text-text-primary'
             }`}
-            title={cloudDriveTitle}
+            title="Connect Google Drive, OneDrive, or iCloud/Device files to import or save workspace files"
           >
             <Cloud className="size-3" aria-hidden="true" />
-            {cloudDriveLabel}
-          </span>
+            <span>{liveCloudDriveLabel}</span>
+          </button>
 
           {!isNormalMode ? (
             <>
@@ -753,7 +948,8 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                 size="sm"
                 onClick={() => setShowFiles((v) => !v)}
                 className="h-7 gap-1.5 px-2 text-xs"
-                aria-label={localize('com_opencode_view_editor')}
+                aria-label={localize('com_opencode_files_label')}
+                title={showFiles ? 'Hide Files sidebar' : 'Show Files sidebar'}
               >
                 <PanelLeft className="size-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">{localize('com_opencode_files_label')}</span>
@@ -764,37 +960,118 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
               <div className="flex items-center gap-1" role="tablist">
                 {(
                   [
-                    ['editor', localize('com_opencode_view_editor'), Code2],
+                    ['editor', 'Editor', Code2],
                     ...(isPlatformAdmin
                       ? ([
-                          ['terminal', localize('com_opencode_terminal_mode_tui'), TerminalIcon],
+                          [
+                            'terminal',
+                            'Terminal',
+                            TerminalIcon,
+                          ] as [WorkbenchTab, string, typeof Code2],
                         ] as Array<[WorkbenchTab, string, typeof Code2]>)
                       : []),
                     ['preview', localize('com_opencode_view_preview'), Globe],
                     ['changes', localize('com_opencode_view_changes'), GitBranch],
                     ['diffs', `${localize('com_opencode_view_diffs')} (${diffs.length})`, FileDiff],
                   ] as Array<[WorkbenchTab, string, typeof Code2]>
-                ).map(([tabKey, label, Icon]) => (
-                  <Button
-                    key={tabKey}
-                    type="button"
-                    role="tab"
-                    aria-selected={workbenchTab === tabKey}
-                    variant={workbenchTab === tabKey ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setWorkbenchTab(tabKey)}
-                    className="h-7 gap-1.5 px-2.5 text-xs"
-                  >
-                    <Icon className="size-3.5" aria-hidden="true" />
-                    {label}
-                  </Button>
-                ))}
+                ).map(([tabKey, label, Icon]) => {
+                  const isEditorTab = tabKey === 'editor';
+                  const isTerminalTab = tabKey === 'terminal';
+                  const isActiveTab = isEditorTab
+                    ? workbenchTab === 'editor' && showEditor
+                    : isTerminalTab
+                    ? showTerminal || workbenchTab === 'terminal'
+                    : workbenchTab === tabKey;
+                  const buttonVariant = isActiveTab ? 'default' : 'ghost';
+
+                  return (
+                    <Button
+                      key={tabKey}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActiveTab}
+                      variant={buttonVariant}
+                      size="sm"
+                      onClick={() => {
+                        if (isEditorTab) {
+                          if (workbenchTab === 'editor') {
+                            const next = !showEditor;
+                            setShowEditor(next);
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('satchida_vibe_show_editor', String(next));
+                            }
+                          } else {
+                            setWorkbenchTab('editor');
+                            setShowEditor(true);
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('satchida_vibe_show_editor', 'true');
+                            }
+                          }
+                          return;
+                        }
+
+                        if (isTerminalTab) {
+                          // Toggle terminal in whatever view the user is on (preview, editor, changes, etc.)
+                          if (workbenchTab === 'terminal') {
+                            setWorkbenchTab('editor');
+                            setShowTerminal(false);
+                            return;
+                          }
+                          setShowTerminal((v) => !v);
+                          return;
+                        }
+
+                        if (tabKey === 'preview') {
+                          if (workbenchTab === 'preview') {
+                            setWorkbenchTab('editor');
+                          } else {
+                            setWorkbenchTab('preview');
+                          }
+                          return;
+                        }
+
+                        setWorkbenchTab(tabKey);
+                      }}
+                      className="h-7 gap-1.5 px-2.5 text-xs"
+                      title={
+                        isEditorTab
+                          ? workbenchTab === 'editor'
+                            ? showEditor
+                              ? 'Click to toggle Editor off'
+                              : 'Click to toggle Editor on'
+                            : 'Open Editor'
+                          : isTerminalTab && workbenchTab === 'editor'
+                          ? showTerminal
+                            ? 'Toggle Terminal off'
+                            : 'Toggle Terminal on'
+                          : undefined
+                      }
+                    >
+                      <Icon className="size-3.5" aria-hidden="true" />
+                      {label}
+                    </Button>
+                  );
+                })}
               </div>
             </>
           ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {!isNormalMode ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEnvSecretsModal(true)}
+              className="h-7 gap-1 px-2 text-xs"
+              title="Manage project .env secrets safely"
+            >
+              <KeyRound className="size-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Secrets</span>
+            </Button>
+          ) : null}
+
           <Button
             type="button"
             variant="outline"
@@ -811,29 +1088,6 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                 : localize('com_opencode_export_zip')}
             </span>
           </Button>
-
-          {!isNormalMode && statusQuery.data?.version ? (
-            <span className="hidden rounded bg-surface-tertiary px-1.5 py-0.5 font-mono text-[10px] text-text-secondary md:inline">
-              {`v${statusQuery.data.version}`}
-            </span>
-          ) : null}
-
-          {!isNormalMode && isPlatformAdmin && !isFullTerminal ? (
-            <Button
-              type="button"
-              variant={showTerminal ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setShowTerminal((v) => !v)}
-              className="h-7 gap-1 px-2 text-xs"
-            >
-              {showTerminal ? (
-                <PanelBottomClose className="size-3.5" aria-hidden="true" />
-              ) : (
-                <PanelBottomOpen className="size-3.5" aria-hidden="true" />
-              )}
-              {localize('com_opencode_view_terminal')}
-            </Button>
-          ) : null}
 
           {!isNormalMode ? (
             <Button
@@ -860,15 +1114,86 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
               hasRunnableApp={hasRunnableApp}
             />
           </div>
-          <div className="flex min-h-0 w-[380px] shrink-0 flex-col border-l border-border-light xl:w-[420px]">
-            <OpenCodeChatPanel projectId={projectId} reachable={isReachable} simpleMode={true} />
-          </div>
+          {/* Resize Handle for Right Panel in Normal Mode */}
+          {showChat ? (
+            <div
+              onMouseDown={startChatResize}
+              className="group relative flex w-2 -ml-1 -mr-1 z-20 shrink-0 cursor-col-resize select-none items-center justify-center transition-colors hover:bg-border-heavy/40 active:bg-text-secondary/40"
+              title="Drag to resize panel"
+            >
+              <div className="h-10 w-1 rounded-full bg-border-medium transition-colors group-hover:bg-text-primary group-active:bg-text-primary" />
+            </div>
+          ) : null}
+          {showChat ? (
+            <div
+              style={{ width: `${chatPanelWidth}px` }}
+              className="flex min-h-0 shrink-0 flex-col border-l border-border-light"
+            >
+              <OpenCodeChatPanel projectId={projectId} reachable={isReachable} simpleMode={true} />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Left File Explorer & Search Sidebar */}
           {showFiles ? (
-            <aside className="flex w-60 shrink-0 flex-col border-r border-border-light bg-surface-secondary">
+            <aside
+              ref={filesAsideRef}
+              style={{ width: `${filesSidebarWidth}px` }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!isDraggingWorkspaceFiles) {
+                  setIsDraggingWorkspaceFiles(true);
+                }
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget === e.target) {
+                  setIsDraggingWorkspaceFiles(false);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingWorkspaceFiles(false);
+                if (e.dataTransfer?.files?.length) {
+                  void handleWorkspaceUpload(e.dataTransfer.files);
+                }
+              }}
+              className={`relative flex shrink-0 flex-col border-r border-border-light bg-surface-secondary ${
+                isDraggingWorkspaceFiles ? 'ring-2 ring-inset ring-emerald-500/70' : ''
+              }`}
+            >
+              <input
+                ref={workspaceFileUploadRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) {
+                    void handleWorkspaceUpload(e.target.files);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={workspaceFolderUploadRef}
+                type="file"
+                multiple
+                {...({ webkitdirectory: '' } as Record<string, string>)}
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) {
+                    void handleWorkspaceUpload(e.target.files);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              {isDraggingWorkspaceFiles ? (
+                <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-surface-primary/85 p-4 text-center backdrop-blur-xs">
+                  <div className="rounded-lg border border-dashed border-emerald-500 px-3 py-2 text-xs font-medium text-emerald-500">
+                    Drop files to upload into workspace
+                  </div>
+                </div>
+              ) : null}
               <div className="flex h-8 shrink-0 items-center justify-between border-b border-border-light px-2 text-xs">
                 <div className="flex items-center gap-1">
                   <button
@@ -896,6 +1221,30 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                   </button>
                 </div>
                 <div className="flex items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isUploadingFiles}
+                    onClick={() => workspaceFileUploadRef.current?.click()}
+                    className="size-6 shrink-0"
+                    title="Upload files from your device into this workspace"
+                    aria-label="Upload files"
+                  >
+                    <Upload className="size-3" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isUploadingFiles}
+                    onClick={() => workspaceFolderUploadRef.current?.click()}
+                    className="size-6 shrink-0"
+                    title="Upload folder from your device into this workspace"
+                    aria-label="Upload folder"
+                  >
+                    <FolderUp className="size-3" aria-hidden="true" />
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -1172,15 +1521,27 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
             </aside>
           ) : null}
 
-          {/* Center Workbench Stage */}
+          {/* Resize Handle for Left Files Sidebar */}
+          {showFiles ? (
+            <div
+              onMouseDown={startFilesResize}
+              className="group relative flex w-2 -ml-1 -mr-1 z-20 shrink-0 cursor-col-resize select-none items-center justify-center transition-colors hover:bg-border-heavy/40 active:bg-text-secondary/40"
+              title="Drag to resize sidebar"
+            >
+              <div className="h-10 w-1 rounded-full bg-border-medium transition-colors group-hover:bg-text-primary group-active:bg-text-primary" />
+            </div>
+          ) : null}
+
+          {/* Center Workbench Stage (remains visible whenever Editor is active OR Terminal is active OR non-editor tab) */}
+          {(workbenchTab === 'editor' && (showEditor || showTerminal)) || workbenchTab !== 'editor' || !showChat ? (
           <div
             className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${
-              showTerminal && !isFullTerminal && terminalSplit === 'vertical'
+              showTerminal && !isFullTerminal && showEditor && terminalSplit === 'vertical'
                 ? 'flex-row'
                 : 'flex-col'
             }`}
           >
-            {!isFullTerminal ? (
+            {!isFullTerminal && (showEditor || workbenchTab !== 'editor') ? (
               <div
                 className={`flex min-h-0 flex-1 overflow-hidden ${
                   showTerminal && terminalSplit === 'vertical' ? 'w-1/2 flex-row' : 'flex-col'
@@ -1201,7 +1562,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                     <OpenCodeDiffPanel diffs={diffs} isLoading={false} />
                   </div>
                 ) : null}
-                {workbenchTab === 'editor' ? (
+                {workbenchTab === 'editor' && showEditor ? (
                   <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     {/* Multi-Tab File Buffer Header */}
                     <div className="flex h-8 shrink-0 items-center justify-between border-b border-border-light bg-surface-secondary px-2 text-xs">
@@ -1279,6 +1640,22 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                             {localize('com_opencode_minimap')}
                           </Button>
                         ) : null}
+                        {/* Terminal Toggle in Editor Toolbar */}
+                        {isPlatformAdmin && !isFullTerminal ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={showTerminal ? 'secondary' : 'ghost'}
+                            onClick={() => setShowTerminal((v) => !v)}
+                            className="h-6 gap-1 px-2 text-[11px]"
+                            title={showTerminal ? 'Hide Terminal' : 'Open Terminal below editor'}
+                          >
+                            <TerminalIcon className="size-3" aria-hidden="true" />
+                            <span className="hidden sm:inline">
+                              {showTerminal ? 'Hide Terminal' : 'Terminal'}
+                            </span>
+                          </Button>
+                        ) : null}
                         {isPlatformAdmin && showTerminal && !isFullTerminal ? (
                           <Button
                             type="button"
@@ -1293,7 +1670,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                             title={
                               terminalSplit === 'horizontal'
                                 ? 'Split Side-by-Side'
-                                : 'Split Stacked'
+                                : 'Split Stacked (Lower)'
                             }
                           >
                             {terminalSplit === 'horizontal' ? (
@@ -1302,7 +1679,7 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                               <Rows className="size-3" />
                             )}
                             <span className="hidden sm:inline">
-                              {terminalSplit === 'horizontal' ? 'Split Vertical' : 'Split Stacked'}
+                              {terminalSplit === 'horizontal' ? 'Split Vertical' : 'Split Lower'}
                             </span>
                           </Button>
                         ) : null}
@@ -1456,12 +1833,13 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
 
             {/* Persistent Live Satchida Code TUI / Terminal (restricted to Platform Admin / platform admin group) */}
             {(() => {
+              // Terminal is displayed when in full terminal mode, OR whenever showTerminal is toggled ON
               if (!isPlatformAdmin || (!isFullTerminal && !showTerminal)) {
                 return null;
               }
               let terminalContainerClass =
                 'flex h-[48%] min-h-[260px] shrink-0 flex-col overflow-hidden border-t border-border-medium';
-              if (isFullTerminal) {
+              if (isFullTerminal || (!showEditor && workbenchTab === 'editor')) {
                 terminalContainerClass = 'flex min-h-0 flex-1 flex-col overflow-hidden';
               } else if (terminalSplit === 'vertical') {
                 terminalContainerClass =
@@ -1478,15 +1856,101 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
               );
             })()}
           </div>
+          ) : null}
 
-          {/* Right AI Agent Chat Panel (Cursor-style, collapsible) */}
+          {/* Resize Handle for Right Chat Panel in Developer Mode */}
+          {showChat && ((workbenchTab === 'editor' && (showEditor || showTerminal)) || workbenchTab !== 'editor') ? (
+            <div
+              onMouseDown={startChatResize}
+              className="group relative flex w-2 -ml-1 -mr-1 z-20 shrink-0 cursor-col-resize select-none items-center justify-center transition-colors hover:bg-border-heavy/40 active:bg-text-secondary/40"
+              title="Drag to resize panel"
+            >
+              <div className="h-10 w-1 rounded-full bg-border-medium transition-colors group-hover:bg-text-primary group-active:bg-text-primary" />
+            </div>
+          ) : null}
+
+          {/* Right AI Agent Chat Panel (Cursor-style, expands to full width only when both Center Editor and Terminal are collapsed) */}
           {showChat ? (
-            <div className="flex min-h-0 w-[360px] shrink-0 flex-col border-l border-border-light xl:w-[400px]">
+            <div
+              style={
+                (workbenchTab === 'editor' && (showEditor || showTerminal)) || workbenchTab !== 'editor'
+                  ? { width: `${chatPanelWidth}px` }
+                  : undefined
+              }
+              className={`flex min-h-0 flex-col border-l border-border-light ${
+                (workbenchTab === 'editor' && (showEditor || showTerminal)) || workbenchTab !== 'editor'
+                  ? 'shrink-0'
+                  : 'min-w-0 flex-1'
+              }`}
+            >
               <OpenCodeChatPanel projectId={projectId} reachable={isReachable} />
             </div>
           ) : null}
         </div>
       )}
+
+      {/* Gold-Standard VS Code-Style Bottom Status Bar */}
+      <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border-light bg-surface-secondary px-3 text-[11px] text-text-secondary">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 font-medium text-text-primary">
+            <span
+              className={`size-1.5 rounded-full ${isReachable ? 'bg-emerald-500' : 'bg-amber-500'}`}
+              aria-hidden="true"
+            />
+            {canUseLocalPrivacy
+              ? localPrivacyActive
+                ? shortLocalModelName
+                  ? `Local Privacy · ${shortLocalModelName}`
+                  : 'Local Privacy · No model loaded'
+                : 'Cloud ZDR'
+              : 'Satchida Gateway'}
+          </span>
+          {selectedFile ? (
+            <span className="hidden truncate font-mono sm:inline" title={selectedFile}>
+              {selectedFile}
+            </span>
+          ) : null}
+          {selectedFile ? (
+            <span className="hidden uppercase md:inline">{getLanguageFromPath(selectedFile)}</span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {diagnostics.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowProblems((v) => !v)}
+              className="inline-flex items-center gap-1 text-amber-500 hover:underline"
+            >
+              <AlertTriangle className="size-3" aria-hidden="true" />
+              <span>{diagnostics.length}</span>
+            </button>
+          ) : null}
+          {isUploadingFiles ? <span className="text-emerald-500">Uploading...</span> : null}
+          {statusQuery.data?.version ? (
+            <span className="font-mono text-[10px] opacity-75">{`Satchida Vibe v${statusQuery.data.version}`}</span>
+          ) : null}
+        </div>
+      </footer>
+
+      {/* Multi-Provider Cloud Drive Modal */}
+      {showCloudDriveModal ? (
+        <CloudDriveModal
+          projectId={projectId}
+          projectName={projectName}
+          selectedFile={selectedFile}
+          localPrivacyActive={localPrivacyActive}
+          onClose={() => setShowCloudDriveModal(false)}
+          onNativeFilesSelected={(files) => void handleWorkspaceUpload(files)}
+        />
+      ) : null}
+
+      {/* Visual .env Secrets Modal */}
+      {showEnvSecretsModal ? (
+        <EnvSecretsModal
+          projectId={projectId}
+          onClose={() => setShowEnvSecretsModal(false)}
+        />
+      ) : null}
 
       {/* Ctrl+P Quick Open Palette */}
       {quickOpenVisible ? (

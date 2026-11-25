@@ -633,6 +633,8 @@ export const opencodeFile = (projectId: string, filePath?: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/file${
     filePath ? `?path=${encodeURIComponent(filePath)}` : ''
   }`;
+export const opencodeUpload = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/upload`;
 export const opencodeFileRename = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/file/rename`;
 export const opencodeSearch = (projectId: string) =>
@@ -645,6 +647,8 @@ export const opencodePtyConnectToken = (projectId: string, ptyId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/pty/${encodeURIComponent(ptyId)}/connect-token`;
 export const opencodeSessions = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/sessions`;
+export const opencodeSession = (projectId: string, sessionId: string) =>
+  `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}`;
 export const opencodeSessionPrompt = (projectId: string, sessionId: string) =>
   `${opencodeSessions(projectId)}/${encodeURIComponent(sessionId)}/prompt`;
 export const opencodeSessionAbort = (projectId: string, sessionId: string) =>
@@ -679,5 +683,10 @@ export const opencodePreviewStatus = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/status`;
 export const opencodePreviewStart = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/start`;
+export const opencodeEnv = (projectId: string) =>
+  `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/env`;
+
+/* Multi-Provider Cloud Drive */
+export const cloudDriveStatus = () => `${BASE_URL}/api/cloud-drive/status`;
 export const opencodePreviewStop = (projectId: string) =>
   `${BASE_URL}/api/opencode/${encodeURIComponent(projectId)}/preview/stop`;

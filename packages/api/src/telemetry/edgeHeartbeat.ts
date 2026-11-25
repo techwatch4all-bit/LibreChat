@@ -382,16 +382,23 @@ let cachedLiveProbe: EdgeLiveWmiProbe = {
  * Live Windows WMI performance probe for Intel GPU dynamic metrics & tenant build processes.
  * Throttled to run at most once every 1.5 seconds.
  */
+let liveProbeInFlight = false;
+
 async function probeLiveWmiMetrics(): Promise<EdgeLiveWmiProbe> {
+  // Disabled by default on Windows: spawning powershell.exe from a console-less PM2
+  // service flashes a visible conhost.exe window on every heartbeat tick. Opt-in via
+  // EDGE_HEARTBEAT_WMI_PROBE=true if Intel iGPU WMI telemetry is explicitly needed.
+  if (process.platform !== 'win32' || process.env.EDGE_HEARTBEAT_WMI_PROBE !== 'true') {
+    return cachedLiveProbe;
+  }
+
   const now = Date.now();
-  if (now - lastLiveProbeTime < 1500 && cachedLiveProbe.processes.length > 0) {
+  if (liveProbeInFlight || now - lastLiveProbeTime < 15000) {
     return cachedLiveProbe;
   }
 
-  if (process.platform !== 'win32') {
-    return cachedLiveProbe;
-  }
-
+  liveProbeInFlight = true;
+  lastLiveProbeTime = now;
   try {
     let scriptPath = path.resolve(__dirname, 'probe_edge_live.ps1');
     if (!fs.existsSync(scriptPath)) {
@@ -401,7 +408,16 @@ async function probeLiveWmiMetrics(): Promise<EdgeLiveWmiProbe> {
     if (fs.existsSync(scriptPath)) {
       const { stdout } = await execFileAsync(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          scriptPath,
+        ],
         { windowsHide: true, timeout: 4500 },
       );
       stdoutText = stdout;
@@ -416,11 +432,12 @@ async function probeLiveWmiMetrics(): Promise<EdgeLiveWmiProbe> {
         intel_video_percent: Math.min(100, Number(parsed.intel_video_percent) || 0),
         processes: Array.isArray(parsed.processes) ? parsed.processes : [],
       };
-      lastLiveProbeTime = now;
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.debug(`[EdgeHeartbeat] probeLiveWmiMetrics warning: ${msg}`);
+  } finally {
+    liveProbeInFlight = false;
   }
 
   return cachedLiveProbe;

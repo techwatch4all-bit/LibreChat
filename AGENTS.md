@@ -343,13 +343,22 @@ model-selection dropdown once (2026-11-10); it must never happen again.
 
 ### 7. In-Repo Self-Containment & UI Confinement Law (NON-NEGOTIABLE)
 
-1. **Zero External Skill / Repository Leaks**:
-   - Every skill, submodule, script, and external dependency required by LibreChat or Satchida must live **inside** the `LibreChat` repository directory:
-     - Dependent repositories belong under `d:\LAN-AI-Infra\LibreChat\repos\<repo-name>`.
+1. **Zero External Dependency / Tool / Binary Leaks**:
+   - Every tool, browser binary, runtime script, submodule, skill, and configuration required by LibreChat or Satchida must live **inside** the `LibreChat` repository directory:
+     - Dependent repositories and submodules belong under `d:\LAN-AI-Infra\LibreChat\repos\<repo-name>`.
+     - Headless browsers (Playwright Chromium, FFmpeg, shell binaries) belong under `d:\LAN-AI-Infra\LibreChat\browsers\` — **NEVER** depend on `%LOCALAPPDATA%\ms-playwright` or user-profile directories.
+     - Project runtime profiles, sessions, and screen recordings belong under `d:\LAN-AI-Infra\LibreChat\vibe-apps\<projectId>\`.
      - Deployment skills belong under `d:\LAN-AI-Infra\LibreChat\skill\<skill-name>\SKILL.md`.
-   - Never reference paths outside `d:\LAN-AI-Infra\LibreChat` (such as `~/.gemini/config/skills` or external system folders) for core runtime tasks, so cloning or copying the repo to tenant edge nodes works out-of-the-box.
+     - Agent personas, XDG configs, and tool exception definitions belong under `d:\LAN-AI-Infra\LibreChat\repos\opencode\xdg-config\`.
+   - **Absolute Path Prohibition**: Never hardcode developer or host user paths (e.g., `C:\Users\WinDiesel\...`, `~/.gemini/config/skills`, `/Users/...`, `~/.config/...`). Always resolve paths dynamically relative to repository root (`path.resolve(__dirname, '...')`), workspace root, or sovereign environment variables. This ensures cloning or copying the repository to any client tenant edge node runs out-of-the-box with zero host path repair.
 
-2. **Never Jump Out of the LibreChat UI**:
+2. **Installation Directive for New Features & Packages**:
+   - When installing new tools, CLI utilities, headless browsers, or dependencies:
+     - Binary packages must be installed into local repo roots (`./browsers/`, `./repos/`, or `./node_modules/`).
+     - Configuration files must be saved under repo-managed directories (`./repos/`, `./config/`, or `./skill/`).
+     - Any auto-install script must specify destination flags (e.g. `PLAYWRIGHT_BROWSERS_PATH=browsers` for Playwright) to guarantee containment.
+
+3. **Never Jump Out of the LibreChat UI**:
    - The user must **never** be directed to external raw URLs, new browser windows, or localhost server ports (e.g. `http://localhost:3080/assets/...`).
    - All visual, motion, art, CAD, audio, and studio deliverables **MUST** render natively within the LibreChat interface:
      - Render through **Artifacts** (`:::artifact{identifier="..." type="application/vnd.librechat.film" ...}`) or the **Satchida Studio Side Panel** (`OpenFilmStudio.tsx` / `ArtifactTabs.tsx`).
@@ -358,9 +367,10 @@ model-selection dropdown once (2026-11-10); it must never happen again.
 
 ### 8. Strict Credential & Password Immutability Directive (NON-NEGOTIABLE)
 - **Zero Automated Password Overwrites**: No script, subagent, automated test, or AI assistant is ever authorized to change, reset, or overwrite passwords or credentials (especially for `admin@satchida.com`, `root`, or local accounts) without explicit, real-time user confirmation.
+- **Strict 2FA Immutability & Anti-Purge Law**: AI agents and automated testing scripts are **STRICTLY PROHIBITED** from disabling, resetting, or tampering with `twoFactorEnabled`, `totpSecret`, or `backupCodes` in MongoDB (e.g., via `updateOne({ $set: { twoFactorEnabled: false } })`). Any automated verification test must use mock session contexts or test-specific ephemeral users; it must **NEVER** turn off 2FA on `admin@satchida.com`.
+- **Zero In-Repo Break-Glass Scripts**: Ad-hoc scripts (e.g. `restore_admin_credentials.js`, `disable_2fa_admin.js`, `set_admin_pwd.js`, `reset-admin-pwd.js`) in `scripts/`, `scratch/`, or `satchida/ops/` are forbidden and must be purged. Emergency procedures must be gated by the out-of-band Sovereign Operator Passphrase Seal.
 - **Mandatory Root Passphrase Authorization**: Modification of the root/superadmin password requires explicit verification of the designated cryptographic root authorization passphrase. Any request, script, or automated tool lacking this passphrase must be strictly rejected at both the API and database levels.
-- **No Ad-Hoc Password Reset Scripts**: Never create or leave standalone ad-hoc scripts (e.g. `set_admin_pwd.js`, `reset-admin-pwd.js`, `reset_root.py`) in `scripts/`, `scratch/`, or `satchida/ops/` containing hardcoded password hashes or direct database mutations.
-- **Tenant Node Protection**: On client/tenant edge installations, local database access must be guarded against unauthorized administrative escalation. Any credential modification must require authenticated master authorization or secondary approval.
+- **Tenant Node Protection & Multi-Tier DB RBAC**: On client/tenant edge installations, local database access must be guarded against unauthorized administrative escalation. MongoDB must enforce `security.authorization: enabled` with three discrete tiers: Sovereign Operator (`satchida_operator` on `admin`), LibreChat Engine (`librechat_app` on `LibreChat`), and Tenant Admin (`tenant_admin_ro` read-only).
 
 ### 9. End-User Login, Per-User Seat Token (`seatToken`), Mode Policy & Bifrost Virtual Key (`x-bf-vk`) Invariants (NON-NEGOTIABLE)
 

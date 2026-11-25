@@ -24,6 +24,7 @@ const {
   AdminRefreshError,
   buildOpenIDRefreshParams,
   isEmailDomainAllowed,
+  calculatePasswordSignature,
   createTwoFactorManagementLimiter,
 } = require('@librechat/api');
 const { loginController } = require('~/server/controllers/auth/LoginController');
@@ -1086,7 +1087,8 @@ router.post('/reset-password', middleware.loginLimiter, async (req, res) => {
 
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(newPassword, salt);
-    await updateUser(user._id.toString(), { password: hash });
+    const passwordSig = calculatePasswordSignature(hash);
+    await updateUser(user._id.toString(), { password: hash, passwordSig });
     await deleteAllUserSessions({ userId: user._id.toString() });
 
     logger.info(

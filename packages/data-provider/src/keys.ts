@@ -116,6 +116,9 @@ export enum QueryKeys {
   opencodeQuestions = 'opencodeQuestions',
   opencodeVcs = 'opencodeVcs',
   opencodePreviewStatus = 'opencodePreviewStatus',
+  opencodeEnv = 'opencodeEnv',
+  cloudDriveStatus = 'cloudDriveStatus',
+  cloudDriveFiles = 'cloudDriveFiles',
 }
 
 // Dynamic query keys that require parameters
@@ -183,6 +186,8 @@ export enum MutationKeys {
   deleteCodeEnvironment = 'deleteCodeEnvironment',
   moveConversationCodeEnvironment = 'moveConversationCodeEnvironment',
   opencodeCreateSession = 'opencodeCreateSession',
+  opencodeUpdateSession = 'opencodeUpdateSession',
+  opencodeDeleteSession = 'opencodeDeleteSession',
   opencodeSendPrompt = 'opencodeSendPrompt',
   opencodeAbortSession = 'opencodeAbortSession',
   opencodeRevertSession = 'opencodeRevertSession',

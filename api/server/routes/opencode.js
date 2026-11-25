@@ -51,7 +51,7 @@ function getHandlers() {
             return null;
           }
           return User.findById(userId)
-            .select('+seatToken accountType tenantId role familyRole')
+            .select('+seatToken accountType tenantId role familyRole username email name')
             .lean();
         }),
     });
@@ -85,6 +85,9 @@ router.get('/:projectId/export-zip', (req, res) => getHandlers().exportProjectZi
 router.get('/:projectId/tree', (req, res) => getHandlers().getTree(req, res));
 router.get('/:projectId/file', (req, res) => getHandlers().readFile(req, res));
 router.post('/:projectId/file', (req, res) => getHandlers().writeFile(req, res));
+router.post('/:projectId/upload', (req, res) => getHandlers().uploadFiles(req, res));
+router.get('/:projectId/env', (req, res) => getHandlers().getEnv(req, res));
+router.post('/:projectId/env', (req, res) => getHandlers().saveEnv(req, res));
 router.delete('/:projectId/file', (req, res) => getHandlers().deleteFile(req, res));
 router.post('/:projectId/file/rename', (req, res) => getHandlers().renameFile(req, res));
 router.post('/:projectId/search', (req, res) => getHandlers().searchFiles(req, res));
@@ -99,6 +102,8 @@ router.post('/:projectId/pty/:ptyId/connect-token', (req, res) =>
 /* Chat loop & sessions */
 router.get('/:projectId/sessions', (req, res) => getHandlers().listSessions(req, res));
 router.post('/:projectId/sessions', (req, res) => getHandlers().createSession(req, res));
+router.patch('/:projectId/sessions/:sessionId', (req, res) => getHandlers().updateSession(req, res));
+router.delete('/:projectId/sessions/:sessionId', (req, res) => getHandlers().deleteSession(req, res));
 router.post('/:projectId/sessions/:sessionId/prompt', promptUsageLimiter, (req, res) =>
   getHandlers().sendPrompt(req, res),
 );
@@ -141,6 +146,14 @@ router.get('/:projectId/vcs', (req, res) => getHandlers().getVcs(req, res));
 router.get('/:projectId/preview/status', (req, res) => getHandlers().getPreviewStatus(req, res));
 router.post('/:projectId/preview/start', (req, res) => getHandlers().startPreview(req, res));
 router.post('/:projectId/preview/stop', (req, res) => getHandlers().stopPreview(req, res));
+
+/* Phase 5: Sandboxed Browser AI Control endpoints */
+router.get('/:projectId/browser/status', (req, res) => getHandlers().getBrowserStatus(req, res));
+router.post('/:projectId/browser/navigate', (req, res) => getHandlers().navigateBrowser(req, res));
+router.post('/:projectId/browser/click', (req, res) => getHandlers().clickBrowser(req, res));
+router.post('/:projectId/browser/type', (req, res) => getHandlers().typeBrowser(req, res));
+router.get('/:projectId/browser/dom', (req, res) => getHandlers().inspectBrowserDom(req, res));
+router.post('/:projectId/browser/close', (req, res) => getHandlers().closeBrowser(req, res));
 
 /* Legacy one-shot prompt creation */
 router.post('/:projectId/prompt', promptUsageLimiter, (req, res) =>

@@ -298,6 +298,78 @@ describe('initializeCustom – Satchida cloud/Privacy seat routing', () => {
     }
   });
 
+  it('normalizes Motion mode to Work for tenant cloud seats (with and without explicit seatPolicy)', async () => {
+    // Without explicit seatPolicy (fallback path for privacy/pro/standard seats)
+    const fallbackParams = createParams({
+      apiKey: 'operator-fallback',
+      baseURL: 'http://127.0.0.1:4000/v1',
+    });
+    fallbackParams.endpoint = 'Satchida-Gateway';
+    mockGetOpenAIConfig.mockClear();
+    (fallbackParams.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-motion-1',
+      tenantId: 'satchida-master',
+      seatToken: 'tk-cloud-seat',
+      satchidaSeatAlias: 'seat_Vicky_8aad68',
+      accountType: 'privacy',
+    };
+    fallbackParams.model_parameters = { model: 'Motion' };
+    await expect(initializeCustom(fallbackParams)).resolves.toBeDefined();
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'tk-cloud-seat',
+      expect.any(Object),
+      'Satchida-Gateway',
+    );
+
+    // With explicit seatPolicy allowing Work
+    const policyParams = createParams({
+      apiKey: 'operator-fallback',
+      baseURL: 'http://127.0.0.1:4000/v1',
+    });
+    policyParams.db.getTenantSeatPolicy = jest.fn().mockResolvedValue({
+      accountType: 'pro',
+      allowedModes: ['Chat', 'Study', 'Work'],
+      allowedCapabilities: ['work_tools'],
+    });
+    policyParams.endpoint = 'Satchida-Gateway';
+    mockGetOpenAIConfig.mockClear();
+    (policyParams.req as unknown as { user: Record<string, unknown> }).user = {
+      id: 'user-motion-2',
+      tenantId: 'satchida-master',
+      seatToken: 'tk-cloud-seat',
+      satchidaSeatAlias: 'seat_pro_01',
+      accountType: 'pro',
+    };
+    policyParams.model_parameters = { model: 'Motion' };
+    await expect(initializeCustom(policyParams)).resolves.toBeDefined();
+
+    // Still rejects Motion for basic seats and minor/child seats
+    for (const deniedUser of [
+      {
+        id: 'user-basic',
+        tenantId: 'satchida-master',
+        seatToken: 'tk-cloud-seat',
+        accountType: 'basic',
+      },
+      {
+        id: 'user-child',
+        tenantId: 'satchida-master',
+        seatToken: 'tk-cloud-seat',
+        accountType: 'family',
+        familyRole: 'minor',
+      },
+    ]) {
+      const deniedParams = createParams({
+        apiKey: 'operator-fallback',
+        baseURL: 'http://127.0.0.1:4000/v1',
+      });
+      deniedParams.endpoint = 'Satchida-Gateway';
+      (deniedParams.req as unknown as { user: Record<string, unknown> }).user = deniedUser;
+      deniedParams.model_parameters = { model: 'Motion' };
+      await expect(initializeCustom(deniedParams)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    }
+  });
+
   it('fails closed when local Privacy has no assertion or points at a non-loopback URL', async () => {
     const noAssertion = createParams({ apiKey: 'fallback', baseURL: 'http://127.0.0.1:4000/v1' });
     noAssertion.endpoint = 'Satchida';

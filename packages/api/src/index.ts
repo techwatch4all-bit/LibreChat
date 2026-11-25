@@ -109,6 +109,8 @@ export * from './langfuse';
 export * from './traces';
 /* Insights */
 export * from './insights';
+/* Cloud Drive */
+export * from './cloudDrive';
 /* Cache */
 export * from './cache';
 /* Cluster */

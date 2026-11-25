@@ -37,6 +37,18 @@ export default memo(function AudioRecorder({
   const [showVoiceUpgradeModal, setShowVoiceUpgradeModal] = useState(false);
   const [showLiveVoiceModal, setShowLiveVoiceModal] = useState(false);
 
+  useEffect(() => {
+    const handleOpenLiveVoice = () => {
+      if (isProVoice) {
+        setShowLiveVoiceModal(true);
+      } else {
+        setShowVoiceUpgradeModal(true);
+      }
+    };
+    window.addEventListener('satchida:open-live-voice', handleOpenLiveVoice);
+    return () => window.removeEventListener('satchida:open-live-voice', handleOpenLiveVoice);
+  }, [isProVoice]);
+
   const userAccountType = (user?.accountType || '').toLowerCase();
   const isProVoice = ['pro', 'pro_family', 'enterprise', 'privacy'].includes(userAccountType);
 
@@ -169,44 +181,7 @@ export default memo(function AudioRecorder({
         </span>
       </div>
 
-      {isProVoice ? (
-        <TooltipAnchor
-          description="Satchida Live Voice (Continuous Voice Mode: Browser STT + Fast LLM + Neural TTS)"
-          render={
-            <button
-              type="button"
-              onClick={() => setShowLiveVoiceModal(true)}
-              className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
-              aria-label="Satchida Live Voice (Continuous Mode)"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
-              </span>
-              <Sparkles className="h-2.5 w-2.5 text-violet-300" />
-              <span>Live Voice</span>
-            </button>
-          }
-        />
-      ) : (
-        <TooltipAnchor
-          description="Live Voice Mode (Continuous STT + Fast LLM + TTS, Pro Feature) — Upgrade via Site Admin"
-          render={
-            <button
-              type="button"
-              onClick={() => setShowVoiceUpgradeModal(true)}
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400 transition-all duration-150 hover:border-amber-500/50 hover:bg-amber-500/20 active:scale-95"
-              aria-label="Live Voice Pro Gate"
-            >
-              <Zap className="h-2.5 w-2.5 text-amber-400" />
-              <span>Live Voice</span>
-              <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] text-amber-300">
-                PRO
-              </span>
-            </button>
-          }
-        />
-      )}
+      {/* Live Voice trigger moved to top-right Header beside HeaderMenu */}
 
       {showVoiceUpgradeModal && (
         <SatchiUpgradeModal

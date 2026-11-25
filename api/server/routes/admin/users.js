@@ -50,6 +50,34 @@ const handlers = createAdminUsersHandlers({
     }));
   },
   upsertBalanceFields: db.upsertBalanceFields,
+  resolveTierQuota: async (tenantId, accountType) => {
+    if (!accountType || !oneApiConfigured()) {
+      return null;
+    }
+    const effectiveTenant = tenantId || ONEAPI_TENANT;
+    if (!effectiveTenant) {
+      return null;
+    }
+    try {
+      const resp = await oneApi(
+        'GET',
+        `/api/tenant/${encodeURIComponent(effectiveTenant)}/account-plan`,
+      );
+      const plans = Array.isArray(resp?.data) ? resp.data : [];
+      const match = plans.find(
+        (p) => String(p.account_type || '').toLowerCase() === String(accountType).toLowerCase(),
+      );
+      return match && typeof match.quota_units === 'number' && match.quota_units > 0
+        ? match.quota_units
+        : null;
+    } catch (err) {
+      console.warn(
+        `[oneApi] resolveTierQuota failed for tenant ${effectiveTenant} tier ${accountType}:`,
+        err.message,
+      );
+      return null;
+    }
+  },
   hashPassword: (plain) => bcrypt.hash(plain, 10),
   generateTempPassword: () => generateSecureTempPassword(12),
   findGroupByName: (nameOrQuery) => {
@@ -941,5 +969,79 @@ router.post('/bulk', requireManageUsers, async (req, res, next) => {
   };
   return handlers.bulkCreateUsers(req, res, next);
 });
+
+/**
+ * Periodic One-API `tenant_account_plans` -> LibreChat `balances` reconciler.
+ * Runs across every distinct tenant in MongoDB `users` and updates existing
+ * users' `refillAmount` / `tokenCredits` only when a tier's `quota_units`
+ * differs from the stored `refillAmount` (preserving mid-month consumption).
+ */
+async function reconcileAllTenantQuotas() {
+  if (!oneApiConfigured() || mongoose.connection.readyState !== 1) {
+    return;
+  }
+  try {
+    const dbConn = mongoose.connection.db;
+    const usersCol = dbConn.collection('users');
+    const balancesCol = dbConn.collection('balances');
+    const tenantIds = await usersCol.distinct('tenantId', {
+      tenantId: { $type: 'string', $ne: '' },
+      accountType: { $type: 'string', $ne: '' },
+    });
+    for (const tenantId of tenantIds) {
+      const resp = await oneApi(
+        'GET',
+        `/api/tenant/${encodeURIComponent(tenantId)}/account-plan`,
+      ).catch(() => null);
+      const plans = Array.isArray(resp?.data) ? resp.data : [];
+      const quotaByTier = new Map();
+      for (const p of plans) {
+        if (p.account_type && typeof p.quota_units === 'number' && p.quota_units > 0) {
+          quotaByTier.set(String(p.account_type).toLowerCase(), p.quota_units);
+        }
+      }
+      if (quotaByTier.size === 0) continue;
+
+      const tenantUsers = await usersCol
+        .find({ tenantId, accountType: { $type: 'string', $ne: '' } }, { projection: { _id: 1, accountType: 1 } })
+        .toArray();
+      for (const u of tenantUsers) {
+        const expected = quotaByTier.get(String(u.accountType).toLowerCase());
+        if (!expected) continue;
+        const existing = await balancesCol.findOne(
+          { user: u._id },
+          { projection: { refillAmount: 1, tokenCredits: 1 } },
+        );
+        if (!existing || existing.refillAmount !== expected) {
+          await balancesCol.updateOne(
+            { user: u._id },
+            {
+              $set: {
+                tokenCredits: expected,
+                autoRefillEnabled: true,
+                refillAmount: expected,
+                refillIntervalValue: 30,
+                refillIntervalUnit: 'days',
+              },
+              $setOnInsert: { user: u._id, lastRefill: new Date() },
+            },
+            { upsert: true },
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[oneApi] reconcileAllTenantQuotas error:', err.message);
+  }
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  const syncIntervalMs = Math.max(
+    60_000,
+    parseInt(process.env.SATCHIDA_QUOTA_SYNC_INTERVAL_MS || '300000', 10) || 300_000,
+  );
+  setTimeout(() => reconcileAllTenantQuotas().catch(() => {}), 30_000).unref();
+  setInterval(() => reconcileAllTenantQuotas().catch(() => {}), syncIntervalMs).unref();
+}
 
 module.exports = router;

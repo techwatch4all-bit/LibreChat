@@ -1731,6 +1731,12 @@ export const writeOpenCodeFile = (
 ): Promise<oc.OpenCodeFileWriteResponse> =>
   request.post(endpoints.opencodeFile(projectId), payload);
 
+export const uploadOpenCodeFiles = (
+  projectId: string,
+  payload: { files: Array<{ path: string; contentBase64: string }> },
+): Promise<oc.OpenCodeUploadFilesResponse> =>
+  request.post(endpoints.opencodeUpload(projectId), payload);
+
 export const deleteOpenCodeFile = (
   projectId: string,
   filePath: string,
@@ -1768,6 +1774,19 @@ export const createOpenCodeSession = (
   payload: { title?: string; agent?: string } = {},
 ): Promise<oc.OpenCodeSessionDto> => request.post(endpoints.opencodeSessions(projectId), payload);
 
+export const updateOpenCodeSession = (
+  projectId: string,
+  sessionId: string,
+  payload: { title?: string; time?: { archived?: number } },
+): Promise<oc.OpenCodeSessionDto> =>
+  request.patch(endpoints.opencodeSession(projectId, sessionId), payload);
+
+export const deleteOpenCodeSession = (
+  projectId: string,
+  sessionId: string,
+): Promise<{ success: boolean; id: string }> =>
+  request.delete(endpoints.opencodeSession(projectId, sessionId));
+
 export const sendOpenCodePrompt = (
   projectId: string,
   sessionId: string,
@@ -1776,6 +1795,7 @@ export const sendOpenCodePrompt = (
     agent?: string;
     model?: { providerID: string; modelID: string };
     images?: oc.OpenCodePromptImageAttachment[];
+    mode?: string;
   },
 ): Promise<{ accepted: boolean }> =>
   request.post(endpoints.opencodeSessionPrompt(projectId, sessionId), payload);
@@ -1844,6 +1864,18 @@ export const rejectOpenCodeQuestion = (
   requestId: string,
 ): Promise<{ ok: boolean }> =>
   request.post(endpoints.opencodeQuestionReject(projectId, requestId), {});
+
+export const getOpenCodeEnv = (projectId: string): Promise<oc.OpenCodeEnvResponse> =>
+  request.get(endpoints.opencodeEnv(projectId));
+
+export const saveOpenCodeEnv = (
+  projectId: string,
+  payload: { entries: oc.OpenCodeEnvVarEntry[] },
+): Promise<{ ok: boolean; count: number }> =>
+  request.post(endpoints.opencodeEnv(projectId), payload);
+
+export const getCloudDriveStatus = (): Promise<oc.CloudDriveStatusResponse> =>
+  request.get(endpoints.cloudDriveStatus());
 
 export const getOpenCodeVcs = (projectId: string): Promise<oc.OpenCodeVcsResponse> =>
   request.get(endpoints.opencodeVcs(projectId));

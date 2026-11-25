@@ -7,13 +7,16 @@ import {
   AlertTriangle,
   Globe,
   Monitor,
+  MousePointerClick,
   Play,
   RotateCw,
+  ScreenShare,
   Smartphone,
   Sparkles,
   Square,
   Tablet,
 } from 'lucide-react';
+import ScreencastCanvas from './ScreencastCanvas';
 import {
   openCodePendingAutoPromptAtom,
   openCodeRunStateAtom,
@@ -48,22 +51,54 @@ export default function OpenCodePreviewPanel({
   const [reloadNonce, setReloadNonce] = useState(0);
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [previewRoutePath, setPreviewRoutePath] = useState<string>('/');
+  const [previewEngine, setPreviewEngine] = useState<'iframe' | 'cdp'>('iframe');
+  const [isRecording, setIsRecording] = useState(true);
   const viewportMaxWidth = { desktop: '100%', tablet: '768px', mobile: '390px' }[viewportMode];
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [inspectMode, setInspectMode] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const prevRunStateRef = useRef(runState);
   const autoStartedRef = useRef<string | null>(null);
   const userEditedCommandRef = useRef(false);
 
+  const toggleInspectMode = () => {
+    const next = !inspectMode;
+    setInspectMode(next);
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'SATCHIDA_TOGGLE_INSPECT', enabled: next },
+        '*',
+      );
+    } catch {
+      /* ignore cross-origin postMessage failure */
+    }
+  };
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; message?: string; source?: string } | undefined;
+      const data = event.data as
+        | {
+            type?: string;
+            message?: string;
+            source?: string;
+            tag?: string;
+            selector?: string;
+            text?: string;
+          }
+        | undefined;
       if (data?.type === 'SATCHIDA_PREVIEW_ERROR' && typeof data.message === 'string') {
         setRuntimeError(data.source ? `${data.message} (${data.source})` : data.message);
+      } else if (data?.type === 'SATCHIDA_ELEMENT_SELECTED' && data.selector) {
+        setInspectMode(false);
+        const label = data.text ? ` with text "${data.text}"` : '';
+        setPendingAutoPrompt(
+          `I clicked on the <${data.tag || 'element'}> element (${data.selector})${label} in the live preview. Please inspect its component/styles and let me know what you can improve or wait for my exact change.`,
+        );
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, []);
+  }, [setPendingAutoPrompt]);
 
   const statusQuery = useQuery(
     [QueryKeys.opencodePreviewStatus, projectId],
@@ -290,9 +325,10 @@ export default function OpenCodePreviewPanel({
             </>
           )}
 
-          {!simpleMode && status?.port ? (
-            <span className="rounded bg-surface-tertiary px-2 py-0.5 font-mono text-[11px] text-text-secondary">
-              {`127.0.0.1:${status.port}`}
+          {!simpleMode && isRunning ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-tertiary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+              <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+              Live
             </span>
           ) : null}
 
@@ -310,6 +346,20 @@ export default function OpenCodePreviewPanel({
               className="h-7 w-32 rounded border border-border-light bg-surface-primary px-2 font-mono text-[11px] text-text-primary focus:border-border-medium focus:outline-none sm:w-44"
               placeholder="/"
             />
+          ) : null}
+
+          {isRunning && proxyPath ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={inspectMode ? 'default' : 'outline'}
+              onClick={toggleInspectMode}
+              className="h-7 gap-1 px-2 text-xs"
+              title="Click any element in the preview to send it to AI Chat"
+            >
+              <MousePointerClick className="size-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">{inspectMode ? 'Click Element...' : 'Inspect'}</span>
+            </Button>
           ) : null}
 
           {isRunning && proxyPath ? (
@@ -355,6 +405,34 @@ export default function OpenCodePreviewPanel({
               </button>
             </div>
           ) : null}
+
+          <div className="flex items-center rounded-md border border-border-light bg-surface-primary p-0.5">
+            <button
+              type="button"
+              onClick={() => setPreviewEngine('iframe')}
+              className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+                previewEngine === 'iframe'
+                  ? 'bg-surface-active text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              title="Standard App Iframe"
+            >
+              App View
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewEngine('cdp')}
+              className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+                previewEngine === 'cdp'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              title="Remote Chromium Browser Engine (Supports external cloud consoles, bypasses X-Frame-Options)"
+            >
+              <ScreenShare className="size-3" />
+              <span>AI Browser</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -378,9 +456,25 @@ export default function OpenCodePreviewPanel({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {isRunning && proxyPath ? (
+        {previewEngine === 'cdp' ? (
+          <ScreencastCanvas
+            projectId={projectId}
+            inspectMode={inspectMode}
+            isRecording={isRecording}
+            onToggleRecording={() => setIsRecording(!isRecording)}
+            onElementSelect={(selector, text) => {
+              setInspectMode(false);
+              setPendingAutoPrompt(
+                `I selected this element (${selector}) in the AI Remote Browser${
+                  text ? ` with label "${text}"` : ''
+                }. Please inspect and modify its attributes/styles as needed.`,
+              );
+            }}
+          />
+        ) : isRunning && proxyPath ? (
           <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-surface-secondary/50">
             <iframe
+              ref={iframeRef}
               key={`${proxyPath}-${previewRoutePath}-${reloadNonce}`}
               src={`${proxyPath.replace(/\/+$/, '')}${
                 previewRoutePath.startsWith('/') ? previewRoutePath : `/${previewRoutePath}`

@@ -5,14 +5,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MutationKeys, QueryKeys, dataService } from 'librechat-data-provider';
 import {
   AlertCircle,
+  Archive,
+  ArchiveRestore,
+  Check,
   CheckCircle2,
+  Circle,
+  Clock,
+  Edit2,
+  FileCode2,
+  FileText,
   ImagePlus,
   ListTodo,
+  Loader2,
+  Paperclip,
   Plus,
   Send,
   ShieldAlert,
   Sparkles,
   Square,
+  Trash2,
   Wrench,
   X,
 } from 'lucide-react';
@@ -27,6 +38,7 @@ import type { StarterDomainId } from './starterTemplates';
 import {
   activeOpenCodeSessionIdAtom,
   openCodeDiffsAtom,
+  openCodeLocalPrivacyAtom,
   openCodeMessagesAtom,
   openCodePendingAutoPromptAtom,
   openCodePermissionsAtom,
@@ -352,8 +364,20 @@ export default function OpenCodeChatPanel({
   const [starterDomain, setStarterDomain] = useState<StarterDomainId>('all');
   const [starterSearch, setStarterSearch] = useState('');
   const [attachedImages, setAttachedImages] = useState<OpenCodePromptImageAttachment[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [isRenamingSession, setIsRenamingSession] = useState(false);
+  const [sessionRenameValue, setSessionRenameValue] = useState('');
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<
+    Array<{ name: string; size: number; content: string }>
+  >([]);
+  const localPrivacyActive = useAtomValue(openCodeLocalPrivacyAtom);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const docInputRef = useRef<HTMLInputElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastSubmittedPromptRef = useRef<{
     text: string;
     images?: OpenCodePromptImageAttachment[];
@@ -544,6 +568,49 @@ export default function OpenCodeChatPanel({
     },
   );
 
+  const updateSessionMutation = useMutation(
+    [MutationKeys.opencodeUpdateSession, projectId],
+    ({
+      sessionId,
+      payload,
+    }: {
+      sessionId: string;
+      payload: { title?: string; time?: { archived?: number } };
+    }) => dataService.updateOpenCodeSession(projectId, sessionId, payload),
+    {
+      onSuccess: (updated) => {
+        setIsRenamingSession(false);
+        queryClient.invalidateQueries([QueryKeys.opencodeSessions, projectId]);
+        if (updated.time?.archived && updated.id === activeSessionId) {
+          const remaining = (sessionsQuery.data ?? []).filter(
+            (s) => s.id !== updated.id && !s.time?.archived,
+          );
+          setActiveSessionId(remaining[0]?.id ?? null);
+          setMessages([]);
+          setDiffs([]);
+        }
+      },
+      onError: () => setSessionError(localize('com_opencode_error_generic')),
+    },
+  );
+
+  const deleteSessionMutation = useMutation(
+    [MutationKeys.opencodeDeleteSession, projectId],
+    (sessionId: string) => dataService.deleteOpenCodeSession(projectId, sessionId),
+    {
+      onSuccess: (_, deletedId) => {
+        queryClient.invalidateQueries([QueryKeys.opencodeSessions, projectId]);
+        if (deletedId === activeSessionId) {
+          const remaining = (sessionsQuery.data ?? []).filter((s) => s.id !== deletedId);
+          setActiveSessionId(remaining[0]?.id ?? null);
+          setMessages([]);
+          setDiffs([]);
+        }
+      },
+      onError: () => setSessionError(localize('com_opencode_error_generic')),
+    },
+  );
+
   const sendPromptMutation = useMutation(
     [MutationKeys.opencodeSendPrompt, projectId],
     async ({ text, images }: { text: string; images?: OpenCodePromptImageAttachment[] }) => {
@@ -561,6 +628,7 @@ export default function OpenCodeChatPanel({
         ...(selectedAgent ? { agent: selectedAgent } : {}),
         ...(selectedModel ? { model: selectedModel } : {}),
         ...(images && images.length > 0 ? { images } : {}),
+        mode: localPrivacyActive ? 'privacy' : 'vibecoding',
       });
     },
     {
@@ -639,12 +707,33 @@ export default function OpenCodeChatPanel({
       const dataUrl = typeof reader.result === 'string' ? reader.result : '';
       if (dataUrl) {
         setAttachedImages((prev) => [
-          ...prev.slice(0, 2),
+          ...prev.slice(0, 4),
           { name: file.name || 'screenshot.png', mime: file.type, dataUrl },
         ]);
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const readDocumentFile = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      readImageFile(file);
+      return;
+    }
+    const MAX_DOC_BYTES = 256 * 1024;
+    if (file.size > MAX_DOC_BYTES) {
+      alert(`File "${file.name}" is too large (max 256KB for context attachments).`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = typeof reader.result === 'string' ? reader.result : '';
+      setAttachedFiles((prev) => [
+        ...prev.filter((f) => f.name !== file.name).slice(0, 5),
+        { name: file.name, size: file.size, content },
+      ]);
+    };
+    reader.readAsText(file);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -675,16 +764,43 @@ export default function OpenCodeChatPanel({
     e.target.value = '';
   };
 
-  const handleSend = () => {
-    const trimmed = promptInput.trim();
-    if ((!trimmed && attachedImages.length === 0) || !reachable || sendPromptMutation.isLoading) {
+  const handleDocInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) {
       return;
     }
-    const textToSend =
-      trimmed || 'Please inspect the attached screenshot and fix or implement what is shown.';
+    for (let i = 0; i < files.length; i++) {
+      readDocumentFile(files[i]);
+    }
+    e.target.value = '';
+  };
+
+  const handleSend = () => {
+    const trimmed = promptInput.trim();
+    if (
+      (!trimmed && attachedImages.length === 0 && attachedFiles.length === 0) ||
+      !reachable ||
+      sendPromptMutation.isLoading
+    ) {
+      return;
+    }
+    let textToSend = trimmed;
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles
+        .map((f) => `--- Attached File: ${f.name} ---\n${f.content}\n--- End of ${f.name} ---`)
+        .join('\n\n');
+      textToSend = textToSend ? `${textToSend}\n\n${fileContext}` : `Attached Files:\n${fileContext}`;
+    }
+    if (!textToSend && attachedImages.length > 0) {
+      textToSend = 'Please inspect the attached screenshot and fix or implement what is shown.';
+    }
     const imgsToSend = [...attachedImages];
     setPromptInput('');
     setAttachedImages([]);
+    setAttachedFiles([]);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '72px';
+    }
     sendPromptMutation.mutate({ text: textToSend, images: imgsToSend });
   };
 
@@ -738,26 +854,117 @@ export default function OpenCodeChatPanel({
       ? localize('com_opencode_status_streaming')
       : localize(streamStatusKeyMap[streamState]);
 
+  const allSessions = sessionsQuery.data ?? [];
+  const visibleSessions = useMemo(
+    () => allSessions.filter((s) => showArchived || !s.time?.archived),
+    [allSessions, showArchived],
+  );
+  const activeSession = useMemo(
+    () => allSessions.find((s) => s.id === activeSessionId) ?? null,
+    [allSessions, activeSessionId],
+  );
+  const isCurrentSessionArchived = Boolean(activeSession?.time?.archived);
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface-primary text-text-primary">
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!isDraggingOver) {
+          setIsDraggingOver(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) {
+          setIsDraggingOver(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDraggingOver(false);
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) {
+          return;
+        }
+        for (let i = 0; i < files.length; i += 1) {
+          readDocumentFile(files[i]);
+        }
+      }}
+      className={`relative flex h-full min-h-0 flex-col bg-surface-primary text-text-primary ${
+        isDraggingOver ? 'ring-2 ring-inset ring-emerald-500/70' : ''
+      }`}
+    >
+      {isDraggingOver ? (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-surface-primary/85 p-6 text-center backdrop-blur-xs">
+          <div className="rounded-xl border border-dashed border-emerald-500 bg-surface-secondary px-5 py-4 text-xs font-medium text-emerald-500 shadow-lg">
+            Drop images or code/document files to attach to your prompt
+          </div>
+        </div>
+      ) : null}
       {/* Toolbar: Sessions, Model picker, Agent picker, Status */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs">
-        <select
-          aria-label={localize('com_opencode_select_session')}
-          value={activeSessionId ?? ''}
-          onChange={(e) => {
-            setActiveSessionId(e.target.value || null);
-            setSessionError(null);
-          }}
-          className="max-w-[180px] rounded border border-border-light bg-surface-primary px-2 py-1 text-xs text-text-primary"
-        >
-          <option value="">{localize('com_opencode_select_session')}</option>
-          {(sessionsQuery.data ?? []).map((sess) => (
-            <option key={sess.id} value={sess.id}>
-              {sess.title || sess.id}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs">
+        {isRenamingSession && activeSessionId ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (sessionRenameValue.trim()) {
+                updateSessionMutation.mutate({
+                  sessionId: activeSessionId,
+                  payload: { title: sessionRenameValue.trim() },
+                });
+              } else {
+                setIsRenamingSession(false);
+              }
+            }}
+            className="flex items-center gap-1"
+          >
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={sessionRenameValue}
+              onChange={(e) => setSessionRenameValue(e.target.value)}
+              className="h-7 w-[160px] rounded border border-border-medium bg-surface-primary px-2 text-xs text-text-primary focus:outline-none"
+              autoFocus
+            />
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={updateSessionMutation.isLoading || !sessionRenameValue.trim()}
+              className="h-7 w-7 p-0"
+              title={localize('com_ui_save')}
+            >
+              <Check className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsRenamingSession(false)}
+              className="h-7 w-7 p-0"
+              title={localize('com_ui_cancel')}
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </Button>
+          </form>
+        ) : (
+          <select
+            aria-label={localize('com_opencode_select_session')}
+            value={activeSessionId ?? ''}
+            onChange={(e) => {
+              setActiveSessionId(e.target.value || null);
+              setSessionError(null);
+            }}
+            className="max-w-[170px] rounded border border-border-light bg-surface-primary px-2 py-1 text-xs text-text-primary"
+          >
+            <option value="">{localize('com_opencode_select_session')}</option>
+            {visibleSessions.map((sess) => (
+              <option key={sess.id} value={sess.id}>
+                {sess.title || sess.id}
+                {sess.time?.archived ? ` [${localize('com_ui_archive')}]` : ''}
+              </option>
+            ))}
+          </select>
+        )}
 
         <Button
           type="button"
@@ -766,10 +973,91 @@ export default function OpenCodeChatPanel({
           disabled={!reachable || createSessionMutation.isLoading}
           onClick={() => createSessionMutation.mutate()}
           className="h-7 gap-1 px-2 text-xs"
+          title={localize('com_opencode_new_session')}
         >
           <Plus className="size-3.5" aria-hidden="true" />
-          {localize('com_opencode_new_session')}
+          <span className="hidden sm:inline">{localize('com_opencode_new_session')}</span>
         </Button>
+
+        {activeSessionId && !isRenamingSession ? (
+          <div className="flex items-center gap-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!reachable || updateSessionMutation.isLoading}
+              onClick={() => {
+                setSessionRenameValue(activeSession?.title || '');
+                setIsRenamingSession(true);
+              }}
+              className="h-7 w-7 p-0 text-text-secondary hover:text-text-primary"
+              title={localize('com_opencode_rename_session')}
+            >
+              <Edit2 className="size-3.5" aria-hidden="true" />
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!reachable || updateSessionMutation.isLoading}
+              onClick={() => {
+                if (isCurrentSessionArchived) {
+                  updateSessionMutation.mutate({
+                    sessionId: activeSessionId,
+                    payload: { time: { archived: 0 } },
+                  });
+                } else {
+                  updateSessionMutation.mutate({
+                    sessionId: activeSessionId,
+                    payload: { time: { archived: Date.now() } },
+                  });
+                }
+              }}
+              className="h-7 w-7 p-0 text-text-secondary hover:text-text-primary"
+              title={
+                isCurrentSessionArchived
+                  ? localize('com_opencode_unarchive_session')
+                  : localize('com_opencode_archive_session')
+              }
+            >
+              {isCurrentSessionArchived ? (
+                <ArchiveRestore className="size-3.5" aria-hidden="true" />
+              ) : (
+                <Archive className="size-3.5" aria-hidden="true" />
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!reachable || deleteSessionMutation.isLoading}
+              onClick={() => {
+                if (window.confirm(localize('com_opencode_delete_session_confirm'))) {
+                  deleteSessionMutation.mutate(activeSessionId);
+                }
+              }}
+              className="h-7 w-7 p-0 text-text-secondary hover:text-red-500"
+              title={localize('com_opencode_delete_session')}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => setShowArchived((v) => !v)}
+          className={`ml-0.5 rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+            showArchived
+              ? 'bg-surface-active font-semibold text-text-primary'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+          title={localize('com_opencode_show_archived_sessions')}
+        >
+          {showArchived ? 'Hide Archived' : 'Show Archived'}
+        </button>
 
         {!simpleMode ? (
           <>
@@ -823,29 +1111,65 @@ export default function OpenCodeChatPanel({
         </span>
       </div>
 
-      {/* Todos bar */}
+      {/* Antigravity-style Dynamic Execution Plan & Task Steps Checklist */}
       {todos.length > 0 ? (
-        <div className="border-b border-border-light bg-surface-secondary/60 px-3 py-2 text-xs">
-          <div className="mb-1 flex items-center gap-1.5 font-medium text-text-secondary">
-            <ListTodo className="size-3.5" aria-hidden="true" />
-            <span>{localize('com_opencode_todos_title')}</span>
+        <div className="border-b border-border-light bg-surface-secondary/80 px-3 py-2.5 text-xs shadow-inner">
+          <div className="mb-2 flex items-center justify-between font-medium">
+            <div className="flex items-center gap-1.5 text-text-primary">
+              <ListTodo className="size-3.5 text-text-secondary" aria-hidden="true" />
+              <span className="font-semibold tracking-tight">{localize('com_opencode_todos_title') || 'Execution Plan'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+              <span className="rounded-full bg-surface-primary px-2 py-0.5 font-mono text-[10px] font-medium border border-border-light">
+                {todos.filter((t) => t.status === 'completed').length} / {todos.length} done
+              </span>
+            </div>
           </div>
-          <ul className="space-y-0.5">
-            {todos.map((todo, idx) => (
-              <li key={idx} className="flex items-center gap-1.5 text-text-primary">
-                <CheckCircle2
-                  className={`size-3 shrink-0 ${
-                    todo.status === 'completed'
-                      ? 'text-text-primary'
-                      : 'text-text-secondary opacity-40'
+          <ul className="space-y-1.5">
+            {todos.map((todo, idx) => {
+              const isCompleted = todo.status === 'completed';
+              const isInProgress = todo.status === 'in_progress' || todo.status === 'running';
+              return (
+                <li
+                  key={idx}
+                  className={`flex items-start gap-2 rounded-md px-2 py-1 transition-colors ${
+                    isInProgress
+                      ? 'bg-surface-primary/90 border border-border-medium shadow-sm'
+                      : isCompleted
+                      ? 'text-text-secondary opacity-75'
+                      : 'text-text-primary hover:bg-surface-primary/40'
                   }`}
-                  aria-hidden="true"
-                />
-                <span className={todo.status === 'completed' ? 'line-through opacity-70' : ''}>
-                  {todo.content}
-                </span>
-              </li>
-            ))}
+                >
+                  <div className="mt-0.5 shrink-0">
+                    {isCompleted ? (
+                      <CheckCircle2 className="size-3.5 text-emerald-500 dark:text-emerald-400" aria-hidden="true" />
+                    ) : isInProgress ? (
+                      <Loader2 className="size-3.5 animate-spin text-blue-500 dark:text-blue-400" aria-hidden="true" />
+                    ) : (
+                      <Circle className="size-3.5 text-text-secondary/60" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`text-xs leading-snug break-words ${
+                        isCompleted
+                          ? 'line-through text-text-secondary opacity-60'
+                          : isInProgress
+                          ? 'font-medium text-text-primary'
+                          : 'text-text-primary'
+                      }`}
+                    >
+                      {todo.content}
+                    </span>
+                  </div>
+                  {isInProgress ? (
+                    <span className="shrink-0 animate-pulse text-[10px] font-medium text-blue-500 dark:text-blue-400">
+                      Running…
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
@@ -1135,13 +1459,14 @@ export default function OpenCodeChatPanel({
         <div ref={endRef} />
       </div>
 
-      {/* Composer with Screenshot Paste (Ctrl+V) & Image Upload */}
+      {/* Composer with Screenshot Paste (Ctrl+V) & Universal File Attachments */}
       <div className="border-t border-border-light bg-surface-secondary p-2.5">
-        {attachedImages.length > 0 ? (
+        {/* Attached Files & Images preview strip */}
+        {(attachedImages.length > 0 || attachedFiles.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">
             {attachedImages.map((img, idx) => (
               <div
-                key={idx}
+                key={`img-${idx}`}
                 className="relative overflow-hidden rounded-md border border-border-medium bg-surface-primary p-1"
               >
                 <img
@@ -1159,8 +1484,29 @@ export default function OpenCodeChatPanel({
                 </button>
               </div>
             ))}
+            {attachedFiles.map((file, idx) => (
+              <div
+                key={`file-${idx}`}
+                className="flex items-center gap-1.5 rounded-md border border-border-medium bg-surface-primary px-2.5 py-1.5 text-xs text-text-primary shadow-sm"
+              >
+                <FileCode2 className="size-4 shrink-0 text-text-secondary" />
+                <div className="max-w-[140px] truncate font-mono text-[11px]" title={file.name}>
+                  {file.name}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                  aria-label="Remove attached file"
+                  className="ml-1 rounded p-0.5 text-text-secondary hover:bg-surface-tertiary hover:text-text-primary"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
           </div>
-        ) : null}
+        )}
+
+        {/* Hidden File Inputs */}
         <input
           ref={fileInputRef}
           type="file"
@@ -1169,6 +1515,15 @@ export default function OpenCodeChatPanel({
           onChange={handleFileInputChange}
           className="hidden"
         />
+        <input
+          ref={docInputRef}
+          type="file"
+          accept=".txt,.md,.json,.js,.ts,.tsx,.jsx,.py,.html,.css,.yaml,.yml,.toml,.csv,.sql,.log,.pdf"
+          multiple
+          onChange={handleDocInputChange}
+          className="hidden"
+        />
+
         {mentionSuggestions.length > 0 ? (
           <div className="mb-1.5 max-h-40 overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-1 shadow-md">
             {mentionSuggestions.map((filePath) => (
@@ -1184,30 +1539,85 @@ export default function OpenCodeChatPanel({
             ))}
           </div>
         ) : null}
-        <div className="flex items-end gap-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={!reachable}
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach or paste screenshot (Ctrl+V)"
-            aria-label="Attach screenshot"
-            className="size-9 shrink-0"
-          >
-            <ImagePlus className="size-4 text-text-secondary" aria-hidden="true" />
-          </Button>
+
+        <div className="relative flex items-end gap-1.5">
+          {/* Universal Attachment Menu */}
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={!reachable}
+              onClick={() => setShowAttachMenu((prev) => !prev)}
+              title="Add attachment (files, code, screenshots)"
+              aria-label="Add attachment"
+              className="size-9 shrink-0"
+            >
+              <Plus className="size-4 text-text-secondary" aria-hidden="true" />
+            </Button>
+            {showAttachMenu && (
+              <div
+                className="absolute bottom-11 left-0 z-30 w-52 rounded-lg border border-border-medium bg-surface-primary p-1 shadow-xl"
+                onMouseLeave={() => setShowAttachMenu(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachMenu(false);
+                    docInputRef.current?.click();
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+                >
+                  <FileText className="size-3.5 text-text-secondary" />
+                  <span>Attach Code & Files</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachMenu(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+                >
+                  <ImagePlus className="size-3.5 text-text-secondary" />
+                  <span>Attach Screenshot / Image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachMenu(false);
+                    setPromptInput((prev) =>
+                      prev.endsWith(' ') || prev.length === 0 ? `${prev}@` : `${prev} @`,
+                    );
+                    textareaRef.current?.focus();
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+                >
+                  <Paperclip className="size-3.5 text-text-secondary" />
+                  <span>Reference Workspace File (@)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <textarea
+            ref={textareaRef}
             value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
+            onChange={(e) => {
+              setPromptInput(e.target.value);
+              // Auto-expand textarea up to 200px
+              e.target.style.height = 'auto';
+              e.target.style.height = `${Math.min(200, Math.max(72, e.target.scrollHeight))}px`;
+            }}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            rows={2}
+            rows={3}
             disabled={!reachable}
             placeholder={localize('com_opencode_prompt_placeholder')}
             aria-label={localize('com_opencode_prompt_placeholder')}
-            className="min-h-[56px] flex-1 resize-none rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-sm leading-snug text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-heavy disabled:opacity-50"
+            className="min-h-[72px] max-h-[200px] flex-1 resize-none rounded-lg border border-border-light bg-surface-primary px-3 py-2 text-sm leading-snug text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-heavy disabled:opacity-50"
           />
+
           {runState !== 'idle' ? (
             <Button
               type="button"
@@ -1228,7 +1638,7 @@ export default function OpenCodeChatPanel({
               size="sm"
               disabled={
                 !reachable ||
-                (!promptInput.trim() && attachedImages.length === 0) ||
+                (!promptInput.trim() && attachedImages.length === 0 && attachedFiles.length === 0) ||
                 sendPromptMutation.isLoading
               }
               onClick={handleSend}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const { spawn } = require('child_process');
 
-const codeServerCmd = 'C:\\Users\\WinDiesel\\AppData\\Roaming\\npm\\code-server.cmd';
+const codeServerCmd = process.env.CODE_SERVER_PATH || 'code-server';
 const args = [
   '--bind-addr',
   '127.0.0.1:8085',

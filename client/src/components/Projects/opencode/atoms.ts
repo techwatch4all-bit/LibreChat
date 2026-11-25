@@ -1,11 +1,17 @@
 import { atom } from 'jotai';
 import type {
+  CloudDriveProviderId,
   OpenCodeDiffDto,
   OpenCodeMessageEnvelope,
   OpenCodePermissionRequestDto,
   OpenCodeQuestionRequestDto,
   OpenCodeTodoDto,
 } from 'librechat-data-provider';
+
+export interface CloudDriveBrowserSession {
+  accessToken: string;
+  expiresAt: number;
+}
 
 export type OpenCodeStreamState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -23,3 +29,15 @@ export const openCodeTodosAtom = atom<OpenCodeTodoDto[]>([]);
 export const openCodePermissionsAtom = atom<OpenCodePermissionRequestDto[]>([]);
 export const openCodeQuestionsAtom = atom<OpenCodeQuestionRequestDto[]>([]);
 export const openCodePendingAutoPromptAtom = atom<string | null>(null);
+export const openCodeLocalPrivacyAtom = atom<boolean>(false);
+
+/**
+ * Strictly in-memory browser-only Cloud Drive OAuth sessions.
+ * Never persisted to localStorage, sessionStorage, MongoDB, or any server.
+ */
+export const cloudDriveSessionsAtom = atom<
+  Record<CloudDriveProviderId, CloudDriveBrowserSession | null>
+>({
+  google_drive: null,
+  onedrive: null,
+});

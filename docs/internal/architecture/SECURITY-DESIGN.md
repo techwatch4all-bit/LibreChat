@@ -319,6 +319,27 @@ To guarantee that **no AI agent can self-authorize or forge administrative mutat
 
 ---
 
+## 5. Multi-Tier Database RBAC & Storage Engine Isolation
+
+### 5.1 The Threat Model
+If MongoDB runs on `127.0.0.1:27017` with authentication disabled (`#security: authorization`), every local script, AI subagent, and process on the tenant PC has unrestricted raw write access to the database. Code-level protections and 2FA can be wiped instantly by issuing an unauthenticated `updateOne()` command.
+
+### 5.2 Multi-Tier RBAC Architecture
+To eliminate raw database access while providing least-privilege operations across edge tenant nodes, MongoDB is partitioned into three discrete access tiers:
+
+| Tier | Principal | Scope / Database | Role / Permissions | Storage & Custody |
+|---|---|---|---|---|
+| **Tier 1: Sovereign Operator** | `satchida_operator` | `admin` | `root` (cluster management, user management, all DB operations) | Stored exclusively in HQ One-API Security Vault. **NEVER** stored on tenant disk or in git. |
+| **Tier 2: LibreChat Engine** | `librechat_app` | `LibreChat` | `readWrite` on `LibreChat` only. Zero access to `admin` or other system DBs. | Confined to `LibreChat/.env`. Windows NTFS ACL locked (`Administrators`/`SYSTEM` only). |
+| **Tier 3: Tenant Admin** | `tenant_admin_ro` | `LibreChat` | `read` on `LibreChat` only (audit, analytics, metrics). | Provided to client/school IT staff for read-only compliance inspection. Cannot mutate users, passwords, or quotas. |
+
+### 5.3 Enforced Invariants
+1. **Mandatory DB Authorization**: `mongod.cfg` must enforce `security.authorization: enabled`.
+2. **Zero In-Repo Break-Glass Scripts**: No ad-hoc scripts that connect to MongoDB and manipulate `twoFactorEnabled`, `password`, or `passwordSig` are permitted in the repository. All administrative changes must pass through the authenticated application layer.
+3. **No 2FA Bypass Without Hardware Sovereign Passphrase**: 2FA state cannot be disabled via database update scripts. Any break-glass procedure requires the cryptographic Sovereign Operator Passphrase Seal verified out-of-band.
+
+---
+
 ## 6. One-API Operator Master Security Vault & Remote Tenant Governance
 
 ### 6.1 Non-Technical Operator Model: Centralized Governance in One-API

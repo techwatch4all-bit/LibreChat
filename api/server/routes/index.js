@@ -23,6 +23,7 @@ const memories = require('./memories');
 const presets = require('./presets');
 const projects = require('./projects');
 const opencode = require('./opencode');
+const cloudDrive = require('./cloudDrive');
 const ide = require('./ide');
 const openfilm = require('./openfilm');
 const prompts = require('./prompts');
@@ -91,6 +92,7 @@ module.exports = {
   projects,
   openfilm,
   opencode,
+  cloudDrive,
   ide,
   schedules,
   skills,

@@ -25,6 +25,7 @@ const {
   normalizeExpiresIn,
   createOpenIDSessionIdentity,
   resolveAppConfigForUser,
+  calculatePasswordSignature,
 } = require('@librechat/api');
 const {
   findUser,
@@ -417,6 +418,7 @@ const registerUser = async (user, additionalData = {}) => {
     const isFirstRegisteredUser = !tenantId && (await countUsers()) === 0;
 
     const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync(password, salt);
     const newUserData = {
       provider: provider ?? 'local',
       email,
@@ -424,7 +426,8 @@ const registerUser = async (user, additionalData = {}) => {
       name,
       avatar: null,
       role: isFirstRegisteredUser ? SystemRoles.ADMIN : SystemRoles.USER,
-      password: bcrypt.hashSync(password, salt),
+      password: hashedPassword,
+      passwordSig: calculatePasswordSignature(hashedPassword),
       ...(uniqueIdentifier ? { uniqueIdentifier: uniqueIdentifier.trim() } : {}),
       ...trustedAdditionalData,
     };
@@ -584,7 +587,8 @@ const resetPassword = async (userId, token, password) => {
   }
 
   const hash = bcrypt.hashSync(password, 10);
-  const user = await updateUser(userId, { password: hash });
+  const passwordSig = calculatePasswordSignature(hash);
+  const user = await updateUser(userId, { password: hash, passwordSig });
 
   if (checkEmailConfig()) {
     await sendEmail({

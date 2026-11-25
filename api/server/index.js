@@ -422,6 +422,14 @@ const startServer = async () => {
       }),
     );
   }
+  /* Allow browser-direct OAuth popups (Google Identity Services / OneDrive PKCE) to
+   * return access tokens to the parent window without weakening same-origin isolation. */
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    }
+    next();
+  });
   app.use('/assets/vendor', (_req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
@@ -434,8 +442,7 @@ const startServer = async () => {
     next();
   });
   // OpenFilm Studio static assets (CanvasView, index chunks, CSS)
-  const openfilmStudioUiAssets =
-    'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\assets';
+  const openfilmStudioUiAssets = path.resolve(__dirname, '../../repos/openfilm/studio/ui/dist/assets');
   if (fs.existsSync(openfilmStudioUiAssets)) {
     app.use(
       '/assets',
@@ -498,14 +505,9 @@ const startServer = async () => {
       res.removeHeader('Cross-Origin-Embedder-Policy');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
-      if (
-        fs.existsSync(
-          'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\index.html',
-        )
-      ) {
-        return res.sendFile(
-          'C:\\Users\\WinDiesel\\AppData\\Local\\npm-cache\\_npx\\ab5ca1f87d8cabd8\\node_modules\\openfilm\\studio\\ui\\dist\\index.html',
-        );
+      const studioHtml = path.resolve(__dirname, '../../repos/openfilm/studio/ui/dist/index.html');
+      if (fs.existsSync(studioHtml)) {
+        return res.sendFile(studioHtml);
       }
     }
     next();
@@ -711,6 +713,7 @@ const startServer = async () => {
 
   app.use('/api/projects', routes.projects);
   app.use('/api/opencode', routes.opencode);
+  app.use('/api/cloud-drive', routes.cloudDrive);
   app.use('/api/ide', routes.ide.router);
   app.use('/api/openfilm', routes.openfilm.router);
 

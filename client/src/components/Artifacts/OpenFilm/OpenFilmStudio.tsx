@@ -182,6 +182,10 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       raw = raw.replace(/^```[a-zA-Z0-9_-]*\s*/, '').replace(/```\s*$/, '').trim();
     }
 
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const resolveAssetUrl = (u: string) => (origin && u.startsWith('/') ? `${origin}${u}` : u);
+    const baseTag = origin ? `<base href="${origin}/">` : '';
+
     if (
       raw.length > 0 &&
       (raw.includes('</script>') || raw.includes('</html>')) &&
@@ -189,6 +193,11 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
         raw.includes('requestAnimationFrame') ||
         raw.includes('renderer.render'))
     ) {
+      if (baseTag && !/<base\s/i.test(raw)) {
+        return /<head[^>]*>/i.test(raw)
+          ? raw.replace(/<head([^>]*)>/i, `<head$1>\n  ${baseTag}`)
+          : `${baseTag}\n${raw}`;
+      }
       return raw;
     }
 
@@ -198,11 +207,12 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       raw.match(/src=["']([^"']+\.html)["']/i) ||
       raw.match(/(\/(?:generated|motion)\/[^"'\s<>]+\.html)/i);
     if (iframeMatch && (iframeMatch[1] || iframeMatch[0])) {
-      const filmHtmlUrl = iframeMatch[1] || iframeMatch[0];
+      const filmHtmlUrl = resolveAssetUrl(iframeMatch[1] || iframeMatch[0]);
       return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  ${baseTag}
   <style>
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
@@ -253,10 +263,12 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
       (raw.startsWith('/') || raw.startsWith('http') ? raw.match(/https?:\/\/[^\s"'<>]+(?:\.(?:mp4|webm))/i)?.[0] || raw.match(/\/(?:generated|motion)\/[^\s"'<>]+\.(?:mp4|webm)/i)?.[0] : null);
 
     if (videoUrl) {
+      const resolvedVideoUrl = resolveAssetUrl(videoUrl);
       return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  ${baseTag}
   <style>
     html, body {
       margin: 0;
@@ -277,7 +289,7 @@ export default function OpenFilmStudio({ artifact, onExportVideo }: OpenFilmStud
   </style>
 </head>
 <body>
-  <video id="studio-video" src="${videoUrl}" preload="auto" playsinline></video>
+  <video id="studio-video" src="${resolvedVideoUrl}" controls preload="auto" playsinline></video>
   <script>
     (function() {
       var v = document.getElementById('studio-video');

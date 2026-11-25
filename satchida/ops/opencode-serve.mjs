@@ -3,14 +3,26 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-const LIBRECHAT_ENV_PATH = process.env.LIBRECHAT_ENV_PATH || resolve(process.cwd(), '.env');
+const LIBRECHAT_ROOT = resolve(dirname(import.meta.dirname || '.'), '..');
+const LIBRECHAT_ENV_PATH = process.env.LIBRECHAT_ENV_PATH || join(LIBRECHAT_ROOT, '.env');
+const envVars = loadEnvFile(LIBRECHAT_ENV_PATH);
+const DEFAULT_IN_REPO_CONFIG = join(LIBRECHAT_ROOT, 'repos', 'opencode', 'opencode.json');
 const OPENCODE_CONFIG_PATH =
-  process.env.OPENCODE_CONFIG || resolve(process.cwd(), 'config', 'opencode', 'opencode.json');
-const OPENCODE_PORT = String(process.env.OPENCODE_PORT || '4096');
+  process.env.OPENCODE_CONFIG ||
+  envVars.OPENCODE_CONFIG ||
+  (existsSync(DEFAULT_IN_REPO_CONFIG) ? DEFAULT_IN_REPO_CONFIG : 'D:\\LAN-AI-Infra\\opencode\\opencode.json');
+const OPENCODE_PORT = String(process.env.OPENCODE_PORT || envVars.OPENCODE_PORT || '4096');
 const OPENCODE_HOSTNAME = '127.0.0.1';
-const AUTOROUTER_BASE_URL = (
-  process.env.SATCHIDA_AUTOROUTER_BASE_URL || 'http://127.0.0.1:4000/v1'
-).replace(/\/+$/, '');
+const rawGateway = (
+  process.env.SATCHIDA_GATEWAY_URL ||
+  envVars.SATCHIDA_GATEWAY_URL ||
+  process.env.SATCHIDA_AUTOROUTER_BASE_URL ||
+  envVars.SATCHIDA_AUTOROUTER_BASE_URL ||
+  process.env.ONEAPI_BASE_URL ||
+  envVars.ONEAPI_BASE_URL ||
+  'http://127.0.0.1:4000/v1'
+).trim().replace(/\/+$/, '');
+const AUTOROUTER_BASE_URL = rawGateway.endsWith('/v1') ? rawGateway : `${rawGateway}/v1`;
 
 /**
  * Loads missing environment variables from LibreChat's `.env` without overwriting
@@ -55,7 +67,13 @@ async function syncOpenCodeConfig(gatewayVk) {
   /** @type {Record<string, { name: string; tool_call: boolean; attachment: boolean }>} */
   const models = {};
   try {
-    const headers = { Accept: 'application/json' };
+    const cfClientId = process.env.CF_ACCESS_CLIENT_ID || envVars.CF_ACCESS_CLIENT_ID;
+    const cfClientSecret = process.env.CF_ACCESS_CLIENT_SECRET || envVars.CF_ACCESS_CLIENT_SECRET;
+    const headers = {
+      Accept: 'application/json',
+      ...(cfClientId ? { 'CF-Access-Client-Id': cfClientId } : {}),
+      ...(cfClientSecret ? { 'CF-Access-Client-Secret': cfClientSecret } : {}),
+    };
     if (gatewayVk) {
       headers.Authorization = `Bearer ${gatewayVk}`;
     }
@@ -81,12 +99,12 @@ async function syncOpenCodeConfig(gatewayVk) {
       );
     } else {
       console.warn(
-        `[opencode-serve] AutoRouter /models returned HTTP ${response.status}; writing empty dynamic model map`,
+        `[opencode-serve] AutoRouter /models returned HTTP ${response.status}; using resilient Vibecoding fallback`,
       );
     }
   } catch (error) {
     console.warn(
-      `[opencode-serve] AutoRouter /models unreachable (${error?.name || 'Error'}); writing empty dynamic model map`,
+      `[opencode-serve] AutoRouter /models unreachable (${error?.name || 'Error'}); using resilient Vibecoding fallback`,
     );
   }
 
@@ -94,19 +112,16 @@ async function syncOpenCodeConfig(gatewayVk) {
   const discoveredIds = Object.keys(models);
   const selectedRoute = discoveredIds.includes(allowedRoute)
     ? allowedRoute
-    : discoveredIds[0];
+    : (discoveredIds[0] || allowedRoute);
 
-  // Expose ONLY the single Satchida Gateway Vibecoding route to OpenCode so end users
-  // cannot switch to Pro, Study, Motion, or raw upstream models.
-  const lockedModels = selectedRoute
-    ? {
-        [selectedRoute]: {
-          name: 'Satchida Gateway',
-          tool_call: true,
-          attachment: true,
-        },
-      }
-    : {};
+  // Expose Satchida Gateway Vibecoding route to OpenCode (with permanent resilient fallback)
+  const lockedModels = {
+    [selectedRoute]: {
+      name: 'Satchida Gateway',
+      tool_call: true,
+      attachment: true,
+    },
+  };
 
   const seatProxyBaseUrl = (
     process.env.SATCHIDA_OPENCODE_LLM_PROXY_URL ||
@@ -116,13 +131,14 @@ async function syncOpenCodeConfig(gatewayVk) {
   const config = {
     $schema: 'https://opencode.ai/config.json',
     enabled_providers: ['satchida', 'opencode', 'opencode-go'],
-    default_agent: 'build',
+    default_agent: 'vibe-coder',
     ...(selectedRoute ? { model: `satchida/${selectedRoute}` } : {}),
     permission: {
       edit: 'allow',
       write: 'allow',
       bash: 'allow',
       read: 'allow',
+      todowrite: 'allow',
     },
     provider: {
       satchida: {
@@ -138,7 +154,7 @@ async function syncOpenCodeConfig(gatewayVk) {
         npm: '@ai-sdk/openai-compatible',
         name: 'OpenCode Zen (Admin Free)',
         options: {
-          baseURL: seatProxyBaseUrl,
+          baseURL: 'https://opencode.ai/zen/v1',
         },
         models: {
           'longcat-2.5-free': {

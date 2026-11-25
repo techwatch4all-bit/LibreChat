@@ -3,7 +3,7 @@
   "defaultTraffic": "internal",
   "revenueGate": "off",
   "visionRegex": "vl|vision|omni|gemma-4|qwen3\\.[5-9]|qwen3\\.8|muse|mimo|gpt-6|llama-4|pixtral|gemini|glm-.*v|kimi",
-  "freeListFile": "C:/Users/WinDiesel/.config/opencode/free-exceptions.json",
+  "freeListFile": "repos/opencode/xdg-config/opencode/free-exceptions.json",
   "freeListSkipRegex": "asr|parakeet|image|lyria|safety|embed|tts|rerank|whisper|lora|abliterated|--ep-",
   "providers": {
     "llama.cpp": {

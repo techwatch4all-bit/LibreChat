@@ -8,8 +8,10 @@ import type { OpenCodeProjectRecord } from './paths';
 import { buildOpenCodeBasicAuthHeader } from './client';
 import { getSafeErrorMetadata } from '~/utils/errors';
 import { resolveProjectRoot } from './paths';
+import { sandboxedBrowserManager } from './browser';
 
 const PTY_CONNECT_PATH_RE = /^\/api\/opencode\/pty\/(pty_[^/]+)\/connect$/;
+const BROWSER_SCREENCAST_PATH_RE = /^\/api\/opencode\/([a-zA-Z0-9_-]+)\/browser\/screencast$/;
 const WS_OPEN_STATE = 1;
 
 export type OpenCodeWsPayload = string | Buffer | ArrayBuffer | Buffer[];
@@ -100,6 +102,35 @@ export function createOpenCodePtyUpgradeHandler(deps: OpenCodePtyUpgradeDeps) {
       url = new URL(req.url ?? '', `http://${req.headers.host || 'localhost'}`);
     } catch {
       return false;
+    }
+
+    const browserMatch = url.pathname.match(BROWSER_SCREENCAST_PATH_RE);
+    if (browserMatch) {
+      const projectId = browserMatch[1];
+      const jwtToken = extractJwtToken(req, url);
+      if (!jwtToken) {
+        rejectUpgrade(socket, 401, 'Unauthorized');
+        return true;
+      }
+      const jwtUser = deps.verifyJwt(jwtToken);
+      if (!jwtUser || !jwtUser.id) {
+        rejectUpgrade(socket, 401, 'Unauthorized');
+        return true;
+      }
+
+      deps.wss.handleUpgrade(req, socket, head, async (clientWs) => {
+        try {
+          const session = await sandboxedBrowserManager.getOrCreateSession({
+            projectId,
+            userId: jwtUser.id,
+          });
+          await sandboxedBrowserManager.startScreencast(projectId, clientWs as any);
+        } catch (err) {
+          logger.error(`[OpenCodeWS] Failed to start browser screencast for ${projectId}:`, err);
+          clientWs.close(1011, 'Browser session error');
+        }
+      });
+      return true;
     }
 
     const match = url.pathname.match(PTY_CONNECT_PATH_RE);

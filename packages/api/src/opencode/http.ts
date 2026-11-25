@@ -29,18 +29,21 @@ import { createOpenCodePtyRegistry } from './ptyRegistry';
 import { getSafeErrorMetadata } from '~/utils/errors';
 import { createOpenCodeClient } from './client';
 import { relayOpenCodeEvents } from './sse';
+import { sandboxedBrowserManager } from './browser';
 
 const SESSION_ID_RE = /^ses[A-Za-z0-9_-]+$/;
 const PERMISSION_ID_RE = /^per[A-Za-z0-9_-]+$/;
 const QUESTION_ID_RE = /^que[A-Za-z0-9_-]+$/;
 const ALLOWED_PERMISSION_REPLIES = new Set(['once', 'always', 'reject']);
 
-const WORKSPACE_RUNTIME_CONTRACT = `\n\n[Workspace Runtime Contract — apply automatically when building or updating a web app:
-1. Build a self-contained runnable Node.js ESM app ("type": "module" in package.json with "scripts": { "dev": "node --watch server.mjs" } so server edits hot-reload automatically).
-2. In server.mjs, import createServer from "node:http" and readFileSync from "node:fs", listen on Number(process.env.PORT || 0) on host "127.0.0.1" (never use placeholder strings like [IP_ADDRESS]), and log "Server listening on http://127.0.0.1:" + server.address().port.
-3. In index.html / frontend code, always use relative paths ("./api/...", never absolute location.origin + "/api/...") so endpoints and EventSource SSE work inside the preview proxy.
-4. When scraping or fetching live data (e.g., metals/gold prices, tickers, or JS-rendered sites where plain HTML has no price strings), do not stop to ask a non-technical user whether to install Puppeteer — either query http://127.0.0.1:3080/api/opencode/reader?url=<encodedUrl> or automatically discover and query the site's underlying JSON/XHR/WebSocket/RSS feed so real live values render out of the box.
-5. Always run "node --check server.mjs" and automatically fix any syntax or runtime issues before finishing.]`;
+const WORKSPACE_RUNTIME_CONTRACT = `\n\n[Workspace Runtime Contract — apply automatically when building, diagnosing, or updating:
+1. Dynamic Plan & Task Tracking: Before executing any multi-step task, diagnostic, or bugfix, call the todowrite tool (or initialize session todos) with 3 to 7 concrete atomic steps (e.g. status: "in_progress" for current step, "pending" for upcoming steps). As you complete each step, update that step's status to "completed" and the next to "in_progress". Keep the user updated on live progress rather than chatting in a question-and-answer loop.
+2. Autonomous Problem Solving & Vibe Coding: Do NOT ask passive questions or stop at merely reporting errors (e.g. saying a service is in 'StopPending' without attempting to resolve it). If a service or command fails, immediately investigate root cause, run diagnostic tools, kill hanging PIDs, restart corrupted processes, and verify operational health automatically.
+3. Build a self-contained runnable Node.js ESM app ("type": "module" in package.json with "scripts": { "dev": "node --watch server.mjs" } so server edits hot-reload automatically).
+4. In server.mjs, import createServer from "node:http" and readFileSync from "node:fs", listen on Number(process.env.PORT || 0) on host "127.0.0.1" (never use placeholder strings like [IP_ADDRESS]), and log "Server listening on http://127.0.0.1:" + server.address().port.
+5. In index.html / frontend code, always use relative paths ("./api/...", never absolute location.origin + "/api/...") so endpoints and EventSource SSE work inside the preview proxy.
+6. When scraping or fetching live data (e.g., metals/gold prices, tickers, or JS-rendered sites where plain HTML has no price strings), do not stop to ask a non-technical user whether to install Puppeteer — either query http://127.0.0.1:3080/api/opencode/reader?url=<encodedUrl> or automatically discover and query the site's underlying JSON/XHR/WebSocket/RSS feed so real live values render out of the box.
+7. Always run "node --check server.mjs" and automatically fix any syntax or runtime issues before finishing.]`;
 
 function appendWorkspaceContract(
   userText: string,
@@ -82,6 +85,7 @@ export interface OpenCodeHttpDeps {
     tenantId?: string | null;
     role?: string | null;
     familyRole?: string | null;
+    username?: string | null;
   } | null>;
   enforcePlatformAdminForPty?: boolean;
 }
@@ -93,6 +97,9 @@ export interface OpenCodeHttpHandlers {
   getTree: (req: Request, res: Response) => Promise<Response>;
   readFile: (req: Request, res: Response) => Promise<Response>;
   writeFile: (req: Request, res: Response) => Promise<Response>;
+  uploadFiles: (req: Request, res: Response) => Promise<Response>;
+  getEnv: (req: Request, res: Response) => Promise<Response>;
+  saveEnv: (req: Request, res: Response) => Promise<Response>;
   deleteFile: (req: Request, res: Response) => Promise<Response>;
   renameFile: (req: Request, res: Response) => Promise<Response>;
   searchFiles: (req: Request, res: Response) => Promise<Response>;
@@ -102,6 +109,8 @@ export interface OpenCodeHttpHandlers {
   createSessionPrompt: (req: Request, res: Response) => Promise<Response>;
   listSessions: (req: Request, res: Response) => Promise<Response>;
   createSession: (req: Request, res: Response) => Promise<Response>;
+  updateSession: (req: Request, res: Response) => Promise<Response>;
+  deleteSession: (req: Request, res: Response) => Promise<Response>;
   sendPrompt: (req: Request, res: Response) => Promise<Response>;
   abortSession: (req: Request, res: Response) => Promise<Response>;
   getSessionMessages: (req: Request, res: Response) => Promise<Response>;
@@ -441,6 +450,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
   const previewManager = deps.previewManager ?? createOpenCodePreviewManager();
   interface SeatCallerRecord {
     userId: string;
+    username?: string | null;
     projectId?: string;
     projectRoot?: string;
     isPlatformAdmin: boolean;
@@ -492,6 +502,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
     let seatToken: string | null | undefined = req.user?.seatToken;
     let accountType: string | null | undefined = req.user?.accountType;
     let tenantId: string | null | undefined = req.user?.tenantId;
+    let username: string | null | undefined = req.user?.username;
 
     if (deps.getUserSeatCredential) {
       const cred = await deps.getUserSeatCredential(userId);
@@ -499,6 +510,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         seatToken = cred.seatToken ?? seatToken;
         accountType = cred.accountType ?? accountType;
         tenantId = cred.tenantId ?? tenantId;
+        username = cred.username ?? username;
         if (cred.familyRole === 'minor' || cred.familyRole === 'child') {
           return { ok: false, error: { code: 'OPENCODE_UNAUTHORIZED', status: 403 } };
         }
@@ -526,6 +538,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
 
     const record: SeatCallerRecord = {
       userId,
+      username,
       projectId: context?.projectId,
       projectRoot: context?.projectRoot,
       isPlatformAdmin,
@@ -606,6 +619,10 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
       });
     }
 
+    void recordActiveLlmCaller(req, { projectId, projectRoot: rootResult.value }).catch(() => {
+      /* ignore background caller context recording failure */
+    });
+
     return {
       ok: true,
       userId,
@@ -684,12 +701,61 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           return res.json({ enabled: true, reachable: false, version: null });
         }
 
-        const isPlatformAdmin = await isPlatformAdminUser(authReq);
+        const fetchFn = deps.fetchImpl ?? fetch;
+        const probeLocalLlama = async (): Promise<{
+          reachable: boolean;
+          loadedModel: string | null;
+        }> => {
+          const llamaBase = (
+            process.env.SATCHIDA_LLAMA_BASE_URL || 'http://127.0.0.1:8080/v1'
+          ).replace(/\/+$/, '');
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 1500);
+          try {
+            const modelsRes = await fetchFn(`${llamaBase}/models`, {
+              method: 'GET',
+              signal: controller.signal,
+            });
+            if (!modelsRes.ok) {
+              return { reachable: false, loadedModel: null };
+            }
+            const modelsJson = (await modelsRes.json()) as {
+              data?: Array<{
+                id?: string;
+                status?: { value?: string };
+                loaded?: boolean;
+              }>;
+            };
+            const modelsList = Array.isArray(modelsJson?.data) ? modelsJson.data : [];
+            const loaded =
+              modelsList.find((m) => m.status?.value === 'loaded' || m.loaded === true) ??
+              modelsList.find(
+                (m) =>
+                  typeof m.id === 'string' &&
+                  m.status?.value !== 'unloaded' &&
+                  m.status?.value !== 'loading',
+              );
+            return {
+              reachable: true,
+              loadedModel: loaded?.id ?? null,
+            };
+          } catch {
+            return { reachable: false, loadedModel: null };
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+
+        const [isPlatformAdmin, localLlama] = await Promise.all([
+          isPlatformAdminUser(authReq),
+          probeLocalLlama(),
+        ]);
         return res.json({
           enabled: true,
           reachable: true,
           version: health.value.version,
           isPlatformAdmin,
+          localLlama,
         });
       } catch (error) {
         logger.error('[OpenCodeHttp] getStatus failed', getSafeErrorMetadata(error));
@@ -788,6 +854,150 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         return res.json({ ok: true, path: resolved.value });
       } catch (error) {
         logger.error('[OpenCodeHttp] writeFile failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    uploadFiles: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+
+        const body = req.body as
+          | { files?: Array<{ path?: unknown; contentBase64?: unknown }> }
+          | undefined;
+        if (!Array.isArray(body?.files) || body.files.length === 0) {
+          return sendError(res, { code: 'INVALID_REQUEST', status: 400 });
+        }
+
+        const MAX_BATCH_FILES = 50;
+        const MAX_SINGLE_BYTES = Math.max(ctx.config.maxFileBytes || 1024 * 1024, 5 * 1024 * 1024);
+        const filesSlice = body.files.slice(0, MAX_BATCH_FILES);
+        const uploaded: string[] = [];
+        const skipped: Array<{ path: string; reason: string }> = [];
+
+        for (const entry of filesSlice) {
+          if (typeof entry?.path !== 'string' || typeof entry.contentBase64 !== 'string') {
+            continue;
+          }
+          const sanitizedRel = entry.path
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '')
+            .trim();
+          if (!sanitizedRel || sanitizedRel.includes('..')) {
+            skipped.push({ path: entry.path, reason: 'PATH_INVALID' });
+            continue;
+          }
+
+          const buf = Buffer.from(entry.contentBase64, 'base64');
+          if (buf.byteLength > MAX_SINGLE_BYTES) {
+            skipped.push({ path: sanitizedRel, reason: 'FILE_TOO_LARGE' });
+            continue;
+          }
+
+          const resolved = resolveInsideRoot(ctx.projectRoot, sanitizedRel, { mustExist: false });
+          if (!resolved.ok) {
+            skipped.push({ path: sanitizedRel, reason: resolved.error.code });
+            continue;
+          }
+
+          const writable = assertWritablePath(ctx.projectRoot, resolved.value);
+          if (!writable.ok) {
+            skipped.push({ path: sanitizedRel, reason: writable.error.code });
+            continue;
+          }
+
+          if (fs.existsSync(resolved.value) && fs.statSync(resolved.value).isDirectory()) {
+            skipped.push({ path: sanitizedRel, reason: 'PATH_INVALID' });
+            continue;
+          }
+
+          fs.mkdirSync(path.dirname(resolved.value), { recursive: true });
+          fs.writeFileSync(resolved.value, buf);
+          uploaded.push(sanitizedRel);
+        }
+
+        return res.json({ ok: true, uploaded, skipped });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] uploadFiles failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    getEnv: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+        const envPath = path.join(ctx.projectRoot, '.env');
+        if (!fs.existsSync(envPath) || !fs.statSync(envPath).isFile()) {
+          return res.json({ entries: [] });
+        }
+        const raw = fs.readFileSync(envPath, 'utf8');
+        const entries: Array<{ key: string; value: string }> = [];
+        for (const line of raw.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) {
+            continue;
+          }
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx <= 0) {
+            continue;
+          }
+          const key = trimmed.slice(0, eqIdx).trim();
+          let value = trimmed.slice(eqIdx + 1).trim();
+          if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+          ) {
+            value = value.slice(1, -1);
+          }
+          if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+            entries.push({ key, value });
+          }
+        }
+        return res.json({ entries });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] getEnv failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    saveEnv: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+        const body = req.body as
+          | { entries?: Array<{ key?: unknown; value?: unknown }> }
+          | undefined;
+        if (!Array.isArray(body?.entries)) {
+          return sendError(res, { code: 'INVALID_REQUEST', status: 400 });
+        }
+        const lines: string[] = [];
+        for (const item of body.entries.slice(0, 100)) {
+          if (typeof item?.key !== 'string' || typeof item?.value !== 'string') {
+            continue;
+          }
+          const key = item.key.trim();
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+            continue;
+          }
+          const cleanVal = item.value.replace(/[\r\n]/g, '');
+          const needsQuotes = /[\s#"'=]/.test(cleanVal);
+          lines.push(
+            needsQuotes ? `${key}="${cleanVal.replace(/"/g, '\\"')}"` : `${key}=${cleanVal}`,
+          );
+        }
+        const envPath = path.join(ctx.projectRoot, '.env');
+        fs.writeFileSync(envPath, `${lines.join('\n')}${lines.length > 0 ? '\n' : ''}`, 'utf8');
+        return res.json({ ok: true, count: lines.length });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] saveEnv failed', getSafeErrorMetadata(error));
         return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
       }
     },
@@ -1250,6 +1460,98 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
       }
     },
 
+    updateSession: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+        const clientRes = requireClient(ctx.config);
+        if (!clientRes.ok) {
+          return sendError(res, clientRes.error);
+        }
+
+        const owned = await assertSessionOwnedByProject(
+          clientRes.client,
+          ctx.projectRoot,
+          req.params?.sessionId,
+        );
+        if (!owned.ok) {
+          return sendError(res, owned.error);
+        }
+
+        const body = req.body as
+          | {
+              title?: unknown;
+              time?: { archived?: unknown };
+              permission?: unknown;
+            }
+          | undefined;
+
+        const updatePayload: {
+          title?: string;
+          time?: { archived?: number };
+        } = {};
+
+        if (typeof body?.title === 'string') {
+          updatePayload.title = body.title.trim();
+        }
+
+        if (body?.time && typeof body.time === 'object') {
+          if (typeof body.time.archived === 'number') {
+            updatePayload.time = { archived: body.time.archived };
+          }
+        }
+
+        const result = await clientRes.client.updateSession({
+          sessionId: owned.session.id,
+          directory: ctx.projectRoot,
+          body: updatePayload,
+        });
+        if (!result.ok) {
+          return sendError(res, result.error);
+        }
+        return res.json(result.value);
+      } catch (error) {
+        logger.error('[OpenCodeHttp] updateSession failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    deleteSession: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveRequestContext(req as AuthenticatedRequest);
+        if (!ctx.ok) {
+          return sendError(res, ctx.error);
+        }
+        const clientRes = requireClient(ctx.config);
+        if (!clientRes.ok) {
+          return sendError(res, clientRes.error);
+        }
+
+        const owned = await assertSessionOwnedByProject(
+          clientRes.client,
+          ctx.projectRoot,
+          req.params?.sessionId,
+        );
+        if (!owned.ok) {
+          return sendError(res, owned.error);
+        }
+
+        const result = await clientRes.client.deleteSession({
+          sessionId: owned.session.id,
+          directory: ctx.projectRoot,
+        });
+        if (!result.ok) {
+          return sendError(res, result.error);
+        }
+        return res.json({ success: true, id: owned.session.id });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] deleteSession failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
     sendPrompt: async (req: Request, res: Response) => {
       try {
         const ctx = await resolveRequestContext(req as AuthenticatedRequest);
@@ -1546,10 +1848,9 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         if (!result.ok) {
           return sendError(res, result.error);
         }
-        const isPlatformAdmin = await isPlatformAdminUser(req as AuthenticatedRequest);
-        const allowedProviders = result.value.providers.filter(
-          (p) => p.id === 'satchida' || (isPlatformAdmin && ADMIN_FREE_PROVIDERS.has(p.id)),
-        );
+        // Invariant: In Satchida Vibecoding, all sessions strictly route through
+        // Satchida Gateway. Do not expose external providers to the session picker.
+        const allowedProviders = result.value.providers.filter((p) => p.id === 'satchida');
         return res.json({
           providers: allowedProviders.length > 0 ? allowedProviders : result.value.providers,
           default: result.value.default,
@@ -2308,9 +2609,17 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           return;
         }
 
-        const gatewayBase = (
-          process.env.SATCHIDA_AUTOROUTER_BASE_URL || 'http://127.0.0.1:4000/v1'
-        ).replace(/\/+$/, '');
+        const defaultGateway =
+          process.env.SATCHIDA_TENANT_MODE === 'true'
+            ? 'https://gateway.satchida.com/v1'
+            : 'http://127.0.0.1:4000/v1';
+        const rawGateway = (
+          process.env.SATCHIDA_GATEWAY_URL ||
+          process.env.SATCHIDA_AUTOROUTER_BASE_URL ||
+          process.env.ONEAPI_BASE_URL ||
+          defaultGateway
+        ).trim().replace(/\/+$/, '');
+        const gatewayBase = rawGateway.endsWith('/v1') ? rawGateway : `${rawGateway}/v1`;
         const subPath = req.path.replace(/^\/+/, '');
         const targetUrl = `${gatewayBase}/${subPath}`;
 
@@ -2347,11 +2656,10 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         }
 
         // Privacy Mode & Tier Enforcement:
-        // When a Privacy-tier user is active OR 'privacy' mode is requested, route STRICTLY to the
-        // local llama.cpp fleet on 127.0.0.1:8080 using the currently loaded model
-        // (zero cloud/gateway routing). For all other modes and entitled tiers,
-        // route through Satchida Gateway using the user's seatToken.
-        const isPrivacyTier = caller?.accountType?.toLowerCase() === 'privacy';
+        // When 'privacy' mode is explicitly requested OR when a local model is targeted,
+        // route to the local llama.cpp fleet on 127.0.0.1:8080.
+        // For Vibecoding mode (including Privacy-tier users using Vibecoding via Satchida Gateway/Cloud ZDR),
+        // route through Satchida Gateway (:4000) using the user's seatToken (or expectedVk fallback).
         const requestedMode = (
           (typeof req.headers['x-satchida-mode'] === 'string'
             ? req.headers['x-satchida-mode']
@@ -2361,22 +2669,38 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         )
           .trim()
           .toLowerCase();
-        const isPrivacyMode = isPrivacyTier || requestedMode === 'privacy';
 
         const fetchFn = deps.fetchImpl ?? fetch;
         const isGetOrHead = req.method === 'GET' || req.method === 'HEAD';
 
-        let upstreamTargetUrl = targetUrl;
-        let upstreamHeaders: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${caller?.seatToken || expectedVk}`,
-          'X-Satchida-Mode': 'Vibecoding',
-          'X-Tenant-Id': caller?.tenantId || 'satchida-master',
-        };
         const forwardBody: Record<string, unknown> | undefined =
           !isGetOrHead && req.body && typeof req.body === 'object'
             ? { ...(req.body as Record<string, unknown>) }
             : undefined;
+
+        const requestedModel = typeof forwardBody?.model === 'string' ? forwardBody.model : '';
+        const isVibecoding =
+          requestedMode === 'vibecoding' ||
+          requestedModel.toLowerCase().includes('vibecoding') ||
+          (!requestedMode && !requestedModel.toLowerCase().includes('bonsai'));
+
+        const isPrivacyMode = requestedMode === 'privacy' || (!isVibecoding && caller?.accountType?.toLowerCase() === 'privacy');
+
+        let upstreamTargetUrl = targetUrl;
+        const cfClientId = process.env.CF_ACCESS_CLIENT_ID;
+        const cfClientSecret = process.env.CF_ACCESS_CLIENT_SECRET;
+        let upstreamHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${caller?.seatToken || expectedVk}`,
+          'X-Satchida-Mode': 'Vibecoding',
+          'X-Tenant-Id': caller?.tenantId || process.env.SATCHIDA_TENANT_ID || 'satchida-master',
+          'X-Seat-Alias': caller?.userId || '',
+          'X-User-Id': caller?.userId || '',
+          'X-User-Tier': caller?.accountType || 'pro',
+          ...(caller?.username ? { 'X-User-Name': caller.username } : {}),
+          ...(cfClientId ? { 'CF-Access-Client-Id': cfClientId } : {}),
+          ...(cfClientSecret ? { 'CF-Access-Client-Secret': cfClientSecret } : {}),
+        };
 
         if (isPrivacyMode) {
           const llamaBase = (
@@ -2391,6 +2715,7 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
           };
 
           if (forwardBody) {
+            let resolvedLocalModel: string | null = null;
             try {
               const modelsRes = await fetchFn(`${llamaBase}/models`, { method: 'GET' });
               if (modelsRes.ok) {
@@ -2404,8 +2729,14 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
                 const modelsList = Array.isArray(modelsJson?.data) ? modelsJson.data : [];
                 const loadedModel =
                   modelsList.find((m) => m.status?.value === 'loaded' || m.loaded === true) ??
-                  modelsList[0];
+                  modelsList.find(
+                    (m) =>
+                      typeof m.id === 'string' &&
+                      m.status?.value !== 'unloaded' &&
+                      m.status?.value !== 'loading',
+                  );
                 if (loadedModel?.id) {
+                  resolvedLocalModel = loadedModel.id;
                   forwardBody.model = loadedModel.id;
                 }
               }
@@ -2414,6 +2745,10 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
                 '[OpenCodeHttp] Failed to resolve loaded local llama model on :8080',
                 getSafeErrorMetadata(modelLookupErr),
               );
+            }
+            if (!resolvedLocalModel) {
+              sendError(res, { code: 'LOCAL_MODEL_NOT_LOADED', status: 503 });
+              return;
             }
           }
         }
@@ -2613,6 +2948,93 @@ export function createOpenCodeHttpHandlers(deps: OpenCodeHttpDeps): OpenCodeHttp
         return res.status(200).send(zipBuffer);
       } catch (error) {
         logger.error('[OpenCodeHttp] exportProjectZip failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    getBrowserStatus: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const session = sandboxedBrowserManager.getSession(ctx.projectId);
+        return res.status(200).json({
+          active: Boolean(session && session.page && !session.page.isClosed()),
+          url: session?.activeUrl || 'about:blank',
+          isRecording: session?.isRecording || false,
+        });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] getBrowserStatus failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    navigateBrowser: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const { url } = req.body as { url?: string };
+        if (!url || typeof url !== 'string') {
+          return sendError(res, { code: 'BAD_REQUEST', status: 400 });
+        }
+        await sandboxedBrowserManager.getOrCreateSession({
+          projectId: ctx.projectId,
+          userId: ctx.userId,
+          projectRoot: ctx.projectRoot,
+        });
+        const result = await sandboxedBrowserManager.navigate(ctx.projectId, { url });
+        return res.status(200).json(result);
+      } catch (error) {
+        logger.error('[OpenCodeHttp] navigateBrowser failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    clickBrowser: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const { selector, x, y } = req.body as { selector?: string; x?: number; y?: number };
+        await sandboxedBrowserManager.click(ctx.projectId, { selector, x, y });
+        return res.status(200).json({ ok: true });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] clickBrowser failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    typeBrowser: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const { selector, text, pressEnter } = req.body as { selector: string; text: string; pressEnter?: boolean };
+        await sandboxedBrowserManager.typeText(ctx.projectId, selector, text, pressEnter);
+        return res.status(200).json({ ok: true });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] typeBrowser failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    inspectBrowserDom: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const summary = await sandboxedBrowserManager.inspectDomSummary(ctx.projectId);
+        return res.status(200).json({ summary });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] inspectBrowserDom failed', getSafeErrorMetadata(error));
+        return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
+      }
+    },
+
+    closeBrowser: async (req: Request, res: Response) => {
+      try {
+        const ctx = await resolveProjectContext(req, res);
+        if (!ctx) return;
+        const recordingPath = await sandboxedBrowserManager.closeSession(ctx.projectId);
+        return res.status(200).json({ ok: true, recordingPath });
+      } catch (error) {
+        logger.error('[OpenCodeHttp] closeBrowser failed', getSafeErrorMetadata(error));
         return sendError(res, { code: 'INTERNAL_ERROR', status: 500 });
       }
     },

@@ -34,6 +34,11 @@ export type OpenCodeRevertSessionBody = NonNullable<
   operations['session.revert']['requestBody']
 >['content']['application/json'];
 
+// spec: PATCH /session/{sessionID} -> operations["session.update"].requestBody.content["application/json"]
+export type OpenCodeUpdateSessionBody = NonNullable<
+  operations['session.update']['requestBody']
+>['content']['application/json'];
+
 // spec: POST /permission/{requestID}/reply -> operations["permission.reply"].requestBody.content["application/json"]
 export type OpenCodePermissionReplyBody = NonNullable<
   operations['permission.reply']['requestBody']
@@ -106,6 +111,10 @@ export interface RevertSessionParams extends SessionScopedParams {
   body: OpenCodeRevertSessionBody;
 }
 
+export interface UpdateSessionParams extends SessionScopedParams {
+  body: OpenCodeUpdateSessionBody;
+}
+
 export interface CreatePtyParams {
   directory: string;
   body?: OpenCodeCreatePtyBody;
@@ -152,6 +161,8 @@ export interface OpenCodeClient {
   }) => Promise<OpenCodeResult<OpenCodeSession[]>>;
   getSession: (params: SessionScopedParams) => Promise<OpenCodeResult<OpenCodeSession>>;
   createSession: (params: CreateSessionParams) => Promise<OpenCodeResult<OpenCodeSession>>;
+  updateSession: (params: UpdateSessionParams) => Promise<OpenCodeResult<OpenCodeSession>>;
+  deleteSession: (params: SessionScopedParams) => Promise<OpenCodeResult<boolean>>;
   sendPromptAsync: (params: SendPromptAsyncParams) => Promise<OpenCodeResult<void>>;
   abortSession: (params: SessionScopedParams) => Promise<OpenCodeResult<boolean>>;
   getSessionMessages: (
@@ -330,7 +341,7 @@ export function createOpenCodeClient(options: OpenCodeClientOptions): OpenCodeCl
   const fetchFn = options.fetchImpl ?? globalThis.fetch;
 
   async function requestJson<T>(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     endpointPath: string,
     query?: Record<string, string | undefined>,
     body?: unknown,
@@ -514,6 +525,26 @@ export function createOpenCodeClient(options: OpenCodeClientOptions): OpenCodeCl
       requestJson<OpenCodeSession>(
         'POST',
         `/session/${encodeURIComponent(sessionId)}/unrevert`,
+        { directory },
+        undefined,
+        signal,
+      ),
+
+    // spec: PATCH /session/{sessionID}?directory=<path> -> operations["session.update"]
+    updateSession: ({ sessionId, directory, body, signal }) =>
+      requestJson<OpenCodeSession>(
+        'PATCH',
+        `/session/${encodeURIComponent(sessionId)}`,
+        { directory },
+        body,
+        signal,
+      ),
+
+    // spec: DELETE /session/{sessionID}?directory=<path> -> operations["session.delete"]
+    deleteSession: ({ sessionId, directory, signal }) =>
+      requestJson<boolean>(
+        'DELETE',
+        `/session/${encodeURIComponent(sessionId)}`,
         { directory },
         undefined,
         signal,

@@ -92,6 +92,9 @@ endpoints:
     summaryModel: Privacy
     forcePrompt: false
     modelDisplayLabel: Satchida AI
+    headers:
+      X-User-Name: '{{LIBRECHAT_USER_NAME}}'
+      X-User-Username: '{{LIBRECHAT_USER_USERNAME}}'
     dropParams:
     - user
     addParams:
@@ -153,7 +156,8 @@ endpoints:
       # LibreChat user id here used to key reservations and seat rows on
       # Mongo ObjectIds; the gateway now rejects such aliases outright, and
       # the headers below carry display data only.
-      X-User-Name: '{{LIBRECHAT_USER_USERNAME}}'
+      X-User-Name: '{{LIBRECHAT_USER_NAME}}'
+      X-User-Username: '{{LIBRECHAT_USER_USERNAME}}'
     dropParams:
     - user
     addParams:
@@ -268,7 +272,7 @@ mcpServers:
     env:
       ANYTHINGLLM_URL: http://127.0.0.1:3012/api/v1
       ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
-      SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated
+      SATCHIDA_EXPORTS_DIR: storage/exports
 
     timeout: 480000
     title: Satchida Unified Intelligence Hub
@@ -285,6 +289,9 @@ mcpServers:
       OPEN_MONTAGE_ROOT: repos/Satchida-Studio/external/OpenMontage
       SATCHIDA_AUTOROUTER_URL: http://127.0.0.1:4000
       SATCHIDA_EXPORTS_DIR: storage/exports
+      SATCHIDA_USER_ID: '{{LIBRECHAT_USER_ID}}'
+      SATCHIDA_USER_NAME: '{{LIBRECHAT_USER_NAME}}'
+      SATCHIDA_USER_USERNAME: '{{LIBRECHAT_USER_USERNAME}}'
     timeout: 480000
     title: Satchida 3D Montage Studio
     description: Full production sequence automation for true 3D animated YouTube videos via OpenMontage, FastWan/LTX AI clips (approved provider chain), FLUX-2 images, and Remotion.
@@ -423,7 +430,7 @@ mcpServers:
     env:
       ANYTHINGLLM_URL: http://127.0.0.1:3012/api/v1
       ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
-      SATCHIDA_EXPORTS_DIR: D:\LAN-AI-Infra\AnythingLLM\server\storage\documents\generated
+      SATCHIDA_EXPORTS_DIR: storage/exports
     title: Satchida Knowledge Vault
     description: Multi-tenant document creation PDF DOCX XLSX PPTX LanceDB vector
       search enterprise RAG and verified citations
@@ -893,7 +900,7 @@ modelSpecs:
         2. Mastered Ambient Music & Soundscapes: When the user asks for music, ambient sound, background audio, temple bells, flute, or specific musical styles, call `generate_ambient_music`.
            - Supports explicit genres: e.g. `genre="Indian classical sitar"`, `genre="Italian jazz"`, `genre="Celtic harp"`, `genre="Lo-Fi piano"`, `genre="Spanish flamenco"`.
            - Supports local audio libraries and user uploads: pass `audio_file="filename.mp3"` to use custom user tracks.
-        3. Kinetic Motion Clips & Explainers: When the user asks for animation, water motion, rain, moving birds, or kinetic explainer clips, call `render_motion_to_video`. Include water flow ripples, tree sway, and atmospheric dynamics. Copy the returned `embed_artifact` block verbatim so the interactive clip mounts in the Studio panel. For full multi-shot art films, consult the deployment skills `satchida-procedural-art` and `satchida-motion-art`.
+        3. Kinetic Motion Clips & Explainers: ONLY when the user explicitly asks for kinetic typography, a chart/diagram explainer, or procedural code art (e.g. watercolor/ink wash), call `render_motion_to_video` or `create_kinetic_motion_clip`. NEVER use `create_kinetic_motion_clip` (HTML text slides) as a substitute when the user asks for a real cinematic or AI-generated video scene — in Chat mode you do not have the AI video diffusion tool (`video_generate`), so clearly tell the user in one sentence to switch to **Motion Studio 🎬** (from the model selector) to render a real MP4 video with audio.
 
         SATCHIDA ACCURACY & ZERO-HALLUCINATION CONTRACT — ALWAYS IN FORCE:
 
@@ -2139,7 +2146,7 @@ modelSpecs:
     label: OpenFilm Studio 🎬
     preset:
       endpoint: Satchida-Gateway
-      model: Motion
+      model: Work
       maxContextTokens: 65536
       max_tokens: 16384
       temperature: 0.3
@@ -2154,9 +2161,17 @@ modelSpecs:
            - **Camera Choreography & Lenses**: 35mm anamorphic, shutter angle, orbit, crane sweep, or dolly zoom.
            - **Soundscape & Foley**: Frame-accurate sound cues (sub-bass drone, rising whoosh, ambient breeze, acoustic impacts).
         3. AUTO-SELECT THE EXACT TOOL & PIPELINE:
-           - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: Three.js + GSAP deterministic timeline (window.__TIMELINE__ and window.__SEEK_FRAME__).
-           - Kinetic Typography / Brand Openers / Motion Promos: BangMotion & Remotion kinetic typography with GSAP easing.
-           - Cinematic Narratives / Historical / Story-to-Animation: Cinematic-Film camera choreography synced to narration beats.
+           - **MULTI-CHARACTER STORIES, CHARACTER SHEETS, OR EPIC ACTION SCENES (4-STAGE DECOMPOSED MOVIE PIPELINE — MANDATORY)**:
+             When a user provides named characters, a character guide, or a multi-beat story scene (e.g. hero fighting a monster, multiple named actors):
+             1. **Stage 1 — Character Lock (₹0–₹0.75/char)**: Check `studio_list_characters` first; call `studio_lock_character` for any new named characters and show the photorealistic portraits.
+             2. **Stage 2 — Storyboard Keyframes (₹0–₹0.75/beat)**: Break the scene into 2–3 clear 5-second action beats (e.g. Beat 1: monster charge; Beat 2: hero impact & collision) and call `studio_generate_keyframe` for each beat. Present the photorealistic keyframes and ask for 1-word **"GO"** approval (plus confirm quality tier: **Cinema HD** vs **Fast Draft**) BEFORE spending on video animation!
+             3. **Stage 3 & 4 — Animate & Stitch**: Once the user says **"GO"**, call `studio_animate_and_stitch` with the approved `keyframe_path`s, dynamic `motion_prompt`s, and `audio_prompt` (music & SFX) to animate each locked keyframe via Image-to-Video and stitch them into one continuous movie with synchronized audio.
+           - **SIMPLE SINGLE-SUBJECT QUICK CLIPS** (e.g., "alpine sunrise drone flight", "rain on cyberpunk street"): Call `video_generate` (`video_generate_mcp_satchida-montage`) directly (or `animated_generate_local` in Privacy mode).
+           - **SINGLE-SHOT CHARACTER CONSISTENCY LAW**: Never split a single scene blindly into unrelated T2V clips — always use `studio_lock_character` + `studio_generate_keyframe` + `studio_animate_and_stitch` for consistent faces across shots and chats.
+           - **STRICTLY FORBIDDEN**: NEVER substitute `create_kinetic_motion_clip` (HTML PowerPoint-style text slides), `generate_procedural_art` (static Python painting), or hand-written HTML/CSS/Three.js animations when the user asks for a video or cinematic scene!
+           - **REALISTIC / PHOTOREALISTIC IMAGES**: Call `image_generate` (`image_generate_mcp_satchida-montage`) (or `image_generate_local` in Privacy mode).
+           - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: ONLY when the user explicitly asks for an interactive 3D simulation, CAD cutaway, or WebGL widget.
+           - Kinetic Typography / Brand Openers / Data Explainers: ONLY when the user explicitly asks for kinetic typography or a chart/slide explainer.
            - Procedural Art / Storybook / Non-3D Aesthetics: still art via the `generate_procedural_art` MCP tool (Satchida Procedural Art skill `satchida-procedural-art` — 82 styles: watercolor, ink wash, sketch, anime, synthwave, ...); kinetic clips and animated explainers via the `render_motion_to_video` MCP tool (Satchida Motion Art skill `satchida-motion-art` — 36 style recipes + 9 explainer grammars); ambient and custom background audio via `generate_ambient_music` (supports explicit genre, e.g. "Indian classical sitar", "Italian jazz", as well as user audio uploads). IMPORTANT FOR ART LEARNERS & PROMPT RECREATION: When the user specifies particular scene objects or elements (e.g. mountain, river, boat, person, temple, tree, animals, or specific color schemes), DO NOT rely on static preset scenes; synthesize custom `scene_py` code utilizing the style classes in `lib/` (e.g. `jiangnan.JiangnanGarden` or `watercolor.Watercolor`) with realistic physical multi-tier architecture, botantical foliage (`pine()`, `willow()`), and water reflections (`lake()`, `reflect()`, `ripples()`), and pass it to `generate_procedural_art` so the exact user concept is painted deterministically. For animation, include water surface displacement and tree swaying. Copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel with Play/Pause/Scrubber/Mute and MP4 export.
            - Foley & Audio Design: Map frame-accurate sound effects with real-sfx and balance acoustic loudness with earshot.
            - Multi-Scene Long Video / YouTube Production: Formulate a GLM 5.3 Flash / MiniMax-H3 beat grid combining visual scenes, synchronized voiceover narration, and ambient/foley tracks.
@@ -2255,13 +2270,11 @@ modelSpecs:
     executeCode: false
     skills: false
     fileSearch: true
-    webSearch: true
+    webSearch: false
     mcpServers:
-    - satchida-art
-    - satchida-tools
-    - satchida-motion
     - satchida-montage
-    - time-server
+    - satchida-motion
+    - satchida-art
     conversation_starters:
     - "Alpine Sunrise Drone Flight — 4K cinematic flythrough of a mountain valley with rushing river and birdsong"
     - "Neon Cyberpunk Metropolis — Rain-soaked streets, holographic billboards, flying speeders and synthwave foley"
@@ -2271,7 +2284,7 @@ modelSpecs:
     label: Motion Studio 🎬
     preset:
       endpoint: Satchida-Gateway
-      model: Motion
+      model: Work
       maxContextTokens: 65536
       max_tokens: 16384
       temperature: 0.3
@@ -2286,9 +2299,17 @@ modelSpecs:
            - **Camera Choreography & Lenses**: 35mm anamorphic, shutter angle, orbit, crane sweep, or dolly zoom.
            - **Soundscape & Foley**: Frame-accurate sound cues (sub-bass drone, rising whoosh, ambient breeze, acoustic impacts).
         3. AUTO-SELECT THE EXACT TOOL & PIPELINE:
-           - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: Three.js + GSAP deterministic timeline (window.__TIMELINE__ and window.__SEEK_FRAME__).
-           - Kinetic Typography / Brand Openers / Motion Promos: BangMotion & Remotion kinetic typography with GSAP easing.
-           - Cinematic Narratives / Historical / Story-to-Animation: Cinematic-Film camera choreography synced to narration beats.
+           - **MULTI-CHARACTER STORIES, CHARACTER SHEETS, OR EPIC ACTION SCENES (4-STAGE DECOMPOSED MOVIE PIPELINE — MANDATORY)**:
+             When a user provides named characters, a character guide, or a multi-beat story scene (e.g. hero fighting a monster, multiple named actors):
+             1. **Stage 1 — Character Lock (₹0–₹0.75/char)**: Check `studio_list_characters` first; call `studio_lock_character` for any new named characters and show the photorealistic portraits.
+             2. **Stage 2 — Storyboard Keyframes (₹0–₹0.75/beat)**: Break the scene into 2–3 clear 5-second action beats (e.g. Beat 1: monster charge; Beat 2: hero impact & collision) and call `studio_generate_keyframe` for each beat. Present the photorealistic keyframes and ask for 1-word **"GO"** approval (plus confirm quality tier: **Cinema HD** vs **Fast Draft**) BEFORE spending on video animation!
+             3. **Stage 3 & 4 — Animate & Stitch**: Once the user says **"GO"**, call `studio_animate_and_stitch` with the approved `keyframe_path`s, dynamic `motion_prompt`s, and `audio_prompt` (music & SFX) to animate each locked keyframe via Image-to-Video and stitch them into one continuous movie with synchronized audio.
+           - **SIMPLE SINGLE-SUBJECT QUICK CLIPS** (e.g., "alpine sunrise drone flight", "rain on cyberpunk street"): Call `video_generate` (`video_generate_mcp_satchida-montage`) directly (or `animated_generate_local` in Privacy mode).
+           - **SINGLE-SHOT CHARACTER CONSISTENCY LAW**: Never split a single scene blindly into unrelated T2V clips — always use `studio_lock_character` + `studio_generate_keyframe` + `studio_animate_and_stitch` for consistent faces across shots and chats.
+           - **STRICTLY FORBIDDEN**: NEVER substitute `create_kinetic_motion_clip` (HTML PowerPoint-style text slides), `generate_procedural_art` (static Python painting), or hand-written HTML/CSS/Three.js animations when the user asks for a video or cinematic scene!
+           - **REALISTIC / PHOTOREALISTIC IMAGES**: Call `image_generate` (`image_generate_mcp_satchida-montage`) (or `image_generate_local` in Privacy mode).
+           - 3D WebGL / Simulations / Robotics / Mechanical Cutaways: ONLY when the user explicitly asks for an interactive 3D simulation, CAD cutaway, or WebGL widget.
+           - Kinetic Typography / Brand Openers / Data Explainers: ONLY when the user explicitly asks for kinetic typography or a chart/slide explainer.
            - Procedural Art / Storybook / Non-3D Aesthetics: still art via the `generate_procedural_art` MCP tool (Satchida Procedural Art skill `satchida-procedural-art` — 82 styles: watercolor, ink wash, sketch, anime, synthwave, ...); kinetic clips and animated explainers via the `render_motion_to_video` MCP tool (Satchida Motion Art skill `satchida-motion-art` — 36 style recipes + 9 explainer grammars); ambient and custom background audio via `generate_ambient_music` (supports explicit genre, e.g. "Indian classical sitar", "Italian jazz", as well as user audio uploads). IMPORTANT FOR ART LEARNERS & PROMPT RECREATION: When the user specifies particular scene objects or elements (e.g. mountain, river, boat, person, temple, tree, animals, or specific color schemes), DO NOT rely on static preset scenes; synthesize custom `scene_py` code utilizing the style classes in `lib/` (e.g. `jiangnan.JiangnanGarden` or `watercolor.Watercolor`) with realistic physical multi-tier architecture, botantical foliage (`pine()`, `willow()`), and water reflections (`lake()`, `reflect()`, `ripples()`), and pass it to `generate_procedural_art` so the exact user concept is painted deterministically. For animation, include water surface displacement and tree swaying. Copy the returned `embed_artifact` block verbatim so the clip mounts in the Studio panel with Play/Pause/Scrubber/Mute and MP4 export.
            - Foley & Audio Design: Map frame-accurate sound effects with real-sfx and balance acoustic loudness with earshot.
            - Multi-Scene Long Video / YouTube Production: Formulate a GLM 5.3 Flash / MiniMax-H3 beat grid combining visual scenes, synchronized voiceover narration, and ambient/foley tracks.
@@ -2382,13 +2403,11 @@ modelSpecs:
     executeCode: false
     skills: false
     fileSearch: true
-    webSearch: true
+    webSearch: false
     mcpServers:
-    - satchida-art
-    - satchida-tools
-    - satchida-motion
     - satchida-montage
-    - time-server
+    - satchida-motion
+    - satchida-art
     conversation_starters:
     - "Alpine Sunrise Drone Flight — 4K cinematic flythrough of a mountain valley with rushing river and birdsong"
     - "Neon Cyberpunk Metropolis — Rain-soaked streets, holographic billboards, flying speeders and synthwave foley"
@@ -2662,7 +2681,7 @@ modelSpecs:
     label: Architect & Building Studio 📐
     preset:
       endpoint: Satchida-Gateway
-      model: Motion
+      model: Work
       maxContextTokens: 65536
       max_tokens: 16384
       temperature: 0.2
@@ -2889,13 +2908,14 @@ modelSpecs:
     showIconInMenu: true
     showIconInHeader: true
     artifacts: custom
+    executeCode: false
+    skills: false
     fileSearch: true
-    webSearch: true
+    webSearch: false
     mcpServers:
-    - satchida-tools
     - satchida-montage
-    - filesystem-shared
-    - time-server
+    - satchida-motion
+    - satchida-art
     conversation_starters:
     - |-
       🎬 3D Science Explainer — Create an engaging 2-minute 3D animation explaining Quantum Superposition for YouTube.

@@ -28,6 +28,21 @@ const MAX_SEARCH_LENGTH = 200;
 const MAX_NAME_LENGTH = 200;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const DEFAULT_QUOTA = 100000;
+/**
+ * Default monthly token credit allocations per seat tier, mirroring One-API
+ * `tenant_account_plans` (`quota_units`) so newly provisioned or tier-changed
+ * users automatically receive their tier-specific budget when no explicit
+ * quota override is supplied.
+ */
+const TIER_DEFAULT_QUOTAS: Record<string, number> = {
+  basic: 250000,
+  standard: 1250000,
+  family: 3750000,
+  pro: 5000000,
+  privacy: 6250000,
+  pro_family: 8750000,
+  enterprise: 100000000,
+};
 const FAMILY_ROLES = ['owner', 'adult', 'minor'] as const;
 
 /**
@@ -52,6 +67,7 @@ export interface BulkUserDocument {
   name: string;
   username: string;
   password: string;
+  passwordSig: string;
   role: string;
   provider: string;
   emailVerified: boolean;
@@ -233,6 +249,8 @@ export interface AdminUsersDeps {
    * request, so a client cannot widen a query with `?scope` or `?tenantId`.
    */
   isPlatformOperator: (user: AdminCapabilityUser) => Promise<boolean>;
+  /** Optional live tier-quota resolver (e.g. querying One-API `GET /api/tenant/:tenantId/account-plan`). */
+  resolveTierQuota?: (tenantId: string | undefined, accountType: string) => Promise<number | null>;
   /** Inserts the user document. `password` must already be hashed. */
   createUserRecord: (data: CreateUserRequest) => Promise<{ _id: Types.ObjectId | string }>;
   updateUserRecord: (userId: string, data: Partial<IUser>) => Promise<IUser | null>;
@@ -339,6 +357,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     updateUserRecord,
     getUserGroups,
     upsertBalanceFields,
+    resolveTierQuota,
     hashPassword,
     generateTempPassword,
     findGroupByName,
@@ -819,7 +838,21 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         seatReserved = reservation.ok;
       }
 
-      const initialCredits = parseQuota(body.quota);
+      const hasExplicitQuota =
+        body.quota !== undefined && body.quota !== null && String(body.quota).trim() !== '';
+      let tierDefault =
+        accountType.value && TIER_DEFAULT_QUOTAS[accountType.value]
+          ? TIER_DEFAULT_QUOTAS[accountType.value]
+          : DEFAULT_QUOTA;
+      if (!hasExplicitQuota && accountType.value && resolveTierQuota) {
+        const liveQuota = await resolveTierQuota(caller.tenantId, accountType.value).catch(
+          () => null,
+        );
+        if (typeof liveQuota === 'number' && liveQuota > 0) {
+          tierDefault = liveQuota;
+        }
+      }
+      const initialCredits = hasExplicitQuota ? parseQuota(body.quota) : tierDefault;
       await upsertBalanceFields(userId, {
         tokenCredits: initialCredits,
         autoRefillEnabled: true,
@@ -988,15 +1021,18 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       const startedAt = Date.now();
       const prepared = await mapWithConcurrency(fresh, BULK_HASH_CONCURRENCY, async (candidate) => {
         const tempPassword = generateTempPassword();
-        return { candidate, tempPassword, password: await hashPassword(tempPassword) };
+        const password = await hashPassword(tempPassword);
+        const passwordSig = calculatePasswordSignature(password);
+        return { candidate, tempPassword, password, passwordSig };
       });
 
       const inserted = await insertUserRecords(
-        prepared.map(({ candidate, password }) => ({
+        prepared.map(({ candidate, password, passwordSig }) => ({
           email: candidate.email,
           name: candidate.name,
           username: candidate.username,
           password,
+          passwordSig,
           role: candidate.role,
           provider: 'local',
           emailVerified: true,
@@ -1240,7 +1276,9 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         if (typeof body.password !== 'string' || body.password.length < 8) {
           return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
-        update.password = await hashPassword(body.password);
+        const hash = await hashPassword(body.password);
+        update.password = hash;
+        update.passwordSig = calculatePasswordSignature(hash);
       }
       if (body.suspended !== undefined) {
         if (typeof body.suspended !== 'boolean') {
@@ -1287,6 +1325,25 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       const updated = await updateUserRecord(id, update);
       if (!updated) {
         return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (update.accountType) {
+        const liveQuota = resolveTierQuota
+          ? await resolveTierQuota(caller.tenantId, update.accountType).catch(() => null)
+          : null;
+        const tierQuota =
+          typeof liveQuota === 'number' && liveQuota > 0
+            ? liveQuota
+            : TIER_DEFAULT_QUOTAS[update.accountType];
+        if (tierQuota) {
+          await upsertBalanceFields(updated._id?.toString() ?? id, {
+            tokenCredits: tierQuota,
+            autoRefillEnabled: true,
+            refillIntervalValue: 30,
+            refillIntervalUnit: 'days',
+            refillAmount: tierQuota,
+          });
+        }
       }
 
       await emitUserAudit(

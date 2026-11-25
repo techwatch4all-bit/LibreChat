@@ -1073,14 +1073,14 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
         expect(sentHeaders2.Authorization).toBe('Bearer seat-pro-1');
         expect(sentHeaders2['X-Tenant-Id']).toBe('tenant-b');
 
-        // 3. Privacy-tier user in non-privacy mode (e.g. vibecoding) is STILL forced to local :8080
+        // 3. Privacy-tier user in default vibecoding mode routes to Satchida Gateway (Cloud ZDR)
         const recRes3 = makeRes();
         await handlers.createSessionPrompt(
           {
             user: { id: 'user-priv', accountType: 'privacy' },
             params: { projectId: 'proj-priv' },
             headers: { 'x-satchida-mode': 'vibecoding' },
-            body: { prompt: 'hello privacy fallback' },
+            body: { prompt: 'hello privacy cloud zdr' },
           } as unknown as Request,
           recRes3.res,
         );
@@ -1105,8 +1105,8 @@ describe('OpenCode path safety & HTTP handlers (Gate 0)', () => {
           } as unknown as Request,
           proxyRes3.res,
         );
-        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:8080/v1/models');
-        expect(fetchCalls[1]?.url).toBe('http://127.0.0.1:8080/v1/chat/completions');
+        expect(fetchCalls.length).toBe(1);
+        expect(fetchCalls[0]?.url).toBe('http://127.0.0.1:4000/v1/chat/completions');
 
         // 4. Pro-tier user explicitly requesting X-Satchida-Mode: privacy routes to local :8080
         fetchCalls.length = 0;

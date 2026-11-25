@@ -2,6 +2,7 @@
 /* eslint-disable no-nested-ternary */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { memo, useState, useEffect, useCallback } from 'react';
+import { useAtomValue } from 'jotai';
 import { Button } from '@librechat/client';
 import { request } from 'librechat-data-provider';
 import { useSetRecoilState, useRecoilState } from 'recoil';
@@ -10,6 +11,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Cloud,
   Film,
   FileText,
   Music,
@@ -18,6 +20,8 @@ import {
   HardDrive,
 } from 'lucide-react';
 import type { Artifact } from '~/common';
+import { cloudDriveSessionsAtom } from '~/components/Projects/opencode/atoms';
+import CloudDriveModal from '~/components/Projects/opencode/CloudDriveModal';
 import store from '~/store';
 
 interface MediaItem {
@@ -62,6 +66,12 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
   const [deleting, setDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [copiedName, setCopiedName] = useState<string | null>(null);
+  const [showCloudDriveModal, setShowCloudDriveModal] = useState(false);
+  const cloudDriveSessions = useAtomValue(cloudDriveSessionsAtom);
+  const isDriveConnected = Boolean(
+    (cloudDriveSessions.google_drive && cloudDriveSessions.google_drive.expiresAt > Date.now()) ||
+      (cloudDriveSessions.onedrive && cloudDriveSessions.onedrive.expiresAt > Date.now()),
+  );
 
   const openInFilmStudio = useCallback((item: MediaItem) => {
     const isVideo = item.kind === 'video' || Boolean(item.url?.match(/\.(mp4|webm)$/i));
@@ -201,6 +211,21 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
           </span>
         </div>
         <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-7 gap-1 px-2 text-[11px] ${
+              isDriveConnected
+                ? 'text-emerald-500 hover:text-emerald-400'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+            onClick={() => setShowCloudDriveModal(true)}
+            title="Sync Studio Library with Cloud Drive"
+            aria-label="Cloud Drive"
+          >
+            <Cloud className="h-3.5 w-3.5" />
+            <span>Drive</span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -423,6 +448,21 @@ const StudioLibrarySidePanel = memo(function StudioLibrarySidePanel() {
           </div>
         )}
       </div>
+      {showCloudDriveModal ? (
+        <CloudDriveModal
+          studioItems={(selectedIds.size > 0
+            ? items.filter((it) => selectedIds.has(it.id || it.name))
+            : filtered
+          ).map((it) => ({
+            id: it.id || it.name,
+            name: it.name,
+            url: it.url,
+            kind: it.kind,
+          }))}
+          localPrivacyActive={false}
+          onClose={() => setShowCloudDriveModal(false)}
+        />
+      ) : null}
     </div>
   );
 });

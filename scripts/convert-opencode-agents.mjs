@@ -38,7 +38,9 @@ config();
 const FORCE = process.argv.includes('--force');
 const DRY_RUN = process.argv.includes('--dry-run');
 
-const AGENT_DIR = process.env.OPENCODE_AGENT_DIR ?? 'C:/Users/WinDiesel/.config/opencode/agent';
+const AGENT_DIR =
+  process.env.OPENCODE_AGENT_DIR ??
+  path.resolve(import.meta.dirname, '../repos/opencode/xdg-config/opencode/agent');
 const BASE_URL = process.env.SATCHIDA_URL ?? 'http://127.0.0.1:3080';
 const EMAIL = process.env.SATCHIDA_ADMIN_EMAIL ?? 'admin@satchida.local';
 const PASSWORD = process.env.SATCHIDA_ADMIN_PASSWORD;

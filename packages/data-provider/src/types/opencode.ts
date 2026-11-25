@@ -1,8 +1,14 @@
+export interface OpenCodeLocalLlamaStatus {
+  reachable: boolean;
+  loadedModel: string | null;
+}
+
 export interface OpenCodeStatusResponse {
   enabled: boolean;
   reachable: boolean;
   version: string | null;
   isPlatformAdmin?: boolean;
+  localLlama?: OpenCodeLocalLlamaStatus;
 }
 
 export interface OpenCodeDirTreeEntry {
@@ -28,6 +34,12 @@ export interface OpenCodeFileReadResponse {
 export interface OpenCodeFileWriteResponse {
   ok: boolean;
   path: string;
+}
+
+export interface OpenCodeUploadFilesResponse {
+  ok: boolean;
+  uploaded: string[];
+  skipped: Array<{ path: string; reason: string }>;
 }
 
 export interface OpenCodeFileDeleteResponse {
@@ -66,6 +78,7 @@ export interface OpenCodeSessionDto {
   time?: {
     created?: number;
     updated?: number;
+    archived?: number;
   };
   summary?: {
     additions: number;
@@ -264,4 +277,36 @@ export interface OpenCodePromptImageAttachment {
   name?: string;
   mime?: string;
   dataUrl: string;
+}
+
+export type CloudDriveProviderId = 'google_drive' | 'onedrive';
+
+export interface CloudDriveProviderStatus {
+  configured: boolean;
+  clientId: string | null;
+  tenantId?: string;
+}
+
+export interface CloudDriveStatusResponse {
+  entitled: boolean;
+  mode: 'browser_direct';
+  providers: Record<CloudDriveProviderId, CloudDriveProviderStatus>;
+}
+
+export interface CloudDriveEntryDto {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  mimeType: string;
+  size: number | null;
+  modifiedTime: string | null;
+}
+
+export interface OpenCodeEnvVarEntry {
+  key: string;
+  value: string;
+}
+
+export interface OpenCodeEnvResponse {
+  entries: OpenCodeEnvVarEntry[];
 }

@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useParams } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import {
   getConfigDefaults,
   Constants,
@@ -119,7 +120,7 @@ function Header({
         </div>
       </div>
 
-      <div className={cn('flex flex-shrink-0 items-center gap-2', hiddenBehindNav)}>
+      <div className={cn('flex flex-shrink-0 items-center gap-1.5 sm:gap-2', hiddenBehindNav)}>
         {hasAccessToTemporaryChat === true && <TemporaryChatIndicator />}
         {!isNewChat && <NewChat className="md:hidden" />}
         {!isNewChat && parentConversationId == null && (
@@ -129,10 +130,24 @@ function Header({
             isSubmitting={isSubmitting}
           />
         )}
+        <HeaderBillingGauge />
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('satchida:open-live-voice'))}
+          className="relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-[11px] font-semibold tracking-wide text-violet-300 shadow-xs transition-all duration-200 hover:border-violet-400 hover:bg-violet-500/20 active:scale-95"
+          aria-label="Satchida Live Voice"
+          title="Satchida Live Voice"
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-500" />
+          </span>
+          <Sparkles className="h-3 w-3 text-violet-300" />
+          <span className="hidden xs:inline sm:inline">Live Voice</span>
+        </button>
         <HeaderMenu startupConfig={startupConfig} trace={trace} className="md:hidden" />
         <div className="hidden items-center gap-2 md:flex">
           {trace.show && <TraceButton onClick={trace.open} />}
-          <HeaderBillingGauge />
           <HeaderAudioSpeaker />
           <ExportAndShareMenu isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false} />
           {hasAccessToTemporaryChat === true && <TemporaryChat />}

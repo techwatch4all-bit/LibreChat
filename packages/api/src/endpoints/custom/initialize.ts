@@ -6,6 +6,7 @@ import {
   EModelEndpoint,
   FetchTokenConfig,
   extractEnvVariable,
+  normalizeSemanticMode,
 } from 'librechat-data-provider';
 import type { AppConfig, IUser } from '@librechat/data-schemas';
 import type { TEndpoint } from 'librechat-data-provider';
@@ -276,10 +277,11 @@ export async function initializeCustom(
   const isChildSeat =
     (user?.familyRole as string | null | undefined) === 'minor' ||
     (user?.familyRole as string | null | undefined) === 'child';
+  const canonicalSemanticMode = normalizeSemanticMode(normalizedMode);
   const semanticMode =
-    normalizedMode === 'vibecoder' || normalizedMode === 'vibe_coding'
-      ? 'Work'
-      : normalizedMode.slice(0, 1).toUpperCase() + normalizedMode.slice(1);
+    canonicalSemanticMode ??
+    normalizedMode.slice(0, 1).toUpperCase() + normalizedMode.slice(1);
+  const effectiveMode = canonicalSemanticMode?.toLowerCase() ?? normalizedMode;
   const toolUseRequested =
     Array.isArray(model_parameters?.tools) && model_parameters.tools.length > 0;
   if (isTenantCloudMode && isSatchidaEndpoint) {
@@ -296,8 +298,12 @@ export async function initializeCustom(
           })
         : undefined;
     if (seatPolicy) {
-      const allowed = new Set(seatPolicy.allowedModes.map((mode) => mode.toLowerCase()));
-      if (!allowed.has(normalizedMode)) {
+      const allowed = new Set(
+        seatPolicy.allowedModes.map(
+          (mode) => normalizeSemanticMode(mode)?.toLowerCase() ?? mode.toLowerCase(),
+        ),
+      );
+      if (!allowed.has(effectiveMode)) {
         throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
       }
     } else {
@@ -310,7 +316,7 @@ export async function initializeCustom(
             : user?.accountType === 'standard' || user?.accountType === 'family'
               ? ['chat', 'study', 'work']
               : ['chat', 'study'];
-      if (!fallback.includes(normalizedMode)) {
+      if (!fallback.includes(effectiveMode)) {
         throw new Error(JSON.stringify({ type: ErrorTypes.NO_USER_KEY }));
       }
     }

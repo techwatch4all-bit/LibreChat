@@ -876,7 +876,7 @@ const ChatForm = memo(function ChatForm({
               )}
               <div
                 className={cn(
-                  'flex flex-wrap items-center gap-1.5 px-2 pb-2',
+                  'flex flex-nowrap items-center gap-1 overflow-x-auto px-2 pb-2 sm:flex-wrap sm:gap-1.5 sm:overflow-visible',
                   isRTL ? 'flex-row-reverse' : 'flex-row',
                 )}
               >

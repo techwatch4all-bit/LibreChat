@@ -148,6 +148,10 @@ export default function LiveVoiceModal({
   const [spokenTranscript, setSpokenTranscript] = useState('');
   const [assistantTranscript, setAssistantTranscript] = useState('');
   const [actionCard, setActionCard] = useState<VoiceActionCard | null>(null);
+  const [transcriptHistory, setTranscriptHistory] = useState<
+    Array<{ role: 'user' | 'assistant'; text: string; time: string }>
+  >([]);
+  const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [micStreaming, setMicStreaming] = useState(false);
   const [activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
@@ -1359,9 +1363,20 @@ export default function LiveVoiceModal({
             msg.type === 'conversation.item.input_audio_transcription.completed' &&
             msg.transcript
           ) {
-            setSpokenTranscript(msg.transcript.trim());
+            const cleanUser = msg.transcript.trim();
+            setSpokenTranscript(cleanUser);
             setAssistantTranscript('');
             setStatusText('Thinking...');
+            if (cleanUser) {
+              const nowLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              setTranscriptHistory((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.role === 'user' && cleanUser.startsWith(last.text.slice(0, 12))) {
+                  return [...prev.slice(0, -1), { role: 'user', text: cleanUser, time: nowLabel }];
+                }
+                return [...prev.slice(-29), { role: 'user', text: cleanUser, time: nowLabel }];
+              });
+            }
             return;
           }
 
@@ -1374,6 +1389,20 @@ export default function LiveVoiceModal({
             if (msg.transcript) {
               setAssistantTranscript(msg.transcript);
             }
+            setAssistantTranscript((current) => {
+              const finalTxt = (msg.transcript || current || '').trim();
+              if (finalTxt) {
+                const nowLabel = new Date().toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                setTranscriptHistory((prev) => [
+                  ...prev.slice(-29),
+                  { role: 'assistant', text: finalTxt, time: nowLabel },
+                ]);
+              }
+              return current;
+            });
             if (activeSourcesRef.current.length === 0 && isAssistantSpeakingRef.current) {
               markPlaybackIdle();
             }
@@ -1583,6 +1612,16 @@ export default function LiveVoiceModal({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {transcriptHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowTranscriptDrawer((prev) => !prev)}
+              className="rounded-full border border-border-medium bg-surface-secondary/70 px-2 py-0.5 text-[10px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+              title="Toggle voice transcript"
+            >
+              {showTranscriptDrawer ? 'Hide Log' : `Log (${transcriptHistory.length})`}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsMinimized(true)}
@@ -1603,6 +1642,41 @@ export default function LiveVoiceModal({
           </button>
         </div>
       </div>
+
+      {/* Mobile-first scrollable Voice Transcript Drawer */}
+      {showTranscriptDrawer && transcriptHistory.length > 0 && (
+        <div className="mb-2 rounded-xl border border-border-medium bg-surface-secondary/60 p-2.5 text-xs">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="font-semibold text-text-primary">Voice Transcript</span>
+            <button
+              type="button"
+              onClick={() => {
+                const body = transcriptHistory
+                  .map((t) => `**${t.role === 'user' ? 'You' : 'Satchida'}** (${t.time}): ${t.text}`)
+                  .join('\n\n');
+                askRef.current({ text: `Here is our voice transcript for reference:\n\n${body}` });
+                setIsMinimized(true);
+              }}
+              className="rounded-md bg-violet-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-violet-500"
+            >
+              Save to Chat
+            </button>
+          </div>
+          <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1 text-[11px]">
+            {transcriptHistory.map((item, idx) => (
+              <div
+                key={idx}
+                className={item.role === 'user' ? 'text-text-secondary' : 'text-text-primary'}
+              >
+                <span className="font-semibold">
+                  {item.role === 'user' ? 'You' : 'Satchida'}:
+                </span>{' '}
+                {item.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Rich Action Cards (Maps, Weather, News, DeepTutor) */}
       {actionCard && (

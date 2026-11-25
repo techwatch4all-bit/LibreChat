@@ -215,10 +215,11 @@ export function detectRealtimeSearchIntent(text: string): {
   const isSearch =
     isDeepResearch ||
     hasUrl ||
-    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest)\b/i.test(
+    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest)\b/i.test(
       lower,
     ) ||
-    /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|weather|events|results|match)\b/i.test(
+    /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का)/u.test(text) ||
+    /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|rate|rates|weather|events|results|match)\b/i.test(
       lower,
     );
   return { isSearch, isDeepResearch, hasUrl };
@@ -1194,6 +1195,14 @@ async function executeVoiceWebSearch(
                   ? `Headline${datePart}: ${title} — ${snippet.slice(0, 220)}`
                   : `Headline${datePart}: ${title}`,
               );
+            }
+            if (
+              item.url &&
+              item.url.startsWith('http') &&
+              !item.url.includes('news.google.com/rss/') &&
+              candidateUrls.length < 3
+            ) {
+              candidateUrls.push(item.url);
             }
           }
         }
@@ -2365,7 +2374,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       if (!resultPayload) {
                         resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
                           deep: searchIntent.isDeepResearch,
-                          fetchPages: searchIntent.hasUrl,
+                          fetchPages: true,
                         });
                       }
 

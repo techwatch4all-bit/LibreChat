@@ -879,4 +879,89 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
 
     expect(savedProfiles.some((p) => p.location === 'Mumbai')).toBe(false);
   });
+
+  test('extracts Hindi name declarations, switches language on Hindi word order, and never saves stray noise or negations as name', async () => {
+    const { wss } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-hindi-1' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-hindi-1',
+        accountType: 'pro_family',
+        seatToken: 'tk_seat_hi',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => JSON.stringify({ preferred_language: 'Hindi' }),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Stray 2-letter noise must NEVER be saved as name
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: { inputTranscription: { text: 'tú' }, turnComplete: true },
+        }),
+      ),
+    );
+    // Negation must NEVER be saved as name
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'यह मेरा नाम नहीं था।' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    expect(savedProfiles.some((p) => p.name)).toBe(false);
+
+    // Hindi name declaration + Hinglish language switch
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'आप मुझे भारत के नाम से बुला सकते हैं।' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'Aap pehle to English mein switch kijiye.' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(savedProfiles.some((p) => p.name === 'भारत')).toBe(true);
+    expect(savedProfiles.some((p) => p.preferred_language === 'English')).toBe(true);
+  });
 });

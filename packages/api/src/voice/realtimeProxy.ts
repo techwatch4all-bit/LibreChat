@@ -1718,7 +1718,6 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
       let pendingLocalQuery: string | null = null;
       let lastLiveLookupKind: 'weather' | 'news' | 'place' | null = null;
-      let lastAssistantAskedForName = false;
       let isTranslatorMode = false;
       let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
         null;
@@ -1729,6 +1728,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         const langMatch =
           cleanUtterance.match(
             /\b(?:speak|talk|switch|change(?:\s+you)?|chat|prefer|use|let'?s\s+(?:do|use|speak|talk))\s+(?:in\s+|to\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+          ) ||
+          cleanUtterance.match(
+            /\b(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\s+(?:mein|me|main|में)\s+(?:switch|baat|bolo|boliye|kijiye|karo|karen)\b/i,
           ) ||
           (!voiceProfile.preferred_language
             ? cleanUtterance.match(
@@ -1742,28 +1744,28 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             void persistVoiceProfilePatch({ preferred_language: chosenLang });
           }
         }
+        const isNameNegation =
+          /\b(not\s+my\s+name|wrong\s+name|nahi|nahin)\b/i.test(cleanUtterance) ||
+          /(?:नहीं|गलत\s+नाम)/u.test(cleanUtterance);
         const NON_NAME_WORDS =
-          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
-        const explicitNameMatch =
-          cleanUtterance.match(
-            /\b(?:my\s+name\s+is|call\s+me|this\s+is|i\s+am|i'm)\s+([a-zA-Z]{2,24})\b/i,
-          ) || cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}]{2,24})/iu);
-        let extractedName = explicitNameMatch?.[1] || '';
-        if (!extractedName && lastAssistantAskedForName && !voiceProfile.name) {
-          const directReply = cleanUtterance
-            .replace(/^(?:it'?s|hey|hi|uh|um|well|just)\s+/i, '')
-            .replace(/\s+(?:and\s+(?:we|i|let'?s)|,).*$/i, '')
-            .replace(/[.,!?]+$/g, '')
-            .trim();
-          const words = directReply.split(/\s+/).filter(Boolean);
-          if (words.length >= 1 && words.length <= 2 && /^[a-zA-Z\p{L}]{2,24}$/u.test(words[0])) {
-            extractedName = words[0];
+          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|tu|tú|you|me|no|yes|nahi|nahin|नहीं|नह|हाँ|जी|क्या|कौन|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
+        if (!isNameNegation) {
+          const explicitNameMatch =
+            cleanUtterance.match(
+              /\b(?:my\s+name\s+is|call\s+me|this\s+is|i\s+am|i'm)\s+([a-zA-Z]{2,24})\b/i,
+            ) ||
+            cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}\p{M}]{2,24})/iu) ||
+            cleanUtterance.match(
+              /(?:आप\s+)?मुझे\s+([\p{L}\p{M}]{2,24})\s+(?:के\s+नाम\s+से\s+)?बुला/u,
+            ) ||
+            cleanUtterance.match(/\bmujhe\s+([a-zA-Z]{2,24})\s+(?:ke\s+naam\s+se\s+)?bula/i);
+          const extractedName = explicitNameMatch?.[1]?.trim() || '';
+          if (extractedName && !NON_NAME_WORDS.test(extractedName)) {
+            const normalizedName = /^[a-zA-Z]+$/.test(extractedName)
+              ? extractedName.charAt(0).toUpperCase() + extractedName.slice(1)
+              : extractedName;
+            void persistVoiceProfilePatch({ name: normalizedName });
           }
-        }
-        if (extractedName && !NON_NAME_WORDS.test(extractedName)) {
-          const normalizedName = extractedName.charAt(0).toUpperCase() + extractedName.slice(1);
-          lastAssistantAskedForName = false;
-          void persistVoiceProfilePatch({ name: normalizedName });
         }
         const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
         if (dietMatch?.[1]) {
@@ -2670,15 +2672,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   const tod = getTimeOfDayGreeting(clientLocalHour);
                   let openingDirective: string;
                   if (!voiceProfile.preferred_language && !voiceProfile.name) {
-                    lastAssistantAskedForName = true;
                     openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly like a friendly human (never say "how may I be of assistance") using "${tod}" — e.g. "${tod}! I'm Satchida. Which language would you like to chat in, and what should I call you?" Keep it to 1-2 short, natural sentences.]`;
                   } else if (!voiceProfile.name) {
-                    lastAssistantAskedForName = true;
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly in ${voiceProfile.preferred_language} using "${tod}" and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
                   } else if (!voiceProfile.preferred_language) {
                     openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name using "${tod}" and casually ask which language they prefer to chat in. 1-2 short sentences.]`;
                   } else {
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" like a friend catching up (e.g. "Hey ${voiceProfile.name}, ${tod.toLowerCase()}! What's on your mind?"). Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") like a friendly companion. Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
                   }
                   currentSocket.send(
                     JSON.stringify({

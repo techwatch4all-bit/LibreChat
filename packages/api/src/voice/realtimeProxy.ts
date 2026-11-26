@@ -1633,6 +1633,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       } | null = null;
       let activeSpeakerKey = 'primary';
       let pendingGuestIntroNotice: string | null = null;
+      let lastGuestGreetingAt = 0;
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -1761,7 +1762,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         if (!isNameNegation) {
           // Only match explicit name introductions — never bare "I am <verb/adjective>" like "I am driving"
           const explicitNameMatch =
-            cleanUtterance.match(/\b(?:my\s+name\s+is|call\s+me)\s+([a-zA-Z]{2,24})\b/i) ||
+            cleanUtterance.match(
+              /\b(?:my\s+name\s+is(?:\s+also)?|call\s+me)\s+([a-zA-Z]{2,24})\b/i,
+            ) ||
             cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}\p{M}]{2,24})/iu) ||
             cleanUtterance.match(
               /(?:आप\s+)?मुझे\s+([\p{L}\p{M}]{2,24})\s+(?:के\s+नाम\s+से\s+)?बुला/u,
@@ -3747,8 +3750,12 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   };
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
-                    const personaName = activeVoiceProfile.gender === 'female' ? 'Maya' : 'Anand';
-                    pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke. If they are addressing you, greet them naturally like: "Hi, I'm ${personaName}, we haven't spoken before — what's your name?"`;
+                    const now = Date.now();
+                    if (now - lastGuestGreetingAt > 5 * 60 * 1000) {
+                      lastGuestGreetingAt = now;
+                      const personaName = activeVoiceProfile.gender === 'female' ? 'Maya' : 'Anand';
+                      pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke. If they are addressing you, greet them naturally like: "Hi, I'm ${personaName}, we haven't spoken before — what's your name?"`;
+                    }
                     logger.info(
                       `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
                     );

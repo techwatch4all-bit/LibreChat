@@ -1772,7 +1772,22 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             const normalizedName = /^[a-zA-Z]+$/.test(extractedName)
               ? extractedName.charAt(0).toUpperCase() + extractedName.slice(1)
               : extractedName;
-            patch.name = normalizedName;
+            if (activeSpeakerKey.startsWith('unknown:') && voiceProfile.name) {
+              patch.add_speaker = {
+                name: normalizedName,
+                ...(_lastGuestAcoustic
+                  ? {
+                      gender_hint: _lastGuestAcoustic.genderHint,
+                      avg_pitch_hz: _lastGuestAcoustic.avgPitchHz,
+                      pitch_std_hz: _lastGuestAcoustic.pitchStdHz,
+                    }
+                  : {}),
+              };
+              activeSpeakerKey = `known:${normalizedName.toLowerCase()}`;
+              pendingGuestIntroNotice = null;
+            } else {
+              patch.name = normalizedName;
+            }
           }
         }
         const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
@@ -3732,7 +3747,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   };
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
-                    pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke in the room. If they are addressing you, warmly greet them and ask their name and relation so you can remember them.`;
+                    const personaName = activeVoiceProfile.gender === 'female' ? 'Maya' : 'Anand';
+                    pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke. If they are addressing you, greet them naturally like: "Hi, I'm ${personaName}, we haven't spoken before — what's your name?"`;
                     logger.info(
                       `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
                     );

@@ -4,6 +4,7 @@ import {
   isPlaceOrDirectionsQuery,
   isWeatherQuery,
   isNewsQuery,
+  detectMediaIntent,
 } from './liveResolvers';
 
 describe('liveResolvers', () => {
@@ -33,5 +34,20 @@ describe('liveResolvers', () => {
   test('isWeatherQuery and isNewsQuery classify accurately', () => {
     expect(isWeatherQuery('temperature in Mumbai')).toBe(true);
     expect(isNewsQuery('top 5 news headlines from India')).toBe(true);
+  });
+
+  test('detectMediaIntent builds YouTube and Spotify launcher cards with Install fallback', () => {
+    const sp = detectMediaIntent('Play relaxing piano music on Spotify');
+    expect(sp?.kind).toBe('media');
+    expect(sp?.platform).toBe('spotify');
+    expect(sp?.openUrl).toContain('open.spotify.com/search/');
+    expect(sp?.installUrl).toContain('play.google.com');
+
+    const yt = detectMediaIntent('Play Arijit Singh songs on YouTube');
+    expect(yt?.kind).toBe('media');
+    expect(yt?.platform).toBe('youtube');
+    expect(yt?.openUrl).toContain('m.youtube.com/results');
+
+    expect(detectMediaIntent('What is the weather today?')).toBeNull();
   });
 });

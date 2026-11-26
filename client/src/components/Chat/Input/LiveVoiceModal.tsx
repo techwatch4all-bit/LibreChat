@@ -156,6 +156,7 @@ export default function LiveVoiceModal({
   const [spokenTranscript, setSpokenTranscript] = useState('');
   const [assistantTranscript, setAssistantTranscript] = useState('');
   const [actionCard, setActionCard] = useState<VoiceActionCard | null>(null);
+  const [cardHistory, setCardHistory] = useState<VoiceActionCard[]>([]);
   const [transcriptHistory, setTranscriptHistory] = useState<
     Array<{ role: 'user' | 'assistant'; text: string; time: string }>
   >([]);
@@ -1316,15 +1317,19 @@ export default function LiveVoiceModal({
           }
 
           if (msg.type === 'voice.action_card') {
-            if (msg.card) {
-              setActionCard(msg.card);
-            } else if (msg.title && msg.mapUrl) {
-              setActionCard({
-                kind: 'maps',
-                title: msg.title,
-                subtitle: msg.subtitle,
-                mapUrl: msg.mapUrl,
-              });
+            const incomingCard: VoiceActionCard | null = msg.card
+              ? msg.card
+              : msg.title && msg.mapUrl
+                ? {
+                    kind: 'maps',
+                    title: msg.title,
+                    subtitle: msg.subtitle,
+                    mapUrl: msg.mapUrl,
+                  }
+                : null;
+            if (incomingCard) {
+              setActionCard(incomingCard);
+              setCardHistory((prev) => [incomingCard, ...prev].slice(0, 8));
             }
             return;
           }
@@ -1488,27 +1493,64 @@ export default function LiveVoiceModal({
     if (!open) {
       return;
     }
-    // Keep mobile screen awake while Live Voice is active (Screen Wake Lock API)
+    // Keep mobile screen awake while Live Voice is active & re-acquire after app switch
     let wakeLock: { release: () => Promise<void> } | null = null;
     const navWithWake = navigator as Navigator & {
       wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
     };
-    if (navWithWake.wakeLock?.request) {
-      void navWithWake.wakeLock
-        .request('screen')
-        .then((sentinel) => {
-          wakeLock = sentinel;
-        })
-        .catch(() => {
-          // Ignore unsupported / battery-saver rejection
-        });
+    const acquireWakeLock = () => {
+      if (document.visibilityState === 'visible' && navWithWake.wakeLock?.request) {
+        void navWithWake.wakeLock
+          .request('screen')
+          .then((sentinel) => {
+            wakeLock = sentinel;
+          })
+          .catch(() => {
+            // Ignore unsupported / battery-saver rejection
+          });
+      }
+    };
+    acquireWakeLock();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        acquireWakeLock();
+        const ctx = audioContextRef.current;
+        if (ctx && ctx.state === 'suspended') {
+          void ctx.resume().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Auto-pause voice playback on incoming phone call / OS audio interruption
+    const ctx = getAudioContext();
+    const handleAudioStateChange = () => {
+      if (!ctx) {
+        return;
+      }
+      const state = ctx.state as string;
+      if (state === 'interrupted') {
+        stopAssistantAudio(false);
+        setIsMuted(true);
+        setStatusText('Paused (call / audio interrupted)');
+      } else if (state === 'running' && isMutedRef.current) {
+        setStatusText('Tap mic to resume');
+      }
+    };
+    if (ctx) {
+      ctx.addEventListener('statechange', handleAudioStateChange);
     }
+
     return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (ctx) {
+        ctx.removeEventListener('statechange', handleAudioStateChange);
+      }
       if (wakeLock) {
         void wakeLock.release().catch(() => {});
       }
     };
-  }, [open]);
+  }, [open, getAudioContext, stopAssistantAudio]);
 
   if (!open) {
     return null;
@@ -1697,6 +1739,28 @@ export default function LiveVoiceModal({
             </button>
           </div>
           <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1 text-[11px]">
+            {cardHistory.length > 0 && (
+              <div className="mb-1.5 flex flex-wrap gap-1 border-b border-border-medium pb-1.5">
+                {cardHistory.map((c, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActionCard(c)}
+                    className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/25"
+                  >
+                    {c.kind === 'maps'
+                      ? `Map: ${c.subtitle || c.title}`
+                      : c.kind === 'media'
+                        ? `${c.platform === 'spotify' ? 'Spotify' : 'YouTube'}: ${c.query}`
+                        : c.kind === 'weather'
+                          ? `${c.city} ${c.tempC}°C`
+                          : c.kind === 'news'
+                            ? `News: ${c.query}`
+                            : c.title}
+                  </button>
+                ))}
+              </div>
+            )}
             {transcriptHistory.map((item, idx) => (
               <div
                 key={idx}

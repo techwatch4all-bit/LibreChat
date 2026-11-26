@@ -1848,6 +1848,32 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let usageReported = false;
       let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
         null;
+      let reverseGeocodePromise: Promise<void> | null = null;
+
+      const injectS2sSystemConfirmation = (notice: string) => {
+        if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
+          suppressCurrentS2sTurn = false;
+          pauseMicForwardUntil = Date.now() + 650;
+          upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+          upstreamWs.send(
+            JSON.stringify({
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: `[SYSTEM ACTION COMPLETED: ${notice} Confirm this warmly in 1 short sentence. Never say you cannot do it.]`,
+                      },
+                    ],
+                  },
+                ],
+                turnComplete: true,
+              },
+            }),
+          );
+        }
+      };
 
       const reportVoiceUsageSummary = (reason: string) => {
         if (usageReported) {
@@ -2277,10 +2303,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   }
                 }
 
-                // 1b. Hands-free UI actions (mode switch, new chat, scroll, read last response)
+                // 1b. Hands-free UI actions (mode switch, new chat, scroll, minimize/maximize)
                 const lowerUtterance = cleanUtterance.toLowerCase();
                 if (/^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(lowerUtterance)) {
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'new_chat' });
+                  injectS2sSystemConfirmation('Opened a brand new chat.');
                   return;
                 }
                 const modeSwitchMatch = lowerUtterance.match(
@@ -2290,7 +2319,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   const target =
                     modeSwitchMatch[1].charAt(0).toUpperCase() +
                     modeSwitchMatch[1].slice(1).toLowerCase();
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'set_mode', value: target });
+                  injectS2sSystemConfirmation(`Switched to ${target} mode.`);
                   return;
                 }
                 if (/\bscroll\s+down\b/i.test(lowerUtterance)) {
@@ -2302,18 +2334,29 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   return;
                 }
                 if (/\bminimize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'minimize' });
+                  injectS2sSystemConfirmation('Minimized the voice window to the corner.');
                   return;
                 }
                 if (/\bmaximize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'maximize' });
+                  injectS2sSystemConfirmation('Expanded the voice window.');
                   return;
                 }
 
                 // 1b-media. YouTube / Spotify Media Launcher Card
                 const mediaCard = detectMediaIntent(cleanUtterance);
                 if (mediaCard) {
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
+                  injectS2sSystemConfirmation(
+                    `Opened the ${mediaCard.title} launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to launch it.`,
+                  );
                   return;
                 }
 
@@ -2371,6 +2414,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     });
 
                     void (async () => {
+                      if (wantsLocalContext && reverseGeocodePromise) {
+                        await reverseGeocodePromise.catch(() => {});
+                      }
                       const parts: string[] = [];
                       const parallelTasks: Promise<void>[] = [];
 
@@ -2542,7 +2588,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 if (
                   modePolicy.toolsAllowed &&
                   (detectRealtimeSearchIntent(pendingInputTranscript).isSearch ||
-                    detectToolOrTutorIntent(pendingInputTranscript).delegate)
+                    detectToolOrTutorIntent(pendingInputTranscript).delegate ||
+                    Boolean(detectMediaIntent(pendingInputTranscript)))
                 ) {
                   suppressCurrentS2sTurn = true;
                 }
@@ -2748,7 +2795,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 typeof userLocation.lng === 'number'
               ) {
                 const { lat, lng } = userLocation;
-                void fetch(
+                reverseGeocodePromise = fetch(
                   `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
                   {
                     signal: AbortSignal.timeout(3000),

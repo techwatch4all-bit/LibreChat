@@ -1752,6 +1752,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         if (!extractedName && lastAssistantAskedForName && !voiceProfile.name) {
           const directReply = cleanUtterance
             .replace(/^(?:it'?s|hey|hi|uh|um|well|just)\s+/i, '')
+            .replace(/\s+(?:and\s+(?:we|i|let'?s)|,).*$/i, '')
             .replace(/[.,!?]+$/g, '')
             .trim();
           const words = directReply.split(/\s+/).filter(Boolean);
@@ -2525,7 +2526,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       ? 'END_SENSITIVITY_LOW'
                       : 'END_SENSITIVITY_HIGH',
                     prefixPaddingMs: isTranslatorMode ? 200 : 120,
-                    silenceDurationMs: isTranslatorMode ? 1200 : 400,
+                    silenceDurationMs: isTranslatorMode ? 1200 : 750,
                   },
                   activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
                 },

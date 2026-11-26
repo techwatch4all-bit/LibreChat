@@ -1346,23 +1346,23 @@ export default function LiveVoiceModal({
             } else {
               // bifrost_bridge: speech-to-text + bridge turn pipeline
               startSpeechRecognition(ws);
+              const greetings = [
+                'Say only: "Hi, how may I be of assistance?"',
+                'Say only: "Hello! How can I help you today?"',
+                'Say only: "Hi there, what can I help you with?"',
+                'Say only: "Hello, how may I help?"',
+              ];
+              const greetingPrompt = greetings[Math.floor(Math.random() * greetings.length)];
+              ws.send(
+                JSON.stringify({
+                  type: 'voice.turn',
+                  text: greetingPrompt,
+                  voice: voiceIdRef.current,
+                  mode: 'discussion',
+                  hasTools: false,
+                }),
+              );
             }
-            const greetings = [
-              'Say only: "Hi, how may I be of assistance?"',
-              'Say only: "Hello! How can I help you today?"',
-              'Say only: "Hi there, what can I help you with?"',
-              'Say only: "Hello, how may I help?"',
-            ];
-            const greetingPrompt = greetings[Math.floor(Math.random() * greetings.length)];
-            ws.send(
-              JSON.stringify({
-                type: 'voice.turn',
-                text: greetingPrompt,
-                voice: voiceIdRef.current,
-                mode: 'discussion',
-                hasTools: false,
-              }),
-            );
             return;
           }
 
@@ -1959,18 +1959,8 @@ export default function LiveVoiceModal({
         }
         touchStartYRef.current = null;
       }}
-      className={
-        isMobileViewport
-          ? 'bg-surface-primary/98 pointer-events-auto fixed inset-0 z-[60] flex flex-col justify-between p-4 text-text-primary backdrop-blur-2xl transition-all duration-300'
-          : 'pointer-events-auto fixed left-2 right-2 top-14 z-[60] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-3 text-text-primary shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:top-16 sm:w-[320px]'
-      }
+      className="pointer-events-auto fixed left-2 right-2 top-14 z-[60] rounded-2xl border border-violet-500/35 bg-surface-primary/95 p-3 text-text-primary shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:top-16 sm:w-[320px]"
     >
-      {isMobileViewport && (
-        <div
-          className="mx-auto mb-2 h-1 w-10 rounded-full bg-border-medium/70"
-          aria-hidden="true"
-        />
-      )}
       {/* Compact Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">

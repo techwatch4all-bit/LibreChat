@@ -1,11 +1,12 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import http from 'http';
-import os from 'os';
 import { spawn } from 'child_process';
+import { logger } from '@librechat/data-schemas';
 import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
-import { logger } from '@librechat/data-schemas';
+import type { VoiceProfileData } from './voiceProfile';
 import {
   stripVoiceStopwords,
   extractSpokenCity,
@@ -17,13 +18,11 @@ import {
   detectMediaIntent,
 } from './liveResolvers';
 import {
-  VOICE_PROFILE_MEMORY_KEY,
   parseVoiceProfile,
   serializeVoiceProfile,
   mergeVoiceProfile,
   buildVoiceMemorySystemBlock,
 } from './voiceProfile';
-import type { VoiceProfileData } from './voiceProfile';
 import { analyzeSpeakerTurn, detectAiVoiceAgent, inferGenderHint } from './voiceIntelligence';
 
 export interface RealtimeWebSocketLike {
@@ -1529,7 +1528,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
     const initialHasTools = url.searchParams.get('tools') === 'true';
     const initialVoiceParam = url.searchParams.get('voice') || 'in_female';
     const requestedModel = url.searchParams.get('model')?.trim();
-    const model = requestedModel || config.model;
+    const _model = requestedModel || config.model;
 
     wss.handleUpgrade(req, socket, head, async (clientWs) => {
       // 2. MANDATORY USER RECORD, TIER ENTITLEMENT & SEAT TOKEN CHECK
@@ -1588,8 +1587,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       }
 
       let activeVoiceProfile = resolveVoiceProfile(initialVoiceParam);
-      const modeVk = selectBifrostVkForMode(modePolicy.semanticMode, userSeat.accountType);
-      const attributionHeaders = buildSatchidaAttributionHeaders({
+      const _modeVk = selectBifrostVkForMode(modePolicy.semanticMode, userSeat.accountType);
+      const _attributionHeaders = buildSatchidaAttributionHeaders({
         user: userSeat,
         userId: authenticatedUserId,
         semanticMode: modePolicy.semanticMode,
@@ -1609,7 +1608,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let voiceProfile: VoiceProfileData = {};
       let initialGreetingSent = false;
       const recentUserTranscripts: string[] = [];
-      let lastGuestAcoustic: {
+      let _lastGuestAcoustic: {
         avgPitchHz: number;
         pitchStdHz: number;
         genderHint: 'male' | 'female' | 'unknown';
@@ -2255,7 +2254,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         }
       };
 
-      const sessionStartTime = Date.now();
+      const _sessionStartTime = Date.now();
       let totalAudioBytesStreamed = 0;
       let micFrameCount = 0;
       let loggedNonSilentMic = false;
@@ -2330,7 +2329,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           void Promise.resolve(
             deps.recordVoiceUsage({
               userId: authenticatedUserId,
-              accountType: userSeat.accountType,
+              accountType: userSeat.accountType ?? 'standard',
               model: isGeminiS2sActive ? 'gemini-3.8-live' : 'cascaded-bridge',
               durationSec,
               promptTokens: finalPromptTokens,
@@ -3321,6 +3320,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               city?: string;
               timeZone?: string;
               enabled?: boolean;
+              avgPitchHz?: number;
+              pitchStdHz?: number;
             };
             if (
               parsed.type === 'voice.set_translator_mode' &&
@@ -3521,7 +3522,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 } else if (analysis.status === 'unknown_guest') {
                   const pitchBucket = Math.round(analysis.pitchHz / 40) * 40;
                   const nextKey = `unknown:${pitchBucket}`;
-                  lastGuestAcoustic = {
+                  _lastGuestAcoustic = {
                     avgPitchHz: analysis.pitchHz,
                     pitchStdHz: Math.round(pitchStdHz),
                     genderHint: analysis.genderHint,

@@ -536,14 +536,9 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
         seatToken: 'tk_seat_2',
       }),
       mintEphemeralToken: async () => 'mock_token',
-      getVoiceProfileMemory: async () => ({}),
+      getVoiceProfileMemory: async () => JSON.stringify({}),
       setVoiceProfileMemory: async (_userId, profile) => {
-        savedProfiles.push(
-          typeof profile === 'string'
-            ? (JSON.parse(profile) as Record<string, unknown>)
-            : (profile as Record<string, unknown>),
-        );
-        return true;
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
       },
     });
 
@@ -619,17 +614,18 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
         seatToken: 'tk_seat_3',
       }),
       mintEphemeralToken: async () => 'mock_token',
-      getVoiceProfileMemory: async () => ({
-        primary_voiceprint: {
-          avg_pitch_hz: 120,
-          pitch_std_hz: 12,
-          gender_hint: 'male',
-          samples: 5,
-        },
-        known_speakers: [
-          { name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 },
-        ],
-      }),
+      getVoiceProfileMemory: async () =>
+        JSON.stringify({
+          primary_voiceprint: {
+            avg_pitch_hz: 120,
+            pitch_std_hz: 12,
+            gender_hint: 'male',
+            samples: 5,
+          },
+          known_speakers: [
+            { name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 },
+          ],
+        }),
     });
 
     const req = {

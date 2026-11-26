@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import {
   Mic,
@@ -28,8 +28,8 @@ import {
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { getSharedVoiceAudioContext } from '~/utils/voiceAudioContext';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import { useAuthContext, useLocalize, useNewConvo } from '~/hooks';
 import { UtterancePitchTracker } from '~/utils/voicePitch';
-import { useAuthContext, useNewConvo } from '~/hooks';
 import OrbVisualizer from './OrbVisualizer';
 
 interface LiveVoiceModalProps {
@@ -108,9 +108,6 @@ interface BrowserSpeechRecognition {
   abort: () => void;
 }
 
-const TOOL_INTENT_REGEX =
-  /\b(search the web|web search|google|latest news|current price|generate an? image|create an? image|generate a video|deep research|check my vault|knowledge vault)\b/i;
-
 const INTERNAL_INFRA_LEAK_REGEX =
   /bifrost|one-?api|cheap(?:er)?inference|deepinfra|openrouter|llamacpp|llama|:8700|:4000|:8080|virtual\s*key|x-bf-vk/i;
 const GENERIC_VOICE_UNAVAILABLE =
@@ -161,7 +158,7 @@ export default function LiveVoiceModal({
   const [webSearchEnabled, setWebSearchEnabled] = useAtom(satchiWebSearchAtom);
   const [researchEnabled, setResearchEnabled] = useAtom(satchiResearchAtom);
   const [imageGenEnabled, setImageGenEnabled] = useAtom(satchiImageGenAtom);
-  const [thinkLevel, setThinkLevel] = useAtom(satchiThinkAtom);
+  const [_thinkLevel, setThinkLevel] = useAtom(satchiThinkAtom);
   const activeTailMessage = useLatestMessage(0);
 
   const hasActiveComposerTools = Boolean(webSearchEnabled || researchEnabled || imageGenEnabled);
@@ -172,6 +169,7 @@ export default function LiveVoiceModal({
   const [statusText, setStatusText] = useState('Connecting...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [spokenTranscript, setSpokenTranscript] = useState('');
+  const localize = useLocalize();
   const [assistantTranscript, setAssistantTranscript] = useState('');
   const [actionCard, setActionCard] = useState<VoiceActionCard | null>(null);
   const [cardHistory, setCardHistory] = useState<VoiceActionCard[]>([]);
@@ -200,7 +198,7 @@ export default function LiveVoiceModal({
   const [translatorMode, setTranslatorMode] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [micStreaming, setMicStreaming] = useState(false);
-  const [activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
+  const [_activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
   const [awaitingToolResponse, setAwaitingToolResponse] = useState(false);
   const [lastSpokenMessageId, setLastSpokenMessageId] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -1050,11 +1048,12 @@ export default function LiveVoiceModal({
             /\b(accent|voice|male|female|us|american|uk|british|indian|india)\b/i.test(lower)
           ) {
             const currentOpt = VOICE_OPTIONS.find((v) => v.id === voiceIdRef.current);
-            let nextRegion: 'in' | 'us' | 'uk' = currentOpt?.id.startsWith('us')
-              ? 'us'
-              : currentOpt?.id.startsWith('uk')
-                ? 'uk'
-                : 'in';
+            let nextRegion: 'in' | 'us' | 'uk' = 'in';
+            if (currentOpt?.id.startsWith('us')) {
+              nextRegion = 'us';
+            } else if (currentOpt?.id.startsWith('uk')) {
+              nextRegion = 'uk';
+            }
             if (/\b(us|u\.s\.|american|united states)\b/i.test(lower)) {
               nextRegion = 'us';
             } else if (/\b(uk|u\.k\.|british|england|london)\b/i.test(lower)) {
@@ -1631,6 +1630,7 @@ export default function LiveVoiceModal({
       }
       cleanupSession();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
     retryNonce,
@@ -1751,7 +1751,13 @@ export default function LiveVoiceModal({
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
-      setStatusText(next ? 'Muted' : isAssistantSpeaking ? 'Speaking...' : 'Listening...');
+      let nextStatus = 'Listening...';
+      if (next) {
+        nextStatus = 'Muted';
+      } else if (isAssistantSpeaking) {
+        nextStatus = 'Speaking...';
+      }
+      setStatusText(nextStatus);
       if (next) {
         pauseRecognitionForEchoGuard();
       } else {
@@ -1769,21 +1775,25 @@ export default function LiveVoiceModal({
   const isListening = connectionState === 'connected' && !isMuted && !isAssistantSpeaking;
   const currentVoiceOpt = VOICE_OPTIONS.find((v) => v.id === voiceId) || VOICE_OPTIONS[0];
 
+  let minimizedPingClass = 'bg-emerald-400';
+  let minimizedDotClass = 'bg-emerald-500';
+  if (isAssistantSpeaking) {
+    minimizedPingClass = 'bg-fuchsia-400';
+    minimizedDotClass = 'bg-fuchsia-500';
+  } else if (isMuted) {
+    minimizedPingClass = 'bg-red-400';
+    minimizedDotClass = 'bg-red-500';
+  }
+
   // Compact minimized floating pill (non-blocking)
   if (isMinimized) {
     return (
       <div className="pointer-events-auto fixed bottom-24 right-6 z-50 flex items-center gap-2 rounded-full border border-violet-500/40 bg-surface-primary/95 px-3 py-2 text-text-primary shadow-2xl backdrop-blur-xl">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           <span
-            className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-              isAssistantSpeaking ? 'bg-fuchsia-400' : isMuted ? 'bg-red-400' : 'bg-emerald-400'
-            } opacity-75`}
+            className={`absolute inline-flex h-full w-full animate-ping rounded-full ${minimizedPingClass} opacity-75`}
           />
-          <span
-            className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-              isAssistantSpeaking ? 'bg-fuchsia-500' : isMuted ? 'bg-red-500' : 'bg-emerald-500'
-            }`}
-          />
+          <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${minimizedDotClass}`} />
         </span>
         <span className="whitespace-nowrap text-xs font-semibold">
           {statusText} · {currentVoiceOpt.shortLabel} ·{' '}
@@ -1821,16 +1831,111 @@ export default function LiveVoiceModal({
   }
 
   // Non-blocking floating Live Voice Dock — chat page stays 100% interactive behind it
-  const orbState =
-    connectionState === 'error'
-      ? ('error' as const)
-      : isAssistantSpeaking
-        ? ('speaking' as const)
-        : isMuted
-          ? ('muted' as const)
-          : connectionState === 'connecting'
-            ? ('thinking' as const)
-            : ('listening' as const);
+  let orbState: 'error' | 'speaking' | 'muted' | 'thinking' | 'listening' = 'listening';
+  if (connectionState === 'error') {
+    orbState = 'error';
+  } else if (isAssistantSpeaking) {
+    orbState = 'speaking';
+  } else if (isMuted) {
+    orbState = 'muted';
+  } else if (connectionState === 'connecting') {
+    orbState = 'thinking';
+  }
+
+  let orbAmplitude = 0.45;
+  if (isAssistantSpeaking) {
+    orbAmplitude = 0.8;
+  } else if (isMuted) {
+    orbAmplitude = 0.1;
+  }
+
+  const getCardChipLabel = (card: VoiceActionCard): string => {
+    if (card.kind === 'maps') {
+      return `Map: ${card.subtitle || card.title}`;
+    }
+    if (card.kind === 'media') {
+      const provider = card.platform === 'spotify' ? 'Spotify' : 'YouTube';
+      return `${provider}: ${card.query}`;
+    }
+    if (card.kind === 'weather') {
+      return `${card.city} ${card.tempC}°C`;
+    }
+    if (card.kind === 'news') {
+      return `News: ${card.query}`;
+    }
+    return card.title;
+  };
+
+  let micButtonRingClass = '';
+  if (isAssistantSpeaking) {
+    micButtonRingClass = 'scale-105 ring-4 ring-fuchsia-400/40';
+  } else if (isListening) {
+    micButtonRingClass = 'ring-2 ring-emerald-400/30';
+  }
+
+  let micButtonIcon: React.ReactNode = <Mic className="h-4 w-4 text-violet-100" />;
+  if (connectionState === 'error') {
+    micButtonIcon = <AlertCircle className="h-4 w-4 text-red-400" />;
+  } else if (isAssistantSpeaking) {
+    micButtonIcon = <Volume2 className="h-4 w-4 animate-pulse text-white" />;
+  } else if (isMuted) {
+    micButtonIcon = <MicOff className="h-4 w-4 text-red-400" />;
+  }
+
+  let transcriptContent: React.ReactNode = (
+    <span>{localize('com_ui_live_voice_speak_naturally')}</span>
+  );
+  if (assistantTranscript) {
+    transcriptContent = <span className="text-text-primary">{assistantTranscript}</span>;
+  } else if (spokenTranscript) {
+    transcriptContent = (
+      <span className="italic text-text-primary">&ldquo;{spokenTranscript}&rdquo;</span>
+    );
+  }
+
+  let primaryControlButton: React.ReactNode;
+  if (connectionState === 'error') {
+    primaryControlButton = (
+      <button
+        type="button"
+        onClick={handleRetry}
+        className="flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-500/40 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-300 transition-all hover:bg-violet-500/25"
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+        <span>{localize('com_ui_live_voice_retry')}</span>
+      </button>
+    );
+  } else if (isAssistantSpeaking) {
+    primaryControlButton = (
+      <button
+        type="button"
+        onClick={() => stopAssistantAudio(true)}
+        className="flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition-all hover:bg-amber-500/25"
+      >
+        <Square className="h-3.5 w-3.5" />
+        <span>{localize('com_ui_live_voice_interrupt')}</span>
+      </button>
+    );
+  } else {
+    primaryControlButton = (
+      <button
+        type="button"
+        onClick={toggleMute}
+        className={`flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
+          isMuted
+            ? 'border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+            : 'border-border-light bg-surface-secondary text-text-primary hover:bg-surface-hover'
+        }`}
+      >
+        {isMuted ? (
+          <MicOff className="h-3.5 w-3.5" />
+        ) : (
+          <Mic className="h-3.5 w-3.5 text-emerald-400" />
+        )}
+        <span>{isMuted ? 'Unmute' : 'Mute'}</span>
+      </button>
+    );
+  }
 
   return (
     <div
@@ -1871,11 +1976,11 @@ export default function LiveVoiceModal({
         <div className="flex min-w-0 items-center gap-2">
           <OrbVisualizer
             state={orbState}
-            amplitude={isAssistantSpeaking ? 0.8 : isMuted ? 0.1 : 0.45}
+            amplitude={orbAmplitude}
             size={isMobileViewport ? 36 : 24}
           />
           <span className="truncate text-xs font-bold tracking-wide text-text-primary">
-            Live Voice
+            {localize('com_ui_live_voice')}
           </span>
           <select
             aria-label="Select Voice Accent"
@@ -1907,7 +2012,7 @@ export default function LiveVoiceModal({
               title="Tap to exit Translator Mode"
             >
               <Globe className="h-3 w-3" />
-              Translator ×
+              {localize('com_ui_live_voice_translator_exit')}
             </button>
           )}
           {transcriptHistory.length > 0 && (
@@ -1945,7 +2050,9 @@ export default function LiveVoiceModal({
       {showTranscriptDrawer && transcriptHistory.length > 0 && (
         <div className="mb-2 rounded-xl border border-border-medium bg-surface-secondary/60 p-2.5 text-xs">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="font-semibold text-text-primary">Voice Transcript</span>
+            <span className="font-semibold text-text-primary">
+              {localize('com_ui_live_voice_transcript')}
+            </span>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1982,7 +2089,7 @@ export default function LiveVoiceModal({
                 }}
                 className="rounded-md bg-violet-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-violet-500"
               >
-                Save to Chat
+                {localize('com_ui_live_voice_save_to_chat')}
               </button>
             </div>
           </div>
@@ -1996,15 +2103,7 @@ export default function LiveVoiceModal({
                     onClick={() => setActionCard(c)}
                     className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/25"
                   >
-                    {c.kind === 'maps'
-                      ? `Map: ${c.subtitle || c.title}`
-                      : c.kind === 'media'
-                        ? `${c.platform === 'spotify' ? 'Spotify' : 'YouTube'}: ${c.query}`
-                        : c.kind === 'weather'
-                          ? `${c.city} ${c.tempC}°C`
-                          : c.kind === 'news'
-                            ? `News: ${c.query}`
-                            : c.title}
+                    {getCardChipLabel(c)}
                   </button>
                 ))}
               </div>
@@ -2049,7 +2148,7 @@ export default function LiveVoiceModal({
                       rel="noopener noreferrer"
                       className="rounded-lg bg-emerald-600 px-2.5 py-1 font-medium text-white hover:bg-emerald-500"
                     >
-                      Navigate
+                      {localize('com_ui_live_voice_navigate')}
                     </a>
                     <button
                       type="button"
@@ -2076,7 +2175,7 @@ export default function LiveVoiceModal({
               <div className="w-full rounded-xl border border-sky-500/25 bg-gradient-to-br from-sky-900/60 to-blue-950/60 p-3 text-white">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-3xl font-bold leading-none">{actionCard.tempC}°C</div>
+                    <div className="text-3xl font-bold leading-none">{`${actionCard.tempC}°C`}</div>
                     <div className="mt-1 text-xs font-medium text-sky-200">
                       {actionCard.condition}
                     </div>
@@ -2133,7 +2232,7 @@ export default function LiveVoiceModal({
                       rel="noopener noreferrer"
                       className="rounded-lg border border-emerald-400/40 px-2 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20"
                     >
-                      Install
+                      {localize('com_ui_live_voice_install')}
                     </a>
                   )}
                   <button
@@ -2161,7 +2260,7 @@ export default function LiveVoiceModal({
                     onClick={() => setIsMinimized(true)}
                     className="rounded-lg bg-violet-600 px-2.5 py-1 font-medium text-white hover:bg-violet-500"
                   >
-                    View Chat
+                    {localize('com_ui_live_voice_view_chat')}
                   </button>
                   <button
                     type="button"
@@ -2178,7 +2277,7 @@ export default function LiveVoiceModal({
               <div className="w-full space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-text-primary">
-                    Live Headlines · {actionCard.query}
+                    {`${localize('com_ui_live_voice_headlines')} · ${actionCard.query}`}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -2194,7 +2293,7 @@ export default function LiveVoiceModal({
                       }}
                       className="rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-sky-500"
                     >
-                      Send to Chat
+                      {localize('com_ui_live_voice_send_to_chat')}
                     </button>
                     <button
                       type="button"
@@ -2241,23 +2340,9 @@ export default function LiveVoiceModal({
             }
             return isMuted ? 'Unmute' : 'Mute';
           })()}
-          className={`bg-linear-to-br relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-400/40 from-violet-600/85 via-purple-700/85 to-indigo-900/90 shadow-md shadow-violet-500/20 transition-transform active:scale-95 ${
-            isAssistantSpeaking
-              ? 'scale-105 ring-4 ring-fuchsia-400/40'
-              : isListening
-                ? 'ring-2 ring-emerald-400/30'
-                : ''
-          }`}
+          className={`bg-linear-to-br relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-400/40 from-violet-600/85 via-purple-700/85 to-indigo-900/90 shadow-md shadow-violet-500/20 transition-transform active:scale-95 ${micButtonRingClass}`}
         >
-          {connectionState === 'error' ? (
-            <AlertCircle className="h-4 w-4 text-red-400" />
-          ) : isAssistantSpeaking ? (
-            <Volume2 className="h-4 w-4 animate-pulse text-white" />
-          ) : isMuted ? (
-            <MicOff className="h-4 w-4 text-red-400" />
-          ) : (
-            <Mic className="h-4 w-4 text-violet-100" />
-          )}
+          {micButtonIcon}
         </button>
 
         <div className="min-w-0 flex-1">
@@ -2266,7 +2351,7 @@ export default function LiveVoiceModal({
             {micStreaming && !isMuted && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Mic live
+                {localize('com_ui_live_voice_mic_live')}
               </span>
             )}
           </div>
@@ -2279,13 +2364,7 @@ export default function LiveVoiceModal({
             </div>
           ) : (
             <div className="mt-0.5 max-h-12 overflow-y-auto text-xs leading-snug text-text-secondary">
-              {assistantTranscript ? (
-                <span className="text-text-primary">{assistantTranscript}</span>
-              ) : spokenTranscript ? (
-                <span className="italic text-text-primary">&ldquo;{spokenTranscript}&rdquo;</span>
-              ) : (
-                <span>Speak naturally — live cloud voice active.</span>
-              )}
+              {transcriptContent}
             </div>
           )}
         </div>
@@ -2293,49 +2372,14 @@ export default function LiveVoiceModal({
 
       {/* Controls Bar */}
       <div className="flex items-center justify-between gap-2">
-        {connectionState === 'error' ? (
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-500/40 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-300 transition-all hover:bg-violet-500/25"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Retry</span>
-          </button>
-        ) : isAssistantSpeaking ? (
-          <button
-            type="button"
-            onClick={() => stopAssistantAudio(true)}
-            className="flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition-all hover:bg-amber-500/25"
-          >
-            <Square className="h-3.5 w-3.5" />
-            <span>Interrupt</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={toggleMute}
-            className={`flex flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-              isMuted
-                ? 'border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                : 'border-border-light bg-surface-secondary text-text-primary hover:bg-surface-hover'
-            }`}
-          >
-            {isMuted ? (
-              <MicOff className="h-3.5 w-3.5" />
-            ) : (
-              <Mic className="h-3.5 w-3.5 text-emerald-400" />
-            )}
-            <span>{isMuted ? 'Unmute' : 'Mute'}</span>
-          </button>
-        )}
+        {primaryControlButton}
 
         <button
           type="button"
           onClick={() => onOpenChange(false)}
           className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-1.5 text-xs font-semibold text-red-400 transition-all hover:bg-red-500/20"
         >
-          End
+          {localize('com_ui_live_voice_end')}
         </button>
       </div>
     </div>

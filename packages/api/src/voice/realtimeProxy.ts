@@ -215,10 +215,12 @@ export function detectRealtimeSearchIntent(text: string): {
   const isSearch =
     isDeepResearch ||
     hasUrl ||
-    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
+    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
       lower,
     ) ||
-    /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का)/u.test(text) ||
+    /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का|पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(
+      text,
+    ) ||
     /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|rate|rates|weather|events|results|match)\b/i.test(
       lower,
     );
@@ -2330,8 +2332,15 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     const wantsWeather = isWeatherQuery(effectiveUtterance);
                     const wantsNews = isNewsQuery(effectiveUtterance);
                     const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                    const wantsLocalContext =
+                      wantsWeather ||
+                      wantsPlace ||
+                      /\b(panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset)\b/i.test(
+                        effectiveUtterance,
+                      ) ||
+                      /(?:पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(effectiveUtterance);
                     const locationSuffix =
-                      (wantsWeather || wantsPlace) &&
+                      wantsLocalContext &&
                       userLocation?.city &&
                       !effectiveUtterance.toLowerCase().includes(userLocation.city.toLowerCase())
                         ? ` in ${userLocation.city}`

@@ -2244,6 +2244,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   );
                 } else if (!initialGreetingSent && currentSocket.readyState === WS_OPEN) {
                   initialGreetingSent = true;
+                  // Prevent initial ambient mic noise from interrupting the opening greeting
+                  pauseMicForwardUntil = Date.now() + 1800;
                   currentSocket.send(
                     JSON.stringify({
                       clientContent: {
@@ -2418,19 +2420,29 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 );
 
                 // 0. Server-side profile preference extraction (zero latency impact on S2S)
-                const langMatch = cleanUtterance.match(
-                  /\b(?:speak|talk|switch|change(?:\s+you)?)\s+(?:in|to)\s+(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
-                );
+                const langMatch =
+                  cleanUtterance.match(
+                    /\b(?:speak|talk|switch|change(?:\s+you)?)\s+(?:in|to)\s+(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+                  ) ||
+                  (!voiceProfile.preferred_language
+                    ? cleanUtterance.match(
+                        /^(?:in\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)[.,!?\s]*$/i,
+                      )
+                    : null);
                 if (langMatch?.[1]) {
                   const chosenLang =
                     langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
                   void persistVoiceProfilePatch({ preferred_language: chosenLang });
                 }
                 const nameMatch = cleanUtterance.match(
-                  /\b(?:my\s+name\s+is|i\s+am|call\s+me)\s+([A-Z][a-z]{1,24})\b/,
+                  /\b(?:my\s+name\s+is|i\s+am|i'm|call\s+me)\s+([A-Z][a-z]{1,24})\b/,
                 );
                 if (nameMatch?.[1] && !/^(?:sorry|good|fine|okay|here|looking|asking|trying)$/i.test(nameMatch[1])) {
                   void persistVoiceProfilePatch({ name: nameMatch[1] });
+                }
+                const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
+                if (dietMatch?.[1]) {
+                  void persistVoiceProfilePatch({ dietary_preference: dietMatch[1].toLowerCase() });
                 }
 
                 // 0b. AI-to-AI voice agent detection (log & track without stalling S2S VAD)

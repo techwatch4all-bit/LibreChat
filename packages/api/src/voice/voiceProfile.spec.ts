@@ -51,7 +51,7 @@ describe('voiceProfile', () => {
     const freshPrompt = buildVoiceMemorySystemBlock({}, 9);
     expect(freshPrompt).toContain('FIRST GREETING RULE');
     expect(freshPrompt).toContain('Good morning');
-    expect(freshPrompt).toContain('save_voice_profile');
+    expect(freshPrompt).toContain('saved automatically');
 
     const returningPrompt = buildVoiceMemorySystemBlock(
       { preferred_language: 'Hindi', name: 'Golu' },

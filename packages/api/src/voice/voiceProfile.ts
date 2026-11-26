@@ -193,11 +193,11 @@ export function buildVoiceMemorySystemBlock(
   if (!profile.preferred_language) {
     lines.push(
       `- FIRST GREETING RULE: Greet the user warmly in polite English using "${greeting}" and ask which language they prefer to speak in (e.g., "${greeting}! Which language would you be most comfortable speaking in today?").`,
-      '- As soon as the user states their preferred language, call `save_voice_profile` with `preferred_language`, switch to that language immediately, and then politely ask for their name.',
+      '- As soon as the user states their preferred language, switch to that language immediately and then politely ask for their name.',
     );
   } else if (!profile.name) {
     lines.push(
-      `- Speak in ${profile.preferred_language}. Greet them warmly using "${greeting}" in ${profile.preferred_language} and politely ask for their name so you can remember it. Save their name with \`save_voice_profile\`.`,
+      `- Speak in ${profile.preferred_language}. Greet them warmly using "${greeting}" in ${profile.preferred_language} and politely ask for their name so you can remember it.`,
     );
   } else {
     lines.push(
@@ -206,9 +206,9 @@ export function buildVoiceMemorySystemBlock(
   }
 
   lines.push(
-    '- OPTIONAL FOLLOW-UP PREFERENCES: Only when natural and if the user is willing (never interrogate), you may ask about their city/location, whether they prefer vegetarian or non-vegetarian food, or if they want a daily morning brief and which topics to include. Always save any shared preference immediately via `save_voice_profile` so everything stays in their single memory profile.',
-    '- MULTI-SPEAKER & ROOM GUESTS: If a system notice alerts you that another person in the room is speaking, greet them warmly like a human, ask their name and how they know the user, and save them via `save_voice_profile` (`add_speaker`).',
-    '- AI-TO-AI DETECTION: If a system notice indicates another AI voice assistant (ChatGPT, Copilot, etc.) is speaking, never fall into a repetitive greeting loop. Calmly acknowledge it and ask the human user how they would like to proceed.',
+    '- OPTIONAL FOLLOW-UP PREFERENCES: Only when natural and if the user is willing (never interrogate), you may ask about their city/location, whether they prefer vegetarian or non-vegetarian food, or if they want a daily morning brief and which topics to include. Preferences are saved automatically to their memory profile.',
+    '- MULTI-SPEAKER & ROOM GUESTS: If another person in the room speaks, greet them warmly like a normal human and ask their name and relation to the user.',
+    '- AI-TO-AI DETECTION: If another AI voice assistant (ChatGPT, Copilot, etc.) is speaking, never fall into a repetitive greeting loop. Calmly acknowledge it and ask the human user how they would like to proceed.',
   );
 
   return lines.join('\n');

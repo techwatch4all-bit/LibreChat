@@ -2096,62 +2096,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 },
                 inputAudioTranscription: {},
                 outputAudioTranscription: {},
-                tools: modePolicy.toolsAllowed
-                  ? [
-                      { googleSearch: {} },
-                      {
-                        functionDeclarations: [
-                          {
-                            name: 'save_voice_profile',
-                            description:
-                              'Save or update the user\'s long-term voice preferences (language, name, location, dietary preference, daily morning brief, or room guest speakers) into their single consolidated memory profile.',
-                            parameters: {
-                              type: 'OBJECT',
-                              properties: {
-                                preferred_language: {
-                                  type: 'STRING',
-                                  description: 'Preferred spoken language, e.g. English, Hindi, Hinglish, Tamil.',
-                                },
-                                name: {
-                                  type: 'STRING',
-                                  description: 'User\'s preferred name.',
-                                },
-                                location: {
-                                  type: 'STRING',
-                                  description: 'User\'s city or location.',
-                                },
-                                dietary_preference: {
-                                  type: 'STRING',
-                                  description: 'Dietary preference, e.g. vegetarian, non-vegetarian, vegan.',
-                                },
-                                morning_brief_enabled: {
-                                  type: 'BOOLEAN',
-                                  description: 'Whether the user wants a daily morning brief.',
-                                },
-                                morning_brief_topics: {
-                                  type: 'ARRAY',
-                                  items: { type: 'STRING' },
-                                  description: 'Topics for the daily morning brief.',
-                                },
-                                guest_name: {
-                                  type: 'STRING',
-                                  description: 'Name of another person speaking in the room.',
-                                },
-                                guest_relation: {
-                                  type: 'STRING',
-                                  description: 'Relation of the room guest to the user (e.g. wife, friend, colleague).',
-                                },
-                                guest_gender_hint: {
-                                  type: 'STRING',
-                                  description: 'male, female, or unknown.',
-                                },
-                              },
-                            },
-                          },
-                        ],
-                      },
-                    ]
-                  : undefined,
+                tools: modePolicy.toolsAllowed ? [{ googleSearch: {} }] : undefined,
                 contextWindowCompression: {
                   slidingWindow: {},
                 },
@@ -2472,34 +2417,31 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   `[RealtimeVoice] S2S user transcript: "${cleanUtterance.slice(0, 120)}"`,
                 );
 
-                // 0. AI-to-AI voice agent detection (ChatGPT / Copilot / assistant loops)
+                // 0. Server-side profile preference extraction (zero latency impact on S2S)
+                const langMatch = cleanUtterance.match(
+                  /\b(?:speak|talk|switch|change(?:\s+you)?)\s+(?:in|to)\s+(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+                );
+                if (langMatch?.[1]) {
+                  const chosenLang =
+                    langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
+                  void persistVoiceProfilePatch({ preferred_language: chosenLang });
+                }
+                const nameMatch = cleanUtterance.match(
+                  /\b(?:my\s+name\s+is|i\s+am|call\s+me)\s+([A-Z][a-z]{1,24})\b/,
+                );
+                if (nameMatch?.[1] && !/^(?:sorry|good|fine|okay|here|looking|asking|trying)$/i.test(nameMatch[1])) {
+                  void persistVoiceProfilePatch({ name: nameMatch[1] });
+                }
+
+                // 0b. AI-to-AI voice agent detection (log & track without stalling S2S VAD)
                 const s2sAiCheck = detectAiVoiceAgent(cleanUtterance, recentUserTranscripts);
                 recentUserTranscripts.push(cleanUtterance);
                 if (recentUserTranscripts.length > 6) {
                   recentUserTranscripts.shift();
                 }
-                if (
-                  s2sAiCheck.isLikelyAi &&
-                  isGeminiS2sActive &&
-                  upstreamWs &&
-                  upstreamWs.readyState === WS_OPEN
-                ) {
-                  upstreamWs.send(
-                    JSON.stringify({
-                      clientContent: {
-                        turns: [
-                          {
-                            role: 'user',
-                            parts: [
-                              {
-                                text: `[SYSTEM NOTICE: The speaker appears to be another AI voice assistant (${s2sAiCheck.reason}). Avoid a repetitive greeting loop; calmly acknowledge it and ask the human user how they want to proceed.]`,
-                              },
-                            ],
-                          },
-                        ],
-                        turnComplete: false,
-                      },
-                    }),
+                if (s2sAiCheck.isLikelyAi) {
+                  logger.info(
+                    `[RealtimeVoice] AI voice agent detected (${s2sAiCheck.reason}, confidence=${s2sAiCheck.confidence})`,
                   );
                 }
 
@@ -3245,40 +3187,15 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   });
                 } else if (analysis.status === 'primary') {
                   activeSpeakerKey = 'primary';
-                } else if (
-                  analysis.status === 'known_guest' &&
-                  analysis.matchedSpeaker &&
-                  isGeminiS2sActive &&
-                  upstreamWs &&
-                  upstreamWs.readyState === WS_OPEN
-                ) {
+                } else if (analysis.status === 'known_guest' && analysis.matchedSpeaker) {
                   const nextKey = `known:${analysis.matchedSpeaker.name.toLowerCase()}`;
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
-                    upstreamWs.send(
-                      JSON.stringify({
-                        clientContent: {
-                          turns: [
-                            {
-                              role: 'user',
-                              parts: [
-                                {
-                                  text: `[SYSTEM NOTICE: Known room guest "${analysis.matchedSpeaker.name}"${analysis.matchedSpeaker.relation ? ` (${analysis.matchedSpeaker.relation})` : ''} started speaking (pitch ~${analysis.pitchHz}Hz). Greet them naturally by name.]`,
-                                },
-                              ],
-                            },
-                          ],
-                          turnComplete: false,
-                        },
-                      }),
+                    logger.info(
+                      `[RealtimeVoice] Known speaker active: ${analysis.matchedSpeaker.name} (pitch=${analysis.pitchHz}Hz)`,
                     );
                   }
-                } else if (
-                  analysis.status === 'unknown_guest' &&
-                  isGeminiS2sActive &&
-                  upstreamWs &&
-                  upstreamWs.readyState === WS_OPEN
-                ) {
+                } else if (analysis.status === 'unknown_guest') {
                   const pitchBucket = Math.round(analysis.pitchHz / 40) * 40;
                   const nextKey = `unknown:${pitchBucket}`;
                   lastGuestAcoustic = {
@@ -3288,22 +3205,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   };
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
-                    upstreamWs.send(
-                      JSON.stringify({
-                        clientContent: {
-                          turns: [
-                            {
-                              role: 'user',
-                              parts: [
-                                {
-                                  text: `[SYSTEM NOTICE: Another person in the room started speaking (pitch ~${analysis.pitchHz}Hz, likely ${analysis.genderHint}). Greet them warmly like a normal human, ask their name and relation to the user, and save them via save_voice_profile.]`,
-                                },
-                              ],
-                            },
-                          ],
-                          turnComplete: false,
-                        },
-                      }),
+                    logger.info(
+                      `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
                     );
                   }
                 }

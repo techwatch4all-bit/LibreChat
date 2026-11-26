@@ -133,7 +133,13 @@ export function extractSpokenCity(text: string): string | null {
         .replace(/\b(today|now|right now|please|thanks|thank you|for today)\b.*$/i, '')
         .replace(/[.,?!]+$/g, '')
         .trim();
-      if (candidate.length >= 2 && candidate.length <= 36) {
+      if (
+        candidate.length >= 2 &&
+        candidate.length <= 36 &&
+        !/^(?:my\s+location|current\s+location|my\s+city|my\s+area|my\s+place|this\s+area|this\s+place|here|nearby|home|the\s+area|the\s+city)$/i.test(
+          candidate,
+        )
+      ) {
         return candidate;
       }
     }

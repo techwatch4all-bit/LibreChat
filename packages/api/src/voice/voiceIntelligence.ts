@@ -17,6 +17,9 @@ export function inferGenderHint(pitchHz: number): GenderHint {
   if (!Number.isFinite(pitchHz) || pitchHz < 70 || pitchHz > 360) {
     return 'unknown';
   }
+  if (pitchHz >= 255) {
+    return 'child';
+  }
   return pitchHz >= 165 ? 'female' : 'male';
 }
 

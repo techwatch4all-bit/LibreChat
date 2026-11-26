@@ -60,6 +60,7 @@ type VoiceActionCard =
       title: string;
       query: string;
       openUrl: string;
+      embedUrl?: string;
       installUrl?: string;
     };
 
@@ -2240,48 +2241,59 @@ export default function LiveVoiceModal({
               </div>
             )}
             {actionCard.kind === 'media' && (
-              <div className="flex w-full items-center justify-between gap-2">
-                <div className="min-w-0 truncate text-text-primary">
-                  <span className="font-semibold">{actionCard.title}</span>
-                  <span className="ml-1 text-text-secondary">· {actionCard.query}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <a
-                    href={actionCard.openUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`rounded-lg px-2.5 py-1 font-medium text-white ${
-                      actionCard.platform === 'spotify'
-                        ? 'bg-emerald-600 hover:bg-emerald-500'
-                        : 'bg-red-600 hover:bg-red-500'
-                    }`}
-                  >
-                    {actionCard.platform === 'spotify' ? 'Open Spotify' : 'Open YouTube'}
-                  </a>
-                  {actionCard.platform === 'spotify' && (
+              <div className="w-full space-y-2">
+                <div className="flex w-full items-center justify-between gap-2">
+                  <div className="min-w-0 truncate text-text-primary">
+                    <span className="font-semibold">{actionCard.title}</span>
+                    <span className="ml-1 text-text-secondary">· {actionCard.query}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <a
-                      href={
-                        /iphone|ipad|ipod/i.test(navigator.userAgent)
-                          ? 'https://apps.apple.com/app/spotify-music-and-podcasts/id324684580'
-                          : actionCard.installUrl ||
-                            'https://play.google.com/store/apps/details?id=com.spotify.music'
-                      }
+                      href={actionCard.openUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg border border-emerald-400/40 px-2 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+                      className={`rounded-lg px-2.5 py-1 font-medium text-white ${
+                        actionCard.platform === 'spotify'
+                          ? 'bg-emerald-600 hover:bg-emerald-500'
+                          : 'bg-red-600 hover:bg-red-500'
+                      }`}
                     >
-                      {localize('com_ui_live_voice_install')}
+                      {actionCard.platform === 'spotify' ? 'Open Spotify' : 'Open YouTube'}
                     </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setActionCard(null)}
-                    aria-label="Dismiss card"
-                    className="rounded p-0.5 text-text-secondary hover:text-text-primary"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                    {actionCard.platform === 'spotify' && (
+                      <a
+                        href={
+                          /iphone|ipad|ipod/i.test(navigator.userAgent)
+                            ? 'https://apps.apple.com/app/spotify-music-and-podcasts/id324684580'
+                            : actionCard.installUrl ||
+                              'https://play.google.com/store/apps/details?id=com.spotify.music'
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-emerald-400/40 px-2 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+                      >
+                        {localize('com_ui_live_voice_install')}
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActionCard(null)}
+                      aria-label="Dismiss card"
+                      className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
+                {actionCard.embedUrl && (
+                  <iframe
+                    src={actionCard.embedUrl}
+                    title={actionCard.query}
+                    className="h-44 w-full rounded-lg border border-red-400/25 bg-black"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
               </div>
             )}
             {actionCard.kind === 'tutor' && (

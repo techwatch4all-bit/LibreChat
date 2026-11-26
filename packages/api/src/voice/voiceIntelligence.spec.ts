@@ -28,7 +28,7 @@ describe('voiceIntelligence', () => {
 
     const unknown = analyzeSpeakerTurn(270, 20, profile);
     expect(unknown.status).toBe('unknown_guest');
-    expect(unknown.genderHint).toBe('female');
+    expect(unknown.genderHint).toBe('child');
   });
 
   it('returns calibrating status when primary_voiceprint is not yet established', () => {

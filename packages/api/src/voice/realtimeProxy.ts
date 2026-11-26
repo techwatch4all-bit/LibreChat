@@ -17,6 +17,8 @@ import {
   fetchStructuredWeather,
   fetchStructuredNews,
   detectMediaIntent,
+  resolveYouTubeEmbedUrl,
+  fetchNearestPlaceWithEta,
 } from './liveResolvers';
 import {
   parseVoiceProfile,
@@ -284,9 +286,13 @@ export function detectToolOrTutorIntent(text: string): {
       lower,
     );
   const wantsChatOrTool =
-    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?(?:image|video|art|chart|presentation|ppt|slide|document|pdf|spreadsheet|report|floorplan)|create (?:an? )?(?:image|video|document|presentation|ppt|spreadsheet|diagram|chart|floorplan|report)|write code|build (?:an? )?(?:app|website|script|tool)|check my (?:vault|files|documents|notes|knowledge base)|search my (?:vault|files|documents|notes)|deep research|full report on|use librechat|new chat)\b/i.test(
+    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?(?:image|video|art|chart|presentation|ppt|slide|document|pdf|spreadsheet|report|floorplan)|create (?:an? )?(?:image|video|document|presentation|ppt|spreadsheet|diagram|chart|floorplan|report)|write code|build (?:an? )?(?:app|website|script|tool)|check my (?:vault|files|documents|notes|knowledge base|email|emails|inbox|gmail)|search my (?:vault|files|documents|notes)|read (?:out )?(?:my )?(?:last|latest|recent|unread)?\s*emails?|any new emails?|deep research|full report on|use librechat|new chat)\b/i.test(
       lower,
-    );
+    ) ||
+    /\b((?:gold|silver|bullion|petrol|diesel|fuel|lpg|gas|stock|nifty|sensex)\s+(?:price|prices|rate|rates)|(?:price|prices|rate|rates)\s+of\s+(?:gold|silver|bullion|petrol|diesel|fuel|lpg|gas))\b/i.test(
+      lower,
+    ) ||
+    /(?:गोल्ड|सोना|सोने|सिल्वर|चांदी|पेट्रोल|डीजल).*(?:प्राइस|भाव|कीमत|रेट)/u.test(trimmed);
 
   if (!wantsDeepTutorOrStudy && !wantsChatOrTool) {
     return { delegate: false, cleanPrompt: trimmed };
@@ -1623,9 +1629,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let _lastGuestAcoustic: {
         avgPitchHz: number;
         pitchStdHz: number;
-        genderHint: 'male' | 'female' | 'unknown';
+        genderHint: 'male' | 'female' | 'child' | 'unknown';
       } | null = null;
       let activeSpeakerKey = 'primary';
+      let pendingGuestIntroNotice: string | null = null;
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -1777,6 +1784,27 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         );
         if (rememberMatch?.[1]) {
           patch.notes = [rememberMatch[1].trim()];
+        }
+        // Guest introduction: "this is my wife Priya", "meet my son Aarav", "my friend Rahul is here"
+        const guestIntroMatch = cleanUtterance.match(
+          /\b(?:this is|meet|here is|my)\s+(?:my\s+)?(wife|husband|son|daughter|brother|sister|friend|mother|mom|father|dad|colleague|partner|cousin)\s+([a-zA-Z]{2,24})\b/i,
+        );
+        if (guestIntroMatch?.[1] && guestIntroMatch?.[2]) {
+          const guestRelation = guestIntroMatch[1].toLowerCase();
+          const rawGuestName = guestIntroMatch[2];
+          const guestName = rawGuestName.charAt(0).toUpperCase() + rawGuestName.slice(1);
+          patch.add_speaker = {
+            name: guestName,
+            relation: guestRelation,
+            ...(_lastGuestAcoustic
+              ? {
+                  gender_hint: _lastGuestAcoustic.genderHint,
+                  avg_pitch_hz: _lastGuestAcoustic.avgPitchHz,
+                  pitch_std_hz: _lastGuestAcoustic.pitchStdHz,
+                }
+              : {}),
+          };
+          pendingGuestIntroNotice = null;
         }
 
         const briefOff =
@@ -2956,20 +2984,38 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   return true;
                 }
 
-                // 1b-media. YouTube / Spotify Media Launcher Card
+                // 1b-media. YouTube / Spotify Media Launcher & Embedded Player Card
                 const mediaCard = detectMediaIntent(cleanUtterance);
                 if (mediaCard) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
-                  sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
-                  injectS2sSystemConfirmation(
-                    `Opened the ${mediaCard.title} launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to launch it.`,
-                  );
+                  if (mediaCard.platform === 'youtube') {
+                    void (async () => {
+                      const embedUrl = await resolveYouTubeEmbedUrl(mediaCard.query);
+                      const finalCard = embedUrl ? { ...mediaCard, embedUrl } : mediaCard;
+                      sendJson(clientWs, { type: 'voice.action_card', card: finalCard });
+                      injectS2sSystemConfirmation(
+                        embedUrl
+                          ? `Embedded and started playing "${mediaCard.query}" on YouTube right inside the screen card. Confirm warmly in 1 short sentence.`
+                          : `Opened the YouTube launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to open it.`,
+                      );
+                    })();
+                  } else {
+                    sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
+                    injectS2sSystemConfirmation(
+                      `Opened the ${mediaCard.title} launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to launch it.`,
+                    );
+                  }
                   return true;
                 }
 
                 // 1c. Conversational location memory: extract spoken city & re-run pending local query
                 const effectiveUtterance = applySpokenLocationMemory(cleanUtterance);
+                if (pendingGuestIntroNotice && !isTranslatorMode) {
+                  const guestNote = pendingGuestIntroNotice;
+                  pendingGuestIntroNotice = null;
+                  injectS2sSystemConfirmation(guestNote);
+                }
 
                 // 2. Fast structured resolvers (Weather/AQI, Google News RSS, Maps/Location) OR LibreChat persona/tools delegation.
                 // General live queries (prices, scores, facts) flow directly to Gemini Live's native googleSearch with zero SearXNG delay.
@@ -3129,26 +3175,40 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         const originCoords = hasCoords
                           ? `${userLocation!.lat!.toFixed(5)},${userLocation!.lng!.toFixed(5)}`
                           : '';
-                        const encodedQ = encodeURIComponent(cleanKeywords);
+                        const etaInfo = hasCoords
+                          ? await fetchNearestPlaceWithEta(
+                              cleanKeywords,
+                              userLocation!.lat!,
+                              userLocation!.lng!,
+                            )
+                          : null;
+                        const destQuery = etaInfo?.name || cleanKeywords;
+                        const encodedQ = encodeURIComponent(destQuery);
                         const mapUrl = originCoords
                           ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originCoords)}&destination=${encodedQ}&travelmode=driving`
                           : `https://www.google.com/maps/search/?api=1&query=${encodedQ}`;
                         const embedUrl = originCoords
                           ? `https://maps.google.com/maps?saddr=${encodeURIComponent(originCoords)}&daddr=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`
                           : `https://maps.google.com/maps?q=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+                        let mapTitle = 'Live Map & Directions';
+                        if (etaInfo) {
+                          mapTitle = `${etaInfo.distanceKm} km · ${etaInfo.durationMin} min drive`;
+                        } else if (originCoords) {
+                          mapTitle = 'Live Driving Directions';
+                        }
                         sendJson(clientWs, {
                           type: 'voice.action_card',
                           card: {
                             kind: 'maps',
-                            title: originCoords
-                              ? 'Live Driving Directions'
-                              : 'Live Map & Directions',
-                            subtitle: cleanKeywords,
+                            title: mapTitle,
+                            subtitle: destQuery,
                             mapUrl,
                             embedUrl,
                           },
                         });
-                        resultPayload = `A live Google Maps ${originCoords ? 'driving directions' : 'location'} card for "${cleanKeywords}"${userLocation?.city ? ` from ${userLocation.city}` : ''} is ALREADY displayed on the user's screen with a Navigate button. Confirm warmly that the map and directions are on their screen right now—never say you cannot display maps on screen.`;
+                        resultPayload = etaInfo
+                          ? `Nearest match: ${etaInfo.name}, approximately ${etaInfo.distanceKm} km away (about ${etaInfo.durationMin} minutes by car). A live Google Maps driving directions card is ALREADY displayed on the user's screen. Tell them the name, distance, and driving time naturally.`
+                          : `A live Google Maps ${originCoords ? 'driving directions' : 'location'} card for "${cleanKeywords}"${userLocation?.city ? ` from ${userLocation.city}` : ''} is ALREADY displayed on the user's screen with a Navigate button. Confirm warmly that the map and directions are on their screen right now—never say you cannot display maps on screen.`;
                       }
                       const locationNote = userLocation?.city
                         ? `User's detected location: ${userLocation.city}.\n`
@@ -3210,6 +3270,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     type: 'voice.status',
                     status: statusMsg,
                   });
+                  injectS2sSystemConfirmation(
+                    'Tell the user warmly in 1 short sentence: "Give me just a moment, I am pulling that up for you right now."',
+                  );
                   sendJson(clientWs, {
                     type: 'voice.delegate_tools',
                     text: toolIntent.cleanPrompt || cleanUtterance,
@@ -3669,6 +3732,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   };
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
+                    pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke in the room. If they are addressing you, warmly greet them and ask their name and relation so you can remember them.`;
                     logger.info(
                       `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
                     );

@@ -1,6 +1,6 @@
 export const VOICE_PROFILE_MEMORY_KEY = 'satchida_voice_profile';
 
-export type GenderHint = 'male' | 'female' | 'unknown';
+export type GenderHint = 'male' | 'female' | 'child' | 'unknown';
 
 export interface VoiceprintBaseline {
   avg_pitch_hz: number;

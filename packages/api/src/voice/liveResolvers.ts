@@ -42,6 +42,7 @@ export interface MediaActionCard {
   title: string;
   query: string;
   openUrl: string;
+  embedUrl?: string;
   installUrl?: string;
 }
 
@@ -249,10 +250,12 @@ export function detectMediaIntent(text: string): MediaActionCard | null {
   const wantsSpotify = /\bspotify\b/i.test(lower);
   const wantsYoutube = /\b(youtube|you tube)\b/i.test(lower);
   const wantsPlayMusic =
-    /\b(play|listen to|put on|open)\b/i.test(lower) &&
+    /\b(play|listen to|put on|open|embed|attach|watch|stream)\b/i.test(lower) &&
     (wantsSpotify ||
       wantsYoutube ||
-      /\b(song|songs|music|track|playlist|album|video|bhajan|podcast)\b/i.test(lower));
+      /\b(song|songs|music|track|playlist|album|video|bhajan|podcast|channel|live news)\b/i.test(
+        lower,
+      ));
 
   if (!wantsPlayMusic) {
     return null;
@@ -295,6 +298,83 @@ export function isWeatherQuery(text: string): boolean {
 
 export function isNewsQuery(text: string): boolean {
   return /\b(news|headlines|breaking|top stories|current events)\b/i.test(text);
+}
+
+export async function resolveYouTubeEmbedUrl(query: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+      {
+        signal: AbortSignal.timeout(2500),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Satchida-LiveVoice/1.0)' },
+      },
+    );
+    if (!res.ok) {
+      return undefined;
+    }
+    const html = await res.text();
+    const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+    if (match?.[1]) {
+      return `https://www.youtube.com/embed/${match[1]}?autoplay=1&playsinline=1&rel=0`;
+    }
+  } catch {
+    // Non-blocking fallback to launcher link
+  }
+  return undefined;
+}
+
+export async function fetchNearestPlaceWithEta(
+  query: string,
+  originLat: number,
+  originLng: number,
+): Promise<{ name: string; distanceKm: number; durationMin: number } | null> {
+  try {
+    const delta = 0.08;
+    const viewbox = `${originLng - delta},${originLat + delta},${originLng + delta},${originLat - delta}`;
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=1`,
+      {
+        signal: AbortSignal.timeout(2200),
+        headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
+      },
+    );
+    if (!nomRes.ok) {
+      return null;
+    }
+    const hits = (await nomRes.json()) as Array<{
+      lat?: string;
+      lon?: string;
+      display_name?: string;
+    }>;
+    const hit = hits?.[0];
+    if (!hit?.lat || !hit?.lon) {
+      return null;
+    }
+    const destLat = Number(hit.lat);
+    const destLng = Number(hit.lon);
+    const name = (hit.display_name || query).split(',').slice(0, 2).join(', ').trim();
+
+    const osrmRes = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`,
+      { signal: AbortSignal.timeout(2200) },
+    ).catch(() => null);
+    if (osrmRes && osrmRes.ok) {
+      const route = (await osrmRes.json()) as {
+        routes?: Array<{ distance?: number; duration?: number }>;
+      };
+      const first = route.routes?.[0];
+      if (typeof first?.distance === 'number' && typeof first?.duration === 'number') {
+        return {
+          name,
+          distanceKm: Math.round((first.distance / 1000) * 10) / 10,
+          durationMin: Math.max(1, Math.round(first.duration / 60)),
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function describeWmoCode(code: number): string {

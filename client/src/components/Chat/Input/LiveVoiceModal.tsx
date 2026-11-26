@@ -197,6 +197,8 @@ export default function LiveVoiceModal({
   const isAssistantSpeakingRef = useRef<boolean>(false);
   const sessionModeRef = useRef<'gemini_live_s2s' | 'bifrost_bridge'>('gemini_live_s2s');
   const hasGreetedRef = useRef<boolean>(false);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreSpeechUntilRef = useRef<number>(0);
   const isMutedRef = useRef(isMuted);
   isMutedRef.current = isMuted;
@@ -1204,6 +1206,7 @@ export default function LiveVoiceModal({
           };
 
           if (msg.type === 'session.created') {
+            reconnectAttemptsRef.current = 0;
             sessionModeRef.current =
               msg.mode === 'bifrost_bridge' ? 'bifrost_bridge' : 'gemini_live_s2s';
             if (msg.satchidaMode) {
@@ -1454,26 +1457,54 @@ export default function LiveVoiceModal({
       };
 
       ws.onerror = () => {
-        if (!cancelled && !receivedExplicitError) {
-          receivedExplicitError = true;
-          reportError(GENERIC_VOICE_UNAVAILABLE);
-        }
+        // Let onclose handle transparent auto-reconnect on transient mobile network drops
       };
 
       ws.onclose = (event) => {
         if (cancelled) {
           return;
         }
-        if (!receivedExplicitError && event.code !== 1000) {
-          reportError(sanitizeVoiceError(event.reason) || GENERIC_VOICE_UNAVAILABLE);
+        // Auth / policy rejections (1008) or explicit errors should not auto-retry
+        if (receivedExplicitError || event.code === 1000) {
+          return;
         }
+        if (event.code !== 1008 && reconnectAttemptsRef.current < 4) {
+          reconnectAttemptsRef.current += 1;
+          const delayMs = Math.min(8000, 1200 * 2 ** (reconnectAttemptsRef.current - 1));
+          setConnectionState('connecting');
+          setStatusText(`Reconnecting (${reconnectAttemptsRef.current}/4)...`);
+          if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current);
+          }
+          reconnectTimerRef.current = setTimeout(() => {
+            if (!cancelled) {
+              setRetryNonce((n) => n + 1);
+            }
+          }, delayMs);
+          return;
+        }
+        reportError(sanitizeVoiceError(event.reason) || GENERIC_VOICE_UNAVAILABLE);
       };
     };
+
+    const handleOnline = () => {
+      if (!cancelled && (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN)) {
+        reconnectAttemptsRef.current = 0;
+        setStatusText('Network restored — reconnecting...');
+        setRetryNonce((n) => n + 1);
+      }
+    };
+    window.addEventListener('online', handleOnline);
 
     void startRealtimeSession();
 
     return () => {
       cancelled = true;
+      window.removeEventListener('online', handleOnline);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       cleanupSession();
     };
   }, [
@@ -1541,16 +1572,53 @@ export default function LiveVoiceModal({
       ctx.addEventListener('statechange', handleAudioStateChange);
     }
 
+    // Register Lock-Screen / Notification Media Controls (Android & iOS)
+    if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'Satchida Live Voice',
+          artist: 'Hands-Free AI Assistant',
+        });
+        navigator.mediaSession.playbackState = 'playing';
+        navigator.mediaSession.setActionHandler('pause', () => {
+          stopAssistantAudio(false);
+          setIsMuted(true);
+          setStatusText('Muted');
+          navigator.mediaSession.playbackState = 'paused';
+        });
+        navigator.mediaSession.setActionHandler('play', () => {
+          setIsMuted(false);
+          setStatusText('Listening...');
+          navigator.mediaSession.playbackState = 'playing';
+        });
+        navigator.mediaSession.setActionHandler('stop', () => {
+          onOpenChange(false);
+        });
+      } catch {
+        // Ignore unsupported mediaSession action
+      }
+    }
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       if (ctx) {
         ctx.removeEventListener('statechange', handleAudioStateChange);
       }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = 'none';
+          navigator.mediaSession.setActionHandler('pause', null);
+          navigator.mediaSession.setActionHandler('play', null);
+          navigator.mediaSession.setActionHandler('stop', null);
+        } catch {
+          // ignore
+        }
+      }
       if (wakeLock) {
         void wakeLock.release().catch(() => {});
       }
     };
-  }, [open, getAudioContext, stopAssistantAudio]);
+  }, [open, getAudioContext, stopAssistantAudio, onOpenChange]);
 
   if (!open) {
     return null;

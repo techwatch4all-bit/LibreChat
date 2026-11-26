@@ -956,107 +956,121 @@ const ChatForm = memo(function ChatForm({
               ) : (
                 <div
                   className={cn(
-                    'items-between flex gap-2 pb-2',
+                    'flex items-center justify-between gap-1.5 px-2 pb-2',
                     isRTL ? 'flex-row-reverse' : 'flex-row',
                   )}
                 >
-                  <div className={`${isRTL ? 'mr-2' : 'ml-2'} flex items-center`}>
-                    <AttachFileChat
-                      conversation={conversation}
-                      disableInputs={disableInputs}
-                      files={files}
-                      setFiles={setFiles}
-                      setFilesLoading={setFilesLoading}
+                  <div
+                    className={cn(
+                      'no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto',
+                      isRTL ? 'flex-row-reverse' : 'flex-row',
+                    )}
+                  >
+                    <div className="flex shrink-0 items-center">
+                      <AttachFileChat
+                        conversation={conversation}
+                        disableInputs={disableInputs}
+                        files={files}
+                        setFiles={setFiles}
+                        setFilesLoading={setFilesLoading}
+                      />
+                    </div>
+                    <BadgeRow
+                      singleLine
+                      showEphemeralBadges={
+                        !!endpoint &&
+                        !hideBadgeRow &&
+                        !isAgentsEndpoint(endpoint) &&
+                        !isAssistantsEndpoint(endpoint)
+                      }
+                      isSubmitting={isSubmitting}
+                      conversationId={conversationId}
+                      specName={conversation?.spec}
+                      onChange={setBadges}
+                      isInChat={
+                        Array.isArray(conversation?.messages) && conversation.messages.length >= 1
+                      }
                     />
+                    <SatchiStyleSelector disabled={disableInputs || isSubmitting} />
+                    <SatchiToolbar
+                      getText={() => methods.getValues('text')}
+                      setText={(text) => {
+                        methods.setValue('text', text);
+                        const textarea = document.getElementById(
+                          mainTextareaId,
+                        ) as HTMLTextAreaElement | null;
+                        textarea?.focus();
+                      }}
+                      disabled={disableInputs || isSubmitting}
+                    />
+                    <CodeApprovalMenu
+                      conversation={conversation}
+                      addedConversation={addedConvo}
+                      setConversation={setConversation}
+                      disabled={disableInputs}
+                    />
+                    {index === 0 && conversationId != null && (
+                      <PendingToolApprovalButton conversationId={conversationId} />
+                    )}
                   </div>
-                  <BadgeRow
-                    showEphemeralBadges={
-                      !!endpoint &&
-                      !hideBadgeRow &&
-                      !isAgentsEndpoint(endpoint) &&
-                      !isAssistantsEndpoint(endpoint)
-                    }
-                    isSubmitting={isSubmitting}
-                    conversationId={conversationId}
-                    specName={conversation?.spec}
-                    onChange={setBadges}
-                    isInChat={
-                      Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                    }
-                  />
-                  <SatchiStyleSelector disabled={disableInputs || isSubmitting} />
-                  <SatchiToolbar
-                    getText={() => methods.getValues('text')}
-                    setText={(text) => {
-                      methods.setValue('text', text);
-                      const textarea = document.getElementById(
-                        mainTextareaId,
-                      ) as HTMLTextAreaElement | null;
-                      textarea?.focus();
-                    }}
-                    disabled={disableInputs || isSubmitting}
-                  />
-                  <CodeApprovalMenu
-                    conversation={conversation}
-                    addedConversation={addedConvo}
-                    setConversation={setConversation}
-                    disabled={disableInputs}
-                  />
-                  {index === 0 && conversationId != null && (
-                    <PendingToolApprovalButton conversationId={conversationId} />
-                  )}
-                  <div className="grow" />
-                  <SatchiModeSelector
-                    conversation={conversation}
-                    setConversation={setConversation}
-                    disabled={disableInputs || isSubmitting}
-                  />
-                  <TokenUsage
-                    index={index}
-                    conversation={conversation}
-                    isSubmitting={isSubmitting}
-                  />
-                  {SpeechToText && (
-                    <AudioRecorder
-                      methods={methods}
-                      ask={submitComposerText}
-                      disabled={disableInputs || isNotAppendable}
+                  <div
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5',
+                      isRTL ? 'flex-row-reverse' : 'flex-row',
+                    )}
+                  >
+                    <SatchiModeSelector
+                      conversation={conversation}
+                      setConversation={setConversation}
+                      disabled={disableInputs || isSubmitting}
+                    />
+                    <TokenUsage
+                      index={index}
+                      conversation={conversation}
                       isSubmitting={isSubmitting}
                     />
-                  )}
-                  {steering.duringRunActive &&
-                    steering.canControlGeneration &&
-                    (textValue?.trim() ?? '') !== '' && (
-                      <div className="shrink-0">
-                        <InterruptSteerButton
-                          steering={steering}
-                          isNewConversation={isNewConversation}
-                          getText={() => methods.getValues('text')}
-                          onConsumed={consumeComposer}
-                          disabled={filesLoading}
-                        />
-                      </div>
+                    {SpeechToText && (
+                      <AudioRecorder
+                        methods={methods}
+                        ask={submitComposerText}
+                        disabled={disableInputs || isNotAppendable}
+                        isSubmitting={isSubmitting}
+                      />
                     )}
-                  <div className={cn('shrink-0', isRTL ? 'mr-auto' : 'ml-auto')}>
-                    {isSubmitting &&
-                    (showStopButton || steering.duringRunActive) &&
-                    !answerMode.composerAnswers
-                      ? duringRunSlot
-                      : endpoint && (
-                          <SendButton
-                            ref={submitButtonRef}
-                            control={methods.control}
-                            fileCount={submittableFileCount}
-                            disabled={
-                              filesLoading ||
-                              disableInputs ||
-                              !codeWorkspace.canSubmit ||
-                              isNotAppendable ||
-                              answerMode.composerLocked ||
-                              (isSubmitting && !answerMode.composerAnswers)
-                            }
+                    {steering.duringRunActive &&
+                      steering.canControlGeneration &&
+                      (textValue?.trim() ?? '') !== '' && (
+                        <div className="shrink-0">
+                          <InterruptSteerButton
+                            steering={steering}
+                            isNewConversation={isNewConversation}
+                            getText={() => methods.getValues('text')}
+                            onConsumed={consumeComposer}
+                            disabled={filesLoading}
                           />
-                        )}
+                        </div>
+                      )}
+                    <div className="shrink-0">
+                      {isSubmitting &&
+                      (showStopButton || steering.duringRunActive) &&
+                      !answerMode.composerAnswers
+                        ? duringRunSlot
+                        : endpoint && (
+                            <SendButton
+                              ref={submitButtonRef}
+                              control={methods.control}
+                              fileCount={submittableFileCount}
+                              disabled={
+                                filesLoading ||
+                                disableInputs ||
+                                !codeWorkspace.canSubmit ||
+                                isNotAppendable ||
+                                answerMode.composerLocked ||
+                                (isSubmitting && !answerMode.composerAnswers)
+                              }
+                            />
+                          )}
+                    </div>
                   </div>
                 </div>
               )}

@@ -42,6 +42,7 @@ import {
   activeOpenCodeSessionIdAtom,
   cloudDriveSessionsAtom,
   openCodeDiffsAtom,
+  openCodeLiveEditAtom,
   openCodeLocalPrivacyAtom,
   openCodePendingAutoPromptAtom,
 } from './opencode/atoms';
@@ -62,6 +63,81 @@ interface VibeWorkspaceProps {
 }
 
 type WorkbenchTab = 'editor' | 'terminal' | 'preview' | 'changes' | 'diffs';
+
+function resolveWorkspaceRelPath(
+  rawPath: string,
+  workspaceRoot: string | null | undefined,
+  treePaths: string[],
+): string | null {
+  const normRaw = rawPath.replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  if (!normRaw) {
+    return null;
+  }
+  const lowerRaw = normRaw.toLowerCase();
+  if (workspaceRoot) {
+    const normRoot = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    const rawFull = rawPath.replace(/\\/g, '/').trim();
+    if (rawFull.toLowerCase().startsWith(`${normRoot}/`)) {
+      const rel = rawFull.slice(normRoot.length + 1);
+      if (rel) {
+        return rel;
+      }
+    }
+  }
+  const exact = treePaths.find((p) => p.replace(/\\/g, '/').toLowerCase() === lowerRaw);
+  if (exact) {
+    return exact;
+  }
+  const suffix = treePaths.find((p) => {
+    const np = p.replace(/\\/g, '/').toLowerCase();
+    return lowerRaw.endsWith(`/${np}`) || lowerRaw === np;
+  });
+  if (suffix) {
+    return suffix;
+  }
+  if (!/^[a-z]:\//i.test(normRaw)) {
+    return normRaw;
+  }
+  const lastSlash = normRaw.lastIndexOf('/');
+  return lastSlash >= 0 ? normRaw.slice(lastSlash + 1) : normRaw;
+}
+
+function findSnippetLineRange(
+  content: string,
+  snippet: string | undefined,
+): { startLine: number; endLine: number } | null {
+  if (!content || !snippet) {
+    return null;
+  }
+  const normContent = content.replace(/\r\n/g, '\n');
+  const normSnippet = snippet.replace(/\r\n/g, '\n').trim();
+  if (!normSnippet) {
+    return null;
+  }
+  const exactIdx = normContent.indexOf(normSnippet);
+  if (exactIdx >= 0) {
+    const startLine = normContent.slice(0, exactIdx).split('\n').length;
+    const lineCount = normSnippet.split('\n').length;
+    return { startLine, endLine: startLine + lineCount - 1 };
+  }
+  const snippetLines = normSnippet
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (snippetLines.length === 0) {
+    return null;
+  }
+  const contentLines = normContent.split('\n');
+  const firstNeedle = snippetLines[0];
+  for (let i = 0; i < contentLines.length; i++) {
+    if (contentLines[i].includes(firstNeedle)) {
+      const startLine = i + 1;
+      const endLine = Math.min(contentLines.length, startLine + snippetLines.length - 1);
+      return { startLine, endLine };
+    }
+  }
+  return null;
+}
 
 function getLanguageFromPath(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase();
@@ -112,6 +188,10 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     revealLineInCenter?: (line: number) => void;
     setPosition?: (pos: { lineNumber: number; column: number }) => void;
     focus?: () => void;
+    deltaDecorations?: (
+      oldDecorations: string[],
+      newDecorations: Array<Record<string, unknown>>,
+    ) => string[];
   } | null>(null);
   const pendingJumpRef = useRef<{ path: string; line: number; column: number } | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState<string>('');
@@ -339,6 +419,15 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     }
   };
 
+  const [liveEdit, setLiveEdit] = useAtom(openCodeLiveEditAtom);
+  const [liveEditBanner, setLiveEditBanner] = useState<{
+    file: string;
+    status: 'running' | 'completed';
+    startLine?: number;
+    endLine?: number;
+  } | null>(null);
+  const liveEditDecorationsRef = useRef<string[]>([]);
+
   useOpenCodeEvents({
     projectId,
     sessionId: activeSessionId,
@@ -351,6 +440,90 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
     () => dataService.getOpenCodeTree(projectId),
     { enabled: isEnabled && Boolean(projectId), retry: false, refetchOnWindowFocus: false },
   );
+
+  // Follow AI file edits in real time (VS Code / Cursor style)
+  useEffect(() => {
+    if (!liveEdit?.filePath) {
+      return;
+    }
+    const flatPaths: string[] = [];
+    const walk = (nodes: OpenCodeDirTreeEntry[]) => {
+      for (const n of nodes) {
+        if (n.type === 'file') {
+          flatPaths.push(n.path);
+        } else if (n.children) {
+          walk(n.children);
+        }
+      }
+    };
+    walk(treeQuery.data?.tree ?? []);
+    const relPath = resolveWorkspaceRelPath(
+      liveEdit.filePath,
+      provisionedPath ?? localPath,
+      flatPaths,
+    );
+    if (!relPath) {
+      return;
+    }
+    setLiveEditBanner((prev) => ({
+      file: relPath,
+      status: liveEdit.status,
+      startLine: prev?.file === relPath ? prev.startLine : undefined,
+      endLine: prev?.file === relPath ? prev.endLine : undefined,
+    }));
+    if (workbenchTab === 'editor' && showEditor && !dirtyFiles[relPath]) {
+      setSelectedFile(relPath);
+      setOpenFiles((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
+    }
+    if (liveEdit.status === 'completed') {
+      queryClient.invalidateQueries([QueryKeys.opencodeFile, projectId, relPath]);
+    }
+  }, [liveEdit?.ts]);
+
+  // Highlight and scroll to the AI-edited code block in Monaco
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !liveEdit || !selectedFile || !liveEditBanner || liveEditBanner.file !== selectedFile) {
+      return;
+    }
+    const range = findSnippetLineRange(editorContent, liveEdit.searchSnippet);
+    if (!range) {
+      return;
+    }
+    setLiveEditBanner((prev) =>
+      prev && prev.file === selectedFile
+        ? { ...prev, startLine: range.startLine, endLine: range.endLine }
+        : prev,
+    );
+    editor.revealLineInCenter?.(range.startLine);
+    const isRunning = liveEdit.status === 'running';
+    if (typeof editor.deltaDecorations === 'function') {
+      liveEditDecorationsRef.current = editor.deltaDecorations(liveEditDecorationsRef.current, [
+        {
+          range: {
+            startLineNumber: range.startLine,
+            startColumn: 1,
+            endLineNumber: range.endLine,
+            endColumn: 1,
+          },
+          options: {
+            isWholeLine: true,
+            className: isRunning ? 'satchida-live-edit-running' : 'satchida-live-edit-completed',
+            linesDecorationsClassName: isRunning
+              ? 'satchida-live-edit-gutter-running'
+              : 'satchida-live-edit-gutter-completed',
+          },
+        },
+      ]);
+    }
+  }, [editorContent, liveEdit?.ts, selectedFile, liveEditBanner?.file]);
+
+  // Reset live edit state on project switch
+  useEffect(() => {
+    setLiveEdit(null);
+    setLiveEditBanner(null);
+    liveEditDecorationsRef.current = [];
+  }, [projectId, localPath, setLiveEdit]);
 
   const provisionWorkspaceMutation = useMutation(
     () => dataService.provisionOpenCodeWorkspace(projectId),
@@ -1615,6 +1788,46 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
 
                       {/* Editor Controls & Diagnostic Actions */}
                       <div className="flex shrink-0 items-center gap-1.5">
+                        {liveEditBanner ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleOpenFile(
+                                liveEditBanner.file,
+                                liveEditBanner.startLine
+                                  ? { line: liveEditBanner.startLine, column: 1 }
+                                  : undefined,
+                              )
+                            }
+                            className={`flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium transition-colors ${
+                              liveEditBanner.status === 'running'
+                                ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                                : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                            }`}
+                            title={`Jump to ${liveEditBanner.file}`}
+                          >
+                            <span
+                              className={`size-1.5 rounded-full ${
+                                liveEditBanner.status === 'running'
+                                  ? 'animate-pulse bg-amber-400'
+                                  : 'bg-emerald-400'
+                              }`}
+                            />
+                            <span className="max-w-[160px] truncate">
+                              {liveEditBanner.status === 'running' ? 'AI editing' : 'AI edited'}{' '}
+                              {liveEditBanner.file.split('/').pop()}
+                            </span>
+                            {liveEditBanner.startLine ? (
+                              <span className="font-mono text-[10px] opacity-80">
+                                L{liveEditBanner.startLine}
+                                {liveEditBanner.endLine &&
+                                liveEditBanner.endLine !== liveEditBanner.startLine
+                                  ? `–${liveEditBanner.endLine}`
+                                  : ''}
+                              </span>
+                            ) : null}
+                          </button>
+                        ) : null}
                         {selectedFile && diagnostics.length > 0 ? (
                           <Button
                             type="button"
@@ -1724,6 +1937,12 @@ export default function VibeWorkspace({ projectId, projectName, localPath }: Vib
                       </div>
                     </div>
                     <div className="min-h-0 flex-1">
+                      <style>{`
+                        .satchida-live-edit-running { background-color: rgba(245, 158, 11, 0.14) !important; }
+                        .satchida-live-edit-completed { background-color: rgba(16, 185, 129, 0.14) !important; }
+                        .satchida-live-edit-gutter-running { border-left: 3px solid rgb(245, 158, 11) !important; margin-left: 3px; }
+                        .satchida-live-edit-gutter-completed { border-left: 3px solid rgb(16, 185, 129) !important; margin-left: 3px; }
+                      `}</style>
                       {selectedFile && fileQuery.isLoading ? (
                         <div className="flex h-full items-center justify-center">
                           <Spinner className="text-text-primary" />

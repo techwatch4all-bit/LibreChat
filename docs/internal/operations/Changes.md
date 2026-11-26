@@ -1,3 +1,15 @@
+## 2026-11-26 — Satchida Vibe Real-Time Editor Follower & Privacy Tier Vibecoding Authorization Fix
+
+- **Permanent Fix for `403: Token is not authorized to use model: Vibecoding` on `privacy` Tier (`D:\LAN-AI-Infra\one-api\model\license_tier.go`, `D:\LAN-AI-Infra\_deploy-src\one-api-attribution\model\license_tier.go`)**:
+  - **Root Cause**: The `privacy` tier seed in `one-api`'s `license_tier.go` omitted `"vibecoding"` from `AllowedModes` and `"Vibecoding"` from `AllowedModels`. Every restart of `satchida-gateway.exe` re-synced `license_tiers` and active tenant `groups` (`satchida-master`, `tenant_emami_city`) back to `Chat,Study,Work,Privacy`, causing `middleware/tenant_token_auth.go` (`intersectCSV(token.Models, seat.AllowedModels, group.AllowedModels)`) to strip `Vibecoding` and return HTTP 403 for all `privacy` users (`admin-com` and `privacy` seats).
+  - **Fix**: Added `"vibecoding"`, `"motion"` (`AllowedModes`) and `"Vibecoding"`, `"Motion"`, `"Pro"` (`AllowedModels`) across `pro`, `pro_family`, `privacy`, and `enterprise` in both `one-api` Go trees, rebuilt `D:\LAN-AI-Infra\one-api\satchida-gateway.exe` (backup: `satchida-gateway.exe.bak-20261126`), restarted the gateway, and updated `groups` in `one-api.db` so `tenant_tokens`, `license_tiers`, `groups`, and Channels 4/5 are 100% aligned.
+  - **Verification**: Live smoke test `POST http://127.0.0.1:4000/v1/chat/completions` (`model: "Vibecoding"`, `admin-com` seat token) returned **HTTP 200** (`deepseek-ai/DeepSeek-V4-Flash-0731`).
+- **Satchida Vibe Real-Time AI Edit Follower & Monaco Code-Block Highlighting (`client/src/components/Projects/opencode/atoms.ts`, `useOpenCodeEvents.ts`, `VibeWorkspace.tsx`)**:
+  - Added `openCodeLiveEditAtom` (`OpenCodeLiveEditEvent`) to track active and completed AI file edits (`filePath`, `tool`, `status`, `searchSnippet`, `ts`).
+  - Updated `useOpenCodeEvents.ts` to capture file-editing tool calls (`edit`, `write`, `patch`, `multiedit`, `str_replace_editor`, `replace_file_content`, `write_to_file`) on `message.part.updated` and `file.edited` SSE events, invalidating file/tree queries immediately on completion.
+  - Upgraded `VibeWorkspace.tsx` to automatically open and focus the edited file in Monaco (respecting unsaved dirty buffers), locate the edited snippet's line range (`findSnippetLineRange`), scroll to it (`revealLineInCenter`), apply live Monaco `deltaDecorations` (amber pulse/gutter bar while running, emerald highlight/gutter bar when completed), and render a clickable live status pill (`AI editing <file> L<start>–<end>` / `AI edited <file> L<start>–<end>`) in the editor toolbar.
+  - Verified with `npx tsc --noEmit` (0 errors in modified files) and `npm run frontend` (clean production build).
+
 ## 2026-11-21 — Tiered User Storage Quotas, Ephemeral Upload Purge Daemon & Sovereign Studios Dropdown Restoration
 
 - **Automated Tiered User Storage System (`storage/users/<username>/`, `scripts/satchida-storage-sentinel.mjs`)**:

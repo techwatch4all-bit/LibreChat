@@ -1,6 +1,5 @@
 import React, { memo, useRef, useMemo, useEffect } from 'react';
 import * as Ariakit from '@ariakit/react';
-import { ChevronDown } from 'lucide-react';
 import { PermissionTypes, Permissions } from 'librechat-data-provider';
 import { TooltipAnchor, composerControlClasses } from '@librechat/client';
 import MCPServerMenuItem from '~/components/MCP/MCPServerMenuItem';
@@ -90,28 +89,19 @@ function MCPSelectContent() {
     <>
       <Ariakit.MenuProvider store={menuStore}>
         <TooltipAnchor
-          description={placeholderText || localize('com_ui_mcp_servers')}
+          description={displayText || placeholderText || localize('com_ui_mcp_servers')}
           disabled={isOpen}
           render={
             <Ariakit.MenuButton
               className={cn(
                 composerControlClasses(),
-                'min-w-theme-control px-2.5 md:w-fit md:justify-start md:px-theme-normal',
+                'min-w-theme-control px-2',
                 isOpen && 'bg-surface-hover',
               )}
             />
           }
         >
           <StackedMCPIcons selectedServers={selectedServers} maxIcons={3} iconSize="sm" />
-          <span className="hidden truncate text-text-primary md:block">
-            {displayText || placeholderText}
-          </span>
-          <ChevronDown
-            className={cn(
-              'hidden h-3 w-3 text-text-secondary transition-transform md:block',
-              isOpen && 'rotate-180',
-            )}
-          />
         </TooltipAnchor>
 
         <Ariakit.Menu

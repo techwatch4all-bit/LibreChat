@@ -17,7 +17,16 @@ export type OpenCodeStreamState = 'disconnected' | 'connecting' | 'connected' | 
 
 export type OpenCodeRunState = 'idle' | 'busy' | 'retry';
 
+export interface OpenCodeLiveEditEvent {
+  filePath: string;
+  tool: string;
+  status: 'running' | 'completed';
+  searchSnippet?: string;
+  ts: number;
+}
+
 export const activeOpenCodeSessionIdAtom = atom<string | null>(null);
+export const openCodeLiveEditAtom = atom<OpenCodeLiveEditEvent | null>(null);
 export const selectedOpenCodeModelAtom = atom<{ providerID: string; modelID: string } | null>(null);
 export const selectedOpenCodeAgentAtom = atom<string>('');
 export const openCodeStreamStateAtom = atom<OpenCodeStreamState>('disconnected');

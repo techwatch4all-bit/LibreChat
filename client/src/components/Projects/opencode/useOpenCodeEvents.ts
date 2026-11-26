@@ -13,6 +13,7 @@ import type {
 } from 'librechat-data-provider';
 import {
   openCodeDiffsAtom,
+  openCodeLiveEditAtom,
   openCodeMessagesAtom,
   openCodePermissionsAtom,
   openCodeQuestionsAtom,
@@ -21,6 +22,65 @@ import {
   openCodeStreamStateAtom,
   openCodeTodosAtom,
 } from './atoms';
+
+const FILE_EDIT_TOOLS = new Set([
+  'edit',
+  'write',
+  'patch',
+  'multiedit',
+  'str_replace_editor',
+  'replace_file_content',
+  'write_to_file',
+]);
+
+function extractLiveEditFromPart(
+  part: OpenCodePartDto,
+): { filePath: string; tool: string; status: 'running' | 'completed'; searchSnippet?: string } | null {
+  if (part.type !== 'tool') {
+    return null;
+  }
+  const toolName = (typeof part.tool === 'string' ? part.tool : '').trim().toLowerCase();
+  if (!toolName || !FILE_EDIT_TOOLS.has(toolName)) {
+    return null;
+  }
+  const state = part.state as
+    | { status?: string; input?: Record<string, unknown> }
+    | undefined;
+  const rawStatus = typeof state?.status === 'string' ? state.status.toLowerCase() : '';
+  const status: 'running' | 'completed' | null =
+    rawStatus === 'running' || rawStatus === 'pending'
+      ? 'running'
+      : rawStatus === 'completed'
+        ? 'completed'
+        : null;
+  if (!status) {
+    return null;
+  }
+  const input = state?.input ?? {};
+  const rawPath =
+    (typeof input.filePath === 'string' && input.filePath) ||
+    (typeof input.path === 'string' && input.path) ||
+    (typeof input.file_path === 'string' && input.file_path) ||
+    (typeof input.TargetFile === 'string' && input.TargetFile) ||
+    '';
+  const filePath = rawPath.trim();
+  if (!filePath) {
+    return null;
+  }
+  const rawSnippet =
+    (typeof input.newString === 'string' && input.newString) ||
+    (typeof input.new_string === 'string' && input.new_string) ||
+    (typeof input.oldString === 'string' && input.oldString) ||
+    (typeof input.old_string === 'string' && input.old_string) ||
+    (typeof input.content === 'string' && input.content) ||
+    '';
+  return {
+    filePath,
+    tool: toolName,
+    status,
+    searchSnippet: rawSnippet.length > 0 ? rawSnippet.slice(0, 4000) : undefined,
+  };
+}
 
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 15_000;
@@ -84,6 +144,7 @@ export function useOpenCodeEvents({
   const setTodos = useSetAtom(openCodeTodosAtom);
   const setPermissions = useSetAtom(openCodePermissionsAtom);
   const setQuestions = useSetAtom(openCodeQuestionsAtom);
+  const setLiveEdit = useSetAtom(openCodeLiveEditAtom);
   const lastEventIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -180,6 +241,14 @@ export function useOpenCodeEvents({
             next[msgIdx] = { ...next[msgIdx], parts: updatedParts };
             return next;
           });
+          const liveEdit = extractLiveEditFromPart(part);
+          if (liveEdit) {
+            setLiveEdit({ ...liveEdit, ts: Date.now() });
+            if (liveEdit.status === 'completed') {
+              queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
+              queryClient.invalidateQueries([QueryKeys.opencodeFile, projectId]);
+            }
+          }
           break;
         }
 
@@ -227,7 +296,24 @@ export function useOpenCodeEvents({
           break;
         }
 
-        case 'file.edited':
+        case 'file.edited': {
+          const editedFile =
+            (typeof props.file === 'string' && props.file) ||
+            (typeof props.filePath === 'string' && props.filePath) ||
+            (typeof props.path === 'string' && props.path) ||
+            '';
+          if (editedFile.trim()) {
+            setLiveEdit((prev) => ({
+              filePath: editedFile.trim(),
+              tool: prev?.tool ?? 'edit',
+              status: 'completed',
+              searchSnippet:
+                prev && prev.filePath.toLowerCase().endsWith(editedFile.trim().toLowerCase())
+                  ? prev.searchSnippet
+                  : undefined,
+              ts: Date.now(),
+            }));
+          }
           queryClient.invalidateQueries([QueryKeys.opencodeTree, projectId]);
           queryClient.invalidateQueries([QueryKeys.opencodeFile, projectId]);
           queryClient.invalidateQueries([QueryKeys.opencodeVcs, projectId]);
@@ -235,6 +321,7 @@ export function useOpenCodeEvents({
             queryClient.invalidateQueries([QueryKeys.opencodeDiff, projectId, sessionId]);
           }
           break;
+        }
 
         case 'todo.updated': {
           const todos = Array.isArray(props.todos) ? (props.todos as OpenCodeTodoDto[]) : [];

@@ -25,11 +25,14 @@ export const DEFAULT_DESKTOP_LAYOUT: DeviceLayout = {
 };
 
 export default function useDeviceLayout(): DeviceLayout {
-  const isPhone = useMediaQuery('(max-width: 639px)');
-  const isTablet = useMediaQuery('(min-width: 640px) and (max-width: 1023px)');
+  const isNarrowWidth = useMediaQuery('(max-width: 639px)');
+  const isShortLandscape = useMediaQuery('(orientation: landscape) and (max-height: 500px)');
+  const isTabletWidth = useMediaQuery('(min-width: 640px) and (max-width: 1023px)');
   const isPortrait = useMediaQuery('(orientation: portrait)');
 
   return useMemo(() => {
+    const isPhone = isNarrowWidth || isShortLandscape;
+    const isTablet = !isPhone && isTabletWidth;
     const deviceClass: DeviceClass = isPhone ? 'phone' : isTablet ? 'tablet' : 'desktop';
     const orientation: Orientation = isPortrait ? 'portrait' : 'landscape';
 
@@ -42,5 +45,5 @@ export default function useDeviceLayout(): DeviceLayout {
       isPortrait,
       isLandscape: !isPortrait,
     };
-  }, [isPhone, isTablet, isPortrait]);
+  }, [isNarrowWidth, isShortLandscape, isTabletWidth, isPortrait]);
 }

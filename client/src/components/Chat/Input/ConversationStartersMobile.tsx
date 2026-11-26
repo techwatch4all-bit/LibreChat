@@ -209,7 +209,13 @@ export default function ConversationStartersMobile() {
         </div>
       ) : isPhone ? (
         <div className="flex w-full flex-col items-center gap-2 px-1">
-          <div className="grid w-full grid-cols-2 gap-2">
+          <div
+            className={cn(
+              isLandscape
+                ? 'no-scrollbar flex w-full flex-nowrap items-center justify-start gap-1.5 overflow-x-auto pb-0.5'
+                : 'grid w-full grid-cols-2 gap-2',
+            )}
+          >
             {visibleStarters.map((item: StarterItem, index: number) => {
               const { cleanTitle, description } = parseStarterMeta(item);
               const visual = resolvePersonaVisual(cleanTitle, item.badge);
@@ -221,24 +227,30 @@ export default function ConversationStartersMobile() {
                   type="button"
                   aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
                   onClick={() => handleStarterClick(item, isAgentEndpoint)}
-                  className="group flex min-w-0 cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/60 bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:border-border-medium hover:bg-white/[0.08]"
+                  className={cn(
+                    'group flex cursor-pointer border border-border-light/60 bg-white/[0.04] text-left transition-all duration-150 hover:border-border-medium hover:bg-white/[0.08]',
+                    isLandscape
+                      ? 'shrink-0 flex-row items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1'
+                      : 'min-w-0 flex-col items-start justify-between rounded-xl p-2.5',
+                  )}
                 >
                   <div className="flex w-full items-center gap-2 overflow-hidden">
                     <span
                       className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-lg border',
+                        'flex shrink-0 items-center justify-center border',
+                        isLandscape ? 'size-5 rounded-full' : 'size-6 rounded-lg',
                         visual.bg,
                         visual.color,
                       )}
                       aria-hidden="true"
                     >
-                      <PersonaIcon className="size-3.5" />
+                      <PersonaIcon className={isLandscape ? 'size-3' : 'size-3.5'} />
                     </span>
                     <span className="truncate text-xs font-semibold text-text-primary">
                       {cleanTitle}
                     </span>
                   </div>
-                  {description && (
+                  {description && !isLandscape && (
                     <p className="mt-1.5 line-clamp-1 w-full text-[11px] leading-snug text-text-tertiary">
                       {description}
                     </p>

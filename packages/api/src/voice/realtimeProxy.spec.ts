@@ -518,4 +518,155 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
       'Charon',
     );
   });
+
+  test('extracts morning brief and first spoken city into satchida_voice_profile without overwriting GPS location', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-pro-2' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-pro-2',
+        accountType: 'pro',
+        seatToken: 'tk_seat_2',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => ({}),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(
+          typeof profile === 'string'
+            ? (JSON.parse(profile) as Record<string, unknown>)
+            : (profile as Record<string, unknown>),
+        );
+        return true;
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Simulate user speech enabling morning brief and mentioning city
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: {
+              text: 'Enable my daily morning brief on cricket and technology. What is the weather in Pune?',
+            },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(savedProfiles.some((p) => (p.morning_brief as { enabled?: boolean })?.enabled === true)).toBe(true);
+    const briefEntry = savedProfiles.find((p) => p.morning_brief);
+    expect((briefEntry?.morning_brief as { topics?: string[] })?.topics).toEqual([
+      'cricket',
+      'technology',
+    ]);
+    expect(savedProfiles.some((p) => p.location === 'Pune')).toBe(true);
+
+    // Ensure subsequent non-city or new city does not overwrite existing location
+    const countBefore = savedProfiles.filter((p) => p.location).length;
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: {
+              text: 'What is the weather in Mumbai?',
+            },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    const countAfter = savedProfiles.filter((p) => p.location).length;
+    expect(countAfter).toBe(countBefore);
+    expect(getLastClientWs()).toBeDefined();
+  });
+
+  test('never sends turnComplete: false to upstream Gemini Live S2S', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-pro-3' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-pro-3',
+        accountType: 'pro',
+        seatToken: 'tk_seat_3',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => ({
+        primary_voiceprint: {
+          avg_pitch_hz: 120,
+          pitch_std_hz: 12,
+          gender_hint: 'male',
+          samples: 5,
+        },
+        known_speakers: [{ name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 }],
+      }),
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    const clientWs = getLastClientWs()!;
+    clientWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'voice.acoustic',
+          avgPitchHz: 212,
+          pitchStdHz: 14,
+          durationMs: 900,
+        }),
+      ),
+    );
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'Hello Satchida' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 360));
+
+    for (const frame of upstreamWs.sent) {
+      const parsed = JSON.parse(frame);
+      if (parsed.clientContent) {
+        expect(parsed.clientContent.turnComplete).toBe(true);
+      }
+    }
+  });
 });

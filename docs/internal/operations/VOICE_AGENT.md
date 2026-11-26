@@ -69,12 +69,18 @@ Satchida Live Voice is a real-time, bidirectional speech-to-speech voice compani
 
 ---
 
-## 4. Key Files for External AI Review
+## 4. Key Files & Capabilities
 - `packages/api/src/voice/voiceProfile.ts` (+ `voiceProfile.spec.ts`)
 - `packages/api/src/voice/voiceIntelligence.ts` (+ `voiceIntelligence.spec.ts`)
 - `packages/api/src/voice/realtimeProxy.ts` (+ `realtimeProxy.spec.ts`)
 - `packages/api/src/voice/liveResolvers.ts` (+ `liveResolvers.spec.ts`)
-- `api/server/index.js` (lines 1330–1365: `getVoiceProfileMemory` / `setVoiceProfileMemory`)
+- `api/server/index.js` (lines 1333–1364: `getVoiceProfileMemory`, `setVoiceProfileMemory`, `recordVoiceUsage`)
 - `client/src/utils/voicePitch.ts`
-- `client/src/components/Chat/Input/LiveVoiceModal.tsx`
+- `client/src/components/Chat/Input/LiveVoiceModal.tsx` (+ `OrbVisualizer.tsx`)
 - `client/src/components/Chat/HeaderAudioSpeaker.tsx`
+
+### Additional Capabilities
+- **Action Cards (`voice.action_card`)**: Weather, News, Maps, Media (`youtube`/`spotify`), and Tutor cards rendered inline in `LiveVoiceModal.tsx`.
+- **Autonomous Research Bridge (`voice.auto_research`)**: Deep research queries automatically dispatch structured findings to LibreChat chat via `askRef.current` without manual tap.
+- **Tier Gating & Telemetry**: `accountType` enforcement and `recordVoiceUsage` token/duration metering on session completion.
+- **Location & Accent Switching**: `voice.location` GPS reverse-geocoding (protected by Invariant #3) and `detectAccentSwitchCommand` for live voice profile switching (`IN`/`US`/`UK` × `M`/`F`).

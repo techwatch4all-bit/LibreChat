@@ -31,6 +31,13 @@ describe('voiceIntelligence', () => {
     expect(unknown.genderHint).toBe('female');
   });
 
+  it('returns calibrating status when primary_voiceprint is not yet established', () => {
+    const res = analyzeSpeakerTurn(130, 15, {});
+    expect(res.status).toBe('calibrating');
+    expect(res.genderHint).toBe('male');
+    expect(res.isNewGuest).toBeFalsy();
+  });
+
   it('detects another AI voice agent via explicit phrasing or reciprocal assistant loops', () => {
     expect(detectAiVoiceAgent('Hello, as an AI language model, how can I assist you today?').isLikelyAi).toBe(
       true,

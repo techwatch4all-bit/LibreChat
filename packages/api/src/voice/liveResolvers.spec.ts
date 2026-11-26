@@ -26,6 +26,12 @@ describe('liveResolvers', () => {
     expect(extractSpokenCity('Tell me a joke')).toBeNull();
   });
 
+  test('extractSpokenCity GPS guard rejects non-city phrases', () => {
+    expect(extractSpokenCity("What's the weather near me?")).toBeNull();
+    expect(extractSpokenCity('Check AQI for my location')).toBeNull();
+    expect(extractSpokenCity('What is the weather in Delhi?')).toBe('Delhi');
+  });
+
   test('isPlaceOrDirectionsQuery triggers only on places/directions, never on weather or news', () => {
     expect(isPlaceOrDirectionsQuery('Find the nearest doctor near me')).toBe(true);
     expect(isPlaceOrDirectionsQuery('Directions to Apollo Hospital')).toBe(true);

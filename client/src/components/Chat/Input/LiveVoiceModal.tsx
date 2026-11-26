@@ -37,7 +37,15 @@ type VoiceActionCard =
   | { kind: 'maps'; title: string; subtitle?: string; mapUrl: string; embedUrl?: string }
   | { kind: 'weather'; city: string; tempC: number; condition: string; highC?: number; lowC?: number }
   | { kind: 'news'; query: string; items: Array<{ title: string; url: string; source?: string }> }
-  | { kind: 'tutor'; title: string; subtitle?: string };
+  | { kind: 'tutor'; title: string; subtitle?: string }
+  | {
+      kind: 'media';
+      platform: 'youtube' | 'spotify';
+      title: string;
+      query: string;
+      openUrl: string;
+      installUrl?: string;
+    };
 
 type ConnectionState = 'connecting' | 'connected' | 'error' | 'closed';
 
@@ -1476,6 +1484,32 @@ export default function LiveVoiceModal({
     startSpeechRecognition,
   ]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // Keep mobile screen awake while Live Voice is active (Screen Wake Lock API)
+    let wakeLock: { release: () => Promise<void> } | null = null;
+    const navWithWake = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
+    };
+    if (navWithWake.wakeLock?.request) {
+      void navWithWake.wakeLock
+        .request('screen')
+        .then((sentinel) => {
+          wakeLock = sentinel;
+        })
+        .catch(() => {
+          // Ignore unsupported / battery-saver rejection
+        });
+    }
+    return () => {
+      if (wakeLock) {
+        void wakeLock.release().catch(() => {});
+      }
+    };
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -1742,6 +1776,51 @@ export default function LiveVoiceModal({
                   <X className="h-3.5 w-3.5" />
                 </button>
               </>
+            )}
+            {actionCard.kind === 'media' && (
+              <div className="flex w-full items-center justify-between gap-2">
+                <div className="min-w-0 truncate text-text-primary">
+                  <span className="font-semibold">{actionCard.title}</span>
+                  <span className="ml-1 text-text-secondary">· {actionCard.query}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <a
+                    href={actionCard.openUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`rounded-lg px-2.5 py-1 font-medium text-white ${
+                      actionCard.platform === 'spotify'
+                        ? 'bg-emerald-600 hover:bg-emerald-500'
+                        : 'bg-red-600 hover:bg-red-500'
+                    }`}
+                  >
+                    {actionCard.platform === 'spotify' ? 'Open Spotify' : 'Open YouTube'}
+                  </a>
+                  {actionCard.platform === 'spotify' && (
+                    <a
+                      href={
+                        /iphone|ipad|ipod/i.test(navigator.userAgent)
+                          ? 'https://apps.apple.com/app/spotify-music-and-podcasts/id324684580'
+                          : actionCard.installUrl ||
+                            'https://play.google.com/store/apps/details?id=com.spotify.music'
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg border border-emerald-400/40 px-2 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+                    >
+                      Install
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActionCard(null)}
+                    aria-label="Dismiss card"
+                    className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             )}
             {actionCard.kind === 'tutor' && (
               <>

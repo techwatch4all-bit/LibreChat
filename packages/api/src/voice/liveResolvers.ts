@@ -33,11 +33,21 @@ export interface TutorActionCard {
   subtitle: string;
 }
 
+export interface MediaActionCard {
+  kind: 'media';
+  platform: 'youtube' | 'spotify';
+  title: string;
+  query: string;
+  openUrl: string;
+  installUrl?: string;
+}
+
 export type VoiceActionCard =
   | WeatherActionCard
   | NewsActionCard
   | MapsActionCard
-  | TutorActionCard;
+  | TutorActionCard
+  | MediaActionCard;
 
 const VOICE_STOPWORDS = new Set([
   'okay',
@@ -140,6 +150,55 @@ export function isPlaceOrDirectionsQuery(text: string): boolean {
   return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol|fuel|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
     lower,
   );
+}
+
+export function detectMediaIntent(text: string): MediaActionCard | null {
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+  const wantsSpotify = /\bspotify\b/i.test(lower);
+  const wantsYoutube = /\b(youtube|you tube)\b/i.test(lower);
+  const wantsPlayMusic =
+    /\b(play|listen to|put on|open)\b/i.test(lower) &&
+    (wantsSpotify ||
+      wantsYoutube ||
+      /\b(song|songs|music|track|playlist|album|video|bhajan|podcast)\b/i.test(lower));
+
+  if (!wantsPlayMusic) {
+    return null;
+  }
+
+  const query =
+    trimmed
+      .replace(
+        /^(?:please\s+)?(?:can you\s+)?(?:play|listen to|put on|open)\s+/i,
+        '',
+      )
+      .replace(/\b(?:on|in|using|via)\s+(?:spotify|youtube|you tube)\b/gi, '')
+      .replace(/\b(?:spotify|youtube|you tube)\b/gi, '')
+      .replace(/[?!.]+$/g, '')
+      .trim() || 'trending music';
+
+  const platform: 'youtube' | 'spotify' = wantsSpotify ? 'spotify' : 'youtube';
+  const encoded = encodeURIComponent(query);
+
+  if (platform === 'spotify') {
+    return {
+      kind: 'media',
+      platform: 'spotify',
+      title: 'Play on Spotify',
+      query,
+      openUrl: `https://open.spotify.com/search/${encoded}`,
+      installUrl: 'https://play.google.com/store/apps/details?id=com.spotify.music',
+    };
+  }
+
+  return {
+    kind: 'media',
+    platform: 'youtube',
+    title: 'Play on YouTube',
+    query,
+    openUrl: `https://m.youtube.com/results?search_query=${encoded}`,
+  };
 }
 
 export function isWeatherQuery(text: string): boolean {

@@ -14,6 +14,7 @@ import {
   isNewsQuery,
   fetchStructuredWeather,
   fetchStructuredNews,
+  detectMediaIntent,
 } from './liveResolvers';
 
 export interface RealtimeWebSocketLike {
@@ -2306,6 +2307,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 }
                 if (/\bmaximize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'maximize' });
+                  return;
+                }
+
+                // 1b-media. YouTube / Spotify Media Launcher Card
+                const mediaCard = detectMediaIntent(cleanUtterance);
+                if (mediaCard) {
+                  sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
                   return;
                 }
 

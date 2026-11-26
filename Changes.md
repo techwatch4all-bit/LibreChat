@@ -32,3 +32,12 @@
   - Upgraded `LiveVoiceModal` to render dismissible **Maps**, **Weather**, **News Headlines (clickable + Send to Chat)**, and **DeepTutor (View Chat)** cards, plus hands-free `minimize`/`maximize` UI actions.
   - Added shared `GainNode` with 6 ms fade-out on barge-in and 40 ms jitter lookahead for click-free audio.
   - Dispatched `satchida:voice-session-ended` on modal cleanup so `HeaderBillingGauge` refreshes Live Voice minutes/tokens immediately.
+
+## 2026-11-26 — Media Action Card (YouTube & Spotify) + Hands-Free Mobile Wake Lock
+
+- **Media Launcher Card** (`packages/api/src/voice/liveResolvers.ts`, `realtimeProxy.ts`, `LiveVoiceModal.tsx`):
+  - Added `detectMediaIntent` for *"play <song/video> on YouTube/Spotify"* with one-tap **Open YouTube / Open Spotify** deep links and an OS-aware **Install Spotify** button (Google Play / App Store).
+- **Hands-Free Screen Wake Lock** (`LiveVoiceModal.tsx`):
+  - Acquires `navigator.wakeLock.request('screen')` while Live Voice is active so mobile devices don't auto-lock mid-conversation.
+- **Future Hands-Free Assistant Roadmap (noted for native Android/iOS & Spotify OAuth phase):**
+  - Background lock-screen audio service, compass/turn-by-turn navigation, Spotify Web API full playback control (play/pause/skip/volume), automatic pause on incoming phone calls, and opt-in user-authorized AI call screening/answering.

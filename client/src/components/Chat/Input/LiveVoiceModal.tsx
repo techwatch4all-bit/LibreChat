@@ -34,7 +34,7 @@ interface LiveVoiceModalProps {
 }
 
 type VoiceActionCard =
-  | { kind: 'maps'; title: string; subtitle?: string; mapUrl: string }
+  | { kind: 'maps'; title: string; subtitle?: string; mapUrl: string; embedUrl?: string }
   | { kind: 'weather'; city: string; tempC: number; condition: string; highC?: number; lowC?: number }
   | { kind: 'news'; query: string; items: Array<{ title: string; url: string; source?: string }> }
   | { kind: 'tutor'; title: string; subtitle?: string };
@@ -1683,32 +1683,43 @@ export default function LiveVoiceModal({
         <div className="mb-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs">
           <div className="flex items-start justify-between gap-2">
             {actionCard.kind === 'maps' && (
-              <>
-                <div className="min-w-0 truncate text-text-primary">
-                  <span className="font-medium">{actionCard.title}</span>
-                  {actionCard.subtitle ? (
-                    <span className="ml-1 text-text-secondary">· {actionCard.subtitle}</span>
-                  ) : null}
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 truncate text-text-primary">
+                    <span className="font-semibold">{actionCard.title}</span>
+                    {actionCard.subtitle ? (
+                      <span className="ml-1 text-text-secondary">· {actionCard.subtitle}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <a
+                      href={actionCard.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-emerald-600 px-2.5 py-1 font-medium text-white hover:bg-emerald-500"
+                    >
+                      Navigate
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setActionCard(null)}
+                      aria-label="Dismiss card"
+                      className="rounded p-0.5 text-text-secondary hover:text-text-primary"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <a
-                    href={actionCard.mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-emerald-600 px-2.5 py-1 font-medium text-white hover:bg-emerald-500"
-                  >
-                    Open Maps
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setActionCard(null)}
-                    aria-label="Dismiss card"
-                    className="rounded p-0.5 text-text-secondary hover:text-text-primary"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </>
+                {actionCard.embedUrl && (
+                  <iframe
+                    src={actionCard.embedUrl}
+                    title={actionCard.subtitle || 'Live Map'}
+                    className="h-36 w-full rounded-lg border border-emerald-400/20 bg-surface-secondary"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                )}
+              </div>
             )}
             {actionCard.kind === 'weather' && (
               <>

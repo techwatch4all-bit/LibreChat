@@ -215,7 +215,7 @@ export function detectRealtimeSearchIntent(text: string): {
   const isSearch =
     isDeepResearch ||
     hasUrl ||
-    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
+    /\b(weather|temperature|forecast|aqi|air quality|traffic|gas station|fuel|petrol|ev charger|parking|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
       lower,
     ) ||
     /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का|पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(
@@ -2435,13 +2435,20 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         return;
                       }
                       if (wantsPlace) {
+                        const llParam =
+                          typeof userLocation?.lat === 'number' &&
+                          typeof userLocation?.lng === 'number'
+                            ? `&ll=${userLocation.lat.toFixed(5)},${userLocation.lng.toFixed(5)}`
+                            : '';
+                        const encodedQ = encodeURIComponent(cleanKeywords);
                         sendJson(clientWs, {
                           type: 'voice.action_card',
                           card: {
                             kind: 'maps',
-                            title: 'Open in Google Maps',
+                            title: 'Live Map & Directions',
                             subtitle: cleanKeywords,
-                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanKeywords)}`,
+                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodedQ}`,
+                            embedUrl: `https://maps.google.com/maps?q=${encodedQ}${llParam}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
                           },
                         });
                       }

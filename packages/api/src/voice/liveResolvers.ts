@@ -24,6 +24,7 @@ export interface MapsActionCard {
   title: string;
   subtitle: string;
   mapUrl: string;
+  embedUrl?: string;
 }
 
 export interface TutorActionCard {
@@ -136,7 +137,7 @@ export function isPlaceOrDirectionsQuery(text: string): boolean {
   if (/\b(weather|temperature|forecast|news|headlines|stock|share price)\b/.test(lower)) {
     return false;
   }
-  return /\b(nearest|near me|nearby|directions to|how to reach|closest|doctor|hospital|clinic|pharmacy|chemist|restaurant|hotel|atm|petrol|airport|station|map)\b/.test(
+  return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol|fuel|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
     lower,
   );
 }

@@ -163,6 +163,10 @@ export function detectAccentSwitchCommand(
   currentProfile: VoiceProfile,
 ): VoiceProfile | null {
   const lower = text.trim().toLowerCase();
+  // Never switch voices on diagnostic/complaint questions like "Why are you talking like a male?"
+  if (/^\s*(?:why|how come)\b/.test(lower)) {
+    return null;
+  }
   const hasVoiceOrAccentWord = /\b(accent|voice)\b/.test(lower);
   const hasSwitchVerb =
     /\b(switch(?:ed|ing)?|chang(?:e|ed|ing)?|use|set|speak|talk|be|sound|become|want|prefer|make|try|still|give)\b/.test(
@@ -2053,7 +2057,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         'Important capabilities & rules:\n' +
                         '- Identity: If anyone asks your name, who made you, or what powers you, casually say your name is Satchida (Satchida Live Voice), powered by Satchida Intelligence from Satchida AI. Never say you don\'t have a name, and never mention Google, Gemini, OpenAI, Anthropic, or any third-party model.\n' +
                         '- Voice switching: You can switch male/female voices and Indian/US/UK accents on the fly. If asked to switch, just say something quick and upbeat like "Switching right now!"\n' +
-                        '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in.\n' +
+                        '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in. NEVER present old or outdated news (older than 48-72 hours) as today\'s news unless the user explicitly asks for historical or past news—if no fresh headlines are available, say so honestly.\n' +
                         '- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don\'t answer questions meant for the other person—translate Person A\'s words directly into Person B\'s language, and tell Person A what Person B said in 3rd person (e.g. "She said, \'...\'"). Stay in interpreter mode until asked to stop.',
                     },
                   ],

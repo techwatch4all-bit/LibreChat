@@ -252,10 +252,16 @@ export async function fetchStructuredWeather(
       return null;
     }
 
-    const wxRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`,
-      { signal: AbortSignal.timeout(3500) },
-    );
+    const [wxRes, aqiRes] = await Promise.all([
+      fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`,
+        { signal: AbortSignal.timeout(3000) },
+      ),
+      fetch(
+        `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&current=us_aqi,pm2_5,pm10`,
+        { signal: AbortSignal.timeout(3000) },
+      ).catch(() => null),
+    ]);
     if (!wxRes.ok) {
       return null;
     }
@@ -271,6 +277,12 @@ export async function fetchStructuredWeather(
         temperature_2m_min?: number[];
       };
     };
+    const aqiData =
+      aqiRes && aqiRes.ok
+        ? ((await aqiRes.json().catch(() => null)) as {
+            current?: { us_aqi?: number; pm2_5?: number; pm10?: number };
+          } | null)
+        : null;
     const temp = wx.current?.temperature_2m;
     if (typeof temp !== 'number') {
       return null;
@@ -280,14 +292,32 @@ export async function fetchStructuredWeather(
     const lowC = wx.daily?.temperature_2m_min?.[0];
     const humidity = wx.current?.relative_humidity_2m;
     const feelsLike = wx.current?.apparent_temperature;
+    const usAqi = aqiData?.current?.us_aqi;
+    const pm25 = aqiData?.current?.pm2_5;
+    const aqiLabel =
+      typeof usAqi === 'number'
+        ? usAqi <= 50
+          ? 'Good'
+          : usAqi <= 100
+            ? 'Moderate'
+            : usAqi <= 150
+              ? 'Unhealthy for sensitive groups'
+              : usAqi <= 200
+                ? 'Unhealthy'
+                : 'Very Unhealthy'
+        : '';
     const displayCity = resolvedCity || 'your location';
 
     const summaryText =
-      `Live Weather for ${displayCity}: ${Math.round(temp)}°C (${condition})` +
+      `Live Weather & AQI for ${displayCity}: ${Math.round(temp)}°C (${condition})` +
       (typeof feelsLike === 'number' ? `, feels like ${Math.round(feelsLike)}°C` : '') +
       (typeof humidity === 'number' ? `, humidity ${Math.round(humidity)}%` : '') +
       (typeof highC === 'number' && typeof lowC === 'number'
-        ? `, today's high ${Math.round(highC)}°C and low ${Math.round(lowC)}°C.`
+        ? `, today's high ${Math.round(highC)}°C and low ${Math.round(lowC)}°C`
+        : '') +
+      (typeof usAqi === 'number'
+        ? `. Air Quality (US AQI): ${Math.round(usAqi)} (${aqiLabel})` +
+          (typeof pm25 === 'number' ? `, PM2.5 ${Math.round(pm25)} µg/m³.` : '.')
         : '.');
 
     return {
@@ -311,98 +341,111 @@ const JUNK_NEWS_PATTERNS =
 
 export async function fetchStructuredNews(
   rawQuery: string,
-  opts?: { mode?: string },
+  _opts?: { mode?: string },
 ): Promise<{ summaryText: string; card: NewsActionCard } | null> {
   try {
     const cleanQuery = stripVoiceStopwords(rawQuery);
-    const isExecutive =
-      opts?.mode === 'Work' ||
-      opts?.mode === 'Pro' ||
-      /\b(critical|brief|executive|risk|security|conflict|geopolitic|market|economy|business|policy)\b/i.test(
-        rawQuery,
-      );
-    const personaBoost = isExecutive
-      ? ' Reuters OR "The Hindu" OR "Indian Express" OR Mint OR "Economic Times" OR BBC'
-      : '';
-    const effectiveQuery = `${cleanQuery}${personaBoost}`.trim();
+    const allowsOldNews = /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(
+      rawQuery,
+    );
+    const wantsIndiaTop = /\b(india|indian|national|bharat)\b/i.test(rawQuery);
     const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
       /\/+$/,
       '',
     );
-    const res = await fetch(
-      `${localSearchUrl}/search?q=${encodeURIComponent(effectiveQuery)}&format=json`,
-      { signal: AbortSignal.timeout(2500) },
-    );
-    if (!res.ok) {
-      return null;
-    }
-    const data = (await res.json()) as {
-      results?: Array<{
-        title?: string;
-        content?: string;
-        publishedDate?: string;
-        url?: string;
-        engine?: string;
-      }>;
-    };
-    const rawItems = Array.isArray(data.results) ? data.results : [];
     const nowMs = Date.now();
-    const maxAgeMs = 72 * 60 * 60 * 1000; // Prefer last 72 hours
+    const maxAgeMs = 72 * 60 * 60 * 1000;
     const freshItems: NewsHeadlineItem[] = [];
-    const fallbackItems: NewsHeadlineItem[] = [];
     const freshLines: string[] = [];
-    const fallbackLines: string[] = [];
+    const seenTitles = new Set<string>();
 
-    for (const r of rawItems) {
+    const addHeadline = (title: string, url: string, pubDate?: string, snippet?: string) => {
       if (freshItems.length >= 5) {
-        break;
+        return;
       }
-      const title = (r.title || '').replace(/<[^>]+>/g, '').trim();
-      const url = (r.url || '').trim();
-      if (!title || r.engine === 'wikipedia' || JUNK_NEWS_PATTERNS.test(title)) {
-        continue;
+      const cleanTitle = title.replace(/<[^>]+>/g, '').trim();
+      if (!cleanTitle || JUNK_NEWS_PATTERNS.test(cleanTitle)) {
+        return;
       }
-      const snippet = (r.content || '')
-        .replace(/&lt;[^&]*&gt;/g, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const key = cleanTitle.toLowerCase().slice(0, 48);
+      if (seenTitles.has(key)) {
+        return;
+      }
+      if (!allowsOldNews && pubDate) {
+        const parsed = Date.parse(pubDate);
+        if (!Number.isNaN(parsed) && nowMs - parsed > maxAgeMs) {
+          return;
+        }
+      }
+      seenTitles.add(key);
       const safeUrl = url.startsWith('http')
         ? url
-        : `https://news.google.com/search?q=${encodeURIComponent(title)}`;
-      const parsedDate = r.publishedDate ? Date.parse(r.publishedDate) : NaN;
-      const isFresh = !Number.isNaN(parsedDate) && nowMs - parsedDate <= maxAgeMs;
-      const itemObj: NewsHeadlineItem = {
-        title,
-        url: safeUrl,
-        source: r.publishedDate || r.engine || undefined,
-      };
-      const line =
-        snippet && !snippet.startsWith(title)
-          ? `- ${title}: ${snippet.slice(0, 180)}`
-          : `- ${title}`;
+        : `https://news.google.com/search?q=${encodeURIComponent(cleanTitle)}`;
+      freshItems.push({ title: cleanTitle, url: safeUrl, source: pubDate || undefined });
+      freshLines.push(
+        snippet && !snippet.startsWith(cleanTitle)
+          ? `- ${cleanTitle}: ${snippet.slice(0, 180)}`
+          : `- ${cleanTitle}`,
+      );
+    };
 
-      if (isFresh) {
-        freshItems.push(itemObj);
-        freshLines.push(line);
-      } else if (fallbackItems.length < 5) {
-        fallbackItems.push(itemObj);
-        fallbackLines.push(line);
+    // Fetch Google News Top Stories RSS (always fresh today's front-page headlines) + local satchida-search in parallel
+    const rssUrl = wantsIndiaTop
+      ? 'https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en'
+      : `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
+
+    const [rssRes, searchRes] = await Promise.all([
+      fetch(rssUrl, { signal: AbortSignal.timeout(2500) }).catch(() => null),
+      fetch(`${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`, {
+        signal: AbortSignal.timeout(2500),
+      }).catch(() => null),
+    ]);
+
+    if (rssRes && rssRes.ok) {
+      const xml = await rssRes.text();
+      const rssMatches = [
+        ...xml.matchAll(
+          /<item>[\s\S]*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>[\s\S]*?<\/item>/g,
+        ),
+      ].slice(0, 10);
+      for (const m of rssMatches) {
+        addHeadline(m[1] || '', (m[2] || '').trim(), (m[3] || '').trim());
       }
     }
 
-    const items = freshItems.length > 0 ? freshItems : fallbackItems;
-    const lines = freshLines.length > 0 ? freshLines : fallbackLines;
-    if (items.length === 0) {
+    if (freshItems.length < 5 && searchRes && searchRes.ok) {
+      const data = (await searchRes.json().catch(() => ({}))) as {
+        results?: Array<{
+          title?: string;
+          content?: string;
+          publishedDate?: string;
+          url?: string;
+          engine?: string;
+        }>;
+      };
+      for (const r of Array.isArray(data.results) ? data.results : []) {
+        if (r.engine === 'wikipedia') {
+          continue;
+        }
+        const snippet = (r.content || '')
+          .replace(/&lt;[^&]*&gt;/g, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        addHeadline(r.title || '', (r.url || '').trim(), r.publishedDate, snippet);
+      }
+    }
+
+    if (freshItems.length === 0) {
       return null;
     }
 
     return {
-      summaryText: lines.join('\n'),
+      summaryText: freshLines.join('\n'),
       card: {
         kind: 'news',
         query: cleanQuery,
-        items,
+        items: freshItems,
       },
     };
   } catch {

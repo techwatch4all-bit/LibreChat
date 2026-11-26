@@ -196,7 +196,7 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                         className={cn('flex flex-col', landingContainerClass)}
                       >
                         {isLandingPage && isPhone ? (
-                          <div className="flex w-full flex-1 flex-col items-center justify-start gap-4 pt-6">
+                          <div className="flex w-full flex-1 flex-col items-center justify-start gap-2.5 pt-3">
                             {content}
                             <ConversationStartersMobile />
                           </div>

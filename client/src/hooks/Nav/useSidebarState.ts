@@ -27,7 +27,9 @@ export type SidebarState = {
  * here so they can never disagree about that frame.
  */
 export default function useSidebarState(): SidebarState {
-  const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  const isNarrowScreen = useMediaQuery('(max-width: 768px)');
+  const isShortLandscape = useMediaQuery('(orientation: landscape) and (max-height: 500px)');
+  const isSmallScreen = isNarrowScreen || isShortLandscape;
   const [expanded, setExpanded] = useRecoilState(store.sidebarExpanded);
   const wasSmallScreen = useRef(isSmallScreen);
 

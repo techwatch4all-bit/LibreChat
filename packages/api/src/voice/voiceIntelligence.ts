@@ -32,7 +32,7 @@ export function analyzeSpeakerTurn(
   const roundedPitch = Math.round(avgPitchHz);
 
   const primary = profile.primary_voiceprint;
-  if (!primary || primary.samples < 2) {
+  if (!primary || primary.samples < 5) {
     return {
       status: 'calibrating',
       genderHint,

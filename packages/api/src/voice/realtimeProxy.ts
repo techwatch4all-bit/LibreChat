@@ -1634,6 +1634,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let activeSpeakerKey = 'primary';
       let pendingGuestIntroNotice: string | null = null;
       const greetedGuestGroups = new Set<string>();
+      let consecutiveUnknownGroup = '';
+      let consecutiveUnknownCount = 0;
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -3712,11 +3714,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               return;
             }
             if (parsed.type === 'voice.acoustic_meta') {
+              // Ignore acoustic frames during echo-guard window so Maya/Anand's own speaker output
+              // never corrupts primary_voiceprint or triggers false guest detection.
+              if (Date.now() < pauseMicForwardUntil) {
+                return;
+              }
               const avgPitchHz = Number(parsed.avgPitchHz);
               const pitchStdHz = Number(parsed.pitchStdHz ?? 0);
               if (Number.isFinite(avgPitchHz) && avgPitchHz >= 70 && avgPitchHz <= 360) {
                 const analysis = analyzeSpeakerTurn(avgPitchHz, pitchStdHz, voiceProfile);
                 if (analysis.status === 'calibrating') {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   const prev = voiceProfile.primary_voiceprint;
                   const samples = (prev?.samples ?? 0) + 1;
                   const nextAvg = prev
@@ -3731,8 +3740,12 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     },
                   });
                 } else if (analysis.status === 'primary') {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   activeSpeakerKey = 'primary';
                 } else if (analysis.status === 'known_guest' && analysis.matchedSpeaker) {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   const nextKey = `known:${analysis.matchedSpeaker.name.toLowerCase()}`;
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
@@ -3741,9 +3754,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     );
                   }
                 } else if (analysis.status === 'unknown_guest') {
-                  // Group by gender/age category rather than narrow 40Hz pitch buckets so natural
-                  // voice inflection (e.g. 238Hz <-> 263Hz) never treats the same guest as multiple people.
+                  // Require 3 consecutive matching frames in the same category to ignore 1-frame
+                  // harmonic pitch spikes (e.g. 281Hz) and ambient noise.
                   const guestGroupKey = `unknown:${analysis.genderHint}`;
+                  if (consecutiveUnknownGroup === guestGroupKey) {
+                    consecutiveUnknownCount += 1;
+                  } else {
+                    consecutiveUnknownGroup = guestGroupKey;
+                    consecutiveUnknownCount = 1;
+                  }
+                  if (consecutiveUnknownCount < 3) {
+                    return;
+                  }
                   _lastGuestAcoustic = {
                     avgPitchHz: analysis.pitchHz,
                     pitchStdHz: Math.round(pitchStdHz),
@@ -3757,7 +3779,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       pendingGuestIntroNotice = `A new ${analysis.genderHint} voice just joined. If they are addressing you, warmly introduce yourself as ${personaName} in your own natural words and casually ask their name. Never repeat the same scripted line—if you didn't catch their name, ask once naturally; if they prefer not to share it, politely let it go and keep chatting naturally.`;
                     }
                     logger.info(
-                      `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
+                      `[RealtimeVoice] Unknown room guest confirmed (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint}, frames=${consecutiveUnknownCount})`,
                     );
                   }
                 }

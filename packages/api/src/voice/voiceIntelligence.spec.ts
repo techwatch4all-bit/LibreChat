@@ -13,7 +13,7 @@ describe('voiceIntelligence', () => {
         avg_pitch_hz: 125,
         pitch_std_hz: 15,
         gender_hint: 'male' as const,
-        samples: 4,
+        samples: 5,
       },
       known_speakers: [
         { name: 'Priya', relation: 'wife', gender_hint: 'female' as const, avg_pitch_hz: 215 },

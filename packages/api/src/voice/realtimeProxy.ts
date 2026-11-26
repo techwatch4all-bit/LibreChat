@@ -1558,6 +1558,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let voiceProfile: VoiceProfileData = {};
       let initialGreetingSent = false;
       const recentUserTranscripts: string[] = [];
+      let lastGuestAcoustic: {
+        avgPitchHz: number;
+        pitchStdHz: number;
+        genderHint: 'male' | 'female' | 'unknown';
+      } | null = null;
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -2355,11 +2360,20 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                                     args.guest_gender_hint === 'male' ||
                                     args.guest_gender_hint === 'female'
                                       ? args.guest_gender_hint
-                                      : 'unknown',
+                                      : (lastGuestAcoustic?.genderHint ?? 'unknown'),
+                                  ...(lastGuestAcoustic
+                                    ? {
+                                        avg_pitch_hz: lastGuestAcoustic.avgPitchHz,
+                                        pitch_std_hz: lastGuestAcoustic.pitchStdHz,
+                                      }
+                                    : {}),
                                 },
                               }
                             : {}),
                         });
+                        if (typeof args.guest_name === 'string' && args.guest_name.trim()) {
+                          lastGuestAcoustic = null;
+                        }
                         logger.info(
                           `[RealtimeVoice] Saved consolidated voice profile (${VOICE_PROFILE_MEMORY_KEY}) for user=${authenticatedUserId}`,
                         );
@@ -2456,6 +2470,37 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 logger.info(
                   `[RealtimeVoice] S2S user transcript: "${cleanUtterance.slice(0, 120)}"`,
                 );
+
+                // 0. AI-to-AI voice agent detection (ChatGPT / Copilot / assistant loops)
+                const s2sAiCheck = detectAiVoiceAgent(cleanUtterance, recentUserTranscripts);
+                recentUserTranscripts.push(cleanUtterance);
+                if (recentUserTranscripts.length > 6) {
+                  recentUserTranscripts.shift();
+                }
+                if (
+                  s2sAiCheck.isLikelyAi &&
+                  isGeminiS2sActive &&
+                  upstreamWs &&
+                  upstreamWs.readyState === WS_OPEN
+                ) {
+                  upstreamWs.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: 'user',
+                            parts: [
+                              {
+                                text: `[SYSTEM NOTICE: The speaker appears to be another AI voice assistant (${s2sAiCheck.reason}). Avoid a repetitive greeting loop; calmly acknowledge it and ask the human user how they want to proceed.]`,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: false,
+                      },
+                    }),
+                  );
+                }
 
                 // 1. Dynamic on-the-fly voice / gender / accent switching
                 const requestedVoice = detectAccentSwitchCommand(
@@ -3227,6 +3272,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   upstreamWs &&
                   upstreamWs.readyState === WS_OPEN
                 ) {
+                  lastGuestAcoustic = {
+                    avgPitchHz: analysis.pitchHz,
+                    pitchStdHz: Math.round(pitchStdHz),
+                    genderHint: analysis.genderHint,
+                  };
                   upstreamWs.send(
                     JSON.stringify({
                       clientContent: {

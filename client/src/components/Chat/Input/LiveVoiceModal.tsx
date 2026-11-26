@@ -23,6 +23,7 @@ import {
 } from '~/store/satchiStore';
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { getSharedVoiceAudioContext } from '~/utils/voiceAudioContext';
+import { UtterancePitchTracker } from '~/utils/voicePitch';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import { useAuthContext, useNewConvo } from '~/hooks';
 
@@ -194,6 +195,8 @@ export default function LiveVoiceModal({
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioQueueRef = useRef<Array<{ audioBase64: string; mimeType: string }>>([]);
+  const pitchTrackerRef = useRef<UtterancePitchTracker>(new UtterancePitchTracker());
+  const pitchFrameCounterRef = useRef<number>(0);
   const isPlayingQueueRef = useRef<boolean>(false);
   const isAssistantSpeakingRef = useRef<boolean>(false);
   const sessionModeRef = useRef<'gemini_live_s2s' | 'bifrost_bridge'>('gemini_live_s2s');
@@ -672,6 +675,21 @@ export default function LiveVoiceModal({
           mimeType: 'audio/pcm;rate=16000',
         }),
       );
+      pitchTrackerRef.current.pushFrame(input, nativeSampleRate);
+      pitchFrameCounterRef.current += 1;
+      if (pitchFrameCounterRef.current >= 24) {
+        pitchFrameCounterRef.current = 0;
+        const stats = pitchTrackerRef.current.flush();
+        if (stats && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: 'voice.acoustic_meta',
+              avgPitchHz: stats.avgPitchHz,
+              pitchStdHz: stats.pitchStdHz,
+            }),
+          );
+        }
+      }
     };
 
     try {
@@ -1167,6 +1185,7 @@ export default function LiveVoiceModal({
       }
       params.set('mode', currentModeRef.current || 'Chat');
       params.set('voice', voiceIdRef.current);
+      params.set('localHour', String(new Date().getHours()));
       if (hasToolsRef.current) {
         params.set('tools', 'true');
       }

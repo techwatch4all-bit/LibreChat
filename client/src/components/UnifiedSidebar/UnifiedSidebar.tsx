@@ -229,9 +229,9 @@ function UnifiedSidebar({ isSliding = false }: { isSliding?: boolean }) {
             <div
               role="region"
               aria-label={localize('com_nav_control_panel')}
-              className="fixed bottom-[144px] left-[60px] right-2 z-[120] flex h-[clamp(160px,28dvh,300px)] flex-col overflow-hidden rounded-2xl border border-border-medium bg-surface-primary-alt shadow-2xl"
+              className="fixed bottom-[144px] left-[60px] right-2 z-[120] flex h-[clamp(140px,28dvh,300px)] max-h-[calc(100dvh-208px)] flex-col overflow-hidden rounded-2xl border border-border-medium bg-surface-primary-alt shadow-2xl"
             >
-              <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border-light px-2.5 py-1.5">
+              <div className="flex flex-shrink-0 items-center justify-between gap-1 overflow-hidden border-b border-border-light px-2 py-1">
                 <div className="min-w-0 flex-1">
                   <MobileHeader
                     links={links}

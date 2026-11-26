@@ -836,10 +836,19 @@ body,
 }
 
 /* Mobile phone landing page (portrait & landscape): enforce pure Dark Black theme */
+html[data-theme='satchida'] [data-mobile-landing='true'],
+html[data-theme='satchida'] [data-mobile-landing='true'] .bg-presentation,
 [data-mobile-landing='true'],
 [data-mobile-landing='true'] .bg-presentation {
   background-color: #000000 !important;
   background-image: none !important;
+}
+
+html:has([data-mobile-landing='true']) body::before,
+html:has([data-mobile-landing='true']) .satchida-chat-surface {
+  background-color: #000000 !important;
+  background-image: none !important;
+  opacity: 1 !important;
 }
 
 /* Global mobile & tablet safe-area and dialog clamping across all pages */

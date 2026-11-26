@@ -88,6 +88,15 @@ const VOICE_STOPWORDS = new Set([
   'your',
   'what',
   'whats',
+  'focus',
+  'on',
+  'itself',
+  'region',
+  'only',
+  'just',
+  'actually',
+  'brief',
+  'please',
 ]);
 
 export function stripVoiceStopwords(rawQuery: string): string {
@@ -248,7 +257,7 @@ export async function fetchStructuredNews(
     );
     const res = await fetch(
       `${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`,
-      { signal: AbortSignal.timeout(3500) },
+      { signal: AbortSignal.timeout(2500) },
     );
     if (!res.ok) {
       return null;

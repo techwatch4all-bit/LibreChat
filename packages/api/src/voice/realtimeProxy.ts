@@ -2213,7 +2213,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 }
                 lastProcessedInputKey = cleanUtterance;
                 lastProcessedInputAt = nowMs;
-                activeSearchEpoch += 1;
+                const isCheckIn =
+                  /^(?:you\s+got\s+that|got\s+that|hello|hey|are\s+you\s+there|can\s+you\s+hear\s+me|okay|ok|yes|yeah|hmm|uh\s*huh)[?.!,\s]*$/i.test(
+                    cleanUtterance,
+                  );
+                if (!isCheckIn) {
+                  activeSearchEpoch += 1;
+                }
                 const currentEpoch = activeSearchEpoch;
                 s2sTranscriptHistory.push({ role: 'user', text: cleanUtterance });
                 if (s2sTranscriptHistory.length > 16) {
@@ -2348,33 +2354,51 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     });
 
                     void (async () => {
-                      let resultPayload = '';
+                      const parts: string[] = [];
+                      const parallelTasks: Promise<void>[] = [];
+
                       if (wantsWeather) {
-                        const wx = await fetchStructuredWeather(
-                          effectiveSearchQuery,
-                          userLocation || undefined,
+                        parallelTasks.push(
+                          (async () => {
+                            const wx = await fetchStructuredWeather(
+                              effectiveSearchQuery,
+                              userLocation || undefined,
+                            );
+                            if (wx) {
+                              pendingLocalQuery = null;
+                              parts.push(wx.summaryText);
+                              sendJson(clientWs, { type: 'voice.action_card', card: wx.card });
+                            } else if (!userLocation?.city && typeof userLocation?.lat !== 'number') {
+                              pendingLocalQuery = effectiveUtterance;
+                              parts.push(
+                                'Weather location not set yet — briefly ask which city they want weather for.',
+                              );
+                            }
+                          })(),
                         );
-                        if (wx) {
-                          pendingLocalQuery = null;
-                          resultPayload = wx.summaryText;
-                          sendJson(clientWs, { type: 'voice.action_card', card: wx.card });
-                        } else if (!userLocation?.city && typeof userLocation?.lat !== 'number') {
-                          pendingLocalQuery = effectiveUtterance;
-                          resultPayload =
-                            'No location detected yet. Ask the user briefly which city they want the weather for.';
-                        }
-                      } else if (wantsNews) {
-                        const news = await fetchStructuredNews(effectiveSearchQuery);
-                        if (news) {
-                          resultPayload = news.summaryText;
-                          sendJson(clientWs, { type: 'voice.action_card', card: news.card });
-                        }
                       }
 
+                      if (wantsNews) {
+                        parallelTasks.push(
+                          (async () => {
+                            const news = await fetchStructuredNews(effectiveSearchQuery);
+                            if (news) {
+                              parts.push(news.summaryText);
+                              sendJson(clientWs, { type: 'voice.action_card', card: news.card });
+                            }
+                          })(),
+                        );
+                      }
+
+                      if (parallelTasks.length > 0) {
+                        await Promise.all(parallelTasks);
+                      }
+
+                      let resultPayload = parts.join('\n\n').trim();
                       if (!resultPayload) {
                         resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
                           deep: searchIntent.isDeepResearch,
-                          fetchPages: true,
+                          fetchPages: !wantsNews,
                         });
                       }
 

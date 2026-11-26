@@ -1762,10 +1762,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         const NON_NAME_WORDS =
           /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|driving|walking|working|sitting|eating|waiting|running|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|tu|tú|you|me|no|yes|nahi|nahin|नहीं|नह|हाँ|जी|क्या|कौन|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
         if (!isNameNegation) {
-          // Only match explicit name introductions — never bare "I am <verb/adjective>" like "I am driving"
+          // Only match explicit name introductions or explicit name changes — never bare "I am <verb/adjective>"
           const explicitNameMatch =
             cleanUtterance.match(
-              /\b(?:my\s+name\s+is(?:\s+also)?|call\s+me)\s+([a-zA-Z]{2,24})\b/i,
+              /\b(?:my\s+name\s+is(?:\s+also)?|call\s+me|use\s+(?:the\s+)?name|(?:change|update|set)\s+my\s+name(?:\s+from\s+[a-zA-Z]+)?\s+to)\s+([a-zA-Z]{2,24})\b/i,
             ) ||
             cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}\p{M}]{2,24})/iu) ||
             cleanUtterance.match(

@@ -253,7 +253,7 @@ export function detectMediaIntent(text: string): MediaActionCard | null {
   const wantsSpotify = /\bspotify\b/i.test(lower);
   const wantsYoutube = /\b(youtube|you tube)\b/i.test(lower);
   const wantsPlayMusic =
-    /\b(play|listen to|put on|open|embed|attach|watch|stream)\b/i.test(lower) &&
+    /\b(play|listen to|put on|open|embed|attach|watch|stream|show)\b/i.test(lower) &&
     (wantsSpotify ||
       wantsYoutube ||
       /\b(song|songs|music|track|playlist|album|video|bhajan|podcast|channel|live news)\b/i.test(

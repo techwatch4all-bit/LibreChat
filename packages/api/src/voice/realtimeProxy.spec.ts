@@ -486,14 +486,16 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
 
     expect(initialUpstream.sent.length).toBe(1);
     const setupFrame = JSON.parse(initialUpstream.sent[0]);
-    expect(setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
-      'Fenrir',
-    );
+    expect(
+      setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+    ).toBe('Fenrir');
     expect(setupFrame.setup.generationConfig.temperature).toBe(0.85);
     expect(setupFrame.setup.tools).toEqual([{ googleSearch: {} }]);
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Live Voice');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Intelligence');
-    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('developed exclusively by Satchida AI');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain(
+      'developed exclusively by Satchida AI',
+    );
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('REALTIME SEARCH');
 
     // Simulate setupComplete
@@ -514,9 +516,9 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
     const secondUpstream = createdUpstreamSockets[1];
     secondUpstream.emit('open');
     const secondSetup = JSON.parse(secondUpstream.sent[0]);
-    expect(secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
-      'Charon',
-    );
+    expect(
+      secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+    ).toBe('Charon');
   });
 
   test('extracts morning brief and first spoken city into satchida_voice_profile without overwriting GPS location', async () => {
@@ -572,7 +574,9 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
     );
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(savedProfiles.some((p) => (p.morning_brief as { enabled?: boolean })?.enabled === true)).toBe(true);
+    expect(
+      savedProfiles.some((p) => (p.morning_brief as { enabled?: boolean })?.enabled === true),
+    ).toBe(true);
     const briefEntry = savedProfiles.find((p) => p.morning_brief);
     expect((briefEntry?.morning_brief as { topics?: string[] })?.topics).toEqual([
       'cricket',
@@ -622,7 +626,9 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
           gender_hint: 'male',
           samples: 5,
         },
-        known_speakers: [{ name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 }],
+        known_speakers: [
+          { name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 },
+        ],
       }),
     });
 
@@ -666,6 +672,92 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
       const parsed = JSON.parse(frame);
       if (parsed.clientContent) {
         expect(parsed.clientContent.turnComplete).toBe(true);
+      }
+    }
+  });
+
+  test('bridge mode supports profile extraction, hands-free UI actions, and tutor delegation', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const savedProfiles: Record<string, unknown>[] = [];
+    const prevFlag = process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED;
+    process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED = 'false';
+
+    try {
+      const handler = createRealtimeVoiceUpgradeHandler({
+        wss,
+        createUpstreamWebSocket: () => new FakeWebSocket(),
+        verifyJwt: () => ({ id: 'user-bridge-1' }),
+        getUserSeatCredential: async () => ({
+          id: 'user-bridge-1',
+          accountType: 'pro',
+          seatToken: 'tk_bridge_1',
+        }),
+        getVoiceProfileMemory: async () => null,
+        setVoiceProfileMemory: async (_userId, profile) => {
+          savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+        },
+      });
+
+      const req = {
+        url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+        headers: { host: 'localhost:3080' },
+      } as unknown as IncomingMessage;
+      const socket = createFakeSocket();
+
+      handler(req, socket, Buffer.alloc(0));
+      await new Promise((r) => setImmediate(r));
+
+      const clientWs = getLastClientWs()!;
+      const sessionEvent = JSON.parse(clientWs.sent[0]);
+      expect(sessionEvent.mode).toBe('bifrost_bridge');
+
+      // 1. Hands-free UI action + profile extraction in bridge mode
+      clientWs.emit(
+        'message',
+        Buffer.from(
+          JSON.stringify({
+            type: 'voice.turn',
+            text: 'My name is Aarav. Switch to Study mode',
+          }),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+
+      expect(savedProfiles.some((p) => p.name === 'Aarav')).toBe(true);
+      const sentMsgs1 = clientWs.sent.map((s) => JSON.parse(s));
+      expect(
+        sentMsgs1.some(
+          (m) => m.type === 'voice.ui_action' && m.action === 'set_mode' && m.value === 'Study',
+        ),
+      ).toBe(true);
+
+      // 2. DeepTutor / Study visual delegation in bridge mode
+      clientWs.emit(
+        'message',
+        Buffer.from(
+          JSON.stringify({
+            type: 'voice.turn',
+            text: 'Teach me photosynthesis with visuals',
+          }),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+
+      const sentMsgs2 = clientWs.sent.map((s) => JSON.parse(s));
+      expect(
+        sentMsgs2.some(
+          (m) =>
+            m.type === 'voice.delegate_tools' &&
+            m.mode === 'Study' &&
+            m.webSearch === true &&
+            m.newChat === true,
+        ),
+      ).toBe(true);
+    } finally {
+      if (prevFlag === undefined) {
+        delete process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED;
+      } else {
+        process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED = prevFlag;
       }
     }
   });

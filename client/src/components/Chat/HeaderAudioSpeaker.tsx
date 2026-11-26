@@ -349,7 +349,8 @@ export default function HeaderAudioSpeaker() {
           className="shadow-xs pointer-events-none absolute -bottom-1 -right-1 select-none rounded border border-emerald-500/20 bg-emerald-500/15 px-1 py-[0.5px] text-[7.5px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400"
           title="On-device Local Speech"
         >
-          Local
+          {/* eslint-disable-next-line i18next/no-literal-string */}
+          {'Local'}
         </span>
       </div>
 

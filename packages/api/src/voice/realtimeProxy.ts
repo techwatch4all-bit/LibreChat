@@ -1563,6 +1563,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         pitchStdHz: number;
         genderHint: 'male' | 'female' | 'unknown';
       } | null = null;
+      let activeSpeakerKey = 'primary';
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -3242,6 +3243,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       samples,
                     },
                   });
+                } else if (analysis.status === 'primary') {
+                  activeSpeakerKey = 'primary';
                 } else if (
                   analysis.status === 'known_guest' &&
                   analysis.matchedSpeaker &&
@@ -3249,51 +3252,60 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   upstreamWs &&
                   upstreamWs.readyState === WS_OPEN
                 ) {
-                  upstreamWs.send(
-                    JSON.stringify({
-                      clientContent: {
-                        turns: [
-                          {
-                            role: 'user',
-                            parts: [
-                              {
-                                text: `[SYSTEM NOTICE: Known room guest "${analysis.matchedSpeaker.name}"${analysis.matchedSpeaker.relation ? ` (${analysis.matchedSpeaker.relation})` : ''} appears to be speaking (pitch ~${analysis.pitchHz}Hz). Greet them naturally by name.]`,
-                              },
-                            ],
-                          },
-                        ],
-                        turnComplete: false,
-                      },
-                    }),
-                  );
+                  const nextKey = `known:${analysis.matchedSpeaker.name.toLowerCase()}`;
+                  if (nextKey !== activeSpeakerKey) {
+                    activeSpeakerKey = nextKey;
+                    upstreamWs.send(
+                      JSON.stringify({
+                        clientContent: {
+                          turns: [
+                            {
+                              role: 'user',
+                              parts: [
+                                {
+                                  text: `[SYSTEM NOTICE: Known room guest "${analysis.matchedSpeaker.name}"${analysis.matchedSpeaker.relation ? ` (${analysis.matchedSpeaker.relation})` : ''} started speaking (pitch ~${analysis.pitchHz}Hz). Greet them naturally by name.]`,
+                                },
+                              ],
+                            },
+                          ],
+                          turnComplete: false,
+                        },
+                      }),
+                    );
+                  }
                 } else if (
                   analysis.status === 'unknown_guest' &&
                   isGeminiS2sActive &&
                   upstreamWs &&
                   upstreamWs.readyState === WS_OPEN
                 ) {
+                  const pitchBucket = Math.round(analysis.pitchHz / 40) * 40;
+                  const nextKey = `unknown:${pitchBucket}`;
                   lastGuestAcoustic = {
                     avgPitchHz: analysis.pitchHz,
                     pitchStdHz: Math.round(pitchStdHz),
                     genderHint: analysis.genderHint,
                   };
-                  upstreamWs.send(
-                    JSON.stringify({
-                      clientContent: {
-                        turns: [
-                          {
-                            role: 'user',
-                            parts: [
-                              {
-                                text: `[SYSTEM NOTICE: Another person in the room appears to be speaking (pitch ~${analysis.pitchHz}Hz, likely ${analysis.genderHint}). Greet them warmly like a normal human, ask their name and relation to the user, and save them via save_voice_profile.]`,
-                              },
-                            ],
-                          },
-                        ],
-                        turnComplete: false,
-                      },
-                    }),
-                  );
+                  if (nextKey !== activeSpeakerKey) {
+                    activeSpeakerKey = nextKey;
+                    upstreamWs.send(
+                      JSON.stringify({
+                        clientContent: {
+                          turns: [
+                            {
+                              role: 'user',
+                              parts: [
+                                {
+                                  text: `[SYSTEM NOTICE: Another person in the room started speaking (pitch ~${analysis.pitchHz}Hz, likely ${analysis.genderHint}). Greet them warmly like a normal human, ask their name and relation to the user, and save them via save_voice_profile.]`,
+                                },
+                              ],
+                            },
+                          ],
+                          turnComplete: false,
+                        },
+                      }),
+                    );
+                  }
                 }
               }
               return;

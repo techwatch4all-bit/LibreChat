@@ -246,17 +246,31 @@ export async function fetchStructuredWeather(
   }
 }
 
+const JUNK_NEWS_PATTERNS =
+  /\b(school assembly|live tv|watch live|horoscope|rashifal|astrology|panchang|quiz|crossword|sudoku|bollywood gossip|bigg boss|coupon|promo code)\b/i;
+
 export async function fetchStructuredNews(
   rawQuery: string,
+  opts?: { mode?: string },
 ): Promise<{ summaryText: string; card: NewsActionCard } | null> {
   try {
     const cleanQuery = stripVoiceStopwords(rawQuery);
+    const isExecutive =
+      opts?.mode === 'Work' ||
+      opts?.mode === 'Pro' ||
+      /\b(critical|brief|executive|risk|security|conflict|geopolitic|market|economy|business|policy)\b/i.test(
+        rawQuery,
+      );
+    const personaBoost = isExecutive
+      ? ' Reuters OR "The Hindu" OR "Indian Express" OR Mint OR "Economic Times" OR BBC'
+      : '';
+    const effectiveQuery = `${cleanQuery}${personaBoost}`.trim();
     const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
       /\/+$/,
       '',
     );
     const res = await fetch(
-      `${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`,
+      `${localSearchUrl}/search?q=${encodeURIComponent(effectiveQuery)}&format=json`,
       { signal: AbortSignal.timeout(2500) },
     );
     if (!res.ok) {
@@ -272,16 +286,20 @@ export async function fetchStructuredNews(
       }>;
     };
     const rawItems = Array.isArray(data.results) ? data.results : [];
-    const items: NewsHeadlineItem[] = [];
-    const lines: string[] = [];
+    const nowMs = Date.now();
+    const maxAgeMs = 72 * 60 * 60 * 1000; // Prefer last 72 hours
+    const freshItems: NewsHeadlineItem[] = [];
+    const fallbackItems: NewsHeadlineItem[] = [];
+    const freshLines: string[] = [];
+    const fallbackLines: string[] = [];
 
     for (const r of rawItems) {
-      if (items.length >= 5) {
+      if (freshItems.length >= 5) {
         break;
       }
       const title = (r.title || '').replace(/<[^>]+>/g, '').trim();
       const url = (r.url || '').trim();
-      if (!title || r.engine === 'wikipedia') {
+      if (!title || r.engine === 'wikipedia' || JUNK_NEWS_PATTERNS.test(title)) {
         continue;
       }
       const snippet = (r.content || '')
@@ -292,18 +310,29 @@ export async function fetchStructuredNews(
       const safeUrl = url.startsWith('http')
         ? url
         : `https://news.google.com/search?q=${encodeURIComponent(title)}`;
-      items.push({
+      const parsedDate = r.publishedDate ? Date.parse(r.publishedDate) : NaN;
+      const isFresh = !Number.isNaN(parsedDate) && nowMs - parsedDate <= maxAgeMs;
+      const itemObj: NewsHeadlineItem = {
         title,
         url: safeUrl,
         source: r.publishedDate || r.engine || undefined,
-      });
-      lines.push(
+      };
+      const line =
         snippet && !snippet.startsWith(title)
           ? `- ${title}: ${snippet.slice(0, 180)}`
-          : `- ${title}`,
-      );
+          : `- ${title}`;
+
+      if (isFresh) {
+        freshItems.push(itemObj);
+        freshLines.push(line);
+      } else if (fallbackItems.length < 5) {
+        fallbackItems.push(itemObj);
+        fallbackLines.push(line);
+      }
     }
 
+    const items = freshItems.length > 0 ? freshItems : fallbackItems;
+    const lines = freshLines.length > 0 ? freshLines : fallbackLines;
     if (items.length === 0) {
       return null;
     }

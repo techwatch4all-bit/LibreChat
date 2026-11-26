@@ -2381,7 +2381,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       if (wantsNews) {
                         parallelTasks.push(
                           (async () => {
-                            const news = await fetchStructuredNews(effectiveSearchQuery);
+                            const news = await fetchStructuredNews(effectiveSearchQuery, {
+                              mode: modePolicy.semanticMode,
+                            });
                             if (news) {
                               parts.push(news.summaryText);
                               sendJson(clientWs, { type: 'voice.action_card', card: news.card });

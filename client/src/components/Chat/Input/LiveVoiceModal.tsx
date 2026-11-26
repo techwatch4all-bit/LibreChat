@@ -161,6 +161,7 @@ export default function LiveVoiceModal({
     Array<{ role: 'user' | 'assistant'; text: string; time: string }>
   >([]);
   const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
+  const [translatorMode, setTranslatorMode] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [micStreaming, setMicStreaming] = useState(false);
   const [activeRoutingMode, setActiveRoutingMode] = useState<string>(currentMode || 'Chat');
@@ -487,6 +488,7 @@ export default function LiveVoiceModal({
     playbackDeadlineRef.current = 0;
     setMicStreaming(false);
     setActionCard(null);
+    setTranslatorMode(false);
     window.dispatchEvent(new CustomEvent('satchida:voice-session-ended'));
 
     if (recognitionRef.current) {
@@ -1197,6 +1199,7 @@ export default function LiveVoiceModal({
             subtitle?: string;
             mapUrl?: string;
             card?: VoiceActionCard;
+            enabled?: boolean;
             text?: string;
             delta?: string;
             transcript?: string;
@@ -1293,6 +1296,12 @@ export default function LiveVoiceModal({
             if (recognitionRef.current && msg.lang) {
               recognitionRef.current.lang = msg.lang;
             }
+            return;
+          }
+
+          if (msg.type === 'voice.translator_mode') {
+            setTranslatorMode(Boolean(msg.enabled));
+            setStatusText(msg.enabled ? 'Translator Mode ON' : 'Listening...');
             return;
           }
 
@@ -1756,6 +1765,24 @@ export default function LiveVoiceModal({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {translatorMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setTranslatorMode(false);
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(
+                    JSON.stringify({ type: 'voice.set_translator_mode', enabled: false }),
+                  );
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/25"
+              title="Tap to exit Translator Mode"
+            >
+              <Globe className="h-3 w-3" />
+              Translator ×
+            </button>
+          )}
           {transcriptHistory.length > 0 && (
             <button
               type="button"

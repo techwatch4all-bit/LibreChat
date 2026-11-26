@@ -1845,6 +1845,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let lastDelegatedEpoch = -1;
       let pauseMicForwardUntil = 0;
       let pendingLocalQuery: string | null = null;
+      let isTranslatorMode = false;
       const sessionStartedAt = Date.now();
       let s2sPromptTokens = 0;
       let s2sResponseTokens = 0;
@@ -2038,9 +2039,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   automaticActivityDetection: {
                     disabled: false,
                     startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
-                    endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
-                    prefixPaddingMs: 120,
-                    silenceDurationMs: 400,
+                    endOfSpeechSensitivity: isTranslatorMode
+                      ? 'END_SENSITIVITY_LOW'
+                      : 'END_SENSITIVITY_HIGH',
+                    prefixPaddingMs: isTranslatorMode ? 200 : 120,
+                    silenceDurationMs: isTranslatorMode ? 1200 : 400,
                   },
                   activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
                 },
@@ -2315,8 +2318,39 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   }
                 }
 
-                // 1b. Hands-free UI actions (mode switch, new chat, scroll, minimize/maximize)
+                // 1b. Hands-free UI actions (translator mode, mode switch, new chat, scroll, minimize/maximize)
                 const lowerUtterance = cleanUtterance.toLowerCase();
+                if (
+                  /\b(?:start|turn on|enable|enter|activate)\s+(?:the\s+)?(?:translator|translation|interpreter)\s+mode\b/i.test(
+                    lowerUtterance,
+                  ) ||
+                  /\btranslate\s+between\s+\w+\s+and\s+\w+/i.test(lowerUtterance)
+                ) {
+                  isTranslatorMode = true;
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
+                  sendJson(clientWs, { type: 'voice.translator_mode', enabled: true });
+                  void connectGeminiUpstream(
+                    activeVoiceProfile,
+                    'Translator Mode is now ON (patient 1.2s turn-taking). Act strictly as a neutral 3rd-person live interpreter between the two speakers—translate Person A to Person B and report Person B to Person A in 3rd person without answering on their behalf.',
+                  );
+                  return;
+                }
+                if (
+                  /\b(?:stop|turn off|disable|exit|end)\s+(?:the\s+)?(?:translator|translation|interpreter)\s+mode\b/i.test(
+                    lowerUtterance,
+                  )
+                ) {
+                  isTranslatorMode = false;
+                  suppressCurrentS2sTurn = true;
+                  sendJson(clientWs, { type: 'voice.interrupted' });
+                  sendJson(clientWs, { type: 'voice.translator_mode', enabled: false });
+                  void connectGeminiUpstream(
+                    activeVoiceProfile,
+                    'Translator Mode is now OFF. Resume normal conversational assistant mode.',
+                  );
+                  return;
+                }
                 if (/^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(lowerUtterance)) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
@@ -2790,7 +2824,21 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               lng?: number;
               city?: string;
               timeZone?: string;
+              enabled?: boolean;
             };
+            if (parsed.type === 'voice.set_translator_mode' && typeof parsed.enabled === 'boolean') {
+              isTranslatorMode = parsed.enabled;
+              sendJson(clientWs, { type: 'voice.translator_mode', enabled: isTranslatorMode });
+              if (!modePolicy.isPrivacyMode && isGeminiS2sActive) {
+                void connectGeminiUpstream(
+                  activeVoiceProfile,
+                  isTranslatorMode
+                    ? 'Translator Mode is now ON. Act strictly as a neutral 3rd-person live interpreter between the two speakers.'
+                    : 'Translator Mode is now OFF. Resume normal conversational assistant mode.',
+                );
+              }
+              return;
+            }
             if (parsed.type === 'voice.location') {
               userLocation = {
                 lat: typeof parsed.lat === 'number' ? parsed.lat : undefined,

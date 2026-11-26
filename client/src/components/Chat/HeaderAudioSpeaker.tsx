@@ -8,13 +8,29 @@ import type { TMessage } from 'librechat-data-provider';
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 
+const HEADER_VOICE_OPTIONS = [
+  { id: 'in_female', flag: '🇮🇳', code: 'F', gender: 'female' as const, label: 'Indian Female (Neerja)' },
+  { id: 'in_male', flag: '🇮🇳', code: 'M', gender: 'male' as const, label: 'Indian Male (Prabhat)' },
+  { id: 'us_female', flag: '🇺🇸', code: 'F', gender: 'female' as const, label: 'US Female (Jenny)' },
+  { id: 'us_male', flag: '🇺🇸', code: 'M', gender: 'male' as const, label: 'US Male (Guy)' },
+  { id: 'uk_female', flag: '🇬🇧', code: 'F', gender: 'female' as const, label: 'UK Female (Sonia)' },
+  { id: 'uk_male', flag: '🇬🇧', code: 'M', gender: 'male' as const, label: 'UK Male (Ryan)' },
+];
+
 export default function HeaderAudioSpeaker() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [voiceGender, setVoiceGender] = useState<'female' | 'male'>(() => {
-    return (localStorage.getItem('satchida_voice_gender') as 'female' | 'male') || 'female';
+  const [voiceId, setVoiceId] = useState<string>(() => {
+    const stored = localStorage.getItem('satchida_voice_id');
+    if (stored && HEADER_VOICE_OPTIONS.some((v) => v.id === stored)) {
+      return stored;
+    }
+    const legacy = localStorage.getItem('satchida_voice_gender');
+    return legacy === 'male' ? 'in_male' : 'in_female';
   });
+  const activeVoice = HEADER_VOICE_OPTIONS.find((v) => v.id === voiceId) || HEADER_VOICE_OPTIONS[0];
+  const voiceGender = activeVoice.gender;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
@@ -158,6 +174,7 @@ export default function HeaderAudioSpeaker() {
           query: studentQuery,
           response: assistantResponse,
           voice: voiceGender,
+          voiceId: activeVoice.id,
         }),
       });
 
@@ -259,9 +276,9 @@ export default function HeaderAudioSpeaker() {
         </span>
       </div>
 
-      {/* Voice Toggle: Neerja (F) vs Prabhat (M) - Indian English */}
+      {/* Voice Toggle: cycles across all 6 voices (IN / US / UK × Female / Male) */}
       <TooltipAnchor
-        description={`Voice: ${voiceGender === 'female' ? 'Female (Neerja, Indian English)' : 'Male (Prabhat, Indian English)'} - Click to switch`}
+        description={`Voice: ${activeVoice.label} — Click to switch`}
         render={
           <button
             type="button"
@@ -269,8 +286,8 @@ export default function HeaderAudioSpeaker() {
             aria-label="Toggle Teacher Voice Accent / Gender"
             className="hidden sm:inline-flex h-9 px-2 items-center justify-center rounded-xl border border-border-light bg-presentation text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-tertiary transition-all"
           >
-            <span className="font-semibold text-primary mr-1">🇮🇳</span>
-            {voiceGender === 'female' ? 'F' : 'M'}
+            <span className="font-semibold text-primary mr-1">{activeVoice.flag}</span>
+            {activeVoice.code}
           </button>
         }
       />

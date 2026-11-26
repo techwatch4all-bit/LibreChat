@@ -1,48 +1,80 @@
-# Satchida Live Voice — Architecture & Feature Documentation
+# Satchida Live Voice — Complete Requirements, Architecture & Review Document
 
-## Overview
-Satchida Live Voice provides real-time, low-latency bidirectional speech-to-speech interaction powered by Satchida Intelligence (`packages/api/src/voice/realtimeProxy.ts` + `client/src/components/Chat/Input/LiveVoiceModal.tsx`).
-
----
-
-## Persistent User Memory (`satchida_voice_profile`)
-- **Storage Backend**: Uses LibreChat's integrated MongoDB **Memory** system (`MemoryEntry` via `packages/data-schemas/src/methods/memory.ts`).
-- **Single-File Consolidation**: All voice preferences and room-speaker profiles are merged into **one single memory key**: `satchida_voice_profile`. Users can inspect or edit this record directly from the left-navigation **Memories** panel.
-- **Startup Loading**: Every Live Voice session loads `satchida_voice_profile` before sending the initial session setup frame, injecting known preferences directly into the voice persona's system instructions.
-
-### Stored Fields
-- `preferred_language`: User's preferred spoken language (e.g., `English`, `Hindi`, `Hinglish`, `Tamil`, etc.).
-- `name`: User's preferred name.
-- `location`: City/region for local weather, AQI, news, and recommendations.
-- `dietary_preference`: Optional dietary preference (e.g., `vegetarian`, `non-vegetarian`, `vegan`).
-- `morning_brief`: Optional `{ enabled: boolean, topics: string[] }` for daily morning briefings.
-- `primary_voiceprint`: Calibrated baseline pitch (`avg_pitch_hz`, `pitch_std_hz`, `gender_hint`) for the primary account holder.
-- `known_speakers[]`: Room guests (`{ name, relation, gender_hint, avg_pitch_hz, pitch_std_hz }`).
+> **Document Path**: `d:\LAN-AI-Infra\LibreChat\docs\internal\operations\VOICE_AGENT.md`
+> **Last Updated**: 2026-11-26
 
 ---
 
-## Conversational Onboarding Flow
-1. **First Session (No Language Saved)**:
-   - Greets the user in polite English using their device's local time of day (*"Good morning / afternoon / evening! Which language would you prefer to speak in today?"*).
-   - Saves the chosen language to `satchida_voice_profile` via `save_voice_profile` and immediately switches to that language.
-2. **Name Collection**:
-   - Once language is known, politely asks for the user's name and saves it to `satchida_voice_profile`.
-3. **Optional Follow-Up Preferences**:
-   - Naturally (only when the user is willing) asks about location, dietary preference, and daily morning brief topics, merging all answers into the same `satchida_voice_profile` entry.
-4. **Returning Sessions**:
-   - Skips onboarding and greets the user directly by name in their preferred language.
+## 1. Executive Summary
+Satchida Live Voice is a real-time, bidirectional speech-to-speech voice companion powered by Satchida Intelligence (`packages/api/src/voice/realtimeProxy.ts`, `packages/api/src/voice/voiceProfile.ts`, `packages/api/src/voice/voiceIntelligence.ts`, `packages/api/src/voice/liveResolvers.ts`, and `client/src/components/Chat/Input/LiveVoiceModal.tsx`).
 
 ---
 
-## Multi-Speaker / Room-Guest Detection
-- **Client Acoustic Extraction (`client/src/utils/voicePitch.ts`)**: Lightweight autocorrelation F0 pitch analyzer runs on mic PCM frames, filtering silence and non-human frequencies (`70–360 Hz`).
-- **Speaker Change Detection (`packages/api/src/voice/voiceIntelligence.ts`)**:
-  - Compares incoming utterance pitch against `primary_voiceprint` and `known_speakers[]`.
-  - When an unknown guest speaks (`>= 45 Hz` delta from primary baseline), Satchida greets them warmly like a human, asks their name and relation, and stores their profile in `known_speakers[]`.
-  - When a known guest speaks again, Satchida recognizes and greets them by name.
+## 2. Complete Functional Requirements & Implementation Status
+
+### Requirement 1 — Time-of-Day Greeting & Language Onboarding
+- **Requirement**: On first session, greet the user politely in English based on their local time of day (*"Good morning / afternoon / evening! Which language would you prefer to speak in today?"*) and persist the chosen language to that user's account memory.
+- **Implementation**:
+  - Client passes `localHour` (`0–23`) in the WebSocket URL (`/api/voice/realtime?localHour=...`) from `LiveVoiceModal.tsx`.
+  - Server computes the greeting via `getTimeOfDayGreeting(localHour)` and injects onboarding rules via `buildVoiceMemorySystemBlock(voiceProfile, clientLocalHour)`.
+  - On initial `setupComplete` (`!switchNotice`), server sends a proactive `clientContent` greeting trigger and sets a `1800ms` mic-forward guard (`pauseMicForwardUntil`) so ambient mic noise at `t=0` does not interrupt the opening greeting.
+  - Server extracts the user's chosen language in `processCompletedS2sUserUtterance` (supporting both full phrases and single-word replies like `"Hindi"` or `"English"`) and persists it to `satchida_voice_profile`.
+
+### Requirement 2 — Name Onboarding & Returning User Recognition
+- **Requirement**: Once language is known, ask for the user's name and save it to memory. On returning sessions, greet the user by name in their preferred language without re-asking.
+- **Implementation**:
+  - `buildVoiceMemorySystemBlock` switches automatically between 3 states: (a) no language → ask language, (b) language known, no name → ask name in that language, (c) both known → greet by name in preferred language.
+  - Server-side extraction saves `name` automatically into `satchida_voice_profile`.
+
+### Requirement 3 — Long-Term Memory Architecture (Integrated LibreChat Memory)
+- **Requirement**: Evaluate and use LibreChat's integrated **Memories** feature (left navigation) using **one single consolidated memory record** per user account rather than fragmented entries.
+- **Implementation**:
+  - Uses LibreChat's existing MongoDB `MemoryEntry` collection (`packages/data-schemas/src/methods/memory.ts`) under one fixed key: **`satchida_voice_profile`** (`agentId: null`).
+  - Wired via dependency injection (`getVoiceProfileMemory` / `setVoiceProfileMemory` in `api/server/index.js` → `RealtimeProxyDeps`).
+  - Users can view and edit their voice profile directly in the left-panel **Memories** UI.
+  - Every Live Voice session loads `satchida_voice_profile` before sending the initial setup frame.
+
+### Requirement 4 — Optional Follow-Up Preferences (Single Consolidated File)
+- **Requirement**: Naturally (when the user is willing, never interrogating) gather optional preferences — city/location, vegetarian/non-vegetarian/vegan dietary preference, and daily morning brief + topics — and merge all of them into the same `satchida_voice_profile` record.
+- **Implementation**:
+  - `mergeVoiceProfile(existing, patch)` performs a non-destructive deep merge (preserving all existing fields and deduplicating `morning_brief.topics` and `known_speakers[]`).
+  - Server-side extraction captures `dietary_preference` and spoken city (`extractSpokenCity`, with a guard rejecting non-city phrases like `"my location"`, `"here"`, `"nearby"` so real device GPS coordinates are never overwritten).
+
+### Requirement 5 — Multi-Speaker / Room-Guest Pitch & State-Transition Detection
+- **Requirement**: Detect voice pitch/pattern changes when another person in the room speaks, greet them naturally like a human, ask their name & relation, and store their profile (`name`, `relation`, `gender_hint`, `avg_pitch_hz`, `pitch_std_hz`) in the same memory file.
+- **Implementation**:
+  - **Client (`client/src/utils/voicePitch.ts`)**: Zero-dependency autocorrelation F0 pitch estimator (`70–360 Hz`, RMS-gated `>= 0.015`) fed from mic PCM frames in `LiveVoiceModal.tsx`, emitting `{ type: 'voice.acoustic_meta', avgPitchHz, pitchStdHz }` every 24 frames.
+  - **Server (`packages/api/src/voice/voiceIntelligence.ts` + `realtimeProxy.ts`)**:
+    - Calibrates `primary_voiceprint` on initial turns.
+    - Uses **speaker state-transition tracking (`activeSpeakerKey`)** (`'primary'` | `'known:<name>'` | `'unknown:<pitchBucket>'`) instead of a wall-clock cooldown timer — zero redundant notices during long turns, instant detection when a third person speaks.
+    - Matches `known_speakers[]` within `±30 Hz`; flags unknown guests at `>= 45 Hz` delta from primary baseline and caches `lastGuestAcoustic`.
+
+### Requirement 6 — AI-to-AI Voice Agent Detection (ChatGPT / Copilot / etc.)
+- **Requirement**: Detect when another AI voice agent is speaking via a second device and avoid infinite polite-greeting loops.
+- **Implementation**:
+  - `detectAiVoiceAgent(transcript, recentUserTurns)` in `packages/api/src/voice/voiceIntelligence.ts` detects explicit AI self-identification phrases and reciprocal assistant-style greeting loops on completed Gemini Live S2S `inputTranscription` turns (`processCompletedS2sUserUtterance`).
+
+### Requirement 7 — Multi-Voice & Strict Grammatical Gender Enforcement (All Languages)
+- **Requirement**: Support all 6 voices (`IN / US / UK` × `Female / Male`) in both Live Voice and the Header Read-Aloud speaker toggle, and strictly enforce masculine/feminine grammatical gender in all gendered languages (Hindi, Hinglish, Urdu, Marathi, Gujarati, French, Spanish, Portuguese, Arabic, etc.) as well as English.
+- **Implementation**:
+  - `HeaderAudioSpeaker.tsx` cycles through all 6 voices (`IN F/M`, `US F/M`, `UK F/M`) synced with `satchida_voice_id` / `satchida_voice_gender` in `localStorage`.
+  - `realtimeProxy.ts` enforces symmetric `STRICT FEMININE GRAMMAR RULE` and `STRICT MASCULINE GRAMMAR RULE` with explicit verb-ending examples and forbidden opposite-gender forms.
 
 ---
 
-## AI-to-AI Voice Agent Detection
-- Detects when another AI voice assistant (e.g., ChatGPT Voice, Copilot, etc.) is speaking over another device via conversational markers and reciprocal assistant-greeting loops (`detectAiVoiceAgent`).
-- Prevents infinite polite-greeting loops by calmly acknowledging the other AI and asking the human user how they would like to proceed (collaborate on a topic or pause).
+## 3. Critical S2S Protocol Invariants (Lessons Learned)
+1. **Never send `clientContent` with `turnComplete: false`** into an active Gemini Live S2S audio stream — incomplete text turns stall Gemini's audio VAD turn-taking (28–38s delays).
+2. **Keep Gemini Live S2S `tools` pure (`[{ googleSearch: {} }]`)** — do not mix custom `functionDeclarations` into the same `tools` array as `googleSearch`, as it degrades native search grounding. Perform memory extraction server-side with zero latency impact.
+3. **Never overwrite GPS coordinates with non-city phrases** (`"my location"`, `"here"`, `"nearby"`).
+
+---
+
+## 4. Key Files for External AI Review
+- `packages/api/src/voice/voiceProfile.ts` (+ `voiceProfile.spec.ts`)
+- `packages/api/src/voice/voiceIntelligence.ts` (+ `voiceIntelligence.spec.ts`)
+- `packages/api/src/voice/realtimeProxy.ts` (+ `realtimeProxy.spec.ts`)
+- `packages/api/src/voice/liveResolvers.ts` (+ `liveResolvers.spec.ts`)
+- `api/server/index.js` (lines 1330–1365: `getVoiceProfileMemory` / `setVoiceProfileMemory`)
+- `client/src/utils/voicePitch.ts`
+- `client/src/components/Chat/Input/LiveVoiceModal.tsx`
+- `client/src/components/Chat/HeaderAudioSpeaker.tsx`

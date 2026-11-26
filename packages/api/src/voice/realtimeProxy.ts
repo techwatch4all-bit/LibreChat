@@ -284,7 +284,7 @@ export function detectToolOrTutorIntent(text: string): {
       lower,
     );
   const wantsChatOrTool =
-    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|write code in chat|use librechat|new chat)\b/i.test(
+    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?(?:image|video|art|chart|presentation|ppt|slide|document|pdf|spreadsheet|report|floorplan)|create (?:an? )?(?:image|video|document|presentation|ppt|spreadsheet|diagram|chart|floorplan|report)|write code|build (?:an? )?(?:app|website|script|tool)|check my (?:vault|files|documents|notes|knowledge base)|search my (?:vault|files|documents|notes)|deep research|full report on|use librechat|new chat)\b/i.test(
       lower,
     );
 
@@ -2961,25 +2961,30 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 // 1c. Conversational location memory: extract spoken city & re-run pending local query
                 const effectiveUtterance = applySpokenLocationMemory(cleanUtterance);
 
-                // 2. Live Web Search (universal for any question/info request, skipped in Translator Mode) or LibreChat tool/tutor delegation
+                // 2. Fast structured resolvers (Weather/AQI, Google News RSS, Maps/Location) OR LibreChat persona/tools delegation.
+                // General live queries (prices, scores, facts) flow directly to Gemini Live's native googleSearch with zero SearXNG delay.
                 const toolIntent = detectToolOrTutorIntent(effectiveUtterance);
                 const searchIntent = isTranslatorMode
                   ? { isSearch: false, isDeepResearch: false, hasUrl: false }
                   : detectRealtimeSearchIntent(effectiveUtterance);
-                if ((toolIntent.delegate || searchIntent.isSearch) && modePolicy.toolsAllowed) {
+                const asksMyLocationCompare =
+                  /\b(my location|where am i|current location|compare.*location|here)\b/i.test(
+                    effectiveUtterance,
+                  );
+                const wantsWeather =
+                  isWeatherQuery(effectiveUtterance) ||
+                  (asksMyLocationCompare && lastLiveLookupKind === 'weather');
+                const wantsNews = isNewsQuery(effectiveUtterance);
+                const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                const needsStructuredCard =
+                  searchIntent.isSearch &&
+                  (wantsWeather || wantsNews || wantsPlace || asksMyLocationCompare);
+
+                if ((toolIntent.delegate || needsStructuredCard) && modePolicy.toolsAllowed) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
 
-                  if (searchIntent.isSearch && !toolIntent.delegate) {
-                    const asksMyLocationCompare =
-                      /\b(my location|where am i|current location|compare.*location|here)\b/i.test(
-                        effectiveUtterance,
-                      );
-                    const wantsWeather =
-                      isWeatherQuery(effectiveUtterance) ||
-                      (asksMyLocationCompare && lastLiveLookupKind === 'weather');
-                    const wantsNews = isNewsQuery(effectiveUtterance);
-                    const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                  if (needsStructuredCard && !toolIntent.delegate) {
                     const wantsLocalContext =
                       wantsWeather ||
                       wantsPlace ||
@@ -3082,13 +3087,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           : `The user's current device coordinates are ${userLocation.lat?.toFixed(4)}, ${userLocation.lng?.toFixed(4)}.`;
                       }
                       if (!resultPayload) {
-                        const webQuery = /[\u0900-\u097F]/.test(effectiveSearchQuery)
-                          ? cleanKeywords
-                          : effectiveSearchQuery;
-                        resultPayload = await executeVoiceWebSearch(webQuery, {
-                          deep: searchIntent.isDeepResearch,
-                          fetchPages: !wantsNews,
-                        });
+                        // Do NOT fall back to slow SearXNG — hand back to Gemini Live's native googleSearch
+                        resultPayload = `No cached structured card for "${cleanKeywords}". Answer directly using your built-in live Google Search grounding.`;
                       }
 
                       if (searchIntent.isDeepResearch && resultPayload) {

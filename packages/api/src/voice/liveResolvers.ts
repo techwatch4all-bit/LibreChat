@@ -445,10 +445,6 @@ export async function fetchStructuredNews(
       !wantsRegional &&
       (/\b(india|indian|national|bharat)\b/i.test(rawQuery) ||
         (isIndiaTz && /\b(top|latest|key|headline|headlines|today)\b/i.test(rawQuery)));
-    const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
-      /\/+$/,
-      '',
-    );
     const nowMs = Date.now();
     const maxAgeMs = 72 * 60 * 60 * 1000;
     const freshItems: NewsHeadlineItem[] = [];
@@ -485,17 +481,12 @@ export async function fetchStructuredNews(
       );
     };
 
-    // Fetch Google News Top Stories RSS (always fresh today's front-page headlines) + local satchida-search in parallel
+    // Fetch Google News RSS directly (no slow SearXNG in live voice path)
     const rssUrl = wantsIndiaTop
       ? 'https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en'
       : `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
 
-    const [rssRes, searchRes] = await Promise.all([
-      fetch(rssUrl, { signal: AbortSignal.timeout(4500) }).catch(() => null),
-      fetch(`${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`, {
-        signal: AbortSignal.timeout(2500),
-      }).catch(() => null),
-    ]);
+    const rssRes = await fetch(rssUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
 
     if (rssRes && rssRes.ok) {
       const xml = await rssRes.text();
@@ -506,29 +497,6 @@ export async function fetchStructuredNews(
       ].slice(0, 10);
       for (const m of rssMatches) {
         addHeadline(m[1] || '', (m[2] || '').trim(), (m[3] || '').trim());
-      }
-    }
-
-    if (freshItems.length < 5 && searchRes && searchRes.ok) {
-      const data = (await searchRes.json().catch(() => ({}))) as {
-        results?: Array<{
-          title?: string;
-          content?: string;
-          publishedDate?: string;
-          url?: string;
-          engine?: string;
-        }>;
-      };
-      for (const r of Array.isArray(data.results) ? data.results : []) {
-        if (r.engine === 'wikipedia') {
-          continue;
-        }
-        const snippet = (r.content || '')
-          .replace(/&lt;[^&]*&gt;/g, ' ')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        addHeadline(r.title || '', (r.url || '').trim(), r.publishedDate, snippet);
       }
     }
 

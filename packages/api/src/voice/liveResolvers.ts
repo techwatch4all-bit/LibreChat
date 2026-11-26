@@ -5,6 +5,9 @@ export interface WeatherActionCard {
   condition: string;
   highC?: number;
   lowC?: number;
+  aqi?: number;
+  aqiLabel?: string;
+  pm25?: number;
 }
 
 export interface NewsHeadlineItem {
@@ -228,10 +231,14 @@ export function extractSpokenCity(text: string): string | null {
 
 export function isPlaceOrDirectionsQuery(text: string): boolean {
   const lower = text.toLowerCase();
-  if (/\b(weather|temperature|forecast|news|headlines|stock|share price)\b/.test(lower)) {
+  if (
+    /\b(weather|temperature|forecast|news|headlines|stock|share price|price|prices|rate|rates|cost)\b/.test(
+      lower,
+    )
+  ) {
     return false;
   }
-  return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol|fuel|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
+  return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol pump|fuel station|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
     lower,
   );
 }
@@ -413,6 +420,9 @@ export async function fetchStructuredWeather(
         condition,
         highC: typeof highC === 'number' ? Math.round(highC) : undefined,
         lowC: typeof lowC === 'number' ? Math.round(lowC) : undefined,
+        aqi: typeof usAqi === 'number' ? Math.round(usAqi) : undefined,
+        aqiLabel: aqiLabel || undefined,
+        pm25: typeof pm25 === 'number' ? Math.round(pm25) : undefined,
       },
     };
   } catch {

@@ -1725,6 +1725,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let dispatchS2sUtterance: ((utterance: string) => boolean) | null = null;
 
       const extractAndPersistProfileFromUtterance = (cleanUtterance: string) => {
+        const patch: Parameters<typeof mergeVoiceProfile>[1] = {};
+
         const langMatch =
           cleanUtterance.match(
             /\b(?:speak|talk|switch|change(?:\s+you)?|chat|prefer|use|let'?s\s+(?:do|use|speak|talk))\s+(?:in\s+|to\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
@@ -1741,19 +1743,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           const chosenLang =
             langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
           if (voiceProfile.preferred_language !== chosenLang) {
-            void persistVoiceProfilePatch({ preferred_language: chosenLang });
+            patch.preferred_language = chosenLang;
           }
         }
         const isNameNegation =
           /\b(not\s+my\s+name|wrong\s+name|nahi|nahin)\b/i.test(cleanUtterance) ||
           /(?:नहीं|गलत\s+नाम)/u.test(cleanUtterance);
         const NON_NAME_WORDS =
-          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|tu|tú|you|me|no|yes|nahi|nahin|नहीं|नह|हाँ|जी|क्या|कौन|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
+          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|driving|walking|working|sitting|eating|waiting|running|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|tu|tú|you|me|no|yes|nahi|nahin|नहीं|नह|हाँ|जी|क्या|कौन|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
         if (!isNameNegation) {
+          // Only match explicit name introductions — never bare "I am <verb/adjective>" like "I am driving"
           const explicitNameMatch =
-            cleanUtterance.match(
-              /\b(?:my\s+name\s+is|call\s+me|this\s+is|i\s+am|i'm)\s+([a-zA-Z]{2,24})\b/i,
-            ) ||
+            cleanUtterance.match(/\b(?:my\s+name\s+is|call\s+me)\s+([a-zA-Z]{2,24})\b/i) ||
             cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}\p{M}]{2,24})/iu) ||
             cleanUtterance.match(
               /(?:आप\s+)?मुझे\s+([\p{L}\p{M}]{2,24})\s+(?:के\s+नाम\s+से\s+)?बुला/u,
@@ -1764,12 +1765,12 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             const normalizedName = /^[a-zA-Z]+$/.test(extractedName)
               ? extractedName.charAt(0).toUpperCase() + extractedName.slice(1)
               : extractedName;
-            void persistVoiceProfilePatch({ name: normalizedName });
+            patch.name = normalizedName;
           }
         }
         const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
         if (dietMatch?.[1]) {
-          void persistVoiceProfilePatch({ dietary_preference: dietMatch[1].toLowerCase() });
+          patch.dietary_preference = dietMatch[1].toLowerCase();
         }
 
         const briefOff =
@@ -1781,7 +1782,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             cleanUtterance,
           ) || /\b(?:enable|start|set\s+up)\s+morning\s+brief\b/i.test(cleanUtterance);
         if (briefOff) {
-          void persistVoiceProfilePatch({ morning_brief: { enabled: false } });
+          patch.morning_brief = { enabled: false };
         } else if (briefOn && !voiceProfile.morning_brief?.enabled) {
           const topicMatch = cleanUtterance.match(
             /\b(?:on|about|for|covering)\s+([\w\s,]+?)(?:[.!?]|$)/i,
@@ -1792,9 +1793,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 .map((t) => t.trim().toLowerCase())
                 .filter(Boolean)
             : undefined;
-          void persistVoiceProfilePatch({
-            morning_brief: { enabled: true, ...(topics ? { topics } : {}) },
-          });
+          patch.morning_brief = { enabled: true, ...(topics ? { topics } : {}) };
+        }
+
+        if (Object.keys(patch).length > 0) {
+          void persistVoiceProfilePatch(patch);
         }
       };
 
@@ -3113,22 +3116,32 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         return;
                       }
                       if (wantsPlace) {
-                        const llParam =
+                        const hasCoords =
                           typeof userLocation?.lat === 'number' &&
-                          typeof userLocation?.lng === 'number'
-                            ? `&ll=${userLocation.lat.toFixed(5)},${userLocation.lng.toFixed(5)}`
-                            : '';
+                          typeof userLocation?.lng === 'number';
+                        const originCoords = hasCoords
+                          ? `${userLocation!.lat!.toFixed(5)},${userLocation!.lng!.toFixed(5)}`
+                          : '';
                         const encodedQ = encodeURIComponent(cleanKeywords);
+                        const mapUrl = originCoords
+                          ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originCoords)}&destination=${encodedQ}&travelmode=driving`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodedQ}`;
+                        const embedUrl = originCoords
+                          ? `https://maps.google.com/maps?saddr=${encodeURIComponent(originCoords)}&daddr=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`
+                          : `https://maps.google.com/maps?q=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
                         sendJson(clientWs, {
                           type: 'voice.action_card',
                           card: {
                             kind: 'maps',
-                            title: 'Live Map & Directions',
+                            title: originCoords
+                              ? 'Live Driving Directions'
+                              : 'Live Map & Directions',
                             subtitle: cleanKeywords,
-                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodedQ}`,
-                            embedUrl: `https://maps.google.com/maps?q=${encodedQ}${llParam}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
+                            mapUrl,
+                            embedUrl,
                           },
                         });
+                        resultPayload = `A live Google Maps ${originCoords ? 'driving directions' : 'location'} card for "${cleanKeywords}"${userLocation?.city ? ` from ${userLocation.city}` : ''} is ALREADY displayed on the user's screen with a Navigate button. Confirm warmly that the map and directions are on their screen right now—never say you cannot display maps on screen.`;
                       }
                       const locationNote = userLocation?.city
                         ? `User's detected location: ${userLocation.city}.\n`

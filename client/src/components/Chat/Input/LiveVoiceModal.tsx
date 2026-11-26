@@ -48,6 +48,9 @@ type VoiceActionCard =
       condition: string;
       highC?: number;
       lowC?: number;
+      aqi?: number;
+      aqiLabel?: string;
+      pm25?: number;
     }
   | { kind: 'news'; query: string; items: Array<{ title: string; url: string; source?: string }> }
   | { kind: 'tutor'; title: string; subtitle?: string }
@@ -195,6 +198,46 @@ export default function LiveVoiceModal({
       transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [transcriptHistory.length, showTranscriptDrawer]);
+
+  // Keep mobile screen awake while Live Voice is open (hands-free / driving)
+  useEffect(() => {
+    if (!open || typeof navigator === 'undefined') {
+      return;
+    }
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
+    };
+    let sentinel: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        if (nav.wakeLock) {
+          const lock = await nav.wakeLock.request('screen');
+          if (cancelled) {
+            void lock.release();
+          } else {
+            sentinel = lock;
+          }
+        }
+      } catch {
+        // Wake Lock not supported or denied
+      }
+    };
+    void acquire();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !cancelled) {
+        void acquire();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (sentinel) {
+        void sentinel.release().catch(() => {});
+      }
+    };
+  }, [open]);
   const [translatorMode, setTranslatorMode] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [micStreaming, setMicStreaming] = useState(false);
@@ -2184,9 +2227,14 @@ export default function LiveVoiceModal({
                   </div>
                 </div>
                 {typeof actionCard.highC === 'number' && typeof actionCard.lowC === 'number' && (
-                  <div className="mt-2 flex gap-4 text-[11px] text-sky-200/90">
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-sky-200/90">
                     <span>↑ {actionCard.highC}°</span>
                     <span>↓ {actionCard.lowC}°</span>
+                    {typeof actionCard.aqi === 'number' && (
+                      <span className="rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white">
+                        {`AQI ${actionCard.aqi}${actionCard.aqiLabel ? ` · ${actionCard.aqiLabel}` : ''}`}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

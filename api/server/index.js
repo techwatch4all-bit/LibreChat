@@ -1330,6 +1330,37 @@ RULES FOR YOUR SPOKEN EXPLANATION:
           rate: 0,
         });
       }),
+    getVoiceProfileMemory: (userId) =>
+      runAsSystem(async () => {
+        const MemoryEntry = mongoose.models.MemoryEntry;
+        if (!MemoryEntry || !userId) {
+          return null;
+        }
+        const entry = await MemoryEntry.findOne({
+          userId,
+          key: 'satchida_voice_profile',
+          agentId: null,
+        }).lean();
+        return entry?.value ?? null;
+      }),
+    setVoiceProfileMemory: (userId, value) =>
+      runAsSystem(async () => {
+        const MemoryEntry = mongoose.models.MemoryEntry;
+        if (!MemoryEntry || !userId) {
+          return;
+        }
+        await MemoryEntry.findOneAndUpdate(
+          { userId, key: 'satchida_voice_profile', agentId: null },
+          {
+            $set: {
+              value,
+              tokenCount: Math.ceil((value?.length ?? 0) / 4),
+              updated_at: new Date(),
+            },
+          },
+          { upsert: true, new: true },
+        );
+      }),
   });
 
   server.on('upgrade', (req, socket, head) => {

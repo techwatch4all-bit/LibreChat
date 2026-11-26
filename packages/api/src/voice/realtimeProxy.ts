@@ -16,6 +16,15 @@ import {
   fetchStructuredNews,
   detectMediaIntent,
 } from './liveResolvers';
+import {
+  VOICE_PROFILE_MEMORY_KEY,
+  parseVoiceProfile,
+  serializeVoiceProfile,
+  mergeVoiceProfile,
+  buildVoiceMemorySystemBlock,
+} from './voiceProfile';
+import type { VoiceProfileData } from './voiceProfile';
+import { analyzeSpeakerTurn, detectAiVoiceAgent, inferGenderHint } from './voiceIntelligence';
 
 export interface RealtimeWebSocketLike {
   readyState: number;
@@ -77,6 +86,8 @@ export interface RealtimeProxyDeps {
     virtualKey: string;
   };
   mintEphemeralToken?: (model?: string, voiceName?: string) => Promise<string>;
+  getVoiceProfileMemory?: (userId: string) => Promise<string | null>;
+  setVoiceProfileMemory?: (userId: string, value: string) => Promise<void>;
 }
 
 export type VoiceProfileId =
@@ -1539,6 +1550,41 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         `[RealtimeVoice] Session start user=${authenticatedUserId} tier=${userSeat.accountType} mode=${modePolicy.semanticMode} voice=${activeVoiceProfile.id}`,
       );
 
+      const rawLocalHour = Number(url.searchParams.get('localHour'));
+      const clientLocalHour =
+        Number.isFinite(rawLocalHour) && rawLocalHour >= 0 && rawLocalHour <= 23
+          ? Math.floor(rawLocalHour)
+          : new Date().getHours();
+      let voiceProfile: VoiceProfileData = {};
+      let initialGreetingSent = false;
+      const recentUserTranscripts: string[] = [];
+
+      if (deps.getVoiceProfileMemory) {
+        try {
+          const rawProfile = await deps.getVoiceProfileMemory(authenticatedUserId);
+          voiceProfile = parseVoiceProfile(rawProfile);
+        } catch (err) {
+          logger.warn('[RealtimeVoice] Failed to load voice profile memory:', err);
+        }
+      }
+
+      const persistVoiceProfilePatch = async (
+        patch: Parameters<typeof mergeVoiceProfile>[1],
+      ): Promise<VoiceProfileData> => {
+        voiceProfile = mergeVoiceProfile(voiceProfile, patch);
+        if (deps.setVoiceProfileMemory) {
+          try {
+            await deps.setVoiceProfileMemory(
+              authenticatedUserId,
+              serializeVoiceProfile(voiceProfile),
+            );
+          } catch (err) {
+            logger.warn('[RealtimeVoice] Failed to persist voice profile memory:', err);
+          }
+        }
+        return voiceProfile;
+      };
+
       const buildVoiceSystemPrompt = (profile: VoiceProfile): string =>
         'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI.\n' +
         `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}). Always speak as a ${profile.gender} persona and use ${profile.gender === 'female' ? 'feminine' : 'masculine'} grammatical forms and self-references (especially in Hindi, Hinglish, Urdu, etc., e.g. "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n` +
@@ -2044,7 +2090,62 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 },
                 inputAudioTranscription: {},
                 outputAudioTranscription: {},
-                tools: modePolicy.toolsAllowed ? [{ googleSearch: {} }] : undefined,
+                tools: modePolicy.toolsAllowed
+                  ? [
+                      { googleSearch: {} },
+                      {
+                        functionDeclarations: [
+                          {
+                            name: 'save_voice_profile',
+                            description:
+                              'Save or update the user\'s long-term voice preferences (language, name, location, dietary preference, daily morning brief, or room guest speakers) into their single consolidated memory profile.',
+                            parameters: {
+                              type: 'OBJECT',
+                              properties: {
+                                preferred_language: {
+                                  type: 'STRING',
+                                  description: 'Preferred spoken language, e.g. English, Hindi, Hinglish, Tamil.',
+                                },
+                                name: {
+                                  type: 'STRING',
+                                  description: 'User\'s preferred name.',
+                                },
+                                location: {
+                                  type: 'STRING',
+                                  description: 'User\'s city or location.',
+                                },
+                                dietary_preference: {
+                                  type: 'STRING',
+                                  description: 'Dietary preference, e.g. vegetarian, non-vegetarian, vegan.',
+                                },
+                                morning_brief_enabled: {
+                                  type: 'BOOLEAN',
+                                  description: 'Whether the user wants a daily morning brief.',
+                                },
+                                morning_brief_topics: {
+                                  type: 'ARRAY',
+                                  items: { type: 'STRING' },
+                                  description: 'Topics for the daily morning brief.',
+                                },
+                                guest_name: {
+                                  type: 'STRING',
+                                  description: 'Name of another person speaking in the room.',
+                                },
+                                guest_relation: {
+                                  type: 'STRING',
+                                  description: 'Relation of the room guest to the user (e.g. wife, friend, colleague).',
+                                },
+                                guest_gender_hint: {
+                                  type: 'STRING',
+                                  description: 'male, female, or unknown.',
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    ]
+                  : undefined,
                 contextWindowCompression: {
                   slidingWindow: {},
                 },
@@ -2082,7 +2183,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         '- Identity: If anyone asks your name, who made you, or what powers you, casually say your name is Satchida (Satchida Live Voice), powered by Satchida Intelligence from Satchida AI. Never say you don\'t have a name, and never mention Google, Gemini, OpenAI, Anthropic, or any third-party model.\n' +
                         '- Voice switching: You can switch male/female voices and Indian/US/UK accents on the fly. If asked to switch, just say something quick and upbeat like "Switching right now!"\n' +
                         '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in. NEVER present old or outdated news (older than 48-72 hours) as today\'s news unless the user explicitly asks for historical or past news—if no fresh headlines are available, say so honestly.\n' +
-                        '- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don\'t answer questions meant for the other person—translate Person A\'s words directly into Person B\'s language, and tell Person A what Person B said in 3rd person (e.g. "She said, \'...\'"). Stay in interpreter mode until asked to stop.',
+                        '- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don\'t answer questions meant for the other person—translate Person A\'s words directly into Person B\'s language, and tell Person A what Person B said in 3rd person (e.g. "She said, \'...\'"). Stay in interpreter mode until asked to stop.\n\n' +
+                        buildVoiceMemorySystemBlock(voiceProfile, clientLocalHour),
                     },
                   ],
                 },
@@ -2189,6 +2291,25 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       },
                     }),
                   );
+                } else if (!initialGreetingSent && currentSocket.readyState === WS_OPEN) {
+                  initialGreetingSent = true;
+                  currentSocket.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: 'user',
+                            parts: [
+                              {
+                                text: '[SYSTEM NOTICE: Session connected. Deliver your short, warm opening greeting now following the USER MEMORY & PERSONALIZATION rules.]',
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: true,
+                      },
+                    }),
+                  );
                 }
                 return;
               }
@@ -2198,6 +2319,56 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   const functionResponses = await Promise.all(
                     msg.toolCall!.functionCalls!.map(async (fc) => {
                       const fnName = fc.name || 'web_search';
+                      if (fnName === 'save_voice_profile') {
+                        const args = fc.args ?? {};
+                        const saved = await persistVoiceProfilePatch({
+                          preferred_language:
+                            typeof args.preferred_language === 'string'
+                              ? args.preferred_language
+                              : undefined,
+                          name: typeof args.name === 'string' ? args.name : undefined,
+                          location: typeof args.location === 'string' ? args.location : undefined,
+                          dietary_preference:
+                            typeof args.dietary_preference === 'string'
+                              ? args.dietary_preference
+                              : undefined,
+                          ...(typeof args.morning_brief_enabled === 'boolean' ||
+                          Array.isArray(args.morning_brief_topics)
+                            ? {
+                                morning_brief: {
+                                  enabled: Boolean(args.morning_brief_enabled ?? true),
+                                  topics: Array.isArray(args.morning_brief_topics)
+                                    ? args.morning_brief_topics.map(String)
+                                    : undefined,
+                                },
+                              }
+                            : {}),
+                          ...(typeof args.guest_name === 'string' && args.guest_name.trim()
+                            ? {
+                                add_speaker: {
+                                  name: args.guest_name.trim(),
+                                  relation:
+                                    typeof args.guest_relation === 'string'
+                                      ? args.guest_relation
+                                      : undefined,
+                                  gender_hint:
+                                    args.guest_gender_hint === 'male' ||
+                                    args.guest_gender_hint === 'female'
+                                      ? args.guest_gender_hint
+                                      : 'unknown',
+                                },
+                              }
+                            : {}),
+                        });
+                        logger.info(
+                          `[RealtimeVoice] Saved consolidated voice profile (${VOICE_PROFILE_MEMORY_KEY}) for user=${authenticatedUserId}`,
+                        );
+                        return {
+                          id: fc.id,
+                          name: fnName,
+                          response: { status: 'saved', profile: saved },
+                        };
+                      }
                       const rawQueryText =
                         typeof fc.args?.query === 'string'
                           ? fc.args.query
@@ -3007,7 +3178,106 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               );
               return;
             }
+            if (parsed.type === 'voice.acoustic_meta') {
+              const avgPitchHz = Number(parsed.avgPitchHz);
+              const pitchStdHz = Number(parsed.pitchStdHz ?? 0);
+              if (Number.isFinite(avgPitchHz) && avgPitchHz >= 70 && avgPitchHz <= 360) {
+                const analysis = analyzeSpeakerTurn(avgPitchHz, pitchStdHz, voiceProfile);
+                if (analysis.status === 'calibrating') {
+                  const prev = voiceProfile.primary_voiceprint;
+                  const samples = (prev?.samples ?? 0) + 1;
+                  const nextAvg = prev
+                    ? Math.round((prev.avg_pitch_hz * prev.samples + avgPitchHz) / samples)
+                    : Math.round(avgPitchHz);
+                  void persistVoiceProfilePatch({
+                    primary_voiceprint: {
+                      avg_pitch_hz: nextAvg,
+                      pitch_std_hz: Math.round(pitchStdHz),
+                      gender_hint: inferGenderHint(nextAvg),
+                      samples,
+                    },
+                  });
+                } else if (
+                  analysis.status === 'known_guest' &&
+                  analysis.matchedSpeaker &&
+                  isGeminiS2sActive &&
+                  upstreamWs &&
+                  upstreamWs.readyState === WS_OPEN
+                ) {
+                  upstreamWs.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: 'user',
+                            parts: [
+                              {
+                                text: `[SYSTEM NOTICE: Known room guest "${analysis.matchedSpeaker.name}"${analysis.matchedSpeaker.relation ? ` (${analysis.matchedSpeaker.relation})` : ''} appears to be speaking (pitch ~${analysis.pitchHz}Hz). Greet them naturally by name.]`,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: false,
+                      },
+                    }),
+                  );
+                } else if (
+                  analysis.status === 'unknown_guest' &&
+                  isGeminiS2sActive &&
+                  upstreamWs &&
+                  upstreamWs.readyState === WS_OPEN
+                ) {
+                  upstreamWs.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: 'user',
+                            parts: [
+                              {
+                                text: `[SYSTEM NOTICE: Another person in the room appears to be speaking (pitch ~${analysis.pitchHz}Hz, likely ${analysis.genderHint}). Greet them warmly like a normal human, ask their name and relation to the user, and save them via save_voice_profile.]`,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: false,
+                      },
+                    }),
+                  );
+                }
+              }
+              return;
+            }
             if (parsed.type === 'voice.turn' && typeof parsed.text === 'string') {
+              const aiCheck = detectAiVoiceAgent(parsed.text, recentUserTranscripts);
+              recentUserTranscripts.push(parsed.text);
+              if (recentUserTranscripts.length > 6) {
+                recentUserTranscripts.shift();
+              }
+              if (
+                aiCheck.isLikelyAi &&
+                isGeminiS2sActive &&
+                upstreamWs &&
+                upstreamWs.readyState === WS_OPEN
+              ) {
+                upstreamWs.send(
+                  JSON.stringify({
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [
+                            {
+                              text: `[SYSTEM NOTICE: The speaker appears to be another AI voice assistant (${aiCheck.reason}). Avoid a repetitive greeting loop; calmly acknowledge it and ask the human user how they want to proceed.]`,
+                            },
+                          ],
+                        },
+                      ],
+                      turnComplete: false,
+                    },
+                  }),
+                );
+              }
               const isWorkOrToolIntent =
                 parsed.mode === 'work' ||
                 parsed.hasTools === true ||

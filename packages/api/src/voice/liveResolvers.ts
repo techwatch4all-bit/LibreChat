@@ -112,9 +112,45 @@ const VOICE_STOPWORDS = new Set([
   'items',
   'looking',
   'wondering',
+  'from',
+  'let',
+  'lets',
+  's',
+  'say',
+  'oh',
+  'no',
+  'enough',
 ]);
 
+const HINDI_SEARCH_TERM_MAP: Array<[RegExp, string]> = [
+  [/(?:गोल्ड|सोना|सोने)/gu, 'gold'],
+  [/(?:सिल्वर|चांदी|चाँदी)/gu, 'silver'],
+  [/(?:पेट्रोल)/gu, 'petrol'],
+  [/(?:डीजल|डीज़ल)/gu, 'diesel'],
+  [/(?:एलपीजी|गैस)/gu, 'LPG gas'],
+  [/(?:प्राइस|भाव|कीमत|कीमतें|रेट)/gu, 'price rate'],
+  [/(?:आज|ताजा|ताज़ा)/gu, 'today'],
+  [/(?:भारत|इंडिया)/gu, 'India'],
+  [/(?:न्यूज़|समाचार|खबर|खबरें)/gu, 'news'],
+  [/(?:मौसम|तापमान)/gu, 'weather'],
+];
+
 export function stripVoiceStopwords(rawQuery: string): string {
+  // If the utterance is in Devanagari with market/news/weather keywords, map to clean English search terms
+  if (/[\u0900-\u097F]/.test(rawQuery)) {
+    const mapped: string[] = [];
+    for (const [re, eng] of HINDI_SEARCH_TERM_MAP) {
+      if (re.test(rawQuery)) {
+        mapped.push(eng);
+      }
+    }
+    if (mapped.length >= 2) {
+      if (!mapped.includes('India')) {
+        mapped.push('India');
+      }
+      return mapped.join(' ');
+    }
+  }
   const tokens = rawQuery
     .replace(/[?!.,;:'"]+/g, ' ')
     .split(/\s+/)
@@ -389,17 +425,26 @@ const JUNK_NEWS_PATTERNS =
 
 export async function fetchStructuredNews(
   rawQuery: string,
-  _opts?: { mode?: string },
+  opts?: { mode?: string; locationCity?: string; timeZone?: string },
 ): Promise<{ summaryText: string; card: NewsActionCard } | null> {
   try {
-    const cleanQuery = stripVoiceStopwords(rawQuery);
+    const isIndiaTz = Boolean(opts?.timeZone && /calcutta|kolkata|india/i.test(opts.timeZone));
+    const wantsRegional = /\b(my region|local news|my area|my state|around here)\b/i.test(rawQuery);
+    const cleanQuery =
+      wantsRegional && opts?.locationCity
+        ? `${opts.locationCity} latest news`
+        : stripVoiceStopwords(rawQuery);
     const allowsOldNews =
       /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(rawQuery);
     const hasSpecificTopic =
       /\b(fuel|gas|petrol|diesel|lpg|gold|silver|stock|nifty|sensex|cricket|ipl|football|tech|ai|election|tariff|economy|budget|weather|cyclone|rbi|rupee|bitcoin|crypto)\b/i.test(
         rawQuery,
       );
-    const wantsIndiaTop = !hasSpecificTopic && /\b(india|indian|national|bharat)\b/i.test(rawQuery);
+    const wantsIndiaTop =
+      !hasSpecificTopic &&
+      !wantsRegional &&
+      (/\b(india|indian|national|bharat)\b/i.test(rawQuery) ||
+        (isIndiaTz && /\b(top|latest|key|headline|headlines|today)\b/i.test(rawQuery)));
     const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
       /\/+$/,
       '',
@@ -446,7 +491,7 @@ export async function fetchStructuredNews(
       : `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
 
     const [rssRes, searchRes] = await Promise.all([
-      fetch(rssUrl, { signal: AbortSignal.timeout(2500) }).catch(() => null),
+      fetch(rssUrl, { signal: AbortSignal.timeout(4500) }).catch(() => null),
       fetch(`${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`, {
         signal: AbortSignal.timeout(2500),
       }).catch(() => null),

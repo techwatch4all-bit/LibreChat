@@ -2528,7 +2528,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       ? 'END_SENSITIVITY_LOW'
                       : 'END_SENSITIVITY_HIGH',
                     prefixPaddingMs: isTranslatorMode ? 200 : 120,
-                    silenceDurationMs: isTranslatorMode ? 1200 : 750,
+                    silenceDurationMs: isTranslatorMode ? 1200 : 550,
                   },
                   activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
                 },
@@ -3056,6 +3056,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           (async () => {
                             const news = await fetchStructuredNews(effectiveSearchQuery, {
                               mode: modePolicy.semanticMode,
+                              locationCity: userLocation?.city,
+                              timeZone: userLocation?.timeZone,
                             });
                             if (news) {
                               parts.push(news.summaryText);
@@ -3080,7 +3082,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           : `The user's current device coordinates are ${userLocation.lat?.toFixed(4)}, ${userLocation.lng?.toFixed(4)}.`;
                       }
                       if (!resultPayload) {
-                        resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
+                        const webQuery = /[\u0900-\u097F]/.test(effectiveSearchQuery)
+                          ? cleanKeywords
+                          : effectiveSearchQuery;
+                        resultPayload = await executeVoiceWebSearch(webQuery, {
                           deep: searchIntent.isDeepResearch,
                           fetchPages: !wantsNews,
                         });
@@ -3128,6 +3133,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       const locationNote = userLocation?.city
                         ? `User's detected location: ${userLocation.city}.\n`
                         : '';
+                      const genderReminder =
+                        activeVoiceProfile.gender === 'female'
+                          ? 'You are FEMALE: in Hindi/Urdu ALWAYS use feminine verbs ("कर सकती हूँ", "रही हूँ"), NEVER masculine ("कर सकता हूँ").'
+                          : 'You are MALE: in Hindi/Urdu ALWAYS use masculine verbs ("कर सकता हूँ", "रहा हूँ").';
                       suppressCurrentS2sTurn = false;
                       pauseMicForwardUntil = Date.now() + 650;
                       upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
@@ -3142,7 +3151,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                                     text:
                                       `${locationNote}[LIVE DATA FOR: "${cleanKeywords}"]\n` +
                                       `${resultPayload.slice(0, 3500)}\n\n` +
-                                      '[CONTEXT: Fresh live info for the user\'s question. Respond like a warm, sharp human friend in 1-3 natural spoken sentences—weave the key facts or numbers naturally into conversation instead of reciting "Headlines include..." or robotic lists. Keep the discussion flowing naturally. Never read URLs or markdown, and never claim you lack real-time access.]',
+                                      `[CONTEXT: Fresh live info for the user's question. Respond like a warm, sharp human friend in 1-3 natural spoken sentences—weave the key facts or numbers naturally into conversation instead of reciting "Headlines include..." or robotic lists. ${genderReminder} Never read URLs or markdown, and never claim you lack real-time access.]`,
                                   },
                                 ],
                               },

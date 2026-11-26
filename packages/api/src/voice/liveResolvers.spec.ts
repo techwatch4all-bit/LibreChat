@@ -21,6 +21,8 @@ describe('liveResolvers', () => {
     expect(extractSpokenCity('You can consider my location as Mumbai.')).toBe('Mumbai');
     expect(extractSpokenCity("I'm in Pune right now")).toBe('Pune');
     expect(extractSpokenCity('What is the weather in New Delhi today?')).toBe('New Delhi');
+    expect(extractSpokenCity("And what's the AQI of Mumbai?")).toBe('Mumbai');
+    expect(extractSpokenCity("What's the AQI of Delhi?")).toBe('Delhi');
     expect(extractSpokenCity('Tell me a joke')).toBeNull();
   });
 

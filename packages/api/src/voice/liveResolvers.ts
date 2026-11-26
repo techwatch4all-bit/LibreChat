@@ -124,8 +124,7 @@ export function extractSpokenCity(text: string): string | null {
     /\b(?:consider\s+)?(?:my\s+)?location\s+(?:as|is|to\s+be)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
     /\bi(?:'m|\s+am|\s+live|\s+stay)\s+(?:in|at|from|near)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
     /\b(?:city|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\bweather\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\btemperature\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\b(?:weather|temperature|forecast|aqi|air\s+quality|panchang)\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
   ];
   for (const re of patterns) {
     const m = cleaned.match(re);
@@ -226,9 +225,10 @@ export async function fetchStructuredWeather(
   coords?: { lat?: number; lng?: number; city?: string },
 ): Promise<{ summaryText: string; card: WeatherActionCard } | null> {
   try {
-    let lat = coords?.lat;
-    let lng = coords?.lng;
-    let resolvedCity = coords?.city || extractSpokenCity(cityOrQuery) || '';
+    const explicitCity = extractSpokenCity(cityOrQuery);
+    let lat = explicitCity ? undefined : coords?.lat;
+    let lng = explicitCity ? undefined : coords?.lng;
+    let resolvedCity = explicitCity || coords?.city || '';
 
     if ((typeof lat !== 'number' || typeof lng !== 'number') && resolvedCity) {
       const geoRes = await fetch(

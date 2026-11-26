@@ -2436,8 +2436,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         effectiveUtterance,
                       ) ||
                       /(?:पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(effectiveUtterance);
+                    const explicitCityInQuery = extractSpokenCity(effectiveUtterance);
                     const locationSuffix =
                       wantsLocalContext &&
+                      !explicitCityInQuery &&
                       userLocation?.city &&
                       !effectiveUtterance.toLowerCase().includes(userLocation.city.toLowerCase())
                         ? ` in ${userLocation.city}`

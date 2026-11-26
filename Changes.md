@@ -41,3 +41,15 @@
   - Acquires `navigator.wakeLock.request('screen')` while Live Voice is active so mobile devices don't auto-lock mid-conversation.
 - **Future Hands-Free Assistant Roadmap (noted for native Android/iOS & Spotify OAuth phase):**
   - Background lock-screen audio service, compass/turn-by-turn navigation, Spotify Web API full playback control (play/pause/skip/volume), automatic pause on incoming phone calls, and opt-in user-authorized AI call screening/answering.
+
+## 2026-11-26 (Continued) — Resident 24/7 Mobile Assistant & Deep-Dive Audit Fixes
+
+- **Inline Embedded GPS Map & Places/Traffic/AQI** (`d935f46cc`):
+  - Embedded interactive Google Map preview inside `LiveVoiceModal` centered on GPS coordinates for nearest gas stations, EV chargers, traffic, parking, doctors, hospitals, restaurants, and directions, with one-tap **Navigate** launch while keeping Live Voice active.
+- **Zero-Refusal Media & UI Action Confirmations + Awaited Reverse-Geocoding** (`9d18868ba`):
+  - Pre-emptively suppresses Gemini refusals on media/UI commands and injects `[SYSTEM ACTION COMPLETED]` confirmations.
+  - Awaits Nominatim reverse-geocoding (`reverseGeocodePromise`) on local/weather/panchang/location queries so `userLocation.city` is guaranteed populated.
+  - Re-acquires `navigator.wakeLock` on `visibilitychange`, auto-pauses on incoming phone call (`AudioContext.statechange === 'interrupted'`), and persists the last 8 Action Cards as tappable pills inside `Log (N)`.
+- **Mobile Network Auto-Reconnect & Lock-Screen Media Controls** (`5102e4f6e`):
+  - Exponential-backoff WebSocket auto-reconnect (4 retries + `window.online` listener) for seamless Wi-Fi ↔ 4G/5G handoff.
+  - Registered `navigator.mediaSession` lock-screen & notification controls (`Play`, `Pause`, `Stop`) for "Satchida Live Voice".

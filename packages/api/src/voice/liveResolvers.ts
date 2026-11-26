@@ -167,7 +167,10 @@ const NON_CITY_LOCATION_PHRASES =
 
 function sanitizeCityCandidate(raw: string): string | null {
   const candidate = raw
-    .replace(/\b(today|now|right now|please|thanks|thank you|for today|currently)\b.*$/i, '')
+    .replace(
+      /\b(today|now|right now|please|thanks|thank you|for today|currently|again|instead|too|also)\b.*$/i,
+      '',
+    )
     .replace(/[.,?!]+$/g, '')
     .trim();
   if (
@@ -313,14 +316,49 @@ export async function resolveYouTubeEmbedUrl(query: string): Promise<string | un
       return undefined;
     }
     const html = await res.text();
-    const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-    if (match?.[1]) {
-      return `https://www.youtube.com/embed/${match[1]}?autoplay=1&playsinline=1&rel=0`;
+    const ids = Array.from(
+      new Set([...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map((m) => m[1])),
+    ).slice(0, 5);
+    for (const videoId of ids) {
+      // Verify the video allows embedding via YouTube oEmbed before embedding
+      const oembed = await fetch(
+        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+        { signal: AbortSignal.timeout(1500) },
+      ).catch(() => null);
+      if (oembed && oembed.ok) {
+        return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1&rel=0`;
+      }
     }
   } catch {
     // Non-blocking fallback to launcher link
   }
   return undefined;
+}
+
+function extractCleanPoiTerm(rawQuery: string): string {
+  const lower = rawQuery.toLowerCase();
+  if (/\b(petrol pump|petrol station|fuel station|gas station|petrol|fuel)\b/.test(lower)) {
+    return 'fuel';
+  }
+  if (/\b(hospital|clinic|doctor|emergency)\b/.test(lower)) {
+    return 'hospital';
+  }
+  if (/\b(pharmacy|chemist|medical store)\b/.test(lower)) {
+    return 'pharmacy';
+  }
+  if (/\b(atm|bank)\b/.test(lower)) {
+    return 'bank';
+  }
+  if (/\b(restaurant|cafe|coffee|food)\b/.test(lower)) {
+    return 'restaurant';
+  }
+  return rawQuery
+    .replace(
+      /\b(which|and|is|the|nearest|near|me|to|my|location|closest|find|show|in|south dumdum|west bengal)\b/gi,
+      ' ',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export async function fetchNearestPlaceWithEta(
@@ -329,10 +367,11 @@ export async function fetchNearestPlaceWithEta(
   originLng: number,
 ): Promise<{ name: string; distanceKm: number; durationMin: number } | null> {
   try {
+    const cleanPoi = extractCleanPoiTerm(query) || query;
     const delta = 0.08;
     const viewbox = `${originLng - delta},${originLat + delta},${originLng + delta},${originLat - delta}`;
     const nomRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=1`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanPoi)}&viewbox=${viewbox}&bounded=1&limit=1`,
       {
         signal: AbortSignal.timeout(2200),
         headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },

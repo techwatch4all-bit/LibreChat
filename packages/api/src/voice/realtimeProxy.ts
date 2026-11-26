@@ -3047,11 +3047,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   /\b(my location|where am i|current location|compare.*location|here)\b/i.test(
                     effectiveUtterance,
                   );
+                const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
                 const wantsWeather =
                   isWeatherQuery(effectiveUtterance) ||
-                  (asksMyLocationCompare && lastLiveLookupKind === 'weather');
+                  (!wantsPlace && asksMyLocationCompare && lastLiveLookupKind === 'weather');
                 const wantsNews = isNewsQuery(effectiveUtterance);
-                const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
                 const needsStructuredCard =
                   searchIntent.isSearch &&
                   (wantsWeather || wantsNews || wantsPlace || asksMyLocationCompare);

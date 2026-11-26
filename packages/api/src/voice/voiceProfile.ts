@@ -27,6 +27,7 @@ export interface VoiceProfileData {
   name?: string;
   location?: string;
   dietary_preference?: string;
+  notes?: string[];
   morning_brief?: MorningBriefPreference;
   primary_voiceprint?: VoiceprintBaseline;
   known_speakers?: KnownSpeakerProfile[];
@@ -74,16 +75,19 @@ export function mergeVoiceProfile(
   if (typeof patch.dietary_preference === 'string' && patch.dietary_preference.trim()) {
     next.dietary_preference = patch.dietary_preference.trim();
   }
+  if (Array.isArray(patch.notes) && patch.notes.length > 0) {
+    const existingNotes = Array.isArray(existing.notes) ? existing.notes : [];
+    const mergedNotes = Array.from(
+      new Set([...existingNotes, ...patch.notes.map((n) => String(n).trim()).filter(Boolean)]),
+    ).slice(-10);
+    if (mergedNotes.length > 0) {
+      next.notes = mergedNotes;
+    }
+  }
   if (patch.morning_brief && typeof patch.morning_brief === 'object') {
     const prevBrief = existing.morning_brief ?? { enabled: false, topics: [] };
     const nextTopics = Array.isArray(patch.morning_brief.topics)
-      ? Array.from(
-          new Set(
-            patch.morning_brief.topics
-              .map((t) => String(t).trim())
-              .filter(Boolean),
-          ),
-        )
+      ? Array.from(new Set(patch.morning_brief.topics.map((t) => String(t).trim()).filter(Boolean)))
       : prevBrief.topics;
     next.morning_brief = {
       enabled:
@@ -120,8 +124,12 @@ export function mergeVoiceProfile(
       name: cleanName,
       ...(speaker.relation ? { relation: speaker.relation.trim() } : {}),
       ...(speaker.gender_hint ? { gender_hint: speaker.gender_hint } : {}),
-      ...(typeof speaker.avg_pitch_hz === 'number' ? { avg_pitch_hz: Math.round(speaker.avg_pitch_hz) } : {}),
-      ...(typeof speaker.pitch_std_hz === 'number' ? { pitch_std_hz: Math.round(speaker.pitch_std_hz) } : {}),
+      ...(typeof speaker.avg_pitch_hz === 'number'
+        ? { avg_pitch_hz: Math.round(speaker.avg_pitch_hz) }
+        : {}),
+      ...(typeof speaker.pitch_std_hz === 'number'
+        ? { pitch_std_hz: Math.round(speaker.pitch_std_hz) }
+        : {}),
     };
     if (idx >= 0) {
       mergedSpeakers[idx] = { ...mergedSpeakers[idx], ...normalized };
@@ -138,7 +146,9 @@ export function mergeVoiceProfile(
   return next;
 }
 
-export function getTimeOfDayGreeting(hour: number): 'Good morning' | 'Good afternoon' | 'Good evening' {
+export function getTimeOfDayGreeting(
+  hour: number,
+): 'Good morning' | 'Good afternoon' | 'Good evening' {
   const safeHour = Number.isFinite(hour) ? ((Math.floor(hour) % 24) + 24) % 24 : 9;
   if (safeHour >= 5 && safeHour < 12) {
     return 'Good morning';
@@ -149,14 +159,9 @@ export function getTimeOfDayGreeting(hour: number): 'Good morning' | 'Good after
   return 'Good evening';
 }
 
-export function buildVoiceMemorySystemBlock(
-  profile: VoiceProfileData,
-  localHour: number,
-): string {
+export function buildVoiceMemorySystemBlock(profile: VoiceProfileData, localHour: number): string {
   const greeting = getTimeOfDayGreeting(localHour);
-  const lines: string[] = [
-    'USER MEMORY & PERSONALIZATION (SINGLE CONSOLIDATED PROFILE):',
-  ];
+  const lines: string[] = ['USER MEMORY & PERSONALIZATION (SINGLE CONSOLIDATED PROFILE):'];
 
   const knownSummary: string[] = [];
   if (profile.preferred_language) {
@@ -170,6 +175,9 @@ export function buildVoiceMemorySystemBlock(
   }
   if (profile.dietary_preference) {
     knownSummary.push(`Dietary preference: ${profile.dietary_preference}`);
+  }
+  if (Array.isArray(profile.notes) && profile.notes.length > 0) {
+    knownSummary.push(`Remembered notes: ${profile.notes.join('; ')}`);
   }
   if (profile.morning_brief) {
     const topics = profile.morning_brief.topics?.join(', ') || 'general';

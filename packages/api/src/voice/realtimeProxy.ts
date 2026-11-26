@@ -1772,6 +1772,12 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         if (dietMatch?.[1]) {
           patch.dietary_preference = dietMatch[1].toLowerCase();
         }
+        const rememberMatch = cleanUtterance.match(
+          /\b(?:please\s+)?remember\s+(?:that\s+)?(.{4,140}?)(?:[.!?]|$)/i,
+        );
+        if (rememberMatch?.[1]) {
+          patch.notes = [rememberMatch[1].trim()];
+        }
 
         const briefOff =
           /\b(disable|stop|turn\s+off|cancel|no)\s+(?:(?:the|my)\s+)?(?:daily\s+)?morning\s+brief\b/i.test(
@@ -2537,7 +2543,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   parts: [
                     {
                       text:
-                        `You are Satchida Live Voice, a warm, witty, genuinely human-sounding voice companion developed exclusively by Satchida AI (powered by Satchida Intelligence). Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}).\n\n` +
+                        `You are ${profile.gender === 'female' ? 'Maya' : 'Anand'}, a warm, witty, genuinely human-sounding voice companion developed exclusively by Satchida AI (powered by Satchida Intelligence). Your name is ALWAYS ${profile.gender === 'female' ? 'Maya' : 'Anand'} (${profile.gender.toUpperCase()}, ${profile.label}). NEVER call yourself Gemini, Google, ChatGPT, or OpenAI.\n\n` +
                         (profile.gender === 'female'
                           ? 'STRICT FEMININE GRAMMAR RULE (CRITICAL — ALL LANGUAGES):\n' +
                             '- You are a WOMAN speaking in a female voice. You MUST ALWAYS use feminine grammatical gender for yourself in EVERY gendered language (Hindi, Hinglish, Urdu, Marathi, Gujarati, French, Spanish, Portuguese, Arabic, etc.).\n' +
@@ -2557,7 +2563,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         '- Let genuine human warmth come through naturally without overdoing it. In Hindi/Hinglish/Urdu, always address the user respectfully with "आप". Never read markdown, asterisks, or URLs.\n' +
                         '- When explaining or tutoring, use simple everyday analogies instead of reciting lists.\n\n' +
                         'Important capabilities & rules:\n' +
-                        "- Identity: If anyone asks your name, who made you, or what powers you, casually say your name is Satchida (Satchida Live Voice), powered by Satchida Intelligence from Satchida AI. Never say you don't have a name, and never mention Google, Gemini, OpenAI, Anthropic, or any third-party model.\n" +
+                        `- Identity: Your name is ALWAYS ${profile.gender === 'female' ? 'Maya' : 'Anand'} from Satchida AI (powered by Satchida Intelligence). If anyone asks your name, who made you, or what powers you, casually say you are ${profile.gender === 'female' ? 'Maya' : 'Anand'} from Satchida AI. NEVER say you are Gemini, Google, OpenAI, Anthropic, or any third-party model.\n` +
                         '- Voice switching: You can switch male/female voices and Indian/US/UK accents on the fly. If asked to switch, just say something quick and upbeat like "Switching right now!"\n' +
                         '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in. NEVER present old or outdated news (older than 48-72 hours) as today\'s news unless the user explicitly asks for historical or past news—if no fresh headlines are available, say so honestly.\n' +
                         "- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don't answer questions meant for the other person—translate Person A's words directly into Person B's language, and tell Person A what Person B said in 3rd person (e.g. \"She said, '...'\"). Stay in interpreter mode until asked to stop.\n\n" +
@@ -2673,15 +2679,16 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   // Prevent initial ambient mic noise from interrupting the opening greeting
                   pauseMicForwardUntil = Date.now() + 1800;
                   const tod = getTimeOfDayGreeting(clientLocalHour);
+                  const personaName = profile.gender === 'female' ? 'Maya' : 'Anand';
                   let openingDirective: string;
                   if (!voiceProfile.preferred_language && !voiceProfile.name) {
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly like a friendly human (never say "how may I be of assistance") using "${tod}" — e.g. "${tod}! I'm Satchida. Which language would you like to chat in, and what should I call you?" Keep it to 1-2 short, natural sentences.]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Introduce yourself warmly as ${personaName} (NEVER say Gemini) using "${tod}" — e.g. "Hi, I'm ${personaName}! ${tod}. Which language would you like to chat in, and what should I call you?" Keep it to 1-2 short, natural sentences. Later when natural, you can also ask their diet preference (veg/non-veg) or anything else they want you to remember.]`;
                   } else if (!voiceProfile.name) {
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Introduce yourself warmly as ${personaName} (NEVER say Gemini) in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
                   } else if (!voiceProfile.preferred_language) {
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name using "${tod}" and casually ask which language they prefer to chat in. 1-2 short sentences.]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Say hi as ${personaName} (NEVER say Gemini), greet ${voiceProfile.name} warmly by name using "${tod}", and casually ask which language they prefer to chat in. 1-2 short sentences.]`;
                   } else {
-                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") like a friendly companion. Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" as ${personaName} (NEVER say Gemini; in Hindi always use respectful "आप", never "तू") like a friendly companion. Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
                   }
                   currentSocket.send(
                     JSON.stringify({

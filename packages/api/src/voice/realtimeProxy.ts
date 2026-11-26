@@ -9,6 +9,7 @@ import type { Duplex } from 'stream';
 import type { VoiceProfileData } from './voiceProfile';
 import {
   stripVoiceStopwords,
+  extractSelfLocationCity,
   extractSpokenCity,
   isPlaceOrDirectionsQuery,
   isWeatherQuery,
@@ -21,6 +22,7 @@ import {
   parseVoiceProfile,
   serializeVoiceProfile,
   mergeVoiceProfile,
+  getTimeOfDayGreeting,
   buildVoiceMemorySystemBlock,
 } from './voiceProfile';
 import { analyzeSpeakerTurn, detectAiVoiceAgent, inferGenderHint } from './voiceIntelligence';
@@ -234,27 +236,37 @@ export function detectRealtimeSearchIntent(text: string): {
 
   // Skip pure greetings, acknowledgments, and tiny chit-chat phrases
   const isPureChitChat =
-    /^(?:hi|hello|hey|good morning|good afternoon|good evening|good night|how are you|how's it going|what's up|thanks|thank you|okay|ok|yes|yeah|no|nope|bye|goodbye|stop|wait|sorry|excuse me|can you hear me|are you there|you got that|who are you|what is your name|who made you|tell me a joke|switch to \w+)[?.!,\s]*$/i.test(
+    /^(?:hi|hello|hey|good morning|good afternoon|good evening|good night|how are you|how's it going|what's up|thanks|thank you|okay|ok|yes|yeah|no|nope|bye|goodbye|stop|wait|sorry|excuse me|can you hear me|are you there|you got that|who are you|what is your name|who made you|tell me a joke|switch to \w+|check again|try again|repeat that)[?.!,\s]*$/i.test(
       lower,
     );
   if (isPureChitChat) {
     return { isSearch: false, isDeepResearch: false, hasUrl: false };
   }
 
+  // Skip conversational meta-questions, complaints, capability checks, and recaps of prior turns
+  // so Gemini Live handles natural human discussion without hijacking the turn with a literal web search.
+  const isConversationalMeta =
+    /\b(why\s+did\s+you|why\s+didn'?t\s+you|why\s+do\s+you\s+(?:think|say|assume)|you\s+(?:skipped|missed|forgot|assumed)|i\s+asked\s+you|i\s+told\s+you|what\s+did\s+you\s+(?:say|mean)|did\s+you\s+(?:just|hear|understand)|do\s+you\s+have\s+access|can\s+you\s+access|are\s+you\s+(?:listening|able\s+to)|i\s+did\s+not\s+know\s+you\s+are\s+listening)\b/i.test(
+      lower,
+    ) ||
+    /^(?:okay|ok|alright|so|well|now)?[,\s]*(?:summarize|recap|elaborate|explain)\s+(?:that|it|this|those|the\s+overall\s+news|the\s+news\s+you\s+just|what\s+you\s+just)\b/i.test(
+      lower,
+    );
+  if (isConversationalMeta && !isDeepResearch && !hasUrl) {
+    return { isSearch: false, isDeepResearch: false, hasUrl: false };
+  }
+
   const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
-  const isQuestionOrInfoRequest =
-    /\?/.test(trimmed) ||
-    /^(?:what|who|where|when|how|which|is|are|was|were|did|does|do|can you|could you|tell me|give me|find|check|show|look up|search|explain|list|provide)\b/i.test(
+  const hasExplicitLiveSignal =
+    /\b(today|now|latest|current|currently|live|recent|yesterday|tomorrow|this week|this month|2026|2027|price|prices|rate|rates|cost|score|scores|match|ipl|stock|nifty|sensex|gold|silver|petrol|diesel|lpg|fuel|gas|weather|temperature|forecast|aqi|air quality|news|headlines|breaking|near me|nearest|nearby|directions|my location|where am i|current location|panchang|tithi|rahu kaal|sunrise|sunset)\b/i.test(
       lower,
     ) ||
-    /\b(today|now|latest|current|currently|live|recent|yesterday|tomorrow|this week|this month|2026|2027|price|rate|cost|score|weather|aqi|news|near me|nearest|nearby|directions)\b/i.test(
-      lower,
-    ) ||
-    /(?:क्या|कब|कहाँ|कौन|कैसे|कितना|आज|अभी|ताजा|न्यूज़|समाचार|खबर|मौसम|भाव|कीमत|पंचांग)/u.test(
+    /^(?:search|look up|google|find|check)\b/i.test(lower) ||
+    /(?:आज|अभी|ताजा|ताज़ा|न्यूज़|समाचार|खबर|मौसम|तापमान|भाव|कीमत|पंचांग|पेट्रोल|डीजल|सोना|चांदी)/u.test(
       trimmed,
     );
 
-  const isSearch = isDeepResearch || hasUrl || (wordCount >= 3 && isQuestionOrInfoRequest);
+  const isSearch = isDeepResearch || hasUrl || (wordCount >= 3 && hasExplicitLiveSignal);
   return { isSearch, isDeepResearch, hasUrl };
 }
 
@@ -1634,6 +1646,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               authenticatedUserId,
               serializeVoiceProfile(voiceProfile),
             );
+            logger.info(
+              `[RealtimeVoice] Saved voice profile patch user=${authenticatedUserId} keys=${Object.keys(patch).join(',')}`,
+            );
           } catch (err) {
             logger.warn('[RealtimeVoice] Failed to persist voice profile memory:', err);
           }
@@ -1702,6 +1717,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       };
 
       let pendingLocalQuery: string | null = null;
+      let lastLiveLookupKind: 'weather' | 'news' | 'place' | null = null;
+      let lastAssistantAskedForName = false;
       let isTranslatorMode = false;
       let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
         null;
@@ -1711,26 +1728,41 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       const extractAndPersistProfileFromUtterance = (cleanUtterance: string) => {
         const langMatch =
           cleanUtterance.match(
-            /\b(?:speak|talk|switch|change(?:\s+you)?)\s+(?:in|to)\s+(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+            /\b(?:speak|talk|switch|change(?:\s+you)?|chat|prefer|use|let'?s\s+(?:do|use|speak|talk))\s+(?:in\s+|to\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
           ) ||
           (!voiceProfile.preferred_language
             ? cleanUtterance.match(
-                /^(?:in\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)[.,!?\s]*$/i,
+                /\b(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
               )
             : null);
         if (langMatch?.[1]) {
           const chosenLang =
             langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
-          void persistVoiceProfilePatch({ preferred_language: chosenLang });
+          if (voiceProfile.preferred_language !== chosenLang) {
+            void persistVoiceProfilePatch({ preferred_language: chosenLang });
+          }
         }
-        const nameMatch = cleanUtterance.match(
-          /\b(?:[Mm]y\s+name\s+is|[Ii]\s+am|[Ii]'m|[Cc]all\s+me)\s+([A-Z][a-z]{1,24})\b/,
-        );
-        if (
-          nameMatch?.[1] &&
-          !/^(?:sorry|good|fine|okay|here|looking|asking|trying)$/i.test(nameMatch[1])
-        ) {
-          void persistVoiceProfilePatch({ name: nameMatch[1] });
+        const NON_NAME_WORDS =
+          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
+        const explicitNameMatch =
+          cleanUtterance.match(
+            /\b(?:my\s+name\s+is|call\s+me|this\s+is|i\s+am|i'm)\s+([a-zA-Z]{2,24})\b/i,
+          ) || cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}]{2,24})/iu);
+        let extractedName = explicitNameMatch?.[1] || '';
+        if (!extractedName && lastAssistantAskedForName && !voiceProfile.name) {
+          const directReply = cleanUtterance
+            .replace(/^(?:it'?s|hey|hi|uh|um|well|just)\s+/i, '')
+            .replace(/[.,!?]+$/g, '')
+            .trim();
+          const words = directReply.split(/\s+/).filter(Boolean);
+          if (words.length >= 1 && words.length <= 2 && /^[a-zA-Z\p{L}]{2,24}$/u.test(words[0])) {
+            extractedName = words[0];
+          }
+        }
+        if (extractedName && !NON_NAME_WORDS.test(extractedName)) {
+          const normalizedName = extractedName.charAt(0).toUpperCase() + extractedName.slice(1);
+          lastAssistantAskedForName = false;
+          void persistVoiceProfilePatch({ name: normalizedName });
         }
         const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
         if (dietMatch?.[1]) {
@@ -1764,18 +1796,44 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       };
 
       const applySpokenLocationMemory = (cleanUtterance: string): string => {
-        const spokenCity = extractSpokenCity(cleanUtterance);
+        const selfCity = extractSelfLocationCity(cleanUtterance);
+        const spokenCity = selfCity || extractSpokenCity(cleanUtterance);
+        const hasGps =
+          typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number';
         let effectiveUtterance = cleanUtterance;
-        if (spokenCity) {
-          userLocation = { ...(userLocation || {}), city: spokenCity };
-          logger.info(`[RealtimeVoice] Updated userLocation.city="${spokenCity}" from speech`);
+
+        if (selfCity) {
+          // Only override GPS city if the user explicitly asks to set/consider their location
+          const isExplicitOverride = /\b(consider|set|change|update)\s+(?:my\s+)?location\b/i.test(
+            cleanUtterance,
+          );
+          if (!hasGps || isExplicitOverride) {
+            userLocation = { ...(userLocation || {}), city: selfCity };
+            logger.info(
+              `[RealtimeVoice] Updated userLocation.city="${selfCity}" from self-location`,
+            );
+          }
           if (!voiceProfile.location) {
-            void persistVoiceProfilePatch({ location: spokenCity });
+            void persistVoiceProfilePatch({ location: selfCity });
           }
-          if (pendingLocalQuery && !detectRealtimeSearchIntent(cleanUtterance).isSearch) {
-            effectiveUtterance = `${pendingLocalQuery} in ${spokenCity}`;
-            pendingLocalQuery = null;
+        } else if (spokenCity) {
+          // Query-target city (e.g. "AQI of Mumbai"): NEVER overwrite GPS or an already-known city!
+          if (!hasGps && !userLocation?.city) {
+            userLocation = { ...(userLocation || {}), city: spokenCity };
+            logger.info(`[RealtimeVoice] Soft-set userLocation.city="${spokenCity}" (no GPS)`);
+            if (!voiceProfile.location) {
+              void persistVoiceProfilePatch({ location: spokenCity });
+            }
           }
+        }
+
+        if (
+          spokenCity &&
+          pendingLocalQuery &&
+          !detectRealtimeSearchIntent(cleanUtterance).isSearch
+        ) {
+          effectiveUtterance = `${pendingLocalQuery} in ${spokenCity}`;
+          pendingLocalQuery = null;
         }
         return effectiveUtterance;
       };
@@ -2608,17 +2666,26 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   initialGreetingSent = true;
                   // Prevent initial ambient mic noise from interrupting the opening greeting
                   pauseMicForwardUntil = Date.now() + 1800;
+                  const tod = getTimeOfDayGreeting(clientLocalHour);
+                  let openingDirective: string;
+                  if (!voiceProfile.preferred_language && !voiceProfile.name) {
+                    lastAssistantAskedForName = true;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly like a friendly human (never say "how may I be of assistance") using "${tod}" — e.g. "${tod}! I'm Satchida. Which language would you like to chat in, and what should I call you?" Keep it to 1-2 short, natural sentences.]`;
+                  } else if (!voiceProfile.name) {
+                    lastAssistantAskedForName = true;
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet the user warmly in ${voiceProfile.preferred_language} using "${tod}" and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
+                  } else if (!voiceProfile.preferred_language) {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name using "${tod}" and casually ask which language they prefer to chat in. 1-2 short sentences.]`;
+                  } else {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" like a friend catching up (e.g. "Hey ${voiceProfile.name}, ${tod.toLowerCase()}! What's on your mind?"). Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
+                  }
                   currentSocket.send(
                     JSON.stringify({
                       clientContent: {
                         turns: [
                           {
                             role: 'user',
-                            parts: [
-                              {
-                                text: '[SYSTEM NOTICE: Session connected. Deliver your short, warm opening greeting now following the USER MEMORY & PERSONALIZATION rules.]',
-                              },
-                            ],
+                            parts: [{ text: openingDirective }],
                           },
                         ],
                         turnComplete: true,
@@ -2903,16 +2970,30 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   sendJson(clientWs, { type: 'voice.interrupted' });
 
                   if (searchIntent.isSearch && !toolIntent.delegate) {
-                    const wantsWeather = isWeatherQuery(effectiveUtterance);
+                    const asksMyLocationCompare =
+                      /\b(my location|where am i|current location|compare.*location|here)\b/i.test(
+                        effectiveUtterance,
+                      );
+                    const wantsWeather =
+                      isWeatherQuery(effectiveUtterance) ||
+                      (asksMyLocationCompare && lastLiveLookupKind === 'weather');
                     const wantsNews = isNewsQuery(effectiveUtterance);
                     const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
                     const wantsLocalContext =
                       wantsWeather ||
                       wantsPlace ||
+                      asksMyLocationCompare ||
                       /\b(panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset)\b/i.test(
                         effectiveUtterance,
                       ) ||
                       /(?:पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(effectiveUtterance);
+                    if (wantsWeather) {
+                      lastLiveLookupKind = 'weather';
+                    } else if (wantsNews) {
+                      lastLiveLookupKind = 'news';
+                    } else if (wantsPlace) {
+                      lastLiveLookupKind = 'place';
+                    }
                     const explicitCityInQuery = extractSpokenCity(effectiveUtterance);
                     const locationSuffix =
                       wantsLocalContext &&
@@ -3060,7 +3141,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                                     text:
                                       `${locationNote}[LIVE DATA FOR: "${cleanKeywords}"]\n` +
                                       `${resultPayload.slice(0, 3500)}\n\n` +
-                                      '[INSTRUCTION: Answer directly and concisely using ONLY these live facts (for news, cover the top 3-5 headlines; for weather/prices, state the exact numbers). Never apologize or say you lack real-time access. Do not read URLs.]',
+                                      '[CONTEXT: Fresh live info for the user\'s question. Respond like a warm, sharp human friend in 1-3 natural spoken sentences—weave the key facts or numbers naturally into conversation instead of reciting "Headlines include..." or robotic lists. Keep the discussion flowing naturally. Never read URLs or markdown, and never claim you lack real-time access.]',
                                   },
                                 ],
                               },
@@ -3355,17 +3436,17 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 typeof userLocation.lng === 'number'
               ) {
                 const { lat, lng } = userLocation;
-                reverseGeocodePromise = fetch(
-                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
-                  {
-                    signal: AbortSignal.timeout(3000),
-                    headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
-                  },
-                )
-                  .then((r) => (r.ok ? r.json() : null))
-                  .then(
-                    (
-                      geo: {
+                reverseGeocodePromise = (async () => {
+                  try {
+                    const nomRes = await fetch(
+                      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
+                      {
+                        signal: AbortSignal.timeout(2500),
+                        headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
+                      },
+                    );
+                    if (nomRes.ok) {
+                      const geo = (await nomRes.json()) as {
                         address?: {
                           suburb?: string;
                           city?: string;
@@ -3373,8 +3454,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           village?: string;
                           state?: string;
                         };
-                      } | null,
-                    ) => {
+                      } | null;
                       const addr = geo?.address;
                       const label = [
                         addr?.suburb,
@@ -3385,12 +3465,42 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         .join(', ');
                       if (label && userLocation) {
                         userLocation.city = label;
+                        logger.info(`[RealtimeVoice] Reverse-geocoded device location: ${label}`);
+                        return;
                       }
-                    },
-                  )
-                  .catch(() => {
+                    }
+                  } catch {
+                    // Fall through to BigDataCloud reverse-geocode
+                  }
+                  try {
+                    const bdcRes = await fetch(
+                      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&localityLanguage=en`,
+                      { signal: AbortSignal.timeout(2500) },
+                    );
+                    if (bdcRes.ok) {
+                      const bdc = (await bdcRes.json()) as {
+                        locality?: string;
+                        city?: string;
+                        principalSubdivision?: string;
+                      } | null;
+                      const label = [
+                        bdc?.locality && bdc.locality !== bdc.city ? bdc.locality : undefined,
+                        bdc?.city,
+                        bdc?.principalSubdivision,
+                      ]
+                        .filter(Boolean)
+                        .join(', ');
+                      if (label && userLocation) {
+                        userLocation.city = label;
+                        logger.info(
+                          `[RealtimeVoice] Reverse-geocoded device location (fallback): ${label}`,
+                        );
+                      }
+                    }
+                  } catch {
                     // Ignore reverse-geocode failure
-                  });
+                  }
+                })();
               }
               return;
             }

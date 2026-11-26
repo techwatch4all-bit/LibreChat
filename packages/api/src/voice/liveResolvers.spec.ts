@@ -1,5 +1,6 @@
 import {
   stripVoiceStopwords,
+  extractSelfLocationCity,
   extractSpokenCity,
   isPlaceOrDirectionsQuery,
   isWeatherQuery,
@@ -9,9 +10,9 @@ import {
 
 describe('liveResolvers', () => {
   test('stripVoiceStopwords removes spoken filler and preserves core search keywords', () => {
-    expect(
-      stripVoiceStopwords('Okay, are you able to provide top news in India for today?'),
-    ).toBe('top news in India today');
+    expect(stripVoiceStopwords('Okay, are you able to provide top news in India for today?')).toBe(
+      'top news in India today',
+    );
     expect(stripVoiceStopwords('Can you please give me the weather in Mumbai?')).toBe(
       'weather in Mumbai',
     );
@@ -57,5 +58,13 @@ describe('liveResolvers', () => {
     expect(yt?.openUrl).toContain('m.youtube.com/results');
 
     expect(detectMediaIntent('What is the weather today?')).toBeNull();
+  });
+
+  test('extractSelfLocationCity separates user self-location from query-target cities and challenges', () => {
+    expect(extractSelfLocationCity('I live in Kolkata')).toBe('Kolkata');
+    expect(extractSelfLocationCity('My location is Pune')).toBe('Pune');
+    expect(extractSelfLocationCity("Hi, what's the AQI of Mumbai today?")).toBeNull();
+    expect(extractSelfLocationCity('Why did you assume my current location is Mumbai?')).toBeNull();
+    expect(extractSelfLocationCity('AQI at my location')).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import {
   createRealtimeVoiceUpgradeHandler,
+  detectRealtimeSearchIntent,
   resolveSemanticMode,
   buildSatchidaAttributionHeaders,
   detectAccentSwitchCommand,
@@ -756,5 +757,126 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
         process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED = prevFlag;
       }
     }
+  });
+
+  test('does not hijack conversational meta-questions or capability checks as live web searches', () => {
+    expect(detectRealtimeSearchIntent('So why did you skip this news?').isSearch).toBe(false);
+    expect(
+      detectRealtimeSearchIntent(
+        'I asked you why did you skip the news about gas prices and fuel prices before?',
+      ).isSearch,
+    ).toBe(false);
+    expect(
+      detectRealtimeSearchIntent('Okay, do you have access to real current event information?')
+        .isSearch,
+    ).toBe(false);
+    expect(detectRealtimeSearchIntent('Okay, summarize the overall news to me.').isSearch).toBe(
+      false,
+    );
+    expect(
+      detectRealtimeSearchIntent('Why did you assume my current location is Mumbai?').isSearch,
+    ).toBe(false);
+    expect(detectRealtimeSearchIntent('Check again.').isSearch).toBe(false);
+
+    // Genuine live queries still trigger live lookup
+    expect(detectRealtimeSearchIntent("Hi, what's the AQI of Mumbai today?").isSearch).toBe(true);
+    expect(
+      detectRealtimeSearchIntent('Any news about changing prices of fuel in India?').isSearch,
+    ).toBe(true);
+    expect(detectRealtimeSearchIntent('How does that compare to my location?').isSearch).toBe(true);
+  });
+
+  test('preserves GPS location when asking about another city and persists lowercase name/language on onboarding', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-gps-1' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-gps-1',
+        accountType: 'pro_family',
+        seatToken: 'tk_seat_gps',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => JSON.stringify({}),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Opening greeting explicitly asks for language and name for first-time users
+    const openingFrames = upstreamWs.sent
+      .map((s) => JSON.parse(s))
+      .filter((m) => m.clientContent?.turns?.[0]?.parts?.[0]?.text);
+    expect(
+      openingFrames.some((m) =>
+        String(m.clientContent.turns[0].parts[0].text).includes('which language'),
+      ) ||
+        openingFrames.some((m) =>
+          String(m.clientContent.turns[0].parts[0].text).toLowerCase().includes('which language'),
+        ),
+    ).toBe(true);
+
+    // Client sends real GPS (Kolkata)
+    const clientWs = getLastClientWs()!;
+    clientWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'voice.location',
+          lat: 22.6293611,
+          lng: 88.416092,
+          city: 'Kolkata, West Bengal',
+          timeZone: 'Asia/Calcutta',
+        }),
+      ),
+    );
+
+    // User introduces themselves (lowercase) and picks English
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'English please, call me kushal.' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(savedProfiles.some((p) => p.preferred_language === 'English')).toBe(true);
+    expect(savedProfiles.some((p) => p.name === 'Kushal')).toBe(true);
+
+    // User asks about Mumbai AQI — must NOT overwrite Kolkata GPS or persist Mumbai as user location
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: "Hi, what's the AQI of Mumbai today?" },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(savedProfiles.some((p) => p.location === 'Mumbai')).toBe(false);
   });
 });

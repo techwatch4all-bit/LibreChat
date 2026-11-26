@@ -107,7 +107,11 @@ const VOICE_STOPWORDS = new Set([
   'just',
   'actually',
   'brief',
-  'please',
+  'am',
+  'interested',
+  'items',
+  'looking',
+  'wondering',
 ]);
 
 export function stripVoiceStopwords(rawQuery: string): string {
@@ -118,28 +122,67 @@ export function stripVoiceStopwords(rawQuery: string): string {
   return tokens.join(' ').trim() || rawQuery.trim();
 }
 
-export function extractSpokenCity(text: string): string | null {
+const NON_CITY_LOCATION_PHRASES =
+  /^(?:my\s+location|current\s+location|my\s+city|my\s+area|my\s+place|this\s+area|this\s+place|here|nearby|home|the\s+area|the\s+city|location|place|city|india|world|global)$/i;
+
+function sanitizeCityCandidate(raw: string): string | null {
+  const candidate = raw
+    .replace(/\b(today|now|right now|please|thanks|thank you|for today|currently)\b.*$/i, '')
+    .replace(/[.,?!]+$/g, '')
+    .trim();
+  if (
+    candidate.length >= 2 &&
+    candidate.length <= 36 &&
+    !NON_CITY_LOCATION_PHRASES.test(candidate)
+  ) {
+    return candidate;
+  }
+  return null;
+}
+
+/**
+ * Extracts a city ONLY when the user explicitly declares their OWN home/current location
+ * (e.g. "I am in Kolkata", "my location is Pune", "consider my location as Delhi").
+ * Never matches query-target cities like "AQI of Mumbai" or "weather in London".
+ */
+export function extractSelfLocationCity(text: string): string | null {
   const cleaned = text.trim();
+  // Never treat a question challenging an assumed location ("why did you assume my location is Mumbai?") as a declaration
+  if (/\b(why\s+did\s+you|did\s+you\s+assume|not\s+in|not\s+my\s+location)\b/i.test(cleaned)) {
+    return null;
+  }
   const patterns = [
     /\b(?:consider\s+)?(?:my\s+)?location\s+(?:as|is|to\s+be)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\bi(?:'m|\s+am|\s+live|\s+stay)\s+(?:in|at|from|near)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\b(?:city|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\b(?:weather|temperature|forecast|aqi|air\s+quality|panchang)\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\bi(?:'m|\s+am|\s+live|\s+stay|\s+reside)\s+(?:in|at|from|near)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\bmy\s+(?:city|hometown|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
   ];
   for (const re of patterns) {
     const m = cleaned.match(re);
     if (m?.[1]) {
-      const candidate = m[1]
-        .replace(/\b(today|now|right now|please|thanks|thank you|for today)\b.*$/i, '')
-        .replace(/[.,?!]+$/g, '')
-        .trim();
-      if (
-        candidate.length >= 2 &&
-        candidate.length <= 36 &&
-        !/^(?:my\s+location|current\s+location|my\s+city|my\s+area|my\s+place|this\s+area|this\s+place|here|nearby|home|the\s+area|the\s+city)$/i.test(
-          candidate,
-        )
-      ) {
+      const candidate = sanitizeCityCandidate(m[1]);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
+export function extractSpokenCity(text: string): string | null {
+  const cleaned = text.trim();
+  const selfCity = extractSelfLocationCity(cleaned);
+  if (selfCity) {
+    return selfCity;
+  }
+  const queryPatterns = [
+    /\b(?:city|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\b(?:weather|temperature|forecast|aqi|air\s+quality|panchang)\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+  ];
+  for (const re of queryPatterns) {
+    const m = cleaned.match(re);
+    if (m?.[1]) {
+      const candidate = sanitizeCityCandidate(m[1]);
+      if (candidate) {
         return candidate;
       }
     }
@@ -174,10 +217,7 @@ export function detectMediaIntent(text: string): MediaActionCard | null {
 
   const query =
     trimmed
-      .replace(
-        /^(?:please\s+)?(?:can you\s+)?(?:play|listen to|put on|open)\s+/i,
-        '',
-      )
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:play|listen to|put on|open)\s+/i, '')
       .replace(/\b(?:on|in|using|via)\s+(?:spotify|youtube|you tube)\b/gi, '')
       .replace(/\b(?:spotify|youtube|you tube)\b/gi, '')
       .replace(/[?!.]+$/g, '')
@@ -300,18 +340,20 @@ export async function fetchStructuredWeather(
     const feelsLike = wx.current?.apparent_temperature;
     const usAqi = aqiData?.current?.us_aqi;
     const pm25 = aqiData?.current?.pm2_5;
-    const aqiLabel =
-      typeof usAqi === 'number'
-        ? usAqi <= 50
-          ? 'Good'
-          : usAqi <= 100
-            ? 'Moderate'
-            : usAqi <= 150
-              ? 'Unhealthy for sensitive groups'
-              : usAqi <= 200
-                ? 'Unhealthy'
-                : 'Very Unhealthy'
-        : '';
+    let aqiLabel = '';
+    if (typeof usAqi === 'number') {
+      if (usAqi <= 50) {
+        aqiLabel = 'Good';
+      } else if (usAqi <= 100) {
+        aqiLabel = 'Moderate';
+      } else if (usAqi <= 150) {
+        aqiLabel = 'Unhealthy for sensitive groups';
+      } else if (usAqi <= 200) {
+        aqiLabel = 'Unhealthy';
+      } else {
+        aqiLabel = 'Very Unhealthy';
+      }
+    }
     const displayCity = resolvedCity || 'your location';
 
     const summaryText =
@@ -351,10 +393,13 @@ export async function fetchStructuredNews(
 ): Promise<{ summaryText: string; card: NewsActionCard } | null> {
   try {
     const cleanQuery = stripVoiceStopwords(rawQuery);
-    const allowsOldNews = /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(
-      rawQuery,
-    );
-    const wantsIndiaTop = /\b(india|indian|national|bharat)\b/i.test(rawQuery);
+    const allowsOldNews =
+      /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(rawQuery);
+    const hasSpecificTopic =
+      /\b(fuel|gas|petrol|diesel|lpg|gold|silver|stock|nifty|sensex|cricket|ipl|football|tech|ai|election|tariff|economy|budget|weather|cyclone|rbi|rupee|bitcoin|crypto)\b/i.test(
+        rawQuery,
+      );
+    const wantsIndiaTop = !hasSpecificTopic && /\b(india|indian|national|bharat)\b/i.test(rawQuery);
     const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
       /\/+$/,
       '',

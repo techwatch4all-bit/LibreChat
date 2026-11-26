@@ -1633,7 +1633,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       } | null = null;
       let activeSpeakerKey = 'primary';
       let pendingGuestIntroNotice: string | null = null;
-      let lastGuestGreetingAt = 0;
+      const greetedGuestGroups = new Set<string>();
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -3741,20 +3741,20 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     );
                   }
                 } else if (analysis.status === 'unknown_guest') {
-                  const pitchBucket = Math.round(analysis.pitchHz / 40) * 40;
-                  const nextKey = `unknown:${pitchBucket}`;
+                  // Group by gender/age category rather than narrow 40Hz pitch buckets so natural
+                  // voice inflection (e.g. 238Hz <-> 263Hz) never treats the same guest as multiple people.
+                  const guestGroupKey = `unknown:${analysis.genderHint}`;
                   _lastGuestAcoustic = {
                     avgPitchHz: analysis.pitchHz,
                     pitchStdHz: Math.round(pitchStdHz),
                     genderHint: analysis.genderHint,
                   };
-                  if (nextKey !== activeSpeakerKey) {
-                    activeSpeakerKey = nextKey;
-                    const now = Date.now();
-                    if (now - lastGuestGreetingAt > 5 * 60 * 1000) {
-                      lastGuestGreetingAt = now;
+                  if (guestGroupKey !== activeSpeakerKey) {
+                    activeSpeakerKey = guestGroupKey;
+                    if (!greetedGuestGroups.has(guestGroupKey)) {
+                      greetedGuestGroups.add(guestGroupKey);
                       const personaName = activeVoiceProfile.gender === 'female' ? 'Maya' : 'Anand';
-                      pendingGuestIntroNotice = `A new ${analysis.genderHint} voice (pitch ~${analysis.pitchHz}Hz) just spoke. If they are addressing you, greet them naturally like: "Hi, I'm ${personaName}, we haven't spoken before — what's your name?"`;
+                      pendingGuestIntroNotice = `A new ${analysis.genderHint} voice just joined. If they are addressing you, warmly introduce yourself as ${personaName} in your own natural words and casually ask their name. Never repeat the same scripted line—if you didn't catch their name, ask once naturally; if they prefer not to share it, politely let it go and keep chatting naturally.`;
                     }
                     logger.info(
                       `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,

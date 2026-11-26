@@ -211,24 +211,37 @@ export function detectRealtimeSearchIntent(text: string): {
   isDeepResearch: boolean;
   hasUrl: boolean;
 } {
-  const lower = text.trim().toLowerCase();
-  const hasUrl = /https?:\/\/\S+/i.test(text);
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+  const hasUrl = /https?:\/\/\S+/i.test(trimmed);
   const isDeepResearch =
     /\b(deep research|research in detail|comprehensive research|thorough research|investigate deeply|full report on)\b/i.test(
       lower,
     );
-  const isSearch =
-    isDeepResearch ||
-    hasUrl ||
-    /\b(weather|temperature|forecast|aqi|air quality|traffic|gas station|fuel|petrol|ev charger|parking|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
-      lower,
-    ) ||
-    /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का|पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(
-      text,
-    ) ||
-    /\b(latest|today'?s|current|currently)\s+(news|headlines|updates|score|scores|price|prices|rate|rates|weather|events|results|match)\b/i.test(
+
+  // Skip pure greetings, acknowledgments, and tiny chit-chat phrases
+  const isPureChitChat =
+    /^(?:hi|hello|hey|good morning|good afternoon|good evening|good night|how are you|how's it going|what's up|thanks|thank you|okay|ok|yes|yeah|no|nope|bye|goodbye|stop|wait|sorry|excuse me|can you hear me|are you there|you got that|who are you|what is your name|who made you|tell me a joke|switch to \w+)[?.!,\s]*$/i.test(
       lower,
     );
+  if (isPureChitChat) {
+    return { isSearch: false, isDeepResearch: false, hasUrl: false };
+  }
+
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  const isQuestionOrInfoRequest =
+    /\?/.test(trimmed) ||
+    /^(?:what|who|where|when|how|which|is|are|was|were|did|does|do|can you|could you|tell me|give me|find|check|show|look up|search|explain|list|provide)\b/i.test(
+      lower,
+    ) ||
+    /\b(today|now|latest|current|currently|live|recent|yesterday|tomorrow|this week|this month|2026|2027|price|rate|cost|score|weather|aqi|news|near me|nearest|nearby|directions)\b/i.test(
+      lower,
+    ) ||
+    /(?:क्या|कब|कहाँ|कौन|कैसे|कितना|आज|अभी|ताजा|न्यूज़|समाचार|खबर|मौसम|भाव|कीमत|पंचांग)/u.test(
+      trimmed,
+    );
+
+  const isSearch = isDeepResearch || hasUrl || (wordCount >= 3 && isQuestionOrInfoRequest);
   return { isSearch, isDeepResearch, hasUrl };
 }
 
@@ -2418,9 +2431,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   }
                 }
 
-                // 2. Live Web Search (structured weather/news + fast satchida-search) or LibreChat tool/tutor delegation
+                // 2. Live Web Search (universal for any question/info request, skipped in Translator Mode) or LibreChat tool/tutor delegation
                 const toolIntent = detectToolOrTutorIntent(effectiveUtterance);
-                const searchIntent = detectRealtimeSearchIntent(effectiveUtterance);
+                const searchIntent = isTranslatorMode
+                  ? { isSearch: false, isDeepResearch: false, hasUrl: false }
+                  : detectRealtimeSearchIntent(effectiveUtterance);
                 if ((toolIntent.delegate || searchIntent.isSearch) && modePolicy.toolsAllowed) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });

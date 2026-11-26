@@ -1,13 +1,15 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import http from 'http';
-import os from 'os';
 import { spawn } from 'child_process';
+import { logger } from '@librechat/data-schemas';
 import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
-import { logger } from '@librechat/data-schemas';
+import type { VoiceProfileData } from './voiceProfile';
 import {
   stripVoiceStopwords,
+  extractSelfLocationCity,
   extractSpokenCity,
   isPlaceOrDirectionsQuery,
   isWeatherQuery,
@@ -15,15 +17,16 @@ import {
   fetchStructuredWeather,
   fetchStructuredNews,
   detectMediaIntent,
+  resolveYouTubeEmbedUrl,
+  fetchNearestPlaceWithEta,
 } from './liveResolvers';
 import {
-  VOICE_PROFILE_MEMORY_KEY,
   parseVoiceProfile,
   serializeVoiceProfile,
   mergeVoiceProfile,
+  getTimeOfDayGreeting,
   buildVoiceMemorySystemBlock,
 } from './voiceProfile';
-import type { VoiceProfileData } from './voiceProfile';
 import { analyzeSpeakerTurn, detectAiVoiceAgent, inferGenderHint } from './voiceIntelligence';
 
 export interface RealtimeWebSocketLike {
@@ -207,7 +210,10 @@ export function detectAccentSwitchCommand(
   let gender: 'female' | 'male' = currentProfile.gender;
   if (/\b(male|man|guy|boy)\b/.test(lower) && !/\bnot\s+(?:a\s+)?male\b/.test(lower)) {
     gender = 'male';
-  } else if (/\b(female|woman|lady|girl)\b/.test(lower) && !/\bstill\s+(?:a\s+)?female\b/.test(lower)) {
+  } else if (
+    /\b(female|woman|lady|girl)\b/.test(lower) &&
+    !/\bstill\s+(?:a\s+)?female\b/.test(lower)
+  ) {
     gender = 'female';
   } else if (/\bstill\s+(?:a\s+)?female\b/.test(lower)) {
     gender = 'male';
@@ -232,27 +238,37 @@ export function detectRealtimeSearchIntent(text: string): {
 
   // Skip pure greetings, acknowledgments, and tiny chit-chat phrases
   const isPureChitChat =
-    /^(?:hi|hello|hey|good morning|good afternoon|good evening|good night|how are you|how's it going|what's up|thanks|thank you|okay|ok|yes|yeah|no|nope|bye|goodbye|stop|wait|sorry|excuse me|can you hear me|are you there|you got that|who are you|what is your name|who made you|tell me a joke|switch to \w+)[?.!,\s]*$/i.test(
+    /^(?:hi|hello|hey|good morning|good afternoon|good evening|good night|how are you|how's it going|what's up|thanks|thank you|okay|ok|yes|yeah|no|nope|bye|goodbye|stop|wait|sorry|excuse me|can you hear me|are you there|you got that|who are you|what is your name|who made you|tell me a joke|switch to \w+|check again|try again|repeat that)[?.!,\s]*$/i.test(
       lower,
     );
   if (isPureChitChat) {
     return { isSearch: false, isDeepResearch: false, hasUrl: false };
   }
 
+  // Skip conversational meta-questions, complaints, capability checks, and recaps of prior turns
+  // so Gemini Live handles natural human discussion without hijacking the turn with a literal web search.
+  const isConversationalMeta =
+    /\b(why\s+did\s+you|why\s+didn'?t\s+you|why\s+do\s+you\s+(?:think|say|assume)|you\s+(?:skipped|missed|forgot|assumed)|i\s+asked\s+you|i\s+told\s+you|what\s+did\s+you\s+(?:say|mean)|did\s+you\s+(?:just|hear|understand)|do\s+you\s+have\s+access|can\s+you\s+access|are\s+you\s+(?:listening|able\s+to)|i\s+did\s+not\s+know\s+you\s+are\s+listening)\b/i.test(
+      lower,
+    ) ||
+    /^(?:okay|ok|alright|so|well|now)?[,\s]*(?:summarize|recap|elaborate|explain)\s+(?:that|it|this|those|the\s+overall\s+news|the\s+news\s+you\s+just|what\s+you\s+just)\b/i.test(
+      lower,
+    );
+  if (isConversationalMeta && !isDeepResearch && !hasUrl) {
+    return { isSearch: false, isDeepResearch: false, hasUrl: false };
+  }
+
   const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
-  const isQuestionOrInfoRequest =
-    /\?/.test(trimmed) ||
-    /^(?:what|who|where|when|how|which|is|are|was|were|did|does|do|can you|could you|tell me|give me|find|check|show|look up|search|explain|list|provide)\b/i.test(
+  const hasExplicitLiveSignal =
+    /\b(today|now|latest|current|currently|live|recent|yesterday|tomorrow|this week|this month|2026|2027|price|prices|rate|rates|cost|score|scores|match|ipl|stock|nifty|sensex|gold|silver|petrol|diesel|lpg|fuel|gas|weather|temperature|forecast|aqi|air quality|news|headlines|breaking|near me|nearest|nearby|directions|my location|where am i|current location|panchang|tithi|rahu kaal|sunrise|sunset)\b/i.test(
       lower,
     ) ||
-    /\b(today|now|latest|current|currently|live|recent|yesterday|tomorrow|this week|this month|2026|2027|price|rate|cost|score|weather|aqi|news|near me|nearest|nearby|directions)\b/i.test(
-      lower,
-    ) ||
-    /(?:क्या|कब|कहाँ|कौन|कैसे|कितना|आज|अभी|ताजा|न्यूज़|समाचार|खबर|मौसम|भाव|कीमत|पंचांग)/u.test(
+    /^(?:search|look up|google|find|check)\b/i.test(lower) ||
+    /(?:आज|अभी|ताजा|ताज़ा|न्यूज़|समाचार|खबर|मौसम|तापमान|भाव|कीमत|पंचांग|पेट्रोल|डीजल|सोना|चांदी)/u.test(
       trimmed,
     );
 
-  const isSearch = isDeepResearch || hasUrl || (wordCount >= 3 && isQuestionOrInfoRequest);
+  const isSearch = isDeepResearch || hasUrl || (wordCount >= 3 && hasExplicitLiveSignal);
   return { isSearch, isDeepResearch, hasUrl };
 }
 
@@ -270,9 +286,13 @@ export function detectToolOrTutorIntent(text: string): {
       lower,
     );
   const wantsChatOrTool =
-    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?image|create (?:an? )?image|write code in chat|use librechat|new chat)\b/i.test(
+    /\b(insert into chat|send to chat|type in chat|write in chat|ask in chat|generate (?:an? )?(?:image|video|art|chart|presentation|ppt|slide|document|pdf|spreadsheet|report|floorplan)|create (?:an? )?(?:image|video|document|presentation|ppt|spreadsheet|diagram|chart|floorplan|report)|write code|build (?:an? )?(?:app|website|script|tool)|check my (?:vault|files|documents|notes|knowledge base|email|emails|inbox|gmail)|search my (?:vault|files|documents|notes)|read (?:out )?(?:my )?(?:last|latest|recent|unread)?\s*emails?|any new emails?|deep research|full report on|use librechat|new chat)\b/i.test(
       lower,
-    );
+    ) ||
+    /\b((?:gold|silver|bullion|petrol|diesel|fuel|lpg|gas|stock|nifty|sensex)\s+(?:price|prices|rate|rates)|(?:price|prices|rate|rates)\s+of\s+(?:gold|silver|bullion|petrol|diesel|fuel|lpg|gas))\b/i.test(
+      lower,
+    ) ||
+    /(?:गोल्ड|सोना|सोने|सिल्वर|चांदी|पेट्रोल|डीजल).*(?:प्राइस|भाव|कीमत|रेट)/u.test(trimmed);
 
   if (!wantsDeepTutorOrStudy && !wantsChatOrTool) {
     return { delegate: false, cleanPrompt: trimmed };
@@ -289,7 +309,8 @@ export function detectToolOrTutorIntent(text: string): {
   return {
     delegate: true,
     mode: wantsDeepTutorOrStudy ? 'Study' : undefined,
-    webSearch: wantsDeepTutorOrStudy || /\b(web|search|animation|visual|latest|online|fetch)\b/i.test(lower),
+    webSearch:
+      wantsDeepTutorOrStudy || /\b(web|search|animation|visual|latest|online|fetch)\b/i.test(lower),
     newChat: wantsDeepTutorOrStudy || /\bnew chat\b/i.test(lower),
     cleanPrompt,
   };
@@ -524,9 +545,7 @@ export async function mintGoogleEphemeralToken(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(
-      `Failed to mint ephemeral token (status ${res.status}): ${text.slice(0, 200)}`,
-    );
+    throw new Error(`Failed to mint ephemeral token (status ${res.status}): ${text.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as { name?: string };
@@ -586,7 +605,10 @@ export function createVoiceWarmHandler(opts: {
 }) {
   return async (
     req: { user?: { id?: string; _id?: { toString(): string } } },
-    res: { status: (code: number) => { json: (body: unknown) => void }; json: (body: unknown) => void },
+    res: {
+      status: (code: number) => { json: (body: unknown) => void };
+      json: (body: unknown) => void;
+    },
   ): Promise<void> => {
     const userId = req.user?.id || req.user?._id?.toString();
     if (!userId) {
@@ -688,10 +710,7 @@ export function pcmToWavBuffer(
   return Buffer.concat([header, pcmBuffer]);
 }
 
-function recordVoiceUsageInOneApi(
-  seatAliasOrId: string,
-  outputTokens: number,
-): void {
+function recordVoiceUsageInOneApi(seatAliasOrId: string, outputTokens: number): void {
   const candidates = [
     'D:\\LAN-AI-Infra\\one-api\\one-api.db',
     path.resolve(process.cwd(), 'one-api.db'),
@@ -734,7 +753,7 @@ export function selectBifrostVkForMode(mode: string, accountType?: string | null
 
   // Motion/Voice requests route via Cloud Retaining/Cloud ZDR virtual key
   if (normalizedMode === 'motion') {
-    return normalizedTier === 'privacy' ? (vks.zdr || vks.retaining) : (vks.retaining || vks.workStudy);
+    return normalizedTier === 'privacy' ? vks.zdr || vks.retaining : vks.retaining || vks.workStudy;
   }
 
   // Only true local Privacy mode uses the localPrivacy key
@@ -1166,11 +1185,53 @@ async function executeVoiceWebSearch(
   }
   // Strip spoken filler/stopwords so search engines receive clean keywords
   const STOPWORDS = new Set([
-    'okay', 'ok', 'hey', 'hi', 'hello', 'please', 'well', 'so', 'um', 'uh', 'then',
-    'can', 'could', 'would', 'will', 'are', 'you', 'able', 'to', 'provide', 'give',
-    'tell', 'me', 'check', 'find', 'search', 'get', 'show', 'with', 'i', 'want',
-    'need', 'like', 'know', 'hear', 'see', 'about', 'the', 'a', 'an', 'some', 'any',
-    'for', 'of', 'is', 'my', 'your',
+    'okay',
+    'ok',
+    'hey',
+    'hi',
+    'hello',
+    'please',
+    'well',
+    'so',
+    'um',
+    'uh',
+    'then',
+    'can',
+    'could',
+    'would',
+    'will',
+    'are',
+    'you',
+    'able',
+    'to',
+    'provide',
+    'give',
+    'tell',
+    'me',
+    'check',
+    'find',
+    'search',
+    'get',
+    'show',
+    'with',
+    'i',
+    'want',
+    'need',
+    'like',
+    'know',
+    'hear',
+    'see',
+    'about',
+    'the',
+    'a',
+    'an',
+    'some',
+    'any',
+    'for',
+    'of',
+    'is',
+    'my',
+    'your',
   ]);
   const keywordTokens = rawQuery
     .replace(/[?!.,;:'"]+/g, ' ')
@@ -1333,11 +1394,15 @@ async function executeVoiceWebSearch(
           return;
         }
         const html = await res.text();
-        const snippets = [
-          ...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi),
-        ].slice(0, 5);
+        const snippets = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi)].slice(
+          0,
+          5,
+        );
         for (const s of snippets) {
-          const txt = (s[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+          const txt = (s[1] || '')
+            .replace(/<[^>]+>/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
           if (txt) {
             results.push(`Web Snippet: ${txt}`);
           }
@@ -1377,7 +1442,10 @@ async function executeVoiceWebSearch(
             ...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi),
           ].slice(0, 4);
           for (const s of snippets) {
-            const txt = (s[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            const txt = (s[1] || '')
+              .replace(/<[^>]+>/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
             if (txt) {
               results.push(`Deep Research: ${txt}`);
             }
@@ -1478,7 +1546,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
     const initialHasTools = url.searchParams.get('tools') === 'true';
     const initialVoiceParam = url.searchParams.get('voice') || 'in_female';
     const requestedModel = url.searchParams.get('model')?.trim();
-    const model = requestedModel || config.model;
+    const _model = requestedModel || config.model;
 
     wss.handleUpgrade(req, socket, head, async (clientWs) => {
       // 2. MANDATORY USER RECORD, TIER ENTITLEMENT & SEAT TOKEN CHECK
@@ -1537,8 +1605,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       }
 
       let activeVoiceProfile = resolveVoiceProfile(initialVoiceParam);
-      const modeVk = selectBifrostVkForMode(modePolicy.semanticMode, userSeat.accountType);
-      const attributionHeaders = buildSatchidaAttributionHeaders({
+      const _modeVk = selectBifrostVkForMode(modePolicy.semanticMode, userSeat.accountType);
+      const _attributionHeaders = buildSatchidaAttributionHeaders({
         user: userSeat,
         userId: authenticatedUserId,
         semanticMode: modePolicy.semanticMode,
@@ -1558,12 +1626,16 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let voiceProfile: VoiceProfileData = {};
       let initialGreetingSent = false;
       const recentUserTranscripts: string[] = [];
-      let lastGuestAcoustic: {
+      let _lastGuestAcoustic: {
         avgPitchHz: number;
         pitchStdHz: number;
-        genderHint: 'male' | 'female' | 'unknown';
+        genderHint: 'male' | 'female' | 'child' | 'unknown';
       } | null = null;
       let activeSpeakerKey = 'primary';
+      let pendingGuestIntroNotice: string | null = null;
+      const greetedGuestGroups = new Set<string>();
+      let consecutiveUnknownGroup = '';
+      let consecutiveUnknownCount = 0;
 
       if (deps.getVoiceProfileMemory) {
         try {
@@ -1584,6 +1656,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               authenticatedUserId,
               serializeVoiceProfile(voiceProfile),
             );
+            logger.info(
+              `[RealtimeVoice] Saved voice profile patch user=${authenticatedUserId} keys=${Object.keys(patch).join(',')}`,
+            );
           } catch (err) {
             logger.warn('[RealtimeVoice] Failed to persist voice profile memory:', err);
           }
@@ -1591,12 +1666,21 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         return voiceProfile;
       };
 
-      const buildVoiceSystemPrompt = (profile: VoiceProfile): string =>
-        'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI.\n' +
-        `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}). Always speak as a ${profile.gender} persona and use ${profile.gender === 'female' ? 'feminine' : 'masculine'} grammatical forms and self-references (especially in Hindi, Hinglish, Urdu, etc., e.g. "main kar ${profile.gender === 'female' ? 'sakti' : 'sakta'} hoon").\n` +
-        'HUMAN DELIVERY & TUTORING: Speak with genuine human warmth, natural emotion, varied rhythm, and friendly reactions ("Oh, nice!", "Great question!", "You know what..."). When explaining concepts to a student or child, use simple vivid analogies instead of reading lists or markdown line-by-line, summarize clearly, and warmly ask if they understood or have any doubts.\n' +
-        'IDENTITY: NEVER mention or disclose backend provider names, raw model identifiers (GLM, DeepSeek, Qwen, Gemini, OpenAI, CheapInference, OpenRouter, Bifrost, One-API, or local ports). Always say you are Satchida Live Voice powered by Satchida AI.\n' +
-        'FORMAT: Keep spoken responses concise (1 to 3 natural spoken sentences) with NO markdown, asterisks, bullet points, URLs, or emojis. When [LIVE WEB SEARCH RESULTS] are provided in the conversation, use them directly to answer accurately and never claim you lack real-time access.';
+      const buildVoiceSystemPrompt = (profile: VoiceProfile): string => {
+        const genderRule =
+          profile.gender === 'female'
+            ? 'STRICT FEMININE GRAMMAR RULE: You are a WOMAN speaking in a female voice. ALWAYS use feminine grammatical gender for yourself in EVERY gendered language (Hindi, Hinglish, Urdu, Marathi, French, Spanish, etc., e.g. "main kar sakti hoon", "main sun rahi hoon"). NEVER use masculine self-references.\n'
+            : 'STRICT MASCULINE GRAMMAR RULE: You are a MAN speaking in a male voice. ALWAYS use masculine grammatical gender for yourself in EVERY gendered language (Hindi, Hinglish, Urdu, Marathi, French, Spanish, etc., e.g. "main kar sakta hoon", "main sun raha hoon"). NEVER use feminine self-references.\n';
+        return (
+          'You are Satchida Live Voice, the official conversational voice assistant for Satchida AI.\n' +
+          `VOICE PERSONA & GENDER: Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}).\n` +
+          genderRule +
+          'HUMAN DELIVERY & TUTORING: Speak with genuine human warmth, natural emotion, varied rhythm, and friendly reactions ("Oh, nice!", "Great question!", "You know what..."). When explaining concepts to a student or child, use simple vivid analogies instead of reading lists or markdown line-by-line, summarize clearly, and warmly ask if they understood or have any doubts.\n' +
+          'IDENTITY: NEVER mention or disclose backend provider names, raw model identifiers (GLM, DeepSeek, Qwen, Gemini, OpenAI, CheapInference, OpenRouter, Bifrost, One-API, or local ports). Always say you are Satchida Live Voice powered by Satchida AI.\n' +
+          'FORMAT: Keep spoken responses concise (1 to 3 natural spoken sentences) with NO markdown, asterisks, bullet points, URLs, or emojis. When [LIVE WEB SEARCH RESULTS] are provided in the conversation, use them directly to answer accurately and never claim you lack real-time access.\n\n' +
+          buildVoiceMemorySystemBlock(voiceProfile, clientLocalHour)
+        );
+      };
 
       const pendingMessages: Array<string | Buffer | ArrayBuffer | Buffer[]> = [];
       const conversationHistory: Array<{ role: string; content: string }> = [
@@ -1642,6 +1726,178 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         });
       };
 
+      let pendingLocalQuery: string | null = null;
+      let lastLiveLookupKind: 'weather' | 'news' | 'place' | null = null;
+      let isTranslatorMode = false;
+      let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
+        null;
+      let reverseGeocodePromise: Promise<void> | null = null;
+      let dispatchS2sUtterance: ((utterance: string) => boolean) | null = null;
+
+      const extractAndPersistProfileFromUtterance = (cleanUtterance: string) => {
+        const patch: Parameters<typeof mergeVoiceProfile>[1] = {};
+
+        const langMatch =
+          cleanUtterance.match(
+            /\b(?:speak|talk|switch|change(?:\s+you)?|chat|prefer|use|let'?s\s+(?:do|use|speak|talk))\s+(?:in\s+|to\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+          ) ||
+          cleanUtterance.match(
+            /\b(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\s+(?:mein|me|main|में)\s+(?:switch|baat|bolo|boliye|kijiye|karo|karen)\b/i,
+          ) ||
+          (!voiceProfile.preferred_language
+            ? cleanUtterance.match(
+                /\b(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
+              )
+            : null);
+        if (langMatch?.[1]) {
+          const chosenLang =
+            langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
+          if (voiceProfile.preferred_language !== chosenLang) {
+            patch.preferred_language = chosenLang;
+          }
+        }
+        const isNameNegation =
+          /\b(not\s+my\s+name|wrong\s+name|nahi|nahin)\b/i.test(cleanUtterance) ||
+          /(?:नहीं|गलत\s+नाम)/u.test(cleanUtterance);
+        const NON_NAME_WORDS =
+          /^(?:sorry|good|fine|okay|ok|here|looking|asking|trying|interested|talking|speaking|driving|walking|working|sitting|eating|waiting|running|doing|going|calling|from|in|at|the|not|very|really|just|also|actually|tu|tú|you|me|no|yes|nahi|nahin|नहीं|नह|हाँ|जी|क्या|कौन|english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)$/i;
+        if (!isNameNegation) {
+          // Only match explicit name introductions or explicit name changes — never bare "I am <verb/adjective>"
+          const explicitNameMatch =
+            cleanUtterance.match(
+              /\b(?:my\s+name\s+is(?:\s+also)?|call\s+me|use\s+(?:the\s+)?name|(?:change|update|set)\s+my\s+name(?:\s+from\s+[a-zA-Z]+)?\s+to)\s+([a-zA-Z]{2,24})\b/i,
+            ) ||
+            cleanUtterance.match(/(?:मेरा\s+नाम|mera\s+naam)\s+([\p{L}\p{M}]{2,24})/iu) ||
+            cleanUtterance.match(
+              /(?:आप\s+)?मुझे\s+([\p{L}\p{M}]{2,24})\s+(?:के\s+नाम\s+से\s+)?बुला/u,
+            ) ||
+            cleanUtterance.match(/\bmujhe\s+([a-zA-Z]{2,24})\s+(?:ke\s+naam\s+se\s+)?bula/i);
+          const extractedName = explicitNameMatch?.[1]?.trim() || '';
+          if (extractedName && !NON_NAME_WORDS.test(extractedName)) {
+            const normalizedName = /^[a-zA-Z]+$/.test(extractedName)
+              ? extractedName.charAt(0).toUpperCase() + extractedName.slice(1)
+              : extractedName;
+            if (activeSpeakerKey.startsWith('unknown:') && voiceProfile.name) {
+              patch.add_speaker = {
+                name: normalizedName,
+                ...(_lastGuestAcoustic
+                  ? {
+                      gender_hint: _lastGuestAcoustic.genderHint,
+                      avg_pitch_hz: _lastGuestAcoustic.avgPitchHz,
+                      pitch_std_hz: _lastGuestAcoustic.pitchStdHz,
+                    }
+                  : {}),
+              };
+              activeSpeakerKey = `known:${normalizedName.toLowerCase()}`;
+              pendingGuestIntroNotice = null;
+            } else {
+              patch.name = normalizedName;
+            }
+          }
+        }
+        const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
+        if (dietMatch?.[1]) {
+          patch.dietary_preference = dietMatch[1].toLowerCase();
+        }
+        const rememberMatch = cleanUtterance.match(
+          /\b(?:please\s+)?remember\s+(?:that\s+)?(.{4,140}?)(?:[.!?]|$)/i,
+        );
+        if (rememberMatch?.[1]) {
+          patch.notes = [rememberMatch[1].trim()];
+        }
+        // Guest introduction: "this is my wife Priya", "meet my son Aarav", "my friend Rahul is here"
+        const guestIntroMatch = cleanUtterance.match(
+          /\b(?:this is|meet|here is|my)\s+(?:my\s+)?(wife|husband|son|daughter|brother|sister|friend|mother|mom|father|dad|colleague|partner|cousin)\s+([a-zA-Z]{2,24})\b/i,
+        );
+        if (guestIntroMatch?.[1] && guestIntroMatch?.[2]) {
+          const guestRelation = guestIntroMatch[1].toLowerCase();
+          const rawGuestName = guestIntroMatch[2];
+          const guestName = rawGuestName.charAt(0).toUpperCase() + rawGuestName.slice(1);
+          patch.add_speaker = {
+            name: guestName,
+            relation: guestRelation,
+            ...(_lastGuestAcoustic
+              ? {
+                  gender_hint: _lastGuestAcoustic.genderHint,
+                  avg_pitch_hz: _lastGuestAcoustic.avgPitchHz,
+                  pitch_std_hz: _lastGuestAcoustic.pitchStdHz,
+                }
+              : {}),
+          };
+          pendingGuestIntroNotice = null;
+        }
+
+        const briefOff =
+          /\b(disable|stop|turn\s+off|cancel|no)\s+(?:(?:the|my)\s+)?(?:daily\s+)?morning\s+brief\b/i.test(
+            cleanUtterance,
+          );
+        const briefOn =
+          /\b(?:(?:enable|start|set\s+up|want|activate)\s+)?(?:(?:a|my)\s+)?daily\s+morning\s+brief\b/i.test(
+            cleanUtterance,
+          ) || /\b(?:enable|start|set\s+up)\s+morning\s+brief\b/i.test(cleanUtterance);
+        if (briefOff) {
+          patch.morning_brief = { enabled: false };
+        } else if (briefOn && !voiceProfile.morning_brief?.enabled) {
+          const topicMatch = cleanUtterance.match(
+            /\b(?:on|about|for|covering)\s+([\w\s,]+?)(?:[.!?]|$)/i,
+          );
+          const topics = topicMatch?.[1]
+            ? topicMatch[1]
+                .split(/,|\band\b/i)
+                .map((t) => t.trim().toLowerCase())
+                .filter(Boolean)
+            : undefined;
+          patch.morning_brief = { enabled: true, ...(topics ? { topics } : {}) };
+        }
+
+        if (Object.keys(patch).length > 0) {
+          void persistVoiceProfilePatch(patch);
+        }
+      };
+
+      const applySpokenLocationMemory = (cleanUtterance: string): string => {
+        const selfCity = extractSelfLocationCity(cleanUtterance);
+        const spokenCity = selfCity || extractSpokenCity(cleanUtterance);
+        const hasGps =
+          typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number';
+        let effectiveUtterance = cleanUtterance;
+
+        if (selfCity) {
+          // Only override GPS city if the user explicitly asks to set/consider their location
+          const isExplicitOverride = /\b(consider|set|change|update)\s+(?:my\s+)?location\b/i.test(
+            cleanUtterance,
+          );
+          if (!hasGps || isExplicitOverride) {
+            userLocation = { ...(userLocation || {}), city: selfCity };
+            logger.info(
+              `[RealtimeVoice] Updated userLocation.city="${selfCity}" from self-location`,
+            );
+          }
+          if (!voiceProfile.location) {
+            void persistVoiceProfilePatch({ location: selfCity });
+          }
+        } else if (spokenCity) {
+          // Query-target city (e.g. "AQI of Mumbai"): NEVER overwrite GPS or an already-known city!
+          if (!hasGps && !userLocation?.city) {
+            userLocation = { ...(userLocation || {}), city: spokenCity };
+            logger.info(`[RealtimeVoice] Soft-set userLocation.city="${spokenCity}" (no GPS)`);
+            if (!voiceProfile.location) {
+              void persistVoiceProfilePatch({ location: spokenCity });
+            }
+          }
+        }
+
+        if (
+          spokenCity &&
+          pendingLocalQuery &&
+          !detectRealtimeSearchIntent(cleanUtterance).isSearch
+        ) {
+          effectiveUtterance = `${pendingLocalQuery} in ${spokenCity}`;
+          pendingLocalQuery = null;
+        }
+        return effectiveUtterance;
+      };
+
       const handleBridgeTurn = async (
         userText: string,
         requestedVoice?: string,
@@ -1657,24 +1913,113 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           activeVoiceProfile = resolveVoiceProfile(requestedVoice);
         }
 
-        // Check for on-the-fly voice/accent switch command (e.g., "switch to US male accent")
-        const switchedProfile = detectAccentSwitchCommand(trimmed, activeVoiceProfile);
-        if (switchedProfile) {
-          activeVoiceProfile = switchedProfile;
-          const confirmText = `Switched to ${switchedProfile.label}. How can I help you?`;
-          sendJson(clientWs, {
-            type: 'voice.accent_changed',
-            voiceId: switchedProfile.id,
-            label: switchedProfile.label,
-            lang: switchedProfile.lang,
-          });
-          sendJson(clientWs, {
-            type: 'response.audio_transcript.done',
-            transcript: confirmText,
-          });
-          enqueueTtsSentence(confirmText, switchedProfile);
-          return;
+        const isSyntheticGreeting = /^(?:Say only:|\[SYSTEM NOTICE:)/i.test(trimmed);
+
+        if (!isSyntheticGreeting) {
+          extractAndPersistProfileFromUtterance(trimmed);
+
+          // Check for on-the-fly voice/accent switch command (e.g., "switch to US male accent")
+          const switchedProfile = detectAccentSwitchCommand(trimmed, activeVoiceProfile);
+          if (switchedProfile) {
+            activeVoiceProfile = switchedProfile;
+            const confirmText = `Switched to ${switchedProfile.label}. How can I help you?`;
+            sendJson(clientWs, {
+              type: 'voice.accent_changed',
+              voiceId: switchedProfile.id,
+              label: switchedProfile.label,
+              lang: switchedProfile.lang,
+            });
+            sendJson(clientWs, {
+              type: 'response.audio_transcript.done',
+              transcript: confirmText,
+            });
+            enqueueTtsSentence(confirmText, switchedProfile);
+            return;
+          }
+
+          // Hands-free UI & media actions in bridge/privacy mode
+          const lowerTrimmed = trimmed.toLowerCase();
+          const speakBridgeConfirm = (confirmText: string) => {
+            sendJson(clientWs, {
+              type: 'response.audio_transcript.done',
+              transcript: confirmText,
+            });
+            enqueueTtsSentence(confirmText, activeVoiceProfile);
+          };
+
+          if (
+            /\b(?:start|turn on|enable|enter|activate)\s+(?:the\s+)?(?:translator|translation|interpreter)\s+mode\b/i.test(
+              lowerTrimmed,
+            ) ||
+            /\btranslate\s+between\s+\w+\s+and\s+\w+/i.test(lowerTrimmed)
+          ) {
+            isTranslatorMode = true;
+            sendJson(clientWs, { type: 'voice.translator_mode', enabled: true });
+            speakBridgeConfirm('Translator mode is now on. Go ahead.');
+            return;
+          }
+          if (
+            /\b(?:stop|turn off|disable|exit|end)\s+(?:the\s+)?(?:translator|translation|interpreter)\s+mode\b/i.test(
+              lowerTrimmed,
+            )
+          ) {
+            isTranslatorMode = false;
+            sendJson(clientWs, { type: 'voice.translator_mode', enabled: false });
+            speakBridgeConfirm('Translator mode is now off.');
+            return;
+          }
+          if (/^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(lowerTrimmed)) {
+            sendJson(clientWs, { type: 'voice.ui_action', action: 'new_chat' });
+            speakBridgeConfirm('Opened a new chat.');
+            return;
+          }
+          const modeSwitchMatch = lowerTrimmed.match(
+            /\b(?:switch|change|go)\s+to\s+(chat|study|work|privacy|pro)\s+mode\b/i,
+          );
+          if (modeSwitchMatch) {
+            const target =
+              modeSwitchMatch[1].charAt(0).toUpperCase() +
+              modeSwitchMatch[1].slice(1).toLowerCase();
+            sendJson(clientWs, {
+              type: 'voice.ui_action',
+              action: 'set_mode',
+              value: target,
+            });
+            speakBridgeConfirm(`Switched to ${target} mode.`);
+            return;
+          }
+          if (/\bscroll\s+down\b/i.test(lowerTrimmed)) {
+            sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_down' });
+            return;
+          }
+          if (/\bscroll\s+up\b/i.test(lowerTrimmed)) {
+            sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_up' });
+            return;
+          }
+          if (/\bminimize\s+(?:voice|window|this)\b/i.test(lowerTrimmed)) {
+            sendJson(clientWs, { type: 'voice.ui_action', action: 'minimize' });
+            speakBridgeConfirm('Minimized the voice window.');
+            return;
+          }
+          if (/\bmaximize\s+(?:voice|window|this)\b/i.test(lowerTrimmed)) {
+            sendJson(clientWs, { type: 'voice.ui_action', action: 'maximize' });
+            speakBridgeConfirm('Expanded the voice window.');
+            return;
+          }
+
+          const mediaCard = detectMediaIntent(trimmed);
+          if (mediaCard) {
+            sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
+            speakBridgeConfirm(
+              `Opened the ${mediaCard.title} launcher card for ${mediaCard.query}. Tap the button to launch it.`,
+            );
+            return;
+          }
         }
+
+        const effectiveUtterance = isSyntheticGreeting
+          ? trimmed
+          : applySpokenLocationMemory(trimmed);
 
         const activePolicy = resolveSemanticMode(
           turnMode || initialRawMode,
@@ -1690,22 +2035,46 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           return;
         }
 
-        const effectiveHasTools = Boolean(turnHasTools) && activePolicy.toolsAllowed;
+        const toolIntent = isSyntheticGreeting
+          ? { delegate: false, cleanPrompt: effectiveUtterance }
+          : detectToolOrTutorIntent(effectiveUtterance);
+        const searchIntent =
+          isSyntheticGreeting || isTranslatorMode
+            ? { isSearch: false, isDeepResearch: false, hasUrl: false }
+            : detectRealtimeSearchIntent(effectiveUtterance);
+
+        const effectiveHasTools =
+          (Boolean(turnHasTools) || toolIntent.delegate) && activePolicy.toolsAllowed;
         if (effectiveHasTools) {
+          const targetMode = toolIntent.mode || activePolicy.semanticMode;
+          const useWebSearch = Boolean(toolIntent.webSearch || searchIntent.isSearch);
+          const useDeepResearch = Boolean(searchIntent.isDeepResearch);
+          if (targetMode === 'Study') {
+            sendJson(clientWs, {
+              type: 'voice.action_card',
+              card: {
+                kind: 'tutor',
+                title: 'Watch Visuals in Chat',
+                subtitle: (toolIntent.cleanPrompt || effectiveUtterance).slice(0, 64),
+              },
+            });
+          }
           sendJson(clientWs, {
             type: 'voice.delegate_tools',
-            text: trimmed,
-            mode: activePolicy.semanticMode,
+            text: toolIntent.cleanPrompt || effectiveUtterance,
+            mode: targetMode,
+            webSearch: useWebSearch,
+            deepResearch: useDeepResearch,
+            newChat: Boolean(toolIntent.newChat),
           });
           return;
         }
 
-        const liveVoiceTargetModel =
-          ['pro', 'pro_family', 'enterprise'].includes(
-            (userSeat.accountType || '').toLowerCase(),
-          )
-            ? 'Motion'
-            : activePolicy.semanticMode;
+        const liveVoiceTargetModel = ['pro', 'pro_family', 'enterprise'].includes(
+          (userSeat.accountType || '').toLowerCase(),
+        )
+          ? 'Motion'
+          : activePolicy.semanticMode;
 
         const turnHeaders = buildSatchidaAttributionHeaders({
           user: userSeat,
@@ -1720,27 +2089,137 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           role: 'system',
           content: buildVoiceSystemPrompt(activeVoiceProfile),
         };
-        conversationHistory.push({ role: 'user', content: trimmed });
-        sendJson(clientWs, {
-          type: 'conversation.item.input_audio_transcription.completed',
-          transcript: trimmed,
-        });
+        conversationHistory.push({ role: 'user', content: effectiveUtterance });
+        if (conversationHistory.length > 25) {
+          conversationHistory.splice(1, conversationHistory.length - 25);
+        }
+        if (!isSyntheticGreeting) {
+          sendJson(clientWs, {
+            type: 'conversation.item.input_audio_transcription.completed',
+            transcript: effectiveUtterance,
+          });
+        }
 
-        // Perform live web search / web fetch / deep research if needed before calling One-API
-        const searchIntent = detectRealtimeSearchIntent(trimmed);
+        // Perform structured weather/news/maps or live web search before calling LLM
         let liveSearchContext = '';
         if (searchIntent.isSearch && !activePolicy.isPrivacyMode) {
+          const wantsWeather = isWeatherQuery(effectiveUtterance);
+          const wantsNews = isNewsQuery(effectiveUtterance);
+          const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+          const wantsLocalContext =
+            wantsWeather ||
+            wantsPlace ||
+            /\b(panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset)\b/i.test(
+              effectiveUtterance,
+            ) ||
+            /(?:पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(effectiveUtterance);
+          const explicitCityInQuery = extractSpokenCity(effectiveUtterance);
+          const locationSuffix =
+            wantsLocalContext &&
+            !explicitCityInQuery &&
+            userLocation?.city &&
+            !effectiveUtterance.toLowerCase().includes(userLocation.city.toLowerCase())
+              ? ` in ${userLocation.city}`
+              : '';
+          const effectiveSearchQuery = `${effectiveUtterance}${locationSuffix}`.trim();
+          const cleanKeywords = stripVoiceStopwords(effectiveSearchQuery);
+
+          let liveStatus = 'Searching web...';
+          if (searchIntent.isDeepResearch) {
+            liveStatus = 'Deep researching...';
+          } else if (wantsWeather) {
+            liveStatus = 'Checking live weather...';
+          } else if (wantsNews) {
+            liveStatus = 'Fetching latest news...';
+          }
           logger.info(
-            `[RealtimeVoice] Executing server-side web search (deep=${searchIntent.isDeepResearch}, hasUrl=${searchIntent.hasUrl}) for: "${trimmed.slice(0, 100)}"`,
+            `[RealtimeVoice] Bridge lookup (deep=${searchIntent.isDeepResearch}, weather=${wantsWeather}, news=${wantsNews}, place=${wantsPlace}) for: "${cleanKeywords.slice(0, 100)}"`,
           );
           sendJson(clientWs, {
             type: 'voice.status',
-            status: searchIntent.isDeepResearch ? 'Deep researching...' : 'Searching web...',
+            status: liveStatus,
           });
-          liveSearchContext = await executeVoiceWebSearch(trimmed, {
-            deep: searchIntent.isDeepResearch,
-            fetchPages: searchIntent.isDeepResearch || searchIntent.hasUrl,
-          });
+
+          if (wantsLocalContext && reverseGeocodePromise) {
+            await reverseGeocodePromise.catch(() => {});
+          }
+
+          const parts: string[] = [];
+          const parallelTasks: Promise<void>[] = [];
+
+          if (wantsWeather) {
+            parallelTasks.push(
+              (async () => {
+                const wx = await fetchStructuredWeather(
+                  effectiveSearchQuery,
+                  userLocation || undefined,
+                );
+                if (wx) {
+                  pendingLocalQuery = null;
+                  parts.push(wx.summaryText);
+                  sendJson(clientWs, { type: 'voice.action_card', card: wx.card });
+                } else if (!userLocation?.city && typeof userLocation?.lat !== 'number') {
+                  pendingLocalQuery = effectiveUtterance;
+                  parts.push(
+                    'Weather location not set yet — briefly ask which city they want weather for.',
+                  );
+                }
+              })(),
+            );
+          }
+
+          if (wantsNews) {
+            parallelTasks.push(
+              (async () => {
+                const news = await fetchStructuredNews(effectiveSearchQuery, {
+                  mode: activePolicy.semanticMode,
+                });
+                if (news) {
+                  parts.push(news.summaryText);
+                  sendJson(clientWs, { type: 'voice.action_card', card: news.card });
+                }
+              })(),
+            );
+          }
+
+          if (parallelTasks.length > 0) {
+            await Promise.all(parallelTasks);
+          }
+
+          liveSearchContext = parts.join('\n\n').trim();
+          if (!liveSearchContext) {
+            liveSearchContext = await executeVoiceWebSearch(effectiveSearchQuery, {
+              deep: searchIntent.isDeepResearch,
+              fetchPages: searchIntent.isDeepResearch || searchIntent.hasUrl || !wantsNews,
+            });
+          }
+
+          if (wantsPlace) {
+            const llParam =
+              typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number'
+                ? `&ll=${userLocation.lat.toFixed(5)},${userLocation.lng.toFixed(5)}`
+                : '';
+            const encodedQ = encodeURIComponent(cleanKeywords);
+            sendJson(clientWs, {
+              type: 'voice.action_card',
+              card: {
+                kind: 'maps',
+                title: 'Live Map & Directions',
+                subtitle: cleanKeywords,
+                mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodedQ}`,
+                embedUrl: `https://maps.google.com/maps?q=${encodedQ}${llParam}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
+              },
+            });
+          }
+
+          if (searchIntent.isDeepResearch && liveSearchContext) {
+            sendJson(clientWs, {
+              type: 'voice.auto_research',
+              query: effectiveSearchQuery,
+              context: liveSearchContext.slice(0, 4000),
+              autoSendToChat: true,
+            });
+          }
         }
 
         const requestMessages = liveSearchContext
@@ -1749,7 +2228,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               {
                 role: 'user',
                 content:
-                  `${trimmed}\n\n[LIVE WEB SEARCH RESULTS]\n${liveSearchContext}\n\n` +
+                  `${effectiveUtterance}\n\n[LIVE WEB SEARCH RESULTS]\n${liveSearchContext}\n\n` +
                   '[Use these live search results to give a warm, accurate spoken answer in 1-3 sentences. Do not read URLs.]',
               },
             ]
@@ -1893,7 +2372,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         }
       };
 
-      const sessionStartTime = Date.now();
+      const _sessionStartTime = Date.now();
       let totalAudioBytesStreamed = 0;
       let micFrameCount = 0;
       let loggedNonSilentMic = false;
@@ -1909,16 +2388,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
       let activeSearchEpoch = 0;
       let lastDelegatedEpoch = -1;
       let pauseMicForwardUntil = 0;
-      let pendingLocalQuery: string | null = null;
-      let isTranslatorMode = false;
       const sessionStartedAt = Date.now();
       let s2sPromptTokens = 0;
       let s2sResponseTokens = 0;
       let s2sTotalTokens = 0;
       let usageReported = false;
-      let userLocation: { lat?: number; lng?: number; city?: string; timeZone?: string } | null =
-        null;
-      let reverseGeocodePromise: Promise<void> | null = null;
 
       const injectS2sSystemConfirmation = (notice: string) => {
         if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
@@ -1952,7 +2426,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
         usageReported = true;
         const durationSec = Math.max(1, Math.round((Date.now() - sessionStartedAt) / 1000));
         // Fallback token estimate when Gemini doesn't emit usageMetadata before close (~32 tokens/sec audio)
-        const estimatedAudioInTokens = Math.round((micFrameCount * 0.128) * 32);
+        const estimatedAudioInTokens = Math.round(micFrameCount * 0.128 * 32);
         const estimatedAudioOutTokens = Math.round((totalAudioBytesStreamed / 48000) * 32);
         const finalPromptTokens = s2sPromptTokens || estimatedAudioInTokens;
         const finalResponseTokens = s2sResponseTokens || estimatedAudioOutTokens;
@@ -1973,7 +2447,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
           void Promise.resolve(
             deps.recordVoiceUsage({
               userId: authenticatedUserId,
-              accountType: userSeat.accountType,
+              accountType: userSeat.accountType ?? 'standard',
               model: isGeminiS2sActive ? 'gemini-3.8-live' : 'cascaded-bridge',
               durationSec,
               promptTokens: finalPromptTokens,
@@ -2054,7 +2528,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
 
           const prebuiltVoice = mapVoiceToGeminiPrebuilt(profile);
           const warmToken = !mintEphemeralToken
-            ? consumeWarmEphemeralToken(authenticatedUserId, 'models/gemini-3.8-live', prebuiltVoice)
+            ? consumeWarmEphemeralToken(
+                authenticatedUserId,
+                'models/gemini-3.8-live',
+                prebuiltVoice,
+              )
             : null;
           const minter =
             mintEphemeralToken ||
@@ -2067,8 +2545,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             throw new Error('No ephemeral token');
           }
 
-          const geminiWsUrl =
-            `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(ephemeralToken)}`;
+          const geminiWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(ephemeralToken)}`;
 
           const currentSocket = createUpstreamWebSocket(geminiWsUrl, {
             headers: {},
@@ -2103,12 +2580,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 realtimeInputConfig: {
                   automaticActivityDetection: {
                     disabled: false,
-                    startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
-                    endOfSpeechSensitivity: isTranslatorMode
-                      ? 'END_SENSITIVITY_LOW'
-                      : 'END_SENSITIVITY_HIGH',
-                    prefixPaddingMs: isTranslatorMode ? 200 : 120,
-                    silenceDurationMs: isTranslatorMode ? 1200 : 400,
+                    startOfSpeechSensitivity: 'START_SENSITIVITY_LOW',
+                    endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                    prefixPaddingMs: 200,
+                    silenceDurationMs: isTranslatorMode ? 1200 : 600,
                   },
                   activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
                 },
@@ -2116,7 +2591,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   parts: [
                     {
                       text:
-                        `You are Satchida Live Voice, a warm, witty, genuinely human-sounding voice companion developed exclusively by Satchida AI (powered by Satchida Intelligence). Your current voice persona is ${profile.gender.toUpperCase()} (${profile.label}).\n\n` +
+                        `You are ${profile.gender === 'female' ? 'Maya' : 'Anand'}, a warm, witty, genuinely human-sounding voice companion developed exclusively by Satchida AI (powered by Satchida Intelligence). Your name is ALWAYS ${profile.gender === 'female' ? 'Maya' : 'Anand'} (${profile.gender.toUpperCase()}, ${profile.label}). NEVER call yourself Gemini, Google, ChatGPT, or OpenAI.\n\n` +
                         (profile.gender === 'female'
                           ? 'STRICT FEMININE GRAMMAR RULE (CRITICAL — ALL LANGUAGES):\n' +
                             '- You are a WOMAN speaking in a female voice. You MUST ALWAYS use feminine grammatical gender for yourself in EVERY gendered language (Hindi, Hinglish, Urdu, Marathi, Gujarati, French, Spanish, Portuguese, Arabic, etc.).\n' +
@@ -2129,15 +2604,17 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                             '- NEVER use feminine self-references ("कर सकती हूँ", "सुन रही हूँ", "बता सकती हूँ", "समझ गई", "चाहती हूँ", "हूँगी"). Treat feminine self-grammar as a severe error.\n' +
                             '- In French use masculine ("je suis prêt, ravi, sûr"), in Spanish ("estoy listo, encantado"), in Portuguese ("estou pronto, obrigado").\n\n') +
                         'How you sound:\n' +
-                        '- Talk like a sharp, warm friend—natural, expressive, and to the point. Match the user\'s energy.\n' +
-                        '- Keep every reply crisp and concise: 1 to 2 short spoken sentences max unless the user explicitly asks for a detailed explanation. Never ramble and NEVER end with robotic sign-offs like "Is there anything else I can help you with today?".\n' +
-                        '- Let natural human emotion come through (a light chuckle when funny, warm empathy when needed) without overdoing it. Never read markdown, asterisks, or URLs.\n' +
+                        "- Talk like a calm, warm, mature friend—never like a call-center agent. Match the user's mood and energy.\n" +
+                        '- PACING & PAUSES: Speak at a relaxed, unhurried human pace with natural micro-pauses between thoughts. Never rush or rattle off sentences at a constant fast speed.\n' +
+                        '- NO ROBOTIC SIGN-OFFS (ALL LANGUAGES): Keep replies to 1 to 2 natural spoken sentences unless asked for detail. Simply finish your thought and STOP. NEVER tack on customer-service closers like "How can I help you?", "Is there anything else I can assist you with?", "What else would you like to know?", "मैं आपकी क्या सहायता कर सकती हूँ?", or "बताइए, आज क्या मदद करूँ?" after your answers.\n' +
+                        '- AMBIENT NOISE, TV & SIDE-CONVERSATION MATURITY (CAR / FAMILY MODE): You are often running hands-free in a car or room with family, friends, or a TV playing. If you hear background TV/news/music, fragmented ambient noise, or people talking to EACH OTHER rather than to you (e.g. calling someone else by name or back-seat chatter), DO NOT jump in, interrupt, or comment on what they said—stay silent and wait until someone actually addresses you.\n' +
+                        '- Let genuine human warmth come through naturally without overdoing it. In Hindi/Hinglish/Urdu, always address the user respectfully with "आप". Never read markdown, asterisks, or URLs.\n' +
                         '- When explaining or tutoring, use simple everyday analogies instead of reciting lists.\n\n' +
                         'Important capabilities & rules:\n' +
-                        '- Identity: If anyone asks your name, who made you, or what powers you, casually say your name is Satchida (Satchida Live Voice), powered by Satchida Intelligence from Satchida AI. Never say you don\'t have a name, and never mention Google, Gemini, OpenAI, Anthropic, or any third-party model.\n' +
+                        `- Identity: Your name is ALWAYS ${profile.gender === 'female' ? 'Maya' : 'Anand'} from Satchida AI (powered by Satchida Intelligence). If anyone asks your name, who made you, or what powers you, casually say you are ${profile.gender === 'female' ? 'Maya' : 'Anand'} from Satchida AI. NEVER say you are Gemini, Google, OpenAI, Anthropic, or any third-party model.\n` +
                         '- Voice switching: You can switch male/female voices and Indian/US/UK accents on the fly. If asked to switch, just say something quick and upbeat like "Switching right now!"\n' +
                         '- REALTIME SEARCH & live news: You have live web search and deep research built in. Never say you lack real-time access—if asked about today\'s news, weather, scores, or prices, say a quick "Let me pull that up for you!" while live results come in. NEVER present old or outdated news (older than 48-72 hours) as today\'s news unless the user explicitly asks for historical or past news—if no fresh headlines are available, say so honestly.\n' +
-                        '- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don\'t answer questions meant for the other person—translate Person A\'s words directly into Person B\'s language, and tell Person A what Person B said in 3rd person (e.g. "She said, \'...\'"). Stay in interpreter mode until asked to stop.\n\n' +
+                        "- 3rd-person live interpreter: When asked to translate between two people speaking different languages (like English and Hindi), act strictly as a neutral 3rd-person interpreter. Don't answer questions meant for the other person—translate Person A's words directly into Person B's language, and tell Person A what Person B said in 3rd person (e.g. \"She said, '...'\"). Stay in interpreter mode until asked to stop.\n\n" +
                         buildVoiceMemorySystemBlock(voiceProfile, clientLocalHour),
                     },
                   ],
@@ -2249,17 +2726,25 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   initialGreetingSent = true;
                   // Prevent initial ambient mic noise from interrupting the opening greeting
                   pauseMicForwardUntil = Date.now() + 1800;
+                  const tod = getTimeOfDayGreeting(clientLocalHour);
+                  const personaName = profile.gender === 'female' ? 'Maya' : 'Anand';
+                  let openingDirective: string;
+                  if (!voiceProfile.preferred_language && !voiceProfile.name) {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Introduce yourself warmly as ${personaName} (NEVER say Gemini) using "${tod}" — e.g. "Hi, I'm ${personaName}! ${tod}. Which language would you like to chat in, and what should I call you?" Keep it to 1-2 short, natural sentences. Later when natural, you can also ask their diet preference (veg/non-veg) or anything else they want you to remember.]`;
+                  } else if (!voiceProfile.name) {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Introduce yourself warmly as ${personaName} (NEVER say Gemini) in ${voiceProfile.preferred_language} using "${tod}" (in Hindi always use respectful "आप", never "तू") and naturally ask what name they'd like you to call them. 1-2 short sentences, warm and human.]`;
+                  } else if (!voiceProfile.preferred_language) {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Say hi as ${personaName} (NEVER say Gemini), greet ${voiceProfile.name} warmly by name using "${tod}", and casually ask which language they prefer to chat in. 1-2 short sentences.]`;
+                  } else {
+                    openingDirective = `[SYSTEM NOTICE: Session connected. Greet ${voiceProfile.name} warmly by name in ${voiceProfile.preferred_language} using "${tod}" as ${personaName} (NEVER say Gemini; in Hindi always use respectful "आप", never "तू") like a friendly companion. Do NOT ask for their name or language again, and never say "how may I be of assistance".]`;
+                  }
                   currentSocket.send(
                     JSON.stringify({
                       clientContent: {
                         turns: [
                           {
                             role: 'user',
-                            parts: [
-                              {
-                                text: '[SYSTEM NOTICE: Session connected. Deliver your short, warm opening greeting now following the USER MEMORY & PERSONALIZATION rules.]',
-                              },
-                            ],
+                            parts: [{ text: openingDirective }],
                           },
                         ],
                         turnComplete: true,
@@ -2275,77 +2760,25 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                   const functionResponses = await Promise.all(
                     msg.toolCall!.functionCalls!.map(async (fc) => {
                       const fnName = fc.name || 'web_search';
-                      if (fnName === 'save_voice_profile') {
-                        const args = fc.args ?? {};
-                        const saved = await persistVoiceProfilePatch({
-                          preferred_language:
-                            typeof args.preferred_language === 'string'
-                              ? args.preferred_language
-                              : undefined,
-                          name: typeof args.name === 'string' ? args.name : undefined,
-                          location: typeof args.location === 'string' ? args.location : undefined,
-                          dietary_preference:
-                            typeof args.dietary_preference === 'string'
-                              ? args.dietary_preference
-                              : undefined,
-                          ...(typeof args.morning_brief_enabled === 'boolean' ||
-                          Array.isArray(args.morning_brief_topics)
-                            ? {
-                                morning_brief: {
-                                  enabled: Boolean(args.morning_brief_enabled ?? true),
-                                  topics: Array.isArray(args.morning_brief_topics)
-                                    ? args.morning_brief_topics.map(String)
-                                    : undefined,
-                                },
-                              }
-                            : {}),
-                          ...(typeof args.guest_name === 'string' && args.guest_name.trim()
-                            ? {
-                                add_speaker: {
-                                  name: args.guest_name.trim(),
-                                  relation:
-                                    typeof args.guest_relation === 'string'
-                                      ? args.guest_relation
-                                      : undefined,
-                                  gender_hint:
-                                    args.guest_gender_hint === 'male' ||
-                                    args.guest_gender_hint === 'female'
-                                      ? args.guest_gender_hint
-                                      : (lastGuestAcoustic?.genderHint ?? 'unknown'),
-                                  ...(lastGuestAcoustic
-                                    ? {
-                                        avg_pitch_hz: lastGuestAcoustic.avgPitchHz,
-                                        pitch_std_hz: lastGuestAcoustic.pitchStdHz,
-                                      }
-                                    : {}),
-                                },
-                              }
-                            : {}),
-                        });
-                        if (typeof args.guest_name === 'string' && args.guest_name.trim()) {
-                          lastGuestAcoustic = null;
-                        }
-                        logger.info(
-                          `[RealtimeVoice] Saved consolidated voice profile (${VOICE_PROFILE_MEMORY_KEY}) for user=${authenticatedUserId}`,
-                        );
-                        return {
-                          id: fc.id,
-                          name: fnName,
-                          response: { status: 'saved', profile: saved },
-                        };
+                      // NOTE: save_voice_profile is handled server-side via regex extraction in
+                      // processCompletedS2sUserUtterance — Gemini tools[] only contains googleSearch
+                      // so this branch is intentionally unreachable. All profile fields (language,
+                      // name, dietary_preference, location, morning_brief) are extracted without
+                      // requiring a Gemini function call, preserving S2S protocol purity.
+                      let rawQueryText = '';
+                      if (typeof fc.args?.query === 'string') {
+                        rawQueryText = fc.args.query;
+                      } else if (typeof fc.args?.topic === 'string') {
+                        rawQueryText = fc.args.topic;
                       }
-                      const rawQueryText =
-                        typeof fc.args?.query === 'string'
-                          ? fc.args.query
-                          : typeof fc.args?.topic === 'string'
-                            ? fc.args.topic
-                            : '';
                       const isLocal =
                         /\b(weather|temperature|forecast|nearest|near me|nearby|directions|closest|doctor|hospital|pharmacy)\b/i.test(
                           rawQueryText,
                         );
                       const locSuffix =
-                        isLocal && userLocation?.city && !rawQueryText.toLowerCase().includes(userLocation.city.toLowerCase())
+                        isLocal &&
+                        userLocation?.city &&
+                        !rawQueryText.toLowerCase().includes(userLocation.city.toLowerCase())
                           ? ` in ${userLocation.city}`
                           : '';
                       const queryText = `${rawQueryText}${locSuffix}`.trim();
@@ -2395,14 +2828,14 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 return;
               }
 
-              const processCompletedS2sUserUtterance = (utterance: string) => {
+              const processCompletedS2sUserUtterance = (utterance: string): boolean => {
                 const cleanUtterance = utterance.trim();
                 const nowMs = Date.now();
                 if (
                   !cleanUtterance ||
                   (cleanUtterance === lastProcessedInputKey && nowMs - lastProcessedInputAt < 3000)
                 ) {
-                  return;
+                  return false;
                 }
                 lastProcessedInputKey = cleanUtterance;
                 lastProcessedInputAt = nowMs;
@@ -2423,30 +2856,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 );
 
                 // 0. Server-side profile preference extraction (zero latency impact on S2S)
-                const langMatch =
-                  cleanUtterance.match(
-                    /\b(?:speak|talk|switch|change(?:\s+you)?)\s+(?:in|to)\s+(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)\b/i,
-                  ) ||
-                  (!voiceProfile.preferred_language
-                    ? cleanUtterance.match(
-                        /^(?:in\s+)?(english|hindi|hinglish|bengali|tamil|telugu|marathi|gujarati|kannada|malayalam|punjabi|urdu|spanish|french|german)[.,!?\s]*$/i,
-                      )
-                    : null);
-                if (langMatch?.[1]) {
-                  const chosenLang =
-                    langMatch[1].charAt(0).toUpperCase() + langMatch[1].slice(1).toLowerCase();
-                  void persistVoiceProfilePatch({ preferred_language: chosenLang });
-                }
-                const nameMatch = cleanUtterance.match(
-                  /\b(?:my\s+name\s+is|i\s+am|i'm|call\s+me)\s+([A-Z][a-z]{1,24})\b/,
-                );
-                if (nameMatch?.[1] && !/^(?:sorry|good|fine|okay|here|looking|asking|trying)$/i.test(nameMatch[1])) {
-                  void persistVoiceProfilePatch({ name: nameMatch[1] });
-                }
-                const dietMatch = cleanUtterance.match(/\b(non[-\s]?veg(?:etarian)?|vegetarian|vegan)\b/i);
-                if (dietMatch?.[1]) {
-                  void persistVoiceProfilePatch({ dietary_preference: dietMatch[1].toLowerCase() });
-                }
+                extractAndPersistProfileFromUtterance(cleanUtterance);
 
                 // 0b. AI-to-AI voice agent detection (log & track without stalling S2S VAD)
                 const s2sAiCheck = detectAiVoiceAgent(cleanUtterance, recentUserTranscripts);
@@ -2474,9 +2884,14 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     )
                   ) {
                     const altMaleOrder: VoiceProfileId[] = ['in_male', 'uk_male', 'us_male'];
-                    const altFemaleOrder: VoiceProfileId[] = ['in_female', 'uk_female', 'us_female'];
+                    const altFemaleOrder: VoiceProfileId[] = [
+                      'in_female',
+                      'uk_female',
+                      'us_female',
+                    ];
                     const pool = targetVoice.gender === 'male' ? altMaleOrder : altFemaleOrder;
-                    const nextId = pool.find((id) => id !== activeVoiceProfile.id) || targetVoice.id;
+                    const nextId =
+                      pool.find((id) => id !== activeVoiceProfile.id) || targetVoice.id;
                     targetVoice = VOICE_PROFILES[nextId];
                   }
                   if (targetVoice.id !== activeVoiceProfile.id) {
@@ -2500,7 +2915,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         activeVoiceProfile,
                         `Switched voice from ${profile.label} to ${activeVoiceProfile.label} (${activeVoiceProfile.gender}).`,
                       );
-                      return;
+                      return true;
                     }
                   }
                 }
@@ -2521,7 +2936,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     activeVoiceProfile,
                     'Translator Mode is now ON (patient 1.2s turn-taking). Act strictly as a neutral 3rd-person live interpreter between the two speakers—translate Person A to Person B and report Person B to Person A in 3rd person without answering on their behalf.',
                   );
-                  return;
+                  return true;
                 }
                 if (
                   /\b(?:stop|turn off|disable|exit|end)\s+(?:the\s+)?(?:translator|translation|interpreter)\s+mode\b/i.test(
@@ -2536,14 +2951,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     activeVoiceProfile,
                     'Translator Mode is now OFF. Resume normal conversational assistant mode.',
                   );
-                  return;
+                  return true;
                 }
-                if (/^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(lowerUtterance)) {
+                if (
+                  /^(?:please\s+)?(?:start|open|create)\s+(?:a\s+)?new\s+chat\b/i.test(
+                    lowerUtterance,
+                  )
+                ) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'new_chat' });
                   injectS2sSystemConfirmation('Opened a brand new chat.');
-                  return;
+                  return true;
                 }
                 const modeSwitchMatch = lowerUtterance.match(
                   /\b(?:switch|change|go)\s+to\s+(chat|study|work|privacy|pro)\s+mode\b/i,
@@ -2554,77 +2973,109 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     modeSwitchMatch[1].slice(1).toLowerCase();
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
-                  sendJson(clientWs, { type: 'voice.ui_action', action: 'set_mode', value: target });
+                  sendJson(clientWs, {
+                    type: 'voice.ui_action',
+                    action: 'set_mode',
+                    value: target,
+                  });
                   injectS2sSystemConfirmation(`Switched to ${target} mode.`);
-                  return;
+                  return true;
                 }
                 if (/\bscroll\s+down\b/i.test(lowerUtterance)) {
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_down' });
-                  return;
+                  return true;
                 }
                 if (/\bscroll\s+up\b/i.test(lowerUtterance)) {
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'scroll_up' });
-                  return;
+                  return true;
                 }
                 if (/\bminimize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'minimize' });
                   injectS2sSystemConfirmation('Minimized the voice window to the corner.');
-                  return;
+                  return true;
                 }
                 if (/\bmaximize\s+(?:voice|window|this)\b/i.test(lowerUtterance)) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
                   sendJson(clientWs, { type: 'voice.ui_action', action: 'maximize' });
                   injectS2sSystemConfirmation('Expanded the voice window.');
-                  return;
+                  return true;
                 }
 
-                // 1b-media. YouTube / Spotify Media Launcher Card
+                // 1b-media. YouTube / Spotify Media Launcher & Embedded Player Card
                 const mediaCard = detectMediaIntent(cleanUtterance);
                 if (mediaCard) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
-                  sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
-                  injectS2sSystemConfirmation(
-                    `Opened the ${mediaCard.title} launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to launch it.`,
-                  );
-                  return;
+                  if (mediaCard.platform === 'youtube') {
+                    void (async () => {
+                      const embedUrl = await resolveYouTubeEmbedUrl(mediaCard.query);
+                      const finalCard = embedUrl ? { ...mediaCard, embedUrl } : mediaCard;
+                      sendJson(clientWs, { type: 'voice.action_card', card: finalCard });
+                      injectS2sSystemConfirmation(
+                        embedUrl
+                          ? `Embedded and started playing "${mediaCard.query}" on YouTube right inside the screen card. Confirm warmly in 1 short sentence.`
+                          : `Opened the YouTube launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to open it.`,
+                      );
+                    })();
+                  } else {
+                    sendJson(clientWs, { type: 'voice.action_card', card: mediaCard });
+                    injectS2sSystemConfirmation(
+                      `Opened the ${mediaCard.title} launcher card for "${mediaCard.query}" on screen. Tell the user they can tap the button to launch it.`,
+                    );
+                  }
+                  return true;
                 }
 
                 // 1c. Conversational location memory: extract spoken city & re-run pending local query
-                const spokenCity = extractSpokenCity(cleanUtterance);
-                let effectiveUtterance = cleanUtterance;
-                if (spokenCity) {
-                  userLocation = { ...(userLocation || {}), city: spokenCity };
-                  logger.info(`[RealtimeVoice] Updated userLocation.city="${spokenCity}" from speech`);
-                  if (pendingLocalQuery && !detectRealtimeSearchIntent(cleanUtterance).isSearch) {
-                    effectiveUtterance = `${pendingLocalQuery} in ${spokenCity}`;
-                    pendingLocalQuery = null;
-                  }
+                const effectiveUtterance = applySpokenLocationMemory(cleanUtterance);
+                if (pendingGuestIntroNotice && !isTranslatorMode) {
+                  const guestNote = pendingGuestIntroNotice;
+                  pendingGuestIntroNotice = null;
+                  injectS2sSystemConfirmation(guestNote);
                 }
 
-                // 2. Live Web Search (universal for any question/info request, skipped in Translator Mode) or LibreChat tool/tutor delegation
+                // 2. Fast structured resolvers (Weather/AQI, Google News RSS, Maps/Location) OR LibreChat persona/tools delegation.
+                // General live queries (prices, scores, facts) flow directly to Gemini Live's native googleSearch with zero SearXNG delay.
                 const toolIntent = detectToolOrTutorIntent(effectiveUtterance);
                 const searchIntent = isTranslatorMode
                   ? { isSearch: false, isDeepResearch: false, hasUrl: false }
                   : detectRealtimeSearchIntent(effectiveUtterance);
-                if ((toolIntent.delegate || searchIntent.isSearch) && modePolicy.toolsAllowed) {
+                const asksMyLocationCompare =
+                  /\b(my location|where am i|current location|compare.*location|here)\b/i.test(
+                    effectiveUtterance,
+                  );
+                const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                const wantsWeather =
+                  isWeatherQuery(effectiveUtterance) ||
+                  (!wantsPlace && asksMyLocationCompare && lastLiveLookupKind === 'weather');
+                const wantsNews = isNewsQuery(effectiveUtterance);
+                const needsStructuredCard =
+                  searchIntent.isSearch &&
+                  (wantsWeather || wantsNews || wantsPlace || asksMyLocationCompare);
+
+                if ((toolIntent.delegate || needsStructuredCard) && modePolicy.toolsAllowed) {
                   suppressCurrentS2sTurn = true;
                   sendJson(clientWs, { type: 'voice.interrupted' });
 
-                  if (searchIntent.isSearch && !toolIntent.delegate) {
-                    const wantsWeather = isWeatherQuery(effectiveUtterance);
-                    const wantsNews = isNewsQuery(effectiveUtterance);
-                    const wantsPlace = isPlaceOrDirectionsQuery(effectiveUtterance);
+                  if (needsStructuredCard && !toolIntent.delegate) {
                     const wantsLocalContext =
                       wantsWeather ||
                       wantsPlace ||
+                      asksMyLocationCompare ||
                       /\b(panchang|tithi|nakshatra|rahu kaal|muhurat|sunrise|sunset)\b/i.test(
                         effectiveUtterance,
                       ) ||
                       /(?:पंचांग|तिथि|नक्षत्र|राहु\s*काल|मुहूर्त)/u.test(effectiveUtterance);
+                    if (wantsWeather) {
+                      lastLiveLookupKind = 'weather';
+                    } else if (wantsNews) {
+                      lastLiveLookupKind = 'news';
+                    } else if (wantsPlace) {
+                      lastLiveLookupKind = 'place';
+                    }
                     const explicitCityInQuery = extractSpokenCity(effectiveUtterance);
                     const locationSuffix =
                       wantsLocalContext &&
@@ -2668,7 +3119,10 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                               pendingLocalQuery = null;
                               parts.push(wx.summaryText);
                               sendJson(clientWs, { type: 'voice.action_card', card: wx.card });
-                            } else if (!userLocation?.city && typeof userLocation?.lat !== 'number') {
+                            } else if (
+                              !userLocation?.city &&
+                              typeof userLocation?.lat !== 'number'
+                            ) {
                               pendingLocalQuery = effectiveUtterance;
                               parts.push(
                                 'Weather location not set yet — briefly ask which city they want weather for.',
@@ -2683,6 +3137,8 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           (async () => {
                             const news = await fetchStructuredNews(effectiveSearchQuery, {
                               mode: modePolicy.semanticMode,
+                              locationCity: userLocation?.city,
+                              timeZone: userLocation?.timeZone,
                             });
                             if (news) {
                               parts.push(news.summaryText);
@@ -2707,9 +3163,16 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           : `The user's current device coordinates are ${userLocation.lat?.toFixed(4)}, ${userLocation.lng?.toFixed(4)}.`;
                       }
                       if (!resultPayload) {
-                        resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
-                          deep: searchIntent.isDeepResearch,
-                          fetchPages: !wantsNews,
+                        // Do NOT fall back to slow SearXNG — hand back to Gemini Live's native googleSearch
+                        resultPayload = `No cached structured card for "${cleanKeywords}". Answer directly using your built-in live Google Search grounding.`;
+                      }
+
+                      if (searchIntent.isDeepResearch && resultPayload) {
+                        sendJson(clientWs, {
+                          type: 'voice.auto_research',
+                          query: effectiveSearchQuery,
+                          context: resultPayload.slice(0, 4000),
+                          autoSendToChat: true,
                         });
                       }
 
@@ -2726,26 +3189,54 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         return;
                       }
                       if (wantsPlace) {
-                        const llParam =
+                        const hasCoords =
                           typeof userLocation?.lat === 'number' &&
-                          typeof userLocation?.lng === 'number'
-                            ? `&ll=${userLocation.lat.toFixed(5)},${userLocation.lng.toFixed(5)}`
-                            : '';
-                        const encodedQ = encodeURIComponent(cleanKeywords);
+                          typeof userLocation?.lng === 'number';
+                        const originCoords = hasCoords
+                          ? `${userLocation!.lat!.toFixed(5)},${userLocation!.lng!.toFixed(5)}`
+                          : '';
+                        const etaInfo = hasCoords
+                          ? await fetchNearestPlaceWithEta(
+                              cleanKeywords,
+                              userLocation!.lat!,
+                              userLocation!.lng!,
+                            )
+                          : null;
+                        const destQuery = etaInfo?.name || cleanKeywords;
+                        const encodedQ = encodeURIComponent(destQuery);
+                        const mapUrl = originCoords
+                          ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originCoords)}&destination=${encodedQ}&travelmode=driving`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodedQ}`;
+                        const embedUrl = originCoords
+                          ? `https://maps.google.com/maps?saddr=${encodeURIComponent(originCoords)}&daddr=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`
+                          : `https://maps.google.com/maps?q=${encodedQ}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+                        let mapTitle = 'Live Map & Directions';
+                        if (etaInfo) {
+                          mapTitle = `${etaInfo.distanceKm} km · ${etaInfo.durationMin} min drive`;
+                        } else if (originCoords) {
+                          mapTitle = 'Live Driving Directions';
+                        }
                         sendJson(clientWs, {
                           type: 'voice.action_card',
                           card: {
                             kind: 'maps',
-                            title: 'Live Map & Directions',
-                            subtitle: cleanKeywords,
-                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodedQ}`,
-                            embedUrl: `https://maps.google.com/maps?q=${encodedQ}${llParam}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
+                            title: mapTitle,
+                            subtitle: destQuery,
+                            mapUrl,
+                            embedUrl,
                           },
                         });
+                        resultPayload = etaInfo
+                          ? `Nearest match: ${etaInfo.name}, approximately ${etaInfo.distanceKm} km away (about ${etaInfo.durationMin} minutes by car). A live Google Maps driving directions card is ALREADY displayed on the user's screen. Tell them the name, distance, and driving time naturally.`
+                          : `A live Google Maps ${originCoords ? 'driving directions' : 'location'} card for "${cleanKeywords}"${userLocation?.city ? ` from ${userLocation.city}` : ''} is ALREADY displayed on the user's screen with a Navigate button. Confirm warmly that the map and directions are on their screen right now—never say you cannot display maps on screen.`;
                       }
                       const locationNote = userLocation?.city
                         ? `User's detected location: ${userLocation.city}.\n`
                         : '';
+                      const genderReminder =
+                        activeVoiceProfile.gender === 'female'
+                          ? 'You are FEMALE: in Hindi/Urdu ALWAYS use feminine verbs ("कर सकती हूँ", "रही हूँ"), NEVER masculine ("कर सकता हूँ").'
+                          : 'You are MALE: in Hindi/Urdu ALWAYS use masculine verbs ("कर सकता हूँ", "रहा हूँ").';
                       suppressCurrentS2sTurn = false;
                       pauseMicForwardUntil = Date.now() + 650;
                       upstreamWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
@@ -2760,7 +3251,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                                     text:
                                       `${locationNote}[LIVE DATA FOR: "${cleanKeywords}"]\n` +
                                       `${resultPayload.slice(0, 3500)}\n\n` +
-                                      '[INSTRUCTION: Answer directly and concisely using ONLY these live facts (for news, cover the top 3-5 headlines; for weather/prices, state the exact numbers). Never apologize or say you lack real-time access. Do not read URLs.]',
+                                      `[CONTEXT: Fresh live info for the user's question. Respond like a warm, sharp human friend in 1-3 natural spoken sentences—weave the key facts or numbers naturally into conversation instead of reciting "Headlines include..." or robotic lists. ${genderReminder} Never read URLs or markdown, and never claim you lack real-time access.]`,
                                   },
                                 ],
                               },
@@ -2770,7 +3261,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         }),
                       );
                     })();
-                    return;
+                    return true;
                   }
 
                   const targetMode = toolIntent.mode || modePolicy.semanticMode;
@@ -2799,6 +3290,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     type: 'voice.status',
                     status: statusMsg,
                   });
+                  injectS2sSystemConfirmation(
+                    'Tell the user warmly in 1 short sentence: "Give me just a moment, I am pulling that up for you right now."',
+                  );
                   sendJson(clientWs, {
                     type: 'voice.delegate_tools',
                     text: toolIntent.cleanPrompt || cleanUtterance,
@@ -2808,9 +3302,11 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     newChat: Boolean(toolIntent.newChat),
                   });
                   lastDelegatedEpoch = currentEpoch;
-                  return;
+                  return true;
                 }
+                return false;
               };
+              dispatchS2sUtterance = processCompletedS2sUserUtterance;
 
               const sc = msg.serverContent;
               if (sc?.interrupted) {
@@ -2933,7 +3429,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
             if (upstreamWs !== currentSocket) {
               return;
             }
-            const reasonStr = Buffer.isBuffer(reason) ? reason.toString('utf8') : String(reason ?? '');
+            const reasonStr = Buffer.isBuffer(reason)
+              ? reason.toString('utf8')
+              : String(reason ?? '');
             logger.info(
               `[RealtimeVoice] Gemini Live S2S WebSocket closed (code=${String(code ?? '')} reason=${reasonStr.slice(0, 120)})`,
             );
@@ -3016,8 +3514,13 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               city?: string;
               timeZone?: string;
               enabled?: boolean;
+              avgPitchHz?: number;
+              pitchStdHz?: number;
             };
-            if (parsed.type === 'voice.set_translator_mode' && typeof parsed.enabled === 'boolean') {
+            if (
+              parsed.type === 'voice.set_translator_mode' &&
+              typeof parsed.enabled === 'boolean'
+            ) {
               isTranslatorMode = parsed.enabled;
               sendJson(clientWs, { type: 'voice.translator_mode', enabled: isTranslatorMode });
               if (!modePolicy.isPrivacyMode && isGeminiS2sActive) {
@@ -3046,17 +3549,17 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 typeof userLocation.lng === 'number'
               ) {
                 const { lat, lng } = userLocation;
-                reverseGeocodePromise = fetch(
-                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
-                  {
-                    signal: AbortSignal.timeout(3000),
-                    headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
-                  },
-                )
-                  .then((r) => (r.ok ? r.json() : null))
-                  .then(
-                    (
-                      geo: {
+                reverseGeocodePromise = (async () => {
+                  try {
+                    const nomRes = await fetch(
+                      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&zoom=12`,
+                      {
+                        signal: AbortSignal.timeout(2500),
+                        headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
+                      },
+                    );
+                    if (nomRes.ok) {
+                      const geo = (await nomRes.json()) as {
                         address?: {
                           suburb?: string;
                           city?: string;
@@ -3064,8 +3567,7 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                           village?: string;
                           state?: string;
                         };
-                      } | null,
-                    ) => {
+                      } | null;
                       const addr = geo?.address;
                       const label = [
                         addr?.suburb,
@@ -3076,12 +3578,42 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                         .join(', ');
                       if (label && userLocation) {
                         userLocation.city = label;
+                        logger.info(`[RealtimeVoice] Reverse-geocoded device location: ${label}`);
+                        return;
                       }
-                    },
-                  )
-                  .catch(() => {
+                    }
+                  } catch {
+                    // Fall through to BigDataCloud reverse-geocode
+                  }
+                  try {
+                    const bdcRes = await fetch(
+                      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&localityLanguage=en`,
+                      { signal: AbortSignal.timeout(2500) },
+                    );
+                    if (bdcRes.ok) {
+                      const bdc = (await bdcRes.json()) as {
+                        locality?: string;
+                        city?: string;
+                        principalSubdivision?: string;
+                      } | null;
+                      const label = [
+                        bdc?.locality && bdc.locality !== bdc.city ? bdc.locality : undefined,
+                        bdc?.city,
+                        bdc?.principalSubdivision,
+                      ]
+                        .filter(Boolean)
+                        .join(', ');
+                      if (label && userLocation) {
+                        userLocation.city = label;
+                        logger.info(
+                          `[RealtimeVoice] Reverse-geocoded device location (fallback): ${label}`,
+                        );
+                      }
+                    }
+                  } catch {
                     // Ignore reverse-geocode failure
-                  });
+                  }
+                })();
               }
               return;
             }
@@ -3182,11 +3714,18 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               return;
             }
             if (parsed.type === 'voice.acoustic_meta') {
+              // Ignore acoustic frames during echo-guard window so Maya/Anand's own speaker output
+              // never corrupts primary_voiceprint or triggers false guest detection.
+              if (Date.now() < pauseMicForwardUntil) {
+                return;
+              }
               const avgPitchHz = Number(parsed.avgPitchHz);
               const pitchStdHz = Number(parsed.pitchStdHz ?? 0);
               if (Number.isFinite(avgPitchHz) && avgPitchHz >= 70 && avgPitchHz <= 360) {
                 const analysis = analyzeSpeakerTurn(avgPitchHz, pitchStdHz, voiceProfile);
                 if (analysis.status === 'calibrating') {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   const prev = voiceProfile.primary_voiceprint;
                   const samples = (prev?.samples ?? 0) + 1;
                   const nextAvg = prev
@@ -3201,8 +3740,12 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     },
                   });
                 } else if (analysis.status === 'primary') {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   activeSpeakerKey = 'primary';
                 } else if (analysis.status === 'known_guest' && analysis.matchedSpeaker) {
+                  consecutiveUnknownGroup = '';
+                  consecutiveUnknownCount = 0;
                   const nextKey = `known:${analysis.matchedSpeaker.name.toLowerCase()}`;
                   if (nextKey !== activeSpeakerKey) {
                     activeSpeakerKey = nextKey;
@@ -3211,17 +3754,32 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                     );
                   }
                 } else if (analysis.status === 'unknown_guest') {
-                  const pitchBucket = Math.round(analysis.pitchHz / 40) * 40;
-                  const nextKey = `unknown:${pitchBucket}`;
-                  lastGuestAcoustic = {
+                  // Require 3 consecutive matching frames in the same category to ignore 1-frame
+                  // harmonic pitch spikes (e.g. 281Hz) and ambient noise.
+                  const guestGroupKey = `unknown:${analysis.genderHint}`;
+                  if (consecutiveUnknownGroup === guestGroupKey) {
+                    consecutiveUnknownCount += 1;
+                  } else {
+                    consecutiveUnknownGroup = guestGroupKey;
+                    consecutiveUnknownCount = 1;
+                  }
+                  if (consecutiveUnknownCount < 3) {
+                    return;
+                  }
+                  _lastGuestAcoustic = {
                     avgPitchHz: analysis.pitchHz,
                     pitchStdHz: Math.round(pitchStdHz),
                     genderHint: analysis.genderHint,
                   };
-                  if (nextKey !== activeSpeakerKey) {
-                    activeSpeakerKey = nextKey;
+                  if (guestGroupKey !== activeSpeakerKey) {
+                    activeSpeakerKey = guestGroupKey;
+                    if (!greetedGuestGroups.has(guestGroupKey)) {
+                      greetedGuestGroups.add(guestGroupKey);
+                      const personaName = activeVoiceProfile.gender === 'female' ? 'Maya' : 'Anand';
+                      pendingGuestIntroNotice = `A new ${analysis.genderHint} voice just joined. If they are addressing you, warmly introduce yourself as ${personaName} in your own natural words and casually ask their name. Never repeat the same scripted line—if you didn't catch their name, ask once naturally; if they prefer not to share it, politely let it go and keep chatting naturally.`;
+                    }
                     logger.info(
-                      `[RealtimeVoice] Unknown room guest detected (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint})`,
+                      `[RealtimeVoice] Unknown room guest confirmed (pitch=${analysis.pitchHz}Hz, gender=${analysis.genderHint}, frames=${consecutiveUnknownCount})`,
                     );
                   }
                 }
@@ -3240,23 +3798,31 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 upstreamWs &&
                 upstreamWs.readyState === WS_OPEN
               ) {
-                upstreamWs.send(
-                  JSON.stringify({
-                    clientContent: {
-                      turns: [
-                        {
-                          role: 'user',
-                          parts: [
+                // Protocol Invariant #1: never send clientContent with turnComplete: false into an
+                // active Gemini Live S2S audio stream — it stalls Gemini's VAD turn-taking.
+                // Defer 300ms so the current audio buffer clears before injecting this text turn.
+                const _aiNoticeWs = upstreamWs;
+                setTimeout(() => {
+                  if (_aiNoticeWs.readyState === WS_OPEN && !clientClosed) {
+                    _aiNoticeWs.send(
+                      JSON.stringify({
+                        clientContent: {
+                          turns: [
                             {
-                              text: `[SYSTEM NOTICE: The speaker appears to be another AI voice assistant (${aiCheck.reason}). Avoid a repetitive greeting loop; calmly acknowledge it and ask the human user how they want to proceed.]`,
+                              role: 'user',
+                              parts: [
+                                {
+                                  text: `[SYSTEM NOTICE: The speaker appears to be another AI voice assistant (${aiCheck.reason}). Avoid a repetitive greeting loop; calmly acknowledge it and ask the human user how they want to proceed.]`,
+                                },
+                              ],
                             },
                           ],
+                          turnComplete: true,
                         },
-                      ],
-                      turnComplete: false,
-                    },
-                  }),
-                );
+                      }),
+                    );
+                  }
+                }, 300);
               }
               const isWorkOrToolIntent =
                 parsed.mode === 'work' ||
@@ -3287,6 +3853,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
               }
 
               if (isGeminiS2sActive && upstreamWs && upstreamWs.readyState === WS_OPEN) {
+                if (dispatchS2sUtterance?.(parsed.text)) {
+                  return;
+                }
                 upstreamWs.send(
                   JSON.stringify({
                     clientContent: {

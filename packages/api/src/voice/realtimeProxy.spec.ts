@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import {
   createRealtimeVoiceUpgradeHandler,
+  detectRealtimeSearchIntent,
   resolveSemanticMode,
   buildSatchidaAttributionHeaders,
   detectAccentSwitchCommand,
@@ -486,14 +487,16 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
 
     expect(initialUpstream.sent.length).toBe(1);
     const setupFrame = JSON.parse(initialUpstream.sent[0]);
-    expect(setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
-      'Fenrir',
-    );
+    expect(
+      setupFrame.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+    ).toBe('Fenrir');
     expect(setupFrame.setup.generationConfig.temperature).toBe(0.85);
     expect(setupFrame.setup.tools).toEqual([{ googleSearch: {} }]);
-    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Live Voice');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Anand');
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('Satchida Intelligence');
-    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('developed exclusively by Satchida AI');
+    expect(setupFrame.setup.systemInstruction.parts[0].text).toContain(
+      'developed exclusively by Satchida AI',
+    );
     expect(setupFrame.setup.systemInstruction.parts[0].text).toContain('REALTIME SEARCH');
 
     // Simulate setupComplete
@@ -514,8 +517,451 @@ describe('realtimeProxy security & seatToken/mode enforcement', () => {
     const secondUpstream = createdUpstreamSockets[1];
     secondUpstream.emit('open');
     const secondSetup = JSON.parse(secondUpstream.sent[0]);
-    expect(secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(
-      'Charon',
+    expect(
+      secondSetup.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+    ).toBe('Charon');
+  });
+
+  test('extracts morning brief and first spoken city into satchida_voice_profile without overwriting GPS location', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-pro-2' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-pro-2',
+        accountType: 'pro',
+        seatToken: 'tk_seat_2',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => JSON.stringify({}),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Simulate user speech enabling morning brief and mentioning city
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: {
+              text: 'Enable my daily morning brief on cricket and technology. What is the weather in Pune?',
+            },
+            turnComplete: true,
+          },
+        }),
+      ),
     );
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(
+      savedProfiles.some((p) => (p.morning_brief as { enabled?: boolean })?.enabled === true),
+    ).toBe(true);
+    const briefEntry = savedProfiles.find((p) => p.morning_brief);
+    expect((briefEntry?.morning_brief as { topics?: string[] })?.topics).toEqual([
+      'cricket',
+      'technology',
+    ]);
+    expect(savedProfiles.some((p) => p.location === 'Pune')).toBe(true);
+
+    // Ensure subsequent non-city or new city does not overwrite existing location
+    const countBefore = savedProfiles.filter((p) => p.location).length;
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: {
+              text: 'What is the weather in Mumbai?',
+            },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    const countAfter = savedProfiles.filter((p) => p.location).length;
+    expect(countAfter).toBe(countBefore);
+    expect(getLastClientWs()).toBeDefined();
+  });
+
+  test('never sends turnComplete: false to upstream Gemini Live S2S', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-pro-3' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-pro-3',
+        accountType: 'pro',
+        seatToken: 'tk_seat_3',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () =>
+        JSON.stringify({
+          primary_voiceprint: {
+            avg_pitch_hz: 120,
+            pitch_std_hz: 12,
+            gender_hint: 'male',
+            samples: 5,
+          },
+          known_speakers: [
+            { name: 'Priya', relation: 'wife', gender_hint: 'female', avg_pitch_hz: 215 },
+          ],
+        }),
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    const clientWs = getLastClientWs()!;
+    clientWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'voice.acoustic',
+          avgPitchHz: 212,
+          pitchStdHz: 14,
+          durationMs: 900,
+        }),
+      ),
+    );
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'Hello Satchida' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 360));
+
+    for (const frame of upstreamWs.sent) {
+      const parsed = JSON.parse(frame);
+      if (parsed.clientContent) {
+        expect(parsed.clientContent.turnComplete).toBe(true);
+      }
+    }
+  });
+
+  test('bridge mode supports profile extraction, hands-free UI actions, and tutor delegation', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const savedProfiles: Record<string, unknown>[] = [];
+    const prevFlag = process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED;
+    process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED = 'false';
+
+    try {
+      const handler = createRealtimeVoiceUpgradeHandler({
+        wss,
+        createUpstreamWebSocket: () => new FakeWebSocket(),
+        verifyJwt: () => ({ id: 'user-bridge-1' }),
+        getUserSeatCredential: async () => ({
+          id: 'user-bridge-1',
+          accountType: 'pro',
+          seatToken: 'tk_bridge_1',
+        }),
+        getVoiceProfileMemory: async () => null,
+        setVoiceProfileMemory: async (_userId, profile) => {
+          savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+        },
+      });
+
+      const req = {
+        url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+        headers: { host: 'localhost:3080' },
+      } as unknown as IncomingMessage;
+      const socket = createFakeSocket();
+
+      handler(req, socket, Buffer.alloc(0));
+      await new Promise((r) => setImmediate(r));
+
+      const clientWs = getLastClientWs()!;
+      const sessionEvent = JSON.parse(clientWs.sent[0]);
+      expect(sessionEvent.mode).toBe('bifrost_bridge');
+
+      // 1. Hands-free UI action + profile extraction in bridge mode
+      clientWs.emit(
+        'message',
+        Buffer.from(
+          JSON.stringify({
+            type: 'voice.turn',
+            text: 'My name is Aarav. Switch to Study mode',
+          }),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+
+      expect(savedProfiles.some((p) => p.name === 'Aarav')).toBe(true);
+      const sentMsgs1 = clientWs.sent.map((s) => JSON.parse(s));
+      expect(
+        sentMsgs1.some(
+          (m) => m.type === 'voice.ui_action' && m.action === 'set_mode' && m.value === 'Study',
+        ),
+      ).toBe(true);
+
+      // 2. DeepTutor / Study visual delegation in bridge mode
+      clientWs.emit(
+        'message',
+        Buffer.from(
+          JSON.stringify({
+            type: 'voice.turn',
+            text: 'Teach me photosynthesis with visuals',
+          }),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+
+      const sentMsgs2 = clientWs.sent.map((s) => JSON.parse(s));
+      expect(
+        sentMsgs2.some(
+          (m) =>
+            m.type === 'voice.delegate_tools' &&
+            m.mode === 'Study' &&
+            m.webSearch === true &&
+            m.newChat === true,
+        ),
+      ).toBe(true);
+    } finally {
+      if (prevFlag === undefined) {
+        delete process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED;
+      } else {
+        process.env.GOOGLE_EPHEMERAL_TOKEN_ENABLED = prevFlag;
+      }
+    }
+  });
+
+  test('does not hijack conversational meta-questions or capability checks as live web searches', () => {
+    expect(detectRealtimeSearchIntent('So why did you skip this news?').isSearch).toBe(false);
+    expect(
+      detectRealtimeSearchIntent(
+        'I asked you why did you skip the news about gas prices and fuel prices before?',
+      ).isSearch,
+    ).toBe(false);
+    expect(
+      detectRealtimeSearchIntent('Okay, do you have access to real current event information?')
+        .isSearch,
+    ).toBe(false);
+    expect(detectRealtimeSearchIntent('Okay, summarize the overall news to me.').isSearch).toBe(
+      false,
+    );
+    expect(
+      detectRealtimeSearchIntent('Why did you assume my current location is Mumbai?').isSearch,
+    ).toBe(false);
+    expect(detectRealtimeSearchIntent('Check again.').isSearch).toBe(false);
+
+    // Genuine live queries still trigger live lookup
+    expect(detectRealtimeSearchIntent("Hi, what's the AQI of Mumbai today?").isSearch).toBe(true);
+    expect(
+      detectRealtimeSearchIntent('Any news about changing prices of fuel in India?').isSearch,
+    ).toBe(true);
+    expect(detectRealtimeSearchIntent('How does that compare to my location?').isSearch).toBe(true);
+  });
+
+  test('preserves GPS location when asking about another city and persists lowercase name/language on onboarding', async () => {
+    const { wss, getLastClientWs } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-gps-1' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-gps-1',
+        accountType: 'pro_family',
+        seatToken: 'tk_seat_gps',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => JSON.stringify({}),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Opening greeting explicitly asks for language and name for first-time users
+    const openingFrames = upstreamWs.sent
+      .map((s) => JSON.parse(s))
+      .filter((m) => m.clientContent?.turns?.[0]?.parts?.[0]?.text);
+    expect(
+      openingFrames.some((m) =>
+        String(m.clientContent.turns[0].parts[0].text).includes('which language'),
+      ) ||
+        openingFrames.some((m) =>
+          String(m.clientContent.turns[0].parts[0].text).toLowerCase().includes('which language'),
+        ),
+    ).toBe(true);
+
+    // Client sends real GPS (Kolkata)
+    const clientWs = getLastClientWs()!;
+    clientWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'voice.location',
+          lat: 22.6293611,
+          lng: 88.416092,
+          city: 'Kolkata, West Bengal',
+          timeZone: 'Asia/Calcutta',
+        }),
+      ),
+    );
+
+    // User introduces themselves (lowercase) and picks English
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'English please, call me kushal.' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(savedProfiles.some((p) => p.preferred_language === 'English')).toBe(true);
+    expect(savedProfiles.some((p) => p.name === 'Kushal')).toBe(true);
+
+    // User asks about Mumbai AQI — must NOT overwrite Kolkata GPS or persist Mumbai as user location
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: "Hi, what's the AQI of Mumbai today?" },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(savedProfiles.some((p) => p.location === 'Mumbai')).toBe(false);
+  });
+
+  test('extracts Hindi name declarations, switches language on Hindi word order, and never saves stray noise or negations as name', async () => {
+    const { wss } = createFakeWss();
+    const upstreamWs = new FakeWebSocket();
+    const savedProfiles: Record<string, unknown>[] = [];
+
+    const handler = createRealtimeVoiceUpgradeHandler({
+      wss,
+      createUpstreamWebSocket: () => upstreamWs,
+      verifyJwt: () => ({ id: 'user-hindi-1' }),
+      getUserSeatCredential: async () => ({
+        id: 'user-hindi-1',
+        accountType: 'pro_family',
+        seatToken: 'tk_seat_hi',
+      }),
+      mintEphemeralToken: async () => 'mock_token',
+      getVoiceProfileMemory: async () => JSON.stringify({ preferred_language: 'Hindi' }),
+      setVoiceProfileMemory: async (_userId, profile) => {
+        savedProfiles.push(JSON.parse(profile) as Record<string, unknown>);
+      },
+    });
+
+    const req = {
+      url: '/api/voice/realtime?token=valid.jwt&mode=Chat',
+      headers: { host: 'localhost:3080' },
+    } as unknown as IncomingMessage;
+    const socket = createFakeSocket();
+
+    handler(req, socket, Buffer.alloc(0));
+    await new Promise((r) => setImmediate(r));
+    upstreamWs.emit('open');
+    upstreamWs.emit('message', Buffer.from(JSON.stringify({ setupComplete: {} })));
+
+    // Stray 2-letter noise must NEVER be saved as name
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: { inputTranscription: { text: 'tú' }, turnComplete: true },
+        }),
+      ),
+    );
+    // Negation must NEVER be saved as name
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'यह मेरा नाम नहीं था।' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    expect(savedProfiles.some((p) => p.name)).toBe(false);
+
+    // Hindi name declaration + Hinglish language switch
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'आप मुझे भारत के नाम से बुला सकते हैं।' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    upstreamWs.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          serverContent: {
+            inputTranscription: { text: 'Aap pehle to English mein switch kijiye.' },
+            turnComplete: true,
+          },
+        }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(savedProfiles.some((p) => p.name === 'भारत')).toBe(true);
+    expect(savedProfiles.some((p) => p.preferred_language === 'English')).toBe(true);
   });
 });

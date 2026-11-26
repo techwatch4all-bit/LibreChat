@@ -13,7 +13,7 @@ describe('voiceIntelligence', () => {
         avg_pitch_hz: 125,
         pitch_std_hz: 15,
         gender_hint: 'male' as const,
-        samples: 4,
+        samples: 5,
       },
       known_speakers: [
         { name: 'Priya', relation: 'wife', gender_hint: 'female' as const, avg_pitch_hz: 215 },
@@ -28,13 +28,20 @@ describe('voiceIntelligence', () => {
 
     const unknown = analyzeSpeakerTurn(270, 20, profile);
     expect(unknown.status).toBe('unknown_guest');
-    expect(unknown.genderHint).toBe('female');
+    expect(unknown.genderHint).toBe('child');
+  });
+
+  it('returns calibrating status when primary_voiceprint is not yet established', () => {
+    const res = analyzeSpeakerTurn(130, 15, {});
+    expect(res.status).toBe('calibrating');
+    expect(res.genderHint).toBe('male');
+    expect(res.matchedSpeaker).toBeUndefined();
   });
 
   it('detects another AI voice agent via explicit phrasing or reciprocal assistant loops', () => {
-    expect(detectAiVoiceAgent('Hello, as an AI language model, how can I assist you today?').isLikelyAi).toBe(
-      true,
-    );
+    expect(
+      detectAiVoiceAgent('Hello, as an AI language model, how can I assist you today?').isLikelyAi,
+    ).toBe(true);
     expect(
       detectAiVoiceAgent('How can I help you today?', [
         'I would be happy to assist you with anything you need.',

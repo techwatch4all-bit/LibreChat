@@ -1,15 +1,21 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { Volume2, VolumeX, Pause, Play, Sparkles } from 'lucide-react';
-import { TooltipAnchor, Spinner } from '@librechat/client';
-import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { QueryKeys } from 'librechat-data-provider';
+import { useQueryClient } from '@tanstack/react-query';
+import { TooltipAnchor, Spinner } from '@librechat/client';
+import { Pause, Play, Volume2 } from 'lucide-react';
 import type { TMessage } from 'librechat-data-provider';
 import { cleanSpeechText, extractMessageContent } from '~/utils/speechCleanup';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 
 const HEADER_VOICE_OPTIONS = [
-  { id: 'in_female', flag: '🇮🇳', code: 'F', gender: 'female' as const, label: 'Indian Female (Neerja)' },
+  {
+    id: 'in_female',
+    flag: '🇮🇳',
+    code: 'F',
+    gender: 'female' as const,
+    label: 'Indian Female (Neerja)',
+  },
   { id: 'in_male', flag: '🇮🇳', code: 'M', gender: 'male' as const, label: 'Indian Male (Prabhat)' },
   { id: 'us_female', flag: '🇺🇸', code: 'F', gender: 'female' as const, label: 'US Female (Jenny)' },
   { id: 'us_male', flag: '🇺🇸', code: 'M', gender: 'male' as const, label: 'US Male (Guy)' },
@@ -55,25 +61,75 @@ export default function HeaderAudioSpeaker() {
       setIsLoading(false);
     };
 
+    const buttonStateClass = (() => {
+      if (isPlaying) {
+        return 'border-primary bg-primary/20 text-primary ring-primary/40 animate-pulse ring-2';
+      }
+      if (isPaused) {
+        return 'border-yellow-500/50 bg-yellow-500/10 text-yellow-500';
+      }
+      return '';
+    })();
+
+    const speakerIcon = (() => {
+      if (isLoading) {
+        return <Spinner className="text-primary h-5 w-5" />;
+      }
+      if (isPlaying) {
+        return (
+          <Pause
+            style={{ width: '1.25rem', height: '1.25rem' }}
+            className="text-primary"
+            aria-hidden="true"
+            focusable="false"
+          />
+        );
+      }
+      if (isPaused) {
+        return (
+          <Play
+            style={{ width: '1.25rem', height: '1.25rem' }}
+            className="ml-0.5 text-yellow-500"
+            aria-hidden="true"
+            focusable="false"
+          />
+        );
+      }
+      return (
+        <Volume2
+          style={{ width: '1.25rem', height: '1.25rem' }}
+          className="text-text-primary"
+          aria-hidden="true"
+          focusable="false"
+        />
+      );
+    })();
+
     return () => {
       audio.pause();
       audio.src = '';
     };
   }, []);
 
-  const toggleGender = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = voiceGender === 'female' ? 'male' : 'female';
-    setVoiceGender(next);
-    localStorage.setItem('satchida_voice_gender', next);
-    // Invalidate cached audio so next play synthesizes with new voice
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setIsPlaying(false);
-    setIsPaused(false);
-    currentAudioUrlRef.current = null;
-  };
+  const cycleVoice = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const currentIdx = HEADER_VOICE_OPTIONS.findIndex((v) => v.id === voiceId);
+      const nextIdx = (currentIdx + 1) % HEADER_VOICE_OPTIONS.length;
+      const next = HEADER_VOICE_OPTIONS[nextIdx];
+      setVoiceId(next.id);
+      localStorage.setItem('satchida_voice_id', next.id);
+      localStorage.setItem('satchida_voice_gender', next.gender); // keep legacy key in sync
+      // Invalidate cached audio so next play synthesizes with new voice
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsPlaying(false);
+      setIsPaused(false);
+      currentAudioUrlRef.current = null;
+    },
+    [voiceId],
+  );
 
   const getRecentDialogue = useCallback((): { studentQuery: string; assistantResponse: string } => {
     let studentQuery = '';
@@ -97,7 +153,7 @@ export default function HeaderAudioSpeaker() {
       for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg && msg.isCreatedByUser) {
-          const txt = (typeof msg.content === 'string' ? msg.content : (msg.text || '')).trim();
+          const txt = (typeof msg.content === 'string' ? msg.content : msg.text || '').trim();
           if (txt) {
             // If the user's latest query is short like "generate a ppt...", also capture earlier topic prompt if available
             if (!studentQuery) {
@@ -124,7 +180,9 @@ export default function HeaderAudioSpeaker() {
         const lastNode = assistantNodes[assistantNodes.length - 1];
         if (lastNode) {
           const clone = lastNode.cloneNode(true) as HTMLElement;
-          clone.querySelectorAll('details, .thought-container, svg, button, form, table').forEach((el) => el.remove());
+          clone
+            .querySelectorAll('details, .thought-container, svg, button, form, table')
+            .forEach((el) => el.remove());
           assistantResponse = cleanSpeechText(clone.innerText || clone.textContent || '');
         }
       }
@@ -213,13 +271,61 @@ export default function HeaderAudioSpeaker() {
     }
   }, [getRecentDialogue, isPaused, isPlaying, voiceGender]);
 
-  const mainTooltip = isPlaying
-    ? 'Pause Teacher Explanation (Click to pause, click again to resume)'
-    : isPaused
-    ? 'Resume Teacher Explanation'
-    : isLoading
-    ? 'Master Teacher is preparing spoken lesson...'
-    : `Listen: Teacher explains lesson aloud (${voiceGender === 'female' ? 'Neerja (Female)' : 'Prabhat (Male)'})`;
+  const mainTooltip = (() => {
+    if (isPlaying) {
+      return 'Pause Teacher Explanation (Click to pause, click again to resume)';
+    }
+    if (isPaused) {
+      return 'Resume Teacher Explanation';
+    }
+    if (isLoading) {
+      return 'Master Teacher is preparing spoken lesson...';
+    }
+    return `Listen: Teacher explains lesson aloud (${voiceGender === 'female' ? 'Neerja (Female)' : 'Prabhat (Male)'})`;
+  })();
+  const buttonStateClass = (() => {
+    if (isPlaying) {
+      return 'border-primary bg-primary/20 text-primary ring-primary/40 animate-pulse ring-2';
+    }
+    if (isPaused) {
+      return 'border-yellow-500/50 bg-yellow-500/10 text-yellow-500';
+    }
+    return '';
+  })();
+
+  const speakerIcon = (() => {
+    if (isLoading) {
+      return <Spinner className="text-primary h-5 w-5" />;
+    }
+    if (isPlaying) {
+      return (
+        <Pause
+          style={{ width: '1.25rem', height: '1.25rem' }}
+          className="text-primary"
+          aria-hidden="true"
+          focusable="false"
+        />
+      );
+    }
+    if (isPaused) {
+      return (
+        <Play
+          style={{ width: '1.25rem', height: '1.25rem' }}
+          className="ml-0.5 text-yellow-500"
+          aria-hidden="true"
+          focusable="false"
+        />
+      );
+    }
+    return (
+      <Volume2
+        style={{ width: '1.25rem', height: '1.25rem' }}
+        className="text-text-primary"
+        aria-hidden="true"
+        focusable="false"
+      />
+    );
+  })();
 
   return (
     <div className="flex items-center gap-1">
@@ -233,46 +339,18 @@ export default function HeaderAudioSpeaker() {
               type="button"
               aria-label={mainTooltip}
               onClick={handleToggleSpeak}
-              className={`relative inline-flex size-9 flex-shrink-0 items-center justify-center rounded-xl border border-border-light bg-presentation text-text-primary transition-all ease-in-out hover:bg-surface-tertiary disabled:pointer-events-none disabled:opacity-50 ${
-                isPlaying
-                  ? 'border-primary bg-primary/20 text-primary animate-pulse ring-2 ring-primary/40'
-                  : isPaused
-                  ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-500'
-                  : ''
-              }`}
+              className={`relative inline-flex size-9 flex-shrink-0 items-center justify-center rounded-xl border border-border-light bg-presentation text-text-primary transition-all ease-in-out hover:bg-surface-tertiary disabled:pointer-events-none disabled:opacity-50 ${buttonStateClass}`}
             >
-              {isLoading ? (
-                <Spinner className="h-5 w-5 text-primary" />
-              ) : isPlaying ? (
-                <Pause
-                  style={{ width: '1.25rem', height: '1.25rem' }}
-                  className="text-primary"
-                  aria-hidden="true"
-                  focusable="false"
-                />
-              ) : isPaused ? (
-                <Play
-                  style={{ width: '1.25rem', height: '1.25rem' }}
-                  className="text-yellow-500 ml-0.5"
-                  aria-hidden="true"
-                  focusable="false"
-                />
-              ) : (
-                <Volume2
-                  style={{ width: '1.25rem', height: '1.25rem' }}
-                  className="text-text-primary"
-                  aria-hidden="true"
-                  focusable="false"
-                />
-              )}
+              {speakerIcon}
             </button>
           }
         />
         <span
-          className="pointer-events-none absolute -bottom-1 -right-1 select-none rounded bg-emerald-500/15 px-1 py-[0.5px] text-[7.5px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-xs"
+          className="shadow-xs pointer-events-none absolute -bottom-1 -right-1 select-none rounded border border-emerald-500/20 bg-emerald-500/15 px-1 py-[0.5px] text-[7.5px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400"
           title="On-device Local Speech"
         >
-          Local
+          {/* eslint-disable-next-line i18next/no-literal-string */}
+          {'Local'}
         </span>
       </div>
 
@@ -282,11 +360,11 @@ export default function HeaderAudioSpeaker() {
         render={
           <button
             type="button"
-            onClick={toggleGender}
+            onClick={cycleVoice}
             aria-label="Toggle Teacher Voice Accent / Gender"
-            className="hidden sm:inline-flex h-9 px-2 items-center justify-center rounded-xl border border-border-light bg-presentation text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-tertiary transition-all"
+            className="hidden h-9 items-center justify-center rounded-xl border border-border-light bg-presentation px-2 text-[11px] font-medium text-text-secondary transition-all hover:bg-surface-tertiary hover:text-text-primary sm:inline-flex"
           >
-            <span className="font-semibold text-primary mr-1">{activeVoice.flag}</span>
+            <span className="text-primary mr-1 font-semibold">{activeVoice.flag}</span>
             {activeVoice.code}
           </button>
         }

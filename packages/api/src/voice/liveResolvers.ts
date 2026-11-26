@@ -5,6 +5,9 @@ export interface WeatherActionCard {
   condition: string;
   highC?: number;
   lowC?: number;
+  aqi?: number;
+  aqiLabel?: string;
+  pm25?: number;
 }
 
 export interface NewsHeadlineItem {
@@ -39,6 +42,7 @@ export interface MediaActionCard {
   title: string;
   query: string;
   openUrl: string;
+  embedUrl?: string;
   installUrl?: string;
 }
 
@@ -107,10 +111,50 @@ const VOICE_STOPWORDS = new Set([
   'just',
   'actually',
   'brief',
-  'please',
+  'am',
+  'interested',
+  'items',
+  'looking',
+  'wondering',
+  'from',
+  'let',
+  'lets',
+  's',
+  'say',
+  'oh',
+  'no',
+  'enough',
 ]);
 
+const HINDI_SEARCH_TERM_MAP: Array<[RegExp, string]> = [
+  [/(?:गोल्ड|सोना|सोने)/gu, 'gold'],
+  [/(?:सिल्वर|चांदी|चाँदी)/gu, 'silver'],
+  [/(?:पेट्रोल)/gu, 'petrol'],
+  [/(?:डीजल|डीज़ल)/gu, 'diesel'],
+  [/(?:एलपीजी|गैस)/gu, 'LPG gas'],
+  [/(?:प्राइस|भाव|कीमत|कीमतें|रेट)/gu, 'price rate'],
+  [/(?:आज|ताजा|ताज़ा)/gu, 'today'],
+  [/(?:भारत|इंडिया)/gu, 'India'],
+  [/(?:न्यूज़|समाचार|खबर|खबरें)/gu, 'news'],
+  [/(?:मौसम|तापमान)/gu, 'weather'],
+];
+
 export function stripVoiceStopwords(rawQuery: string): string {
+  // If the utterance is in Devanagari with market/news/weather keywords, map to clean English search terms
+  if (/[\u0900-\u097F]/.test(rawQuery)) {
+    const mapped: string[] = [];
+    for (const [re, eng] of HINDI_SEARCH_TERM_MAP) {
+      if (re.test(rawQuery)) {
+        mapped.push(eng);
+      }
+    }
+    if (mapped.length >= 2) {
+      if (!mapped.includes('India')) {
+        mapped.push('India');
+      }
+      return mapped.join(' ');
+    }
+  }
   const tokens = rawQuery
     .replace(/[?!.,;:'"]+/g, ' ')
     .split(/\s+/)
@@ -118,28 +162,70 @@ export function stripVoiceStopwords(rawQuery: string): string {
   return tokens.join(' ').trim() || rawQuery.trim();
 }
 
-export function extractSpokenCity(text: string): string | null {
+const NON_CITY_LOCATION_PHRASES =
+  /^(?:my\s+location|current\s+location|my\s+city|my\s+area|my\s+place|this\s+area|this\s+place|here|nearby|home|the\s+area|the\s+city|location|place|city|india|world|global)$/i;
+
+function sanitizeCityCandidate(raw: string): string | null {
+  const candidate = raw
+    .replace(
+      /\b(today|now|right now|please|thanks|thank you|for today|currently|again|instead|too|also)\b.*$/i,
+      '',
+    )
+    .replace(/[.,?!]+$/g, '')
+    .trim();
+  if (
+    candidate.length >= 2 &&
+    candidate.length <= 36 &&
+    !NON_CITY_LOCATION_PHRASES.test(candidate)
+  ) {
+    return candidate;
+  }
+  return null;
+}
+
+/**
+ * Extracts a city ONLY when the user explicitly declares their OWN home/current location
+ * (e.g. "I am in Kolkata", "my location is Pune", "consider my location as Delhi").
+ * Never matches query-target cities like "AQI of Mumbai" or "weather in London".
+ */
+export function extractSelfLocationCity(text: string): string | null {
   const cleaned = text.trim();
+  // Never treat a question challenging an assumed location ("why did you assume my location is Mumbai?") as a declaration
+  if (/\b(why\s+did\s+you|did\s+you\s+assume|not\s+in|not\s+my\s+location)\b/i.test(cleaned)) {
+    return null;
+  }
   const patterns = [
     /\b(?:consider\s+)?(?:my\s+)?location\s+(?:as|is|to\s+be)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\bi(?:'m|\s+am|\s+live|\s+stay)\s+(?:in|at|from|near)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\b(?:city|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
-    /\b(?:weather|temperature|forecast|aqi|air\s+quality|panchang)\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\bi(?:'m|\s+am|\s+live|\s+stay|\s+reside)\s+(?:in|at|from|near)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\bmy\s+(?:city|hometown|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
   ];
   for (const re of patterns) {
     const m = cleaned.match(re);
     if (m?.[1]) {
-      const candidate = m[1]
-        .replace(/\b(today|now|right now|please|thanks|thank you|for today)\b.*$/i, '')
-        .replace(/[.,?!]+$/g, '')
-        .trim();
-      if (
-        candidate.length >= 2 &&
-        candidate.length <= 36 &&
-        !/^(?:my\s+location|current\s+location|my\s+city|my\s+area|my\s+place|this\s+area|this\s+place|here|nearby|home|the\s+area|the\s+city)$/i.test(
-          candidate,
-        )
-      ) {
+      const candidate = sanitizeCityCandidate(m[1]);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
+export function extractSpokenCity(text: string): string | null {
+  const cleaned = text.trim();
+  const selfCity = extractSelfLocationCity(cleaned);
+  if (selfCity) {
+    return selfCity;
+  }
+  const queryPatterns = [
+    /\b(?:city|place)\s+(?:is|as)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+    /\b(?:weather|temperature|forecast|aqi|air\s+quality|panchang)\s+(?:in|for|at|of)\s+([a-zA-Z][a-zA-Z\s-]{1,35})/i,
+  ];
+  for (const re of queryPatterns) {
+    const m = cleaned.match(re);
+    if (m?.[1]) {
+      const candidate = sanitizeCityCandidate(m[1]);
+      if (candidate) {
         return candidate;
       }
     }
@@ -149,10 +235,14 @@ export function extractSpokenCity(text: string): string | null {
 
 export function isPlaceOrDirectionsQuery(text: string): boolean {
   const lower = text.toLowerCase();
-  if (/\b(weather|temperature|forecast|news|headlines|stock|share price)\b/.test(lower)) {
+  if (
+    /\b(weather|temperature|forecast|news|headlines|stock|share price|price|prices|rate|rates|cost)\b/.test(
+      lower,
+    )
+  ) {
     return false;
   }
-  return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol|fuel|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
+  return /\b(nearest|near me|nearby|directions to|how to reach|closest|traffic|gas station|petrol pump|fuel station|ev charger|charging station|parking|doctor|hospital|clinic|pharmacy|chemist|restaurant|cafe|coffee|hotel|atm|bank|airport|station|metro|bus stop|grocery|supermarket|mall|temple|map)\b/.test(
     lower,
   );
 }
@@ -163,10 +253,12 @@ export function detectMediaIntent(text: string): MediaActionCard | null {
   const wantsSpotify = /\bspotify\b/i.test(lower);
   const wantsYoutube = /\b(youtube|you tube)\b/i.test(lower);
   const wantsPlayMusic =
-    /\b(play|listen to|put on|open)\b/i.test(lower) &&
+    /\b(play|listen to|put on|open|embed|attach|watch|stream|show)\b/i.test(lower) &&
     (wantsSpotify ||
       wantsYoutube ||
-      /\b(song|songs|music|track|playlist|album|video|bhajan|podcast)\b/i.test(lower));
+      /\b(song|songs|music|track|playlist|album|video|bhajan|podcast|channel|live news)\b/i.test(
+        lower,
+      ));
 
   if (!wantsPlayMusic) {
     return null;
@@ -174,10 +266,7 @@ export function detectMediaIntent(text: string): MediaActionCard | null {
 
   const query =
     trimmed
-      .replace(
-        /^(?:please\s+)?(?:can you\s+)?(?:play|listen to|put on|open)\s+/i,
-        '',
-      )
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:play|listen to|put on|open)\s+/i, '')
       .replace(/\b(?:on|in|using|via)\s+(?:spotify|youtube|you tube)\b/gi, '')
       .replace(/\b(?:spotify|youtube|you tube)\b/gi, '')
       .replace(/[?!.]+$/g, '')
@@ -212,6 +301,119 @@ export function isWeatherQuery(text: string): boolean {
 
 export function isNewsQuery(text: string): boolean {
   return /\b(news|headlines|breaking|top stories|current events)\b/i.test(text);
+}
+
+export async function resolveYouTubeEmbedUrl(query: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+      {
+        signal: AbortSignal.timeout(2500),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Satchida-LiveVoice/1.0)' },
+      },
+    );
+    if (!res.ok) {
+      return undefined;
+    }
+    const html = await res.text();
+    const ids = Array.from(
+      new Set([...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map((m) => m[1])),
+    ).slice(0, 5);
+    for (const videoId of ids) {
+      // Verify the video allows embedding via YouTube oEmbed before embedding
+      const oembed = await fetch(
+        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+        { signal: AbortSignal.timeout(1500) },
+      ).catch(() => null);
+      if (oembed && oembed.ok) {
+        return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1&rel=0`;
+      }
+    }
+  } catch {
+    // Non-blocking fallback to launcher link
+  }
+  return undefined;
+}
+
+function extractCleanPoiTerm(rawQuery: string): string {
+  const lower = rawQuery.toLowerCase();
+  if (/\b(petrol pump|petrol station|fuel station|gas station|petrol|fuel)\b/.test(lower)) {
+    return 'fuel';
+  }
+  if (/\b(hospital|clinic|doctor|emergency)\b/.test(lower)) {
+    return 'hospital';
+  }
+  if (/\b(pharmacy|chemist|medical store)\b/.test(lower)) {
+    return 'pharmacy';
+  }
+  if (/\b(atm|bank)\b/.test(lower)) {
+    return 'bank';
+  }
+  if (/\b(restaurant|cafe|coffee|food)\b/.test(lower)) {
+    return 'restaurant';
+  }
+  return rawQuery
+    .replace(
+      /\b(which|and|is|the|nearest|near|me|to|my|location|closest|find|show|in|south dumdum|west bengal)\b/gi,
+      ' ',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export async function fetchNearestPlaceWithEta(
+  query: string,
+  originLat: number,
+  originLng: number,
+): Promise<{ name: string; distanceKm: number; durationMin: number } | null> {
+  try {
+    const cleanPoi = extractCleanPoiTerm(query) || query;
+    const delta = 0.08;
+    const viewbox = `${originLng - delta},${originLat + delta},${originLng + delta},${originLat - delta}`;
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanPoi)}&viewbox=${viewbox}&bounded=1&limit=1`,
+      {
+        signal: AbortSignal.timeout(2200),
+        headers: { 'User-Agent': 'Satchida-LiveVoice/1.0' },
+      },
+    );
+    if (!nomRes.ok) {
+      return null;
+    }
+    const hits = (await nomRes.json()) as Array<{
+      lat?: string;
+      lon?: string;
+      display_name?: string;
+    }>;
+    const hit = hits?.[0];
+    if (!hit?.lat || !hit?.lon) {
+      return null;
+    }
+    const destLat = Number(hit.lat);
+    const destLng = Number(hit.lon);
+    const name = (hit.display_name || query).split(',').slice(0, 2).join(', ').trim();
+
+    const osrmRes = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`,
+      { signal: AbortSignal.timeout(2200) },
+    ).catch(() => null);
+    if (osrmRes && osrmRes.ok) {
+      const route = (await osrmRes.json()) as {
+        routes?: Array<{ distance?: number; duration?: number }>;
+      };
+      const first = route.routes?.[0];
+      if (typeof first?.distance === 'number' && typeof first?.duration === 'number') {
+        return {
+          name,
+          distanceKm: Math.round((first.distance / 1000) * 10) / 10,
+          durationMin: Math.max(1, Math.round(first.duration / 60)),
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function describeWmoCode(code: number): string {
@@ -300,18 +502,20 @@ export async function fetchStructuredWeather(
     const feelsLike = wx.current?.apparent_temperature;
     const usAqi = aqiData?.current?.us_aqi;
     const pm25 = aqiData?.current?.pm2_5;
-    const aqiLabel =
-      typeof usAqi === 'number'
-        ? usAqi <= 50
-          ? 'Good'
-          : usAqi <= 100
-            ? 'Moderate'
-            : usAqi <= 150
-              ? 'Unhealthy for sensitive groups'
-              : usAqi <= 200
-                ? 'Unhealthy'
-                : 'Very Unhealthy'
-        : '';
+    let aqiLabel = '';
+    if (typeof usAqi === 'number') {
+      if (usAqi <= 50) {
+        aqiLabel = 'Good';
+      } else if (usAqi <= 100) {
+        aqiLabel = 'Moderate';
+      } else if (usAqi <= 150) {
+        aqiLabel = 'Unhealthy for sensitive groups';
+      } else if (usAqi <= 200) {
+        aqiLabel = 'Unhealthy';
+      } else {
+        aqiLabel = 'Very Unhealthy';
+      }
+    }
     const displayCity = resolvedCity || 'your location';
 
     const summaryText =
@@ -335,6 +539,9 @@ export async function fetchStructuredWeather(
         condition,
         highC: typeof highC === 'number' ? Math.round(highC) : undefined,
         lowC: typeof lowC === 'number' ? Math.round(lowC) : undefined,
+        aqi: typeof usAqi === 'number' ? Math.round(usAqi) : undefined,
+        aqiLabel: aqiLabel || undefined,
+        pm25: typeof pm25 === 'number' ? Math.round(pm25) : undefined,
       },
     };
   } catch {
@@ -347,18 +554,26 @@ const JUNK_NEWS_PATTERNS =
 
 export async function fetchStructuredNews(
   rawQuery: string,
-  _opts?: { mode?: string },
+  opts?: { mode?: string; locationCity?: string; timeZone?: string },
 ): Promise<{ summaryText: string; card: NewsActionCard } | null> {
   try {
-    const cleanQuery = stripVoiceStopwords(rawQuery);
-    const allowsOldNews = /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(
-      rawQuery,
-    );
-    const wantsIndiaTop = /\b(india|indian|national|bharat)\b/i.test(rawQuery);
-    const localSearchUrl = (process.env.SEARXNG_INSTANCE_URL || 'http://127.0.0.1:8880').replace(
-      /\/+$/,
-      '',
-    );
+    const isIndiaTz = Boolean(opts?.timeZone && /calcutta|kolkata|india/i.test(opts.timeZone));
+    const wantsRegional = /\b(my region|local news|my area|my state|around here)\b/i.test(rawQuery);
+    const cleanQuery =
+      wantsRegional && opts?.locationCity
+        ? `${opts.locationCity} latest news`
+        : stripVoiceStopwords(rawQuery);
+    const allowsOldNews =
+      /\b(202[0-5]|19\d\d|old|archive|history|historical|last year|last month)\b/i.test(rawQuery);
+    const hasSpecificTopic =
+      /\b(fuel|gas|petrol|diesel|lpg|gold|silver|stock|nifty|sensex|cricket|ipl|football|tech|ai|election|tariff|economy|budget|weather|cyclone|rbi|rupee|bitcoin|crypto)\b/i.test(
+        rawQuery,
+      );
+    const wantsIndiaTop =
+      !hasSpecificTopic &&
+      !wantsRegional &&
+      (/\b(india|indian|national|bharat)\b/i.test(rawQuery) ||
+        (isIndiaTz && /\b(top|latest|key|headline|headlines|today)\b/i.test(rawQuery)));
     const nowMs = Date.now();
     const maxAgeMs = 72 * 60 * 60 * 1000;
     const freshItems: NewsHeadlineItem[] = [];
@@ -395,17 +610,12 @@ export async function fetchStructuredNews(
       );
     };
 
-    // Fetch Google News Top Stories RSS (always fresh today's front-page headlines) + local satchida-search in parallel
+    // Fetch Google News RSS directly (no slow SearXNG in live voice path)
     const rssUrl = wantsIndiaTop
       ? 'https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en'
       : `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
 
-    const [rssRes, searchRes] = await Promise.all([
-      fetch(rssUrl, { signal: AbortSignal.timeout(2500) }).catch(() => null),
-      fetch(`${localSearchUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`, {
-        signal: AbortSignal.timeout(2500),
-      }).catch(() => null),
-    ]);
+    const rssRes = await fetch(rssUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
 
     if (rssRes && rssRes.ok) {
       const xml = await rssRes.text();
@@ -416,29 +626,6 @@ export async function fetchStructuredNews(
       ].slice(0, 10);
       for (const m of rssMatches) {
         addHeadline(m[1] || '', (m[2] || '').trim(), (m[3] || '').trim());
-      }
-    }
-
-    if (freshItems.length < 5 && searchRes && searchRes.ok) {
-      const data = (await searchRes.json().catch(() => ({}))) as {
-        results?: Array<{
-          title?: string;
-          content?: string;
-          publishedDate?: string;
-          url?: string;
-          engine?: string;
-        }>;
-      };
-      for (const r of Array.isArray(data.results) ? data.results : []) {
-        if (r.engine === 'wikipedia') {
-          continue;
-        }
-        const snippet = (r.content || '')
-          .replace(/&lt;[^&]*&gt;/g, ' ')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        addHeadline(r.title || '', (r.url || '').trim(), r.publishedDate, snippet);
       }
     }
 

@@ -3588,5 +3588,19 @@
   "com_ui_smart_agent_templates": "1-Click Smart Agent Templates",
   "com_ui_smart_memory_starters": "1-Click Smart Memory Starters",
   "com_ui_smart_memory_desc": "Auto-memory is active for your chats. Click any starter below to seed your personal memory profile immediately:",
-  "com_ui_artifact_format_film": "Film / Animation"
+  "com_ui_artifact_format_film": "Film / Animation",
+  "com_ui_live_voice": "Live Voice",
+  "com_ui_live_voice_translator_exit": "Translator ×",
+  "com_ui_live_voice_transcript": "Voice Transcript",
+  "com_ui_live_voice_save_to_chat": "Save to Chat",
+  "com_ui_live_voice_navigate": "Navigate",
+  "com_ui_live_voice_install": "Install",
+  "com_ui_live_voice_view_chat": "View Chat",
+  "com_ui_live_voice_headlines": "Live Headlines",
+  "com_ui_live_voice_send_to_chat": "Send to Chat",
+  "com_ui_live_voice_mic_live": "Mic live",
+  "com_ui_live_voice_speak_naturally": "Speak naturally — live cloud voice active.",
+  "com_ui_live_voice_retry": "Retry",
+  "com_ui_live_voice_interrupt": "Interrupt",
+  "com_ui_live_voice_end": "End"
 }

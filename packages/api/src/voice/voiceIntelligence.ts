@@ -17,6 +17,9 @@ export function inferGenderHint(pitchHz: number): GenderHint {
   if (!Number.isFinite(pitchHz) || pitchHz < 70 || pitchHz > 360) {
     return 'unknown';
   }
+  if (pitchHz >= 255) {
+    return 'child';
+  }
   return pitchHz >= 165 ? 'female' : 'male';
 }
 
@@ -29,7 +32,7 @@ export function analyzeSpeakerTurn(
   const roundedPitch = Math.round(avgPitchHz);
 
   const primary = profile.primary_voiceprint;
-  if (!primary || primary.samples < 2) {
+  if (!primary || primary.samples < 5) {
     return {
       status: 'calibrating',
       genderHint,

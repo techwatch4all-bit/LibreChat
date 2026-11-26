@@ -215,7 +215,7 @@ export function detectRealtimeSearchIntent(text: string): {
   const isSearch =
     isDeepResearch ||
     hasUrl ||
-    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest)\b/i.test(
+    /\b(weather|temperature|forecast|news|headlines|live score|score|who won|stock price|share price|bitcoin|crypto|exchange rate|price of|rate of|gold|silver|nifty|sensex|search the web|search for|look up|google|find out|what happened|breaking|nearest|near me|nearby|directions to|how to reach|closest|my location|where am i|current location)\b/i.test(
       lower,
     ) ||
     /(?:न्यूज़|समाचार|खबर|खबरें|मौसम|तापमान|भाव|कीमत|सोना|चांदी|शेयर|ताजा|आज\s+का)/u.test(text) ||
@@ -2395,6 +2395,15 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                       }
 
                       let resultPayload = parts.join('\n\n').trim();
+                      if (
+                        !resultPayload &&
+                        /\b(my location|where am i|current location)\b/i.test(effectiveUtterance) &&
+                        (userLocation?.city || typeof userLocation?.lat === 'number')
+                      ) {
+                        resultPayload = userLocation.city
+                          ? `The user's current device location is ${userLocation.city}.`
+                          : `The user's current device coordinates are ${userLocation.lat?.toFixed(4)}, ${userLocation.lng?.toFixed(4)}.`;
+                      }
                       if (!resultPayload) {
                         resultPayload = await executeVoiceWebSearch(effectiveSearchQuery, {
                           deep: searchIntent.isDeepResearch,
@@ -2704,6 +2713,9 @@ export function createRealtimeVoiceUpgradeHandler(deps: RealtimeProxyDeps) {
                 city: typeof parsed.city === 'string' ? parsed.city.trim() : undefined,
                 timeZone: typeof parsed.timeZone === 'string' ? parsed.timeZone.trim() : undefined,
               };
+              logger.info(
+                `[RealtimeVoice] Device location received lat=${userLocation.lat ?? 'n/a'} lng=${userLocation.lng ?? 'n/a'} tz=${userLocation.timeZone ?? 'n/a'}`,
+              );
               if (
                 !userLocation.city &&
                 typeof userLocation.lat === 'number' &&

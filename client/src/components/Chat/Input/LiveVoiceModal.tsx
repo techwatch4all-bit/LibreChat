@@ -1238,7 +1238,7 @@ export default function LiveVoiceModal({
                     ws.send(JSON.stringify({ type: 'voice.location', timeZone }));
                   }
                 },
-                { timeout: 5000, maximumAge: 300000 },
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
               );
             } else if (timeZone) {
               ws.send(JSON.stringify({ type: 'voice.location', timeZone }));

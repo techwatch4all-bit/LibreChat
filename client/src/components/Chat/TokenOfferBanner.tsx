@@ -210,7 +210,7 @@ const TokenOfferBanner: React.FC = () => {
           setOpen(true);
         }}
         aria-label={`Claim ${totalMtok} Mtok bonus offer`}
-        className="fixed bottom-20 right-4 z-40 flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg ring-2 ring-white/30 transition-transform duration-200 hover:scale-105 focus:outline-none motion-safe:animate-bounce"
+        className="fixed bottom-40 right-4 z-40 flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg ring-2 ring-white/30 transition-transform duration-200 hover:scale-105 focus:outline-none motion-safe:animate-bounce sm:bottom-20"
       >
         <img
           src="/assets/satchida/satchida-splash-mandala.png?v=clean4"

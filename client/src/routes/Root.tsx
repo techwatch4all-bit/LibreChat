@@ -264,18 +264,16 @@ export default function Root() {
                       /** Focus target of last resort when the drawer closes on a
                        *  route that renders no opener. Not in the tab order. */
                       tabIndex={-1}
-                      className="relative flex h-full max-w-full flex-1 flex-col overflow-hidden focus:outline-none"
+                      className={`relative flex h-full max-w-full flex-1 flex-col overflow-hidden focus:outline-none${isSmallScreen ? ' !transform-none' : ''}`}
                       style={{
-                        /** A percentage of the pane's own width, so it tracks the
-                         *  drawer without a literal and survives rotation. */
-                        transform: isSmallScreen && sidebarExpanded ? MOBILE_PANE_SHIFT : 'none',
-                        transition: prefersReducedMotion ? undefined : SIDEBAR_TRANSITION,
+                        paddingLeft: isSmallScreen && sidebarExpanded ? '56px' : undefined,
+                        transition: prefersReducedMotion ? undefined : 'padding-left 200ms ease',
                       }}
                       /** Recoil's flip is deferred past the opening frames and
                        *  the closing transition outlives it at the other end, so
                        *  `isSliding` covers the travel `sidebarExpanded` brackets
                        *  too late and drops too early. */
-                      inert={isSmallScreen && (sidebarExpanded || isSliding) ? '' : undefined}
+                      inert={undefined}
                     >
                       {pullDistance > 14 && (
                         <div
@@ -293,7 +291,7 @@ export default function Root() {
                       the deferred flip has not committed yet. Once expanded
                       lands, a full-width drawer covers it, so keeping it
                       mounted would only expose a duplicate dismiss control. */}
-                    {isSmallScreen && (drawerStrip || (isSliding && !sidebarExpanded)) && (
+                    {false && isSmallScreen && (drawerStrip || (isSliding && !sidebarExpanded)) && (
                       <MobileDrawerScrim
                         expanded={sidebarExpanded}
                         isSliding={isSliding}

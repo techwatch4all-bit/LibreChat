@@ -21,7 +21,7 @@ import {
   parseStarterMeta,
 } from './useConversationStartersData';
 
-const PHONE_MAX_PILLS = 6;
+const PHONE_MAX_PILLS = 4;
 
 export default function ConversationStartersMobile() {
   const { isPhone, isLandscape } = useAtomValue(deviceLayoutAtom);
@@ -168,7 +168,7 @@ export default function ConversationStartersMobile() {
           className={cn(
             'no-scrollbar flex w-full items-center gap-1.5 pb-0.5',
             isPhone
-              ? 'flex-nowrap justify-start overflow-x-auto'
+              ? 'flex-nowrap justify-start overflow-x-auto pr-4 [mask-image:linear-gradient(to_right,black_88%,transparent)]'
               : 'flex-wrap justify-center',
           )}
         >
@@ -208,15 +208,8 @@ export default function ConversationStartersMobile() {
           {localize('com_ui_motion_no_matches')}
         </div>
       ) : isPhone ? (
-        <div className="flex w-full flex-col items-center gap-1">
-          <div
-            className={cn(
-              'no-scrollbar flex w-full items-center gap-1.5',
-              showAllPhone
-                ? 'flex-wrap justify-center'
-                : 'flex-nowrap justify-start overflow-x-auto pb-0.5',
-            )}
-          >
+        <div className="flex w-full flex-col items-center gap-2 px-1">
+          <div className="grid w-full grid-cols-2 gap-2">
             {visibleStarters.map((item: StarterItem, index: number) => {
               const { cleanTitle, description } = parseStarterMeta(item);
               const visual = resolvePersonaVisual(cleanTitle, item.badge);
@@ -228,19 +221,28 @@ export default function ConversationStartersMobile() {
                   type="button"
                   aria-label={cleanTitle && description ? `${cleanTitle}. ${description}` : item.prompt}
                   onClick={() => handleStarterClick(item, isAgentEndpoint)}
-                  className="group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-border-light/70 bg-surface-secondary/70 px-2.5 py-1.5 text-left transition-all duration-150 hover:border-border-medium hover:bg-surface-tertiary/90"
+                  className="group flex min-w-0 cursor-pointer flex-col items-start justify-between rounded-xl border border-border-light/60 bg-white/[0.04] p-2.5 text-left transition-all duration-150 hover:border-border-medium hover:bg-white/[0.08]"
                 >
-                  <span
-                    className={cn(
-                      'flex size-5 shrink-0 items-center justify-center rounded-full border',
-                      visual.bg,
-                      visual.color,
-                    )}
-                    aria-hidden="true"
-                  >
-                    <PersonaIcon className="size-3" />
-                  </span>
-                  <span className="text-xs font-semibold text-text-primary">{cleanTitle}</span>
+                  <div className="flex w-full items-center gap-2 overflow-hidden">
+                    <span
+                      className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-lg border',
+                        visual.bg,
+                        visual.color,
+                      )}
+                      aria-hidden="true"
+                    >
+                      <PersonaIcon className="size-3.5" />
+                    </span>
+                    <span className="truncate text-xs font-semibold text-text-primary">
+                      {cleanTitle}
+                    </span>
+                  </div>
+                  {description && (
+                    <p className="mt-1.5 line-clamp-1 w-full text-[11px] leading-snug text-text-tertiary">
+                      {description}
+                    </p>
+                  )}
                 </button>
               );
             })}
@@ -249,7 +251,7 @@ export default function ConversationStartersMobile() {
             <button
               type="button"
               onClick={() => setShowAllPhone((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+              className="inline-flex items-center gap-1 rounded-full border border-border-light/50 bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
             >
               {showAllPhone ? (
                 <>

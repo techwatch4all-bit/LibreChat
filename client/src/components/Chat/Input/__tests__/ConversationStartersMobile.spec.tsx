@@ -94,14 +94,14 @@ function renderStarters(deviceClass: 'phone' | 'tablet', isLandscape = false) {
 }
 
 describe('ConversationStartersMobile', () => {
-  it('caps phone starters to 6 initially and expands via Show more toggle', () => {
+  it('caps phone starters to 4 initially and expands via Show more toggle', () => {
     renderStarters('phone', false);
     expect(screen.getByText('Starter 1')).toBeInTheDocument();
-    expect(screen.getByText('Starter 6')).toBeInTheDocument();
-    expect(screen.queryByText('Starter 7')).not.toBeInTheDocument();
+    expect(screen.getByText('Starter 4')).toBeInTheDocument();
+    expect(screen.queryByText('Starter 5')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Show more/i }));
-    expect(screen.getByText('Starter 7')).toBeInTheDocument();
+    expect(screen.getByText('Starter 5')).toBeInTheDocument();
     expect(screen.getByText('Starter 8')).toBeInTheDocument();
   });
 

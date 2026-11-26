@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import * as Ariakit from '@ariakit/react';
+import { useAtomValue } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { QueryKeys, request } from 'librechat-data-provider';
@@ -21,6 +22,7 @@ import { useGetUserUsageStats, useGetStartupConfig, useGetUserBalance } from '~/
 import { formatTokens, cn } from '~/utils';
 import { useAuthContext } from '~/hooks';
 import Settings from '~/components/Nav/Settings';
+import { deviceLayoutAtom } from '~/store/layout';
 import store from '~/store';
 
 const SHOW_DELAY_MS = 100;
@@ -131,6 +133,7 @@ export default function HeaderBillingGauge() {
 
   useEffect(() => cancelTimers, [cancelTimers]);
 
+  const { isPhone } = useAtomValue(deviceLayoutAtom);
   // Date boundaries for tracking:
   // 1. Today (since local midnight)
   // 2. Last 7 days
@@ -324,7 +327,7 @@ export default function HeaderBillingGauge() {
           popover.show();
         }}
         className={cn(
-          'group flex h-9 items-center gap-1.5 rounded-full border border-border-light bg-surface-primary px-3 py-1 text-xs font-medium text-text-primary transition-all duration-200',
+          'group flex h-9 items-center gap-1 rounded-full border border-border-light bg-surface-primary px-2 py-1 text-xs font-medium text-text-primary transition-all duration-200 sm:gap-1.5 sm:px-3',
           'hover:border-border-medium hover:bg-surface-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
           'shadow-sm',
         )}
@@ -335,7 +338,7 @@ export default function HeaderBillingGauge() {
         <span className="font-semibold text-text-primary">
           {pillValue}
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-text-tertiary sm:inline">
           {pillLabel}
         </span>
         <ChevronDown className="size-3 text-text-tertiary transition-transform duration-200 group-data-[open]:rotate-180" />
@@ -360,6 +363,53 @@ export default function HeaderBillingGauge() {
           'data-[leave]:translate-y-1 data-[leave]:scale-95 data-[leave]:opacity-0',
         )}
       >
+        {isPhone ? (
+          <div className="w-[248px] space-y-2 text-text-primary">
+            <div className="flex items-center justify-between border-b border-border-light pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Coins className="size-3.5 text-amber-500" />
+                <span className="text-xs font-semibold">Balance</span>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-500">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Live
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-lg font-bold text-emerald-500">{pillValue}</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                {pillLabel}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-surface-secondary/50 p-2 text-[11px]">
+              <div>
+                <div className="text-[10px] text-text-tertiary">Month used</div>
+                <div className="font-semibold text-text-primary">
+                  {loadingMonth ? '...' : formatMillions(monthStats?.totalTokens ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-text-tertiary">Requests</div>
+                <div className="font-semibold text-text-primary">
+                  {loadingMonth ? '...' : (monthStats?.requestCount ?? 0)}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end border-t border-border-light pt-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  popover.hide();
+                  setShowSettings(true);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                <SettingsIcon className="size-3" />
+                Settings
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="w-[330px] space-y-2.5 text-text-primary">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border-light pb-2">
@@ -774,6 +824,7 @@ export default function HeaderBillingGauge() {
             </button>
           </div>
         </div>
+        )}
       </Ariakit.Popover>
 
       {showSettings && <Settings open={showSettings} onOpenChange={setShowSettings} />}

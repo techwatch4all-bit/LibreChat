@@ -28,6 +28,7 @@ import Footer, { useConfiguredFooter } from './Footer';
 import { AskAnswerHostProvider } from './ask/state';
 import DeviceLayoutSync from './DeviceLayoutSync';
 import MessagesView from './Messages/MessagesView';
+import MobileFooter from './MobileFooter';
 import MobileLanding from './MobileLanding';
 import TabletLanding from './TabletLanding';
 import Presentation from './Presentation';
@@ -41,6 +42,13 @@ import { cn } from '~/utils';
 import store from '~/store';
 
 function LoadingSpinner() {
+  let landingContainerClass = 'h-full overflow-y-auto';
+  if (isLandingPage) {
+    landingContainerClass = isPhone
+      ? 'min-h-full flex-1 flex-col items-center justify-between overflow-y-auto bg-black px-2 pb-2 pt-14'
+      : 'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 pb-3 pt-12 sm:py-4';
+  }
+
   return (
     <div className="relative flex-1 overflow-hidden overflow-y-auto">
       <div className="relative flex h-full items-center justify-center">
@@ -167,6 +175,13 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
    * in-place mutation of this canonical child transcript. */
   const isSubagentThreadReadOnly = activeSubagentThread != null;
 
+  let landingContainerClass = 'h-full overflow-y-auto';
+  if (isLandingPage) {
+    landingContainerClass = isPhone
+      ? 'min-h-full flex-1 flex-col items-center justify-between overflow-y-auto bg-black px-2 pb-2 pt-14'
+      : 'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 pb-3 pt-12 sm:py-4';
+  }
+
   return (
     <AskAnswerHostProvider saveDrafts={saveDrafts}>
       <ChatFormProvider {...methods}>
@@ -184,22 +199,17 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                     />
                     <>
                       <div
-                        className={cn(
-                          'flex flex-col',
-                          isLandingPage
-                            ? /* The gutter is reserved once per state, wherever the
-                               centring happens. A conversation centres the composer
-                               inside the band below, against a message column that
-                               holds the scrollbar band back; the landing page centres
-                               this whole column instead, greeting and composer
-                               together, so it holds the same band back here. Without
-                               it the composer lands 4px right of where a conversation
-                               puts it and slides sideways on the way in. */
-                              'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 pb-3 pt-12 sm:py-4'
-                            : 'h-full overflow-y-auto',
-                        )}
+                        data-mobile-landing={isLandingPage && isPhone ? 'true' : undefined}
+                        className={cn('flex flex-col', landingContainerClass)}
                       >
-                        {content}
+                        {isLandingPage && isPhone ? (
+                          <div className="flex w-full flex-1 flex-col items-center justify-start gap-4 pt-6">
+                            {content}
+                            <ConversationStartersMobile />
+                          </div>
+                        ) : (
+                          content
+                        )}
                         {/* Named + opaque so a view transition (the ask_user_question
                         popover ⇄ chat-card morph) paints the whole composer band
                         over the travelling card instead of letting it show
@@ -215,8 +225,8 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                               'mx-auto w-full max-w-3xl transition-all duration-200 sm:max-w-4xl lg:max-w-5xl',
                           )}
                         >
-                          {isLandingPage &&
-                          (isPhone || isTablet ? (
+                          {isLandingPage && !isPhone &&
+                          (isTablet ? (
                             <ConversationStartersMobile />
                           ) : (
                             <ConversationStarters />
@@ -243,7 +253,8 @@ function ChatView({ index = 0, project }: { index?: number; project?: TChatProje
                             stay with the conversation that always showed them. */}
                           {!isLandingPage && configuredFooter && <Footer configuredOnly />}
                         </div>
-                        {isLandingPage && !(isPhone && isLandscape) && <Footer />}
+                        {isLandingPage &&
+                          (isPhone ? !isLandscape && <MobileFooter /> : <Footer />)}
                         <TokenOfferBanner />
                       </div>
                     </>

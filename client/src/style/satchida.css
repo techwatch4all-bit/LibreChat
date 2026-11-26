@@ -826,6 +826,24 @@ body,
   height: 100dvh;
 }
 
+/* Hide native scrollbars on horizontal mobile strips */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile phone landing page: enforce pure Dark Black theme */
+@media (max-width: 639px) {
+  [data-mobile-landing='true'],
+  [data-mobile-landing='true'] .bg-presentation {
+    background-color: #000000 !important;
+    background-image: none !important;
+  }
+}
+
 /* Global mobile & tablet safe-area and dialog clamping across all pages */
 @media (max-width: 768px) {
   [role='dialog'] {

@@ -42,13 +42,6 @@ import { cn } from '~/utils';
 import store from '~/store';
 
 function LoadingSpinner() {
-  let landingContainerClass = 'h-full overflow-y-auto';
-  if (isLandingPage) {
-    landingContainerClass = isPhone
-      ? 'min-h-full flex-1 flex-col items-center justify-between overflow-y-auto bg-black px-2 pb-2 pt-14'
-      : 'scrollbar-gutter-spacer min-h-full flex-1 flex-col items-center justify-center overflow-y-auto px-2 pb-3 pt-12 sm:py-4';
-  }
-
   return (
     <div className="relative flex-1 overflow-hidden overflow-y-auto">
       <div className="relative flex h-full items-center justify-center">
